@@ -23,6 +23,7 @@ public abstract class ChunkRendererDefMixin implements IChunkRenderer {
 
 	private final IChunkRenderer[] adjacentSections = new IChunkRenderer[6];
 	private int frame = -1;
+	private int adjacentMask = 0;
 
 	private static long asLong(int x, int y, int z) {
 		long l = 0L;
@@ -64,15 +65,27 @@ public abstract class ChunkRendererDefMixin implements IChunkRenderer {
 			IChunkRenderer renderer = getSection(dir);
 
 			if (renderer != null) {
-				this.setAdjacentNeighbor(renderer, dir);
 				renderer.setAdjacentNeighbor(this, Direction.opposite(dir));
 			}
+
+			this.setAdjacentNeighbor(renderer, dir);
 		}
 	}
 
 	@Override
 	public void setAdjacentNeighbor(IChunkRenderer render, int direction) {
+		if (render == null) {
+			this.adjacentMask &= ~direction;
+		} else {
+			this.adjacentMask |= direction;
+		}
+
 		this.adjacentSections[direction] = render;
+	}
+
+	@Override
+	public int getAdjacentMask() {
+		return this.adjacentMask;
 	}
 
 	private IChunkRenderer getSection(int direction) {
@@ -98,9 +111,10 @@ public abstract class ChunkRendererDefMixin implements IChunkRenderer {
 			IChunkRenderer renderer = getSection(dir);
 
 			if (renderer != null) {
-				this.setAdjacentNeighbor(null, dir);
 				renderer.setAdjacentNeighbor(null, Direction.opposite(dir));
 			}
+
+			this.setAdjacentNeighbor(null, dir);
 		}
 	}
 

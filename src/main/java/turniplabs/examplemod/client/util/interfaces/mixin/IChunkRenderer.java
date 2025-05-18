@@ -16,12 +16,17 @@ public interface IChunkRenderer {
 
 	ChunkRenderer getRender();
 
-	int getFrame();
 	void setFrame(int frame);
+	int getFrame();
 	int getSolidFaces();
+
+	int getAdjacentMask();
 
 	boolean solidSection();
 	boolean emptySection();
+	boolean isDirty();
+	void setDirty(boolean dirty);
+	void queueRebuild();
 
 	Long2ReferenceMap<ChunkRenderer> chunkMap();
 }

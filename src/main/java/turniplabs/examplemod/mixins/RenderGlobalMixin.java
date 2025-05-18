@@ -34,6 +34,8 @@ public abstract class RenderGlobalMixin {
 	private WorldClient worldObj;
 	@Shadow
 	private int dummyInt0;
+	@Shadow
+	private ChunkRenderer[] chunkRenderers;
 	private boolean shaderCreated = false;
 
 	/**
@@ -56,7 +58,29 @@ public abstract class RenderGlobalMixin {
 
 	private int activeFrame = 0;
 
-	private void searchGraph() {
+	private static int getOutwardDirections(int playerChunkX, int playerChunkY, int playerChunkZ, ChunkRenderer render) {
+		int planes = 0;
+
+		planes |= (render.posX >> 4) <= playerChunkX ? 1 << Direction.WEST  : 0;
+		planes |= (render.posX >> 4) >= playerChunkX ? 1 << Direction.EAST  : 0;
+
+		planes |= (render.posY >> 4) <= playerChunkY ? 1 << Direction.DOWN  : 0;
+		planes |= (render.posY >> 4) >= playerChunkY ? 1 << Direction.UP    : 0;
+
+		planes |= (render.posZ >> 4) <= playerChunkZ ? 1 << Direction.NORTH : 0;
+		planes |= (render.posZ >> 4) >= playerChunkZ ? 1 << Direction.SOUTH : 0;
+
+		return planes;
+	}
+
+
+
+	/**
+	 * @author Safixo
+	 * @reason Avoid no sense and cull all together to avoid looping through the renderer too often.
+	 */
+	@Overwrite
+	public boolean updateRenderers(ICamera camera) {
 		this.activeFrame++;
 		this.renderList.clear();
 
@@ -78,102 +102,59 @@ public abstract class RenderGlobalMixin {
 		}
 
 		final ObjectArrayList<IChunkRenderer> queue = new ObjectArrayList<>();
-		queue.add(node);
+		int chunkUpdated = 0;
+
+		if (node != null) {
+			queue.add(node);
+			chunkUpdated = exploreNeighbors(queue, node, (1 << 7) - 1, this.activeFrame, chunkUpdated);
+		}
 
 		int sectionIndex = 0;
-		boolean chunksUpdated = false;
 
 		while (queue.size() > sectionIndex) {
 			node = queue.get(sectionIndex++);
 
-			if (node == null || !isSectionVisible(node.getRender(), playerX, playerY, playerZ, renderDistance) && sectionIndex < 9) {
+			if (!isSectionVisible(node.getRender(), playerX, playerY, playerZ, renderDistance)) {
 				continue;
 			}
 
 			this.renderList.add(node.getRender());
+
 			int outwardDirections = getOutwardDirections(playerChunkX, playerChunkY, playerChunkZ, node.getRender());
+			chunkUpdated = exploreNeighbors(queue, node, outwardDirections, this.activeFrame, chunkUpdated);
+		}
 
-			for (int dir = 0; dir < Direction.COUNT; dir++) {
-				if ((outwardDirections & (1 << dir)) == 0) {
-					continue;
+		return true;
+	}
+
+	private static int exploreNeighbors(ObjectArrayList<IChunkRenderer> queue, IChunkRenderer fatherNode, int directions, int activeFrame, int chunkUpdated) {
+		for (int dir = 0; dir < Direction.COUNT; dir++) {
+			if ((directions & (1 << dir)) == 0) {
+				continue;
+			}
+
+			IChunkRenderer adjacent = fatherNode.getAdjacent(dir);
+
+			if (adjacent != null && adjacent.getFrame() != activeFrame && !adjacent.solidSection() && cullableFaces(fatherNode, adjacent, dir)) {
+				if (chunkUpdated < 5 && adjacent.getRender().dirty) {
+					GlobalFlags.MESHING = true;
+					adjacent.queueRebuild();
+					GlobalFlags.MESHING = false;
+
+					adjacent.setDirty(false);
+					chunkUpdated++;
 				}
 
-				IChunkRenderer adjacent = node.getAdjacent(dir);
-
-				if (adjacent != null && adjacent.getFrame() != this.activeFrame && !adjacent.solidSection() && (adjacent.getSolidFaces() & (1 << (dir ^ 1))) == 0) {
-					if (!chunksUpdated && node.getRender().dirty) {
-						GlobalFlags.MESHING = true;
-						node.getRender().rebuild();
-						GlobalFlags.MESHING = false;
-
-						node.getRender().dirty = false;
-						chunksUpdated = true;
-					}
-
-					adjacent.setFrame(this.activeFrame);
-					queue.add(adjacent);
-				}
+				adjacent.setFrame(activeFrame);
+				queue.add(adjacent);
 			}
 		}
 
+		return chunkUpdated;
 	}
 
-	private static int getOutwardDirections(int playerChunkX, int playerChunkY, int playerChunkZ, ChunkRenderer render) {
-		int planes = 0;
-
-		planes |= (render.posX >> 4) <= playerChunkX ? 1 << Direction.WEST  : 0;
-		planes |= (render.posX >> 4) >= playerChunkX ? 1 << Direction.EAST  : 0;
-
-		planes |= (render.posY >> 4) <= playerChunkY ? 1 << Direction.DOWN  : 0;
-		planes |= (render.posY >> 4) >= playerChunkY ? 1 << Direction.UP    : 0;
-
-		planes |= (render.posZ >> 4) <= playerChunkZ ? 1 << Direction.NORTH : 0;
-		planes |= (render.posZ >> 4) >= playerChunkZ ? 1 << Direction.SOUTH : 0;
-
-		return planes;
-	}
-
-	/**
-	 * @author Safixo
-	 * @reason Avoid no sense and cull all together to avoid looping through the renderer too often.
-	 */
-	@Overwrite
-	public boolean updateRenderers(ICamera camera) {
-		searchGraph();
-//		this.renderList.clear();
-//
-//		float playerX = (float) camera.getX();
-//		float playerY = (float) camera.getY();
-//		float playerZ = (float) camera.getZ();
-//
-//		boolean chunksUpdated = false;
-//
-//		float renderDistance = square(GL11.glGetFloat(GL11.GL_FOG_END));
-//
-//		positionMap = ((IChunkRenderer)this.sortedChunkRenderers[0]).chunkMap();
-//
-//		for (ChunkRenderer render : this.sortedChunkRenderers) {
-//			IChunkRenderer ext = (IChunkRenderer) render;
-//			render.visible = false;
-//
-//			if ((!ext.emptySection() || render.dirty) && isSectionVisible(render, playerX, playerY, playerZ, renderDistance)) {
-//				if (render.dirty && (lastDistance <= 256.0F || !chunksUpdated)) {
-//					GlobalFlags.MESHING = true;
-//					render.rebuild();
-//					GlobalFlags.MESHING = false;
-//
-//					render.dirty = false;
-//					chunksUpdated = true;
-//				}
-//
-//				if (!ext.emptySection() || !ext.solidSection()) {
-//					this.renderList.add(render);
-//				}
-//			}
-//		}
-//
-		return true;
-
+	private static boolean cullableFaces(IChunkRenderer fatherNode, IChunkRenderer adjacent, int dir) {
+		return (fatherNode.getSolidFaces() & (1 << dir)) == 0 && (adjacent.getSolidFaces() & (1 << (dir ^ 1))) == 0;
 	}
 
 	/**

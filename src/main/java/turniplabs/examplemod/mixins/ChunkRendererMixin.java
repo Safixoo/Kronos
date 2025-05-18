@@ -97,14 +97,14 @@ public abstract class ChunkRendererMixin extends ChunkRenderer implements IChunk
 					if (Blocks.solid[blockId]) {
 						solidBlocks++;
 
-						if (y == 15) solidFaces[Direction.UP]++;
-						if (y == 0) solidFaces[Direction.DOWN]++;
+						if (y == maxY - 1) solidFaces[Direction.UP]++;
+						if (y == minY) solidFaces[Direction.DOWN]++;
 
-						if (x == 15) solidFaces[Direction.EAST]++;
-						if (x == 0) solidFaces[Direction.WEST]++;
+						if (x == maxX - 1) solidFaces[Direction.EAST]++;
+						if (x == minX) solidFaces[Direction.WEST]++;
 
-						if (z == 15) solidFaces[Direction.SOUTH]++;
-						if (z == 0) solidFaces[Direction.NORTH]++;
+						if (z == maxZ - 1) solidFaces[Direction.SOUTH]++;
+						if (z == minZ) solidFaces[Direction.NORTH]++;
 					}
 
 					BlockModel<?> model = BlockModelDispatcher.getInstance().getDispatch(Blocks.blocksList[blockId]);
@@ -123,7 +123,9 @@ public abstract class ChunkRendererMixin extends ChunkRenderer implements IChunk
 		}
 
 		for (int dir = 0; dir < Direction.COUNT; dir++) {
-			this.solidFaces |= (solidFaces[dir] == 256 ? 1 : 0) << dir;
+			if (solidFaces[dir] == 256) {
+				this.solidFaces |= 1 << dir;
+			}
 		}
 
 		this.solidSection = solidBlocks == 4096 && solidWriter.getVertices() == 0;
@@ -210,6 +212,21 @@ public abstract class ChunkRendererMixin extends ChunkRenderer implements IChunk
 	@Override
 	public boolean solidSection() {
 		return this.solidSection && this.compiled;
+	}
+
+	@Override
+	public boolean isDirty() {
+		return this.dirty;
+	}
+
+	@Override
+	public void setDirty(boolean dirty) {
+		this.dirty = dirty;
+	}
+
+	@Override
+	public void queueRebuild() {
+		this.rebuild();
 	}
 }
 
