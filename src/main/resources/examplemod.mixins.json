@@ -1,13 +1,28 @@
 {
-    "required": true,
-    "minVersion": "0.8",
-    "package": "turniplabs.examplemod.mixin",
-    "compatibilityLevel": "JAVA_8",
-    "mixins": [
-    ],
-    "client": [
-    ],
-    "injectors": {
-        "defaultRequire": 1
+  "required": true,
+  "minVersion": "0.8",
+  "package": "turniplabs.examplemod.mixins",
+  "compatibilityLevel": "JAVA_8",
+  "mixins": [
+  ],
+  "client": [
+    "AABBMixin",
+    "BlockLogicMixin",
+    "BlockModelMixin",
+    "BlocksMixin",
+    "ChunkCacheMixin",
+    "ChunkRendererDefMixin",
+    "ChunkRendererMixin",
+    "FrustumMixin",
+    "LightmapHelperMixin",
+    "MinecraftMixin",
+    "OpenGlHelperMixin",
+    "RenderBlockCacheMixin",
+    "RenderBlocksMixin",
+    "RenderGlobalMixin",
+    "TesselatorStandardMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
   }
 }

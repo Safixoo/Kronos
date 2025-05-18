@@ -3,6 +3,7 @@ package turniplabs.examplemod;
 import net.fabricmc.api.ModInitializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import turniplabs.examplemod.client.util.BlocksFlags;
 import turniplabs.halplibe.util.ClientStartEntrypoint;
 import turniplabs.halplibe.util.GameStartEntrypoint;
 import turniplabs.halplibe.util.RecipeEntrypoint;
@@ -18,7 +19,6 @@ public class ExampleMod implements ModInitializer, RecipeEntrypoint, GameStartEn
 
 	@Override
 	public void onRecipesReady() {
-
 	}
 
 	@Override
@@ -28,11 +28,10 @@ public class ExampleMod implements ModInitializer, RecipeEntrypoint, GameStartEn
 
 	@Override
 	public void beforeGameStart() {
-
 	}
 
 	@Override
 	public void afterGameStart() {
-
+		BlocksFlags.computeFlagArrays();
 	}
 }

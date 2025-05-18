@@ -25,6 +25,13 @@ version = project.mod_version
 loom {
 	noIntermediateMappings()
 	customMinecraftMetadata.set("https://downloads.betterthanadventure.net/bta-client/${project.bta_channel}/v${project.bta_version}/manifest.json")
+
+	runs {
+		named("client") {
+			vmArg("-XX:+UnlockDiagnosticVMOptions");
+			vmArg("-XX:+DebugNonSafepoints");
+		}
+	}
 }
 
 repositories {
@@ -108,6 +115,10 @@ dependencies {
 
 	modImplementation("com.github.Better-than-Adventure:legacy-lwjgl3:1.0.5")
 	implementation platform("org.lwjgl:lwjgl-bom:$lwjglVersion")
+	// https://mvnrepository.com/artifact/org.joml/joml
+	implementation 'org.joml:joml:1.10.8'
+	// https://mvnrepository.com/artifact/it.unimi.dsi/fastutil
+	implementation 'it.unimi.dsi:fastutil:8.5.14'
 
 	runtimeOnly "org.lwjgl:lwjgl::$lwjglNatives"
 	runtimeOnly "org.lwjgl:lwjgl-assimp::$lwjglNatives"
