@@ -151,13 +151,7 @@ public class BlockRenderer {
 
 			}
 		} else {
-			float brightness;
-
-			if (!block.isSolidRender()) {
-				brightness = this.cache.getBrightness(0, 0, 0);
-			} else {
-				brightness = this.cache.getBrightness(dirX, dirY, dirZ);
-			}
+			float brightness = this.cache.getBrightness(dirX, dirY, dirZ);
 
 			lightTR = brightness;
 			lightBR = brightness;

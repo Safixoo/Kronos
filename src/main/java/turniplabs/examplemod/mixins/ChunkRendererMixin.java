@@ -1,8 +1,5 @@
 package turniplabs.examplemod.mixins;
 
-import it.unimi.dsi.fastutil.longs.Long2ReferenceMap;
-import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
-import net.minecraft.client.render.LightmapHelper;
 import net.minecraft.client.render.RenderBlocks;
 import net.minecraft.client.render.block.model.BlockModel;
 import net.minecraft.client.render.block.model.BlockModelDispatcher;
@@ -12,17 +9,14 @@ import net.minecraft.client.render.tessellator.Tessellator;
 import net.minecraft.core.block.Blocks;
 import net.minecraft.core.block.entity.TileEntity;
 import net.minecraft.core.world.World;
-import net.minecraft.core.world.chunk.Chunk;
 import net.minecraft.core.world.chunk.ChunkCache;
 import net.minecraft.core.world.chunk.ChunkSection;
-import org.checkerframework.checker.units.qual.A;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
-import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
 import turniplabs.examplemod.client.VertexWriterManager;
 import turniplabs.examplemod.client.renderer.BlockRenderer;
 import turniplabs.examplemod.client.renderer.gl.GlVertexBuffer;
+import turniplabs.examplemod.client.util.Direction;
 import turniplabs.examplemod.client.util.interfaces.mixin.IChunkRenderer;
 import turniplabs.examplemod.client.vertex.format.DefaultVertexFormats;
 
@@ -41,6 +35,8 @@ public abstract class ChunkRendererMixin extends ChunkRenderer implements IChunk
 	private int solidVertices, translucentVertices;
 	private boolean emptySection;
 	private boolean solidSection;
+
+	private int solidFaces;
 
 	/**
 	 * @author Safixo
@@ -84,7 +80,10 @@ public abstract class ChunkRendererMixin extends ChunkRenderer implements IChunk
 		this.prepareWriterForTerrain(solidWriter);
 		this.prepareWriterForTerrain(translucentWriter);
 
+		this.solidFaces = 0;
+
 		int solidBlocks = 0;
+		int[] solidFaces = new int[Direction.COUNT];
 
 		for (int y = minY; y < maxY; ++y) {
 			for (int z = minZ; z < maxZ; ++z) {
@@ -97,6 +96,15 @@ public abstract class ChunkRendererMixin extends ChunkRenderer implements IChunk
 
 					if (Blocks.solid[blockId]) {
 						solidBlocks++;
+
+						if (y == 15) solidFaces[Direction.UP]++;
+						if (y == 0) solidFaces[Direction.DOWN]++;
+
+						if (x == 15) solidFaces[Direction.EAST]++;
+						if (x == 0) solidFaces[Direction.WEST]++;
+
+						if (z == 15) solidFaces[Direction.SOUTH]++;
+						if (z == 0) solidFaces[Direction.NORTH]++;
 					}
 
 					BlockModel<?> model = BlockModelDispatcher.getInstance().getDispatch(Blocks.blocksList[blockId]);
@@ -108,18 +116,17 @@ public abstract class ChunkRendererMixin extends ChunkRenderer implements IChunk
 						VertexWriterManager.setCurrentInstance(translucentWriter);
 					}
 
-//					if (LightmapHelper.isLightmapEnabled()) {
-//						solidWriter.setLightMap(LightmapHelper.getLightmapCoord(15, 0));
-//						translucentWriter.setLightMap(LightmapHelper.getLightmapCoord(15, 0));
-//					}
-
 					this.renderBlock(Tessellator.instance, renderBlocks, model, x, y, z);
 					//renderBlockModel(model, x, y, z);
 				}
 			}
 		}
 
-		this.solidSection = solidBlocks == 4096;
+		for (int dir = 0; dir < Direction.COUNT; dir++) {
+			this.solidFaces |= (solidFaces[dir] == 256 ? 1 : 0) << dir;
+		}
+
+		this.solidSection = solidBlocks == 4096 && solidWriter.getVertices() == 0;
 
 		this.solidVertices = solidWriter.getVertices();
 		if (solidWriter.getVertices() != 0) {
@@ -153,6 +160,11 @@ public abstract class ChunkRendererMixin extends ChunkRenderer implements IChunk
 			this.translucentBuffer = new GlVertexBuffer(DefaultVertexFormats.TERRAIN_FORMAT);
 		}
 		this.translucentBuffer.upload(vertexData, vertices);
+	}
+
+	@Override
+	public int getSolidFaces() {
+		return this.solidFaces;
 	}
 
 	private void prepareWriterForTerrain(VertexWriterManager writerManager) {
@@ -197,7 +209,7 @@ public abstract class ChunkRendererMixin extends ChunkRenderer implements IChunk
 
 	@Override
 	public boolean solidSection() {
-		return this.solidSection && this.solidBuffer.vertexCount == 0 && this.compiled;
+		return this.solidSection && this.compiled;
 	}
 }
 

@@ -11,6 +11,15 @@ public interface IChunkRenderer {
 	int solidVertices();
 	int translucentVertices();
 
+	void setAdjacentNeighbor(IChunkRenderer render, int direction);
+	IChunkRenderer getAdjacent(int direction);
+
+	ChunkRenderer getRender();
+
+	int getFrame();
+	void setFrame(int frame);
+	int getSolidFaces();
+
 	boolean solidSection();
 	boolean emptySection();
 

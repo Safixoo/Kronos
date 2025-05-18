@@ -1,7 +1,6 @@
 package turniplabs.examplemod.mixins;
 
 import it.unimi.dsi.fastutil.longs.Long2ReferenceMap;
-import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.render.RenderGlobal;
@@ -9,17 +8,15 @@ import net.minecraft.client.render.camera.ICamera;
 import net.minecraft.client.render.culling.CameraFrustum;
 import net.minecraft.client.render.terrain.ChunkRenderer;
 import net.minecraft.client.world.WorldClient;
-import net.minecraft.core.world.World;
-import net.minecraft.core.world.chunk.Chunk;
-import net.minecraft.core.world.chunk.ChunkPosition;
+import net.minecraft.core.util.helper.MathHelper;
 import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL15;
 import org.lwjgl.opengl.GL20;
 import org.lwjgl.opengl.GL30;
 import org.spongepowered.asm.mixin.*;
 import turniplabs.examplemod.client.ComplexFrustum;
 import turniplabs.examplemod.client.GlobalFlags;
 import turniplabs.examplemod.client.renderer.gl.GlVertexBuffer;
+import turniplabs.examplemod.client.util.Direction;
 import turniplabs.examplemod.client.util.interfaces.mixin.IChunkRenderer;
 
 @Mixin(value = RenderGlobal.class, remap = false)
@@ -35,6 +32,8 @@ public abstract class RenderGlobalMixin {
 	private int renderersLoaded;
 	@Shadow
 	private WorldClient worldObj;
+	@Shadow
+	private int dummyInt0;
 	private boolean shaderCreated = false;
 
 	/**
@@ -55,43 +54,126 @@ public abstract class RenderGlobalMixin {
 
 	private static Long2ReferenceMap<ChunkRenderer> positionMap;
 
+	private int activeFrame = 0;
+
+	private void searchGraph() {
+		this.activeFrame++;
+		this.renderList.clear();
+
+		positionMap = ((IChunkRenderer)this.sortedChunkRenderers[0]).chunkMap();
+
+		float playerX = (float) this.mc.activeCamera.getX();
+		float playerY = (float) this.mc.activeCamera.getY();
+		float playerZ = (float) this.mc.activeCamera.getZ();
+
+		int playerChunkX = MathHelper.floor(playerX) >> 4;
+		int playerChunkY = MathHelper.floor(playerY) >> 4;
+		int playerChunkZ = MathHelper.floor(playerZ) >> 4;
+
+		float renderDistance = square(GL11.glGetFloat(GL11.GL_FOG_END));
+		IChunkRenderer node = (IChunkRenderer) positionMap.get(asLong(playerChunkX, playerChunkY, playerChunkZ));
+
+		if (node != null && node.getRender().dirty) {
+			node.getRender().rebuild();
+		}
+
+		final ObjectArrayList<IChunkRenderer> queue = new ObjectArrayList<>();
+		queue.add(node);
+
+		int sectionIndex = 0;
+		boolean chunksUpdated = false;
+
+		while (queue.size() > sectionIndex) {
+			node = queue.get(sectionIndex++);
+
+			if (node == null || !isSectionVisible(node.getRender(), playerX, playerY, playerZ, renderDistance) && sectionIndex < 9) {
+				continue;
+			}
+
+			this.renderList.add(node.getRender());
+			int outwardDirections = getOutwardDirections(playerChunkX, playerChunkY, playerChunkZ, node.getRender());
+
+			for (int dir = 0; dir < Direction.COUNT; dir++) {
+				if ((outwardDirections & (1 << dir)) == 0) {
+					continue;
+				}
+
+				IChunkRenderer adjacent = node.getAdjacent(dir);
+
+				if (adjacent != null && adjacent.getFrame() != this.activeFrame && !adjacent.solidSection() && (adjacent.getSolidFaces() & (1 << (dir ^ 1))) == 0) {
+					if (!chunksUpdated && node.getRender().dirty) {
+						GlobalFlags.MESHING = true;
+						node.getRender().rebuild();
+						GlobalFlags.MESHING = false;
+
+						node.getRender().dirty = false;
+						chunksUpdated = true;
+					}
+
+					adjacent.setFrame(this.activeFrame);
+					queue.add(adjacent);
+				}
+			}
+		}
+
+	}
+
+	private static int getOutwardDirections(int playerChunkX, int playerChunkY, int playerChunkZ, ChunkRenderer render) {
+		int planes = 0;
+
+		planes |= (render.posX >> 4) <= playerChunkX ? 1 << Direction.WEST  : 0;
+		planes |= (render.posX >> 4) >= playerChunkX ? 1 << Direction.EAST  : 0;
+
+		planes |= (render.posY >> 4) <= playerChunkY ? 1 << Direction.DOWN  : 0;
+		planes |= (render.posY >> 4) >= playerChunkY ? 1 << Direction.UP    : 0;
+
+		planes |= (render.posZ >> 4) <= playerChunkZ ? 1 << Direction.NORTH : 0;
+		planes |= (render.posZ >> 4) >= playerChunkZ ? 1 << Direction.SOUTH : 0;
+
+		return planes;
+	}
+
 	/**
 	 * @author Safixo
 	 * @reason Avoid no sense and cull all together to avoid looping through the renderer too often.
 	 */
 	@Overwrite
 	public boolean updateRenderers(ICamera camera) {
-		this.renderList.clear();
-
-		float playerX = (float) camera.getX();
-		float playerY = (float) camera.getY();
-		float playerZ = (float) camera.getZ();
-
-		boolean chunksUpdated = false;
-
-		float renderDistance = square(GL11.glGetFloat(GL11.GL_FOG_END));
-
-		positionMap = ((IChunkRenderer)this.sortedChunkRenderers[0]).chunkMap();
-
-		for (ChunkRenderer render : this.sortedChunkRenderers) {
-			IChunkRenderer ext = (IChunkRenderer) render;
-			render.visible = false;
-
-			if ((ext.emptySection() || render.dirty) && isSectionVisible(this.worldObj, render, playerX, playerY, playerZ, renderDistance)) {
-				this.renderList.add(render);
-
-				if (render.dirty && (lastDistance <= 256.0F || !chunksUpdated)) {
-					GlobalFlags.MESHING = true;
-					render.rebuild();
-					GlobalFlags.MESHING = false;
-
-					render.dirty = false;
-					chunksUpdated = true;
-				}
-			}
-		}
-
+		searchGraph();
+//		this.renderList.clear();
+//
+//		float playerX = (float) camera.getX();
+//		float playerY = (float) camera.getY();
+//		float playerZ = (float) camera.getZ();
+//
+//		boolean chunksUpdated = false;
+//
+//		float renderDistance = square(GL11.glGetFloat(GL11.GL_FOG_END));
+//
+//		positionMap = ((IChunkRenderer)this.sortedChunkRenderers[0]).chunkMap();
+//
+//		for (ChunkRenderer render : this.sortedChunkRenderers) {
+//			IChunkRenderer ext = (IChunkRenderer) render;
+//			render.visible = false;
+//
+//			if ((!ext.emptySection() || render.dirty) && isSectionVisible(render, playerX, playerY, playerZ, renderDistance)) {
+//				if (render.dirty && (lastDistance <= 256.0F || !chunksUpdated)) {
+//					GlobalFlags.MESHING = true;
+//					render.rebuild();
+//					GlobalFlags.MESHING = false;
+//
+//					render.dirty = false;
+//					chunksUpdated = true;
+//				}
+//
+//				if (!ext.emptySection() || !ext.solidSection()) {
+//					this.renderList.add(render);
+//				}
+//			}
+//		}
+//
 		return true;
+
 	}
 
 	/**
@@ -236,7 +318,7 @@ public abstract class RenderGlobalMixin {
 		final IChunkRenderer sectionRenderInterface = (IChunkRenderer) sectionRender;
 		final GlVertexBuffer buffer = sectionRenderInterface.solidBuffer();
 
-		if (!sectionRender.empty[0]) {
+		if (buffer != null && buffer.vertexCount != 0) {
 			buffer.bindVAO();
 			buffer.draw();
 			this.renderersLoaded++;
@@ -249,7 +331,7 @@ public abstract class RenderGlobalMixin {
 		final IChunkRenderer sectionRenderInterface = (IChunkRenderer) sectionRender;
 		final GlVertexBuffer buffer = sectionRenderInterface.translucentBuffer();
 
-		if (!sectionRender.empty[1]) {
+		if (buffer != null && buffer.vertexCount != 0) {
 			buffer.bindVAO();
 			buffer.draw();
 		}
@@ -257,95 +339,16 @@ public abstract class RenderGlobalMixin {
 
 	private static float lastDistance;
 
-	private static boolean isSectionVisible(World world, ChunkRenderer render, float playerX, float playerY, float playerZ, float renderDistance) {
+	private static boolean isSectionVisible(ChunkRenderer render, float playerX, float playerY, float playerZ, float renderDistance) {
 		float distX = render.posX - playerX;
 		float distY = render.posY - playerY;
 		float distZ = render.posZ - playerZ;
 
 		lastDistance = withinRenderDistance(distX, distY, distZ);
-
-		boolean wasVisible = render.visible;
-		boolean visible = lastDistance < renderDistance && ComplexFrustum.testAab(distX, distY, distZ);
-		render.visible = visible;
-
-		if (visible && wasVisible) {
-			visible = isSectionVisibleWithRaytrace(world, render, playerX, playerY, playerZ);
-		}
-
-		return visible;
+		return lastDistance < renderDistance && ComplexFrustum.testAab(distX, distY, distZ);
 	}
 
-	private static boolean isSectionVisibleWithRaytrace(World world, ChunkRenderer render, float playerX, float playerY, float playerZ) {
-		if (lastDistance < (128.0F * 128.0F)) {
-			return true;
-		}
 
-		// Raytrace from render section to player position
-		double sx = render.posX;
-		double sy = render.posY;
-		double sz = render.posZ;
-
-		int chunkX = (int)Math.floor(sx) >> 4;
-		int chunkY = (int)Math.floor(sy) >> 4;
-		int chunkZ = (int)Math.floor(sz) >> 4;
-
-		int endChunkX = (int)Math.floor(playerX) >> 4;
-		int endChunkY = (int)Math.floor(playerY) >> 4;
-		int endChunkZ = (int)Math.floor(playerZ) >> 4;
-
-		double dx = (double) playerX - sx;
-		double dy = (double) playerY - sy;
-		double dz = (double) playerZ - sz;
-
-		double length = Math.sqrt(dx * dx + dy * dy + dz * dz);
-		if (length == 0) return true;
-
-		double invLength = 1.0 / length;
-		double dirX = dx * invLength;
-		double dirY = dy * invLength;
-		double dirZ = dz * invLength;
-
-		int stepX = Integer.signum((int) dx);
-		int stepY = Integer.signum((int) dy);
-		int stepZ = Integer.signum((int) dz);
-
-		double tMaxX = intBound(sx / 16.0, dirX);
-		double tMaxY = intBound(sy / 16.0, dirY);
-		double tMaxZ = intBound(sz / 16.0, dirZ);
-
-		double tDeltaX = Math.abs(1.0 / dirX);
-		double tDeltaY = Math.abs(1.0 / dirY);
-		double tDeltaZ = Math.abs(1.0 / dirZ);
-
-		while (chunkX != endChunkX || chunkY != endChunkY || chunkZ != endChunkZ) {
-			// Skip the section we're rendering
-			if (!(chunkX == (render.posX / 16) && chunkY == (render.posY / 16) && chunkZ == (render.posZ / 16))) {
-				if (isOpaque(chunkX, chunkY, chunkZ)) {
-					return false; // blocked
-				}
-			}
-
-			if (tMaxX < tMaxY) {
-				if (tMaxX < tMaxZ) {
-					chunkX += stepX;
-					tMaxX += tDeltaX;
-				} else {
-					chunkZ += stepZ;
-					tMaxZ += tDeltaZ;
-				}
-			} else {
-				if (tMaxY < tMaxZ) {
-					chunkY += stepY;
-					tMaxY += tDeltaY;
-				} else {
-					chunkZ += stepZ;
-					tMaxZ += tDeltaZ;
-				}
-			}
-		}
-
-		return true; // No blocking section found
-	}
 
 	private static long asLong(int x, int y, int z) {
 		long l = 0L;
@@ -358,7 +361,7 @@ public abstract class RenderGlobalMixin {
 	private static boolean isOpaque(int chunkX, int chunkY, int chunkZ) {
 		ChunkRenderer render = positionMap.get(asLong(chunkX, chunkY, chunkZ));
 
-		return render != null && ((IChunkRenderer) render).solidSection() && render.visible;
+		return render != null && ((IChunkRenderer) render).solidSection();
 	}
 
 	private static double intBound(double s, double ds) {

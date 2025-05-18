@@ -40,7 +40,7 @@ public class VertexWriterManager {
 	}
 
 	public VertexWriterManager() {
-		this(65536);
+		this(65536 << 1);
 	}
 
 	public static VertexWriterManager getCurrentInstance() {
@@ -62,7 +62,7 @@ public class VertexWriterManager {
 	}
 
 	public void ensureCapacity(int offset) {
-		if (this.offset + offset >= this.capacity) {
+		if ((this.offset + offset * 2) >= this.capacity) {
 			this.grow();
 		}
 	}

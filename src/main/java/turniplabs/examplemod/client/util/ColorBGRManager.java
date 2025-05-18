@@ -13,7 +13,7 @@ public class ColorBGRManager {
 	}
 
 	public static int multiplyColor(int color, float factor) {
-		return multiplyColor(color, (int) (factor * 0xFF));
+		return multiplyColor(color, (int) (factor * 256));
 	}
 
 	public static int multiplyColor(int color, int factor) {
