@@ -98,15 +98,29 @@ public abstract class ChunkRendererMixin extends ChunkRenderer implements IChunk
 					if (Blocks.solid[blockId]) {
 						solidBlocks++;
 
-						if (y == maxY - 1) solidFaces[Direction.UP]++;
-						if (y == minY) solidFaces[Direction.DOWN]++;
+						if (y == maxY - 1) {
+							solidFaces[Direction.UP]++;
+						}
+						if (y == minY) {
+							solidFaces[Direction.DOWN]++;
+						}
 
-						if (x == maxX - 1) solidFaces[Direction.EAST]++;
-						if (x == minX) solidFaces[Direction.WEST]++;
+						if (x == maxX - 1) {
+							solidFaces[Direction.EAST]++;
+						}
+						if (x == minX) {
+							solidFaces[Direction.WEST]++;
+						}
 
-						if (z == maxZ - 1) solidFaces[Direction.SOUTH]++;
-						if (z == minZ) solidFaces[Direction.NORTH]++;
+						if (z == maxZ - 1) {
+							solidFaces[Direction.SOUTH]++;
+						}
+						if (z == minZ) {
+							solidFaces[Direction.NORTH]++;
+						}
 					}
+
+					solidVertices = solidWriter.getVertices();
 
 					BlockModel<?> model = BlockModelDispatcher.getInstance().getDispatch(Blocks.blocksList[blockId]);
 					int blockRenderPass = model.renderLayer();

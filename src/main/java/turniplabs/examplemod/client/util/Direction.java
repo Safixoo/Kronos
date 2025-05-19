@@ -10,6 +10,13 @@ public class Direction {
 	public static final int WEST    = 4;
 	public static final int EAST    = 5;
 
+	public static final int DOWN_SET    = 1 << 0;
+	public static final int UP_SET      = 1 << 1;
+	public static final int NORTH_SET   = 1 << 2;
+	public static final int SOUTH_SET   = 1 << 3;
+	public static final int WEST_SET    = 1 << 4;
+	public static final int EAST_SET    = 1 << 5;
+
 
 	public static final int COUNT   = 6;
 
@@ -53,6 +60,10 @@ public class Direction {
 
 	public static int set(int direction) {
 		return 1 << direction;
+	}
+
+	public static boolean hasSet(int num, int dir) {
+		return (num & dir) != 0;
 	}
 
 	public static int x(int direction) {

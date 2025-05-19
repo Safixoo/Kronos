@@ -96,17 +96,17 @@ public abstract class RenderGlobalMixin {
 		// TODO: Se podria optimizar la queue y la render list utilizando mi propio "queue".
 		this.renderList.clear();
 
-		activeFrame++;
-		chunksUpdated = 0;
-		positionMap = ((IChunkRenderer)this.sortedChunkRenderers[0]).chunkMap();
-
 		float playerX = (float) camera.getX();
 		float playerY = (float) camera.getY();
 		float playerZ = (float) camera.getZ();
 
 		int playerChunkX = MathHelper.floor(playerX) >> 4;
-		int playerChunkY = MathHelper.floor(playerY) >> 4;
+		int playerChunkY = MathHelper.clamp(MathHelper.floor(playerY) >> 4, 0, 15);
 		int playerChunkZ = MathHelper.floor(playerZ) >> 4;
+
+		activeFrame++;
+		chunksUpdated = 0;
+		positionMap = ((IChunkRenderer)this.sortedChunkRenderers[0]).chunkMap();
 
 		float renderDistance = square(GL11.glGetFloat(GL11.GL_FOG_END));
 		IChunkRenderer spawn = (IChunkRenderer) positionMap.get(asLong(playerChunkX, playerChunkY, playerChunkZ));
@@ -115,19 +115,29 @@ public abstract class RenderGlobalMixin {
 
 		if (spawn != null) {
 			GlobalFlags.MESHING = true;
-			spawn.queueRebuild();
+			if (spawn.isDirty()) {
+				spawn.queueRebuild();
+			}
 			GlobalFlags.MESHING = false;
 
-			queue.add(spawn);
-			exploreNodes(queue, spawn, spawn.getAdjacentMask(), activeFrame);
+			exploreNodes(queue, spawn, spawn.getAdjacentMask(), 0);
+			spawn.setFrame(activeFrame);
+			this.renderList.add(spawn.getRender());
 		}
+
+		chunksUpdated = 0;
 
 		int sectionIndex = 0;
 
 		while (queue.size() > sectionIndex) {
 			IChunkRenderer node = queue.get(sectionIndex++);
+			ChunkRenderer render = node.getRender();
 
-			if (!isSectionVisible(node.getRender(), playerX, playerY, playerZ, renderDistance)) {
+			float distX = render.posX - playerX;
+			float distY = render.posY - playerY;
+			float distZ = render.posZ - playerZ;
+
+			if (!isSectionVisible(distX, distY, distZ, renderDistance)) {
 				continue;
 			}
 
@@ -135,50 +145,62 @@ public abstract class RenderGlobalMixin {
 
 			// TODO: Esto se podia optimizar con bitmath perturbadora.
 			int outwardDirections = getOutwardDirections(playerChunkX, playerChunkY, playerChunkZ, node.getRender());
+			int angleMask = 0;
+
+			// TODO: Porque esto sería necesario en primer lugar?
+			if (playerChunkY != render.posY >> 4) {
+				angleMask = getAngleVisibilityMask(distX, distY, distZ);
+			}
 
 			outwardDirections &= node.getAdjacentMask();
 
-			exploreNodes(queue, node, outwardDirections, activeFrame);
+			exploreNodes(queue, node, outwardDirections, angleMask);
 		}
 	}
 
 	private static int chunksUpdated = 0;
 
-	private static void exploreNodes(ObjectArrayList<IChunkRenderer> queue, IChunkRenderer fatherNode, int directions, int activeFrame) {
-		if ((directions & Direction.set(Direction.DOWN)) != 0) {
+	private static void exploreNodes(ObjectArrayList<IChunkRenderer> queue, IChunkRenderer fatherNode, int directions, int angleMask) {
+		if (directions == 0) {
+			return;
+		}
+
+		int solidFaces = fatherNode.getSolidFaces();
+
+		if (Direction.hasSet(directions, Direction.DOWN_SET) && notSolidFace(solidFaces, Direction.DOWN_SET | angleMask)) {
 			IChunkRenderer adjacent = fatherNode.getAdjacent(Direction.DOWN);
-			visitNode(queue, adjacent, fatherNode, activeFrame, Direction.DOWN);
+			visitNode(queue, adjacent, activeFrame, Direction.DOWN);
 		}
 
-		if ((directions & Direction.set(Direction.UP)) != 0) {
+		if (Direction.hasSet(directions, Direction.UP_SET) && notSolidFace(solidFaces, Direction.UP_SET | angleMask)) {
 			IChunkRenderer adjacent = fatherNode.getAdjacent(Direction.UP);
-			visitNode(queue, adjacent, fatherNode, activeFrame, Direction.UP);
+			visitNode(queue, adjacent, activeFrame, Direction.UP);
 		}
 
-		if ((directions & Direction.set(Direction.NORTH)) != 0) {
+		if (Direction.hasSet(directions, Direction.NORTH_SET) && notSolidFace(solidFaces, Direction.NORTH_SET | angleMask)) {
 			IChunkRenderer adjacent = fatherNode.getAdjacent(Direction.NORTH);
-			visitNode(queue, adjacent, fatherNode, activeFrame, Direction.NORTH);
+			visitNode(queue, adjacent, activeFrame, Direction.NORTH);
 		}
 
-		if ((directions & Direction.set(Direction.SOUTH)) != 0) {
+		if (Direction.hasSet(directions, Direction.SOUTH_SET) && notSolidFace(solidFaces, Direction.SOUTH_SET | angleMask)) {
 			IChunkRenderer adjacent = fatherNode.getAdjacent(Direction.SOUTH);
-			visitNode(queue, adjacent, fatherNode, activeFrame, Direction.SOUTH);
+			visitNode(queue, adjacent, activeFrame, Direction.SOUTH);
 		}
 
-		if ((directions & Direction.set(Direction.WEST)) != 0) {
+		if (Direction.hasSet(directions, Direction.WEST_SET) && notSolidFace(solidFaces, Direction.WEST_SET | angleMask)) {
 			IChunkRenderer adjacent = fatherNode.getAdjacent(Direction.WEST);
-			visitNode(queue, adjacent, fatherNode, activeFrame, Direction.WEST);
+			visitNode(queue, adjacent, activeFrame, Direction.WEST);
 		}
 
-		if ((directions & Direction.set(Direction.EAST)) != 0) {
+		if (Direction.hasSet(directions, Direction.EAST_SET) && notSolidFace(solidFaces, Direction.EAST_SET | angleMask)) {
 			IChunkRenderer adjacent = fatherNode.getAdjacent(Direction.EAST);
-			visitNode(queue, adjacent, fatherNode, activeFrame, Direction.EAST);
+			visitNode(queue, adjacent, activeFrame, Direction.EAST);
 		}
 	}
 
-	private static void visitNode(ObjectArrayList<IChunkRenderer> queue, IChunkRenderer adj, IChunkRenderer node, int activeFrame, int dir) {
-		if (adj.getFrame() != activeFrame && !adj.solidSection() && cullableFaces(node, dir)) {
-			if (chunksUpdated < 5 && adj.getRender().dirty) {
+	private static void visitNode(ObjectArrayList<IChunkRenderer> queue, IChunkRenderer adj, int activeFrame, int dir) {
+		if (adj.getFrame() != activeFrame && !adj.solidSection()) {
+			if (chunksUpdated < 5 && adj.isDirty()) {
 				GlobalFlags.MESHING = true;
 				adj.queueRebuild();
 				GlobalFlags.MESHING = false;
@@ -192,8 +214,8 @@ public abstract class RenderGlobalMixin {
 		}
 	}
 
-	private static boolean cullableFaces(IChunkRenderer fatherNode, int dir) {
-		return (fatherNode.getSolidFaces() & (1 << dir)) == 0;
+	private static boolean notSolidFace(int solidFaces, int dir) {
+		return (solidFaces & dir) == 0;
 	}
 
 	@Redirect(method = "sortAndRender", at = @At(value = "INVOKE", target = "Ljava/util/List;contains(Ljava/lang/Object;)Z"))
@@ -269,6 +291,7 @@ public abstract class RenderGlobalMixin {
 
 	private int programId;
 	private int tex, camPos;
+	private static int angleMask;
 
 	public void prepareAndCompileShader() {
 		this.programId = GL20.glCreateProgram();
@@ -371,13 +394,29 @@ public abstract class RenderGlobalMixin {
 
 	private static float lastDistance;
 
-	private static boolean isSectionVisible(ChunkRenderer render, float playerX, float playerY, float playerZ, float renderDistance) {
-		float distX = render.posX - playerX;
-		float distY = render.posY - playerY;
-		float distZ = render.posZ - playerZ;
-
+	private static boolean isSectionVisible(float distX, float distY, float distZ, float renderDistance) {
 		lastDistance = withinRenderDistance(distX, distY, distZ);
 		return lastDistance < renderDistance && ComplexFrustum.testAab(distX, distY, distZ);
+	}
+
+	private static int getAngleVisibilityMask(float dx, float dy, float dz) {
+		int angleOcclusionMask = 0;
+
+		dx = Math.abs(dx - 8);
+		dy = Math.abs(dy - 8);
+		dz = Math.abs(dz - 8);
+
+		if (dx > dy || dz > dy) {
+			angleOcclusionMask |= Direction.DOWN_SET | Direction.UP_SET;
+		}
+		if (dx > dz || dy > dz) {
+			angleOcclusionMask |= Direction.SOUTH_SET | Direction.NORTH_SET;
+		}
+		if (dy > dx || dz > dx) {
+			angleOcclusionMask |= Direction.EAST_SET | Direction.WEST_SET;
+		}
+
+		return ~angleOcclusionMask;
 	}
 
 

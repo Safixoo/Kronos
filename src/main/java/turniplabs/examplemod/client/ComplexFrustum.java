@@ -15,10 +15,12 @@ public class ComplexFrustum {
 
 		nxX = m.m03() + m.m00(); nxY = m.m13() + m.m10(); nxZ = m.m23() + m.m20(); nxW = m.m33() + m.m30();
 
-		nxW += nxX >= 0 ? 16.0F : 0.0F;
-		nxW += nxY >= 0 ? 16.0F : 0.0F;
-		nxW += nxZ >= 0 ? 16.0F : 0.0F;
+		double nxW = m.m33() + m.m30();
+		nxW += nxX >= 0 ? 16.0 : 0.0;
+		nxW += nxY >= 0 ? 16.0 : 0.0;
+		nxW += nxZ >= 0 ? 16.0 : 0.0;
 		nxW = -nxW;
+		ComplexFrustum.nxW = (float) nxW;
 //		invW = 1.0f / nxW;
 //
 //		nxX *= invW;
@@ -27,10 +29,12 @@ public class ComplexFrustum {
 
 		pxX = m.m03() - m.m00(); pxY = m.m13() - m.m10(); pxZ = m.m23() - m.m20(); pxW = m.m33() - m.m30();
 
-		pxW += pxX >= 0 ? 16.0F : 0.0F;
-		pxW += pxY >= 0 ? 16.0F : 0.0F;
-		pxW += pxZ >= 0 ? 16.0F : 0.0F;
+		double pxW = (double) m.m33() - (double) m.m30();
+		pxW += pxX >= 0 ? 16.0 : 0.0;
+		pxW += pxY >= 0 ? 16.0 : 0.0;
+		pxW += pxZ >= 0 ? 16.0 : 0.0;
 		pxW = -pxW;
+		ComplexFrustum.pxW = (float) pxW;
 //		invW = 1.0f / pxW;
 //
 //		pxX *= invW;
@@ -39,10 +43,12 @@ public class ComplexFrustum {
 
 		nyX = m.m03() + m.m01(); nyY = m.m13() + m.m11(); nyZ = m.m23() + m.m21(); nyW = m.m33() + m.m31();
 
-		nyW += nyX >= 0 ? 16.0F : 0.0F;
-		nyW += nyY >= 0 ? 16.0F : 0.0F;
-		nyW += nyZ >= 0 ? 16.0F : 0.0F;
+		double nyW = (double) m.m33() + (double) m.m31();
+		nyW += nyX >= 0 ? 16.0 : 0.0;
+		nyW += nyY >= 0 ? 16.0 : 0.0;
+		nyW += nyZ >= 0 ? 16.0 : 0.0;
 		nyW = -nyW;
+		ComplexFrustum.nyW = (float) nyW;
 //		invW = 1.0f / nyW;
 //
 //		nyX *= invW;
@@ -51,10 +57,12 @@ public class ComplexFrustum {
 
 		pyX = m.m03() - m.m01(); pyY = m.m13() - m.m11(); pyZ = m.m23() - m.m21(); pyW = m.m33() - m.m31();
 
-		pyW += pyX >= 0 ? 16.0F : 0.0F;
-		pyW += pyY >= 0 ? 16.0F : 0.0F;
-		pyW += pyZ >= 0 ? 16.0F : 0.0F;
+		double pyW = (double) m.m33() - (double) m.m31();
+		pyW += pyX >= 0 ? 16.0 : 0.0;
+		pyW += pyY >= 0 ? 16.0 : 0.0;
+		pyW += pyZ >= 0 ? 16.0 : 0.0;
 		pyW = -pyW;
+		ComplexFrustum.pyW = (float) pyW;
 //		invW = 1.0f / pyW;
 //
 //		pyX *= invW;
