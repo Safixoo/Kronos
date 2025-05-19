@@ -51,6 +51,10 @@ public class Direction {
 		return OPPOSITE[direction];
 	}
 
+	public static int set(int direction) {
+		return 1 << direction;
+	}
+
 	public static int x(int direction) {
 		return X[direction];
 	}

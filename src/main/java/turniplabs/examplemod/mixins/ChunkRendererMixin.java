@@ -60,6 +60,7 @@ public abstract class ChunkRendererMixin extends ChunkRenderer implements IChunk
 		ChunkSection chunkSection = this.world.getChunkFromBlockCoords(this.posX, this.posZ).getSection(this.posY >> 4);
 
 		if (chunkSection.blocks == null) {
+			this.compiled = true;
 			this.solidSection = false;
 			this.translucentVertices = 0;
 			this.solidVertices = 0;
@@ -211,7 +212,7 @@ public abstract class ChunkRendererMixin extends ChunkRenderer implements IChunk
 
 	@Override
 	public boolean solidSection() {
-		return this.solidSection && this.compiled;
+		return this.solidSection;
 	}
 
 	@Override

@@ -75,9 +75,9 @@ public abstract class ChunkRendererDefMixin implements IChunkRenderer {
 	@Override
 	public void setAdjacentNeighbor(IChunkRenderer render, int direction) {
 		if (render == null) {
-			this.adjacentMask &= ~direction;
+			this.adjacentMask &= ~(1 << direction);
 		} else {
-			this.adjacentMask |= direction;
+			this.adjacentMask |= (1 << direction);
 		}
 
 		this.adjacentSections[direction] = render;

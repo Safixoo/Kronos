@@ -13,11 +13,17 @@ import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL20;
 import org.lwjgl.opengl.GL30;
 import org.spongepowered.asm.mixin.*;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.Redirect;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import turniplabs.examplemod.client.ComplexFrustum;
 import turniplabs.examplemod.client.GlobalFlags;
 import turniplabs.examplemod.client.renderer.gl.GlVertexBuffer;
 import turniplabs.examplemod.client.util.Direction;
 import turniplabs.examplemod.client.util.interfaces.mixin.IChunkRenderer;
+
+import java.util.List;
 
 @Mixin(value = RenderGlobal.class, remap = false)
 public abstract class RenderGlobalMixin {
@@ -47,28 +53,28 @@ public abstract class RenderGlobalMixin {
 
 	@Unique
 	private static float withinRenderDistance(float x, float y, float z) {
-		x += 8;
-		y += 8;
-		z += 8;
+		x += 8.0F;
+		y += 8.0F;
+		z += 8.0F;
 
 		return (x * x) + (y * y) + (z * z);
 	}
 
 	private static Long2ReferenceMap<ChunkRenderer> positionMap;
 
-	private int activeFrame = 0;
+	private static int activeFrame = 0;
 
 	private static int getOutwardDirections(int playerChunkX, int playerChunkY, int playerChunkZ, ChunkRenderer render) {
 		int planes = 0;
 
-		planes |= (render.posX >> 4) <= playerChunkX ? 1 << Direction.WEST  : 0;
-		planes |= (render.posX >> 4) >= playerChunkX ? 1 << Direction.EAST  : 0;
+		planes |= (render.posX >> 4) <= playerChunkX ? Direction.set(Direction.WEST)  : 0;
+		planes |= (render.posX >> 4) >= playerChunkX ? Direction.set(Direction.EAST)  : 0;
 
-		planes |= (render.posY >> 4) <= playerChunkY ? 1 << Direction.DOWN  : 0;
-		planes |= (render.posY >> 4) >= playerChunkY ? 1 << Direction.UP    : 0;
+		planes |= (render.posY >> 4) <= playerChunkY ? Direction.set(Direction.DOWN)  : 0;
+		planes |= (render.posY >> 4) >= playerChunkY ? Direction.set(Direction.UP)    : 0;
 
-		planes |= (render.posZ >> 4) <= playerChunkZ ? 1 << Direction.NORTH : 0;
-		planes |= (render.posZ >> 4) >= playerChunkZ ? 1 << Direction.SOUTH : 0;
+		planes |= (render.posZ >> 4) <= playerChunkZ ? Direction.set(Direction.NORTH) : 0;
+		planes |= (render.posZ >> 4) >= playerChunkZ ? Direction.set(Direction.SOUTH) : 0;
 
 		return planes;
 	}
@@ -81,38 +87,45 @@ public abstract class RenderGlobalMixin {
 	 */
 	@Overwrite
 	public boolean updateRenderers(ICamera camera) {
-		this.activeFrame++;
+		this.bfsGraph(camera);
+
+		return true;
+	}
+
+	private void bfsGraph(ICamera camera) {
+		// TODO: Se podria optimizar la queue y la render list utilizando mi propio "queue".
 		this.renderList.clear();
 
+		activeFrame++;
+		chunksUpdated = 0;
 		positionMap = ((IChunkRenderer)this.sortedChunkRenderers[0]).chunkMap();
 
-		float playerX = (float) this.mc.activeCamera.getX();
-		float playerY = (float) this.mc.activeCamera.getY();
-		float playerZ = (float) this.mc.activeCamera.getZ();
+		float playerX = (float) camera.getX();
+		float playerY = (float) camera.getY();
+		float playerZ = (float) camera.getZ();
 
 		int playerChunkX = MathHelper.floor(playerX) >> 4;
 		int playerChunkY = MathHelper.floor(playerY) >> 4;
 		int playerChunkZ = MathHelper.floor(playerZ) >> 4;
 
 		float renderDistance = square(GL11.glGetFloat(GL11.GL_FOG_END));
-		IChunkRenderer node = (IChunkRenderer) positionMap.get(asLong(playerChunkX, playerChunkY, playerChunkZ));
-
-		if (node != null && node.getRender().dirty) {
-			node.getRender().rebuild();
-		}
+		IChunkRenderer spawn = (IChunkRenderer) positionMap.get(asLong(playerChunkX, playerChunkY, playerChunkZ));
 
 		final ObjectArrayList<IChunkRenderer> queue = new ObjectArrayList<>();
-		int chunkUpdated = 0;
 
-		if (node != null) {
-			queue.add(node);
-			chunkUpdated = exploreNeighbors(queue, node, (1 << 7) - 1, this.activeFrame, chunkUpdated);
+		if (spawn != null) {
+			GlobalFlags.MESHING = true;
+			spawn.queueRebuild();
+			GlobalFlags.MESHING = false;
+
+			queue.add(spawn);
+			exploreNodes(queue, spawn, spawn.getAdjacentMask(), activeFrame);
 		}
 
 		int sectionIndex = 0;
 
 		while (queue.size() > sectionIndex) {
-			node = queue.get(sectionIndex++);
+			IChunkRenderer node = queue.get(sectionIndex++);
 
 			if (!isSectionVisible(node.getRender(), playerX, playerY, playerZ, renderDistance)) {
 				continue;
@@ -120,41 +133,79 @@ public abstract class RenderGlobalMixin {
 
 			this.renderList.add(node.getRender());
 
+			// TODO: Esto se podia optimizar con bitmath perturbadora.
 			int outwardDirections = getOutwardDirections(playerChunkX, playerChunkY, playerChunkZ, node.getRender());
-			chunkUpdated = exploreNeighbors(queue, node, outwardDirections, this.activeFrame, chunkUpdated);
+
+			outwardDirections &= node.getAdjacentMask();
+
+			exploreNodes(queue, node, outwardDirections, activeFrame);
+		}
+	}
+
+	private static int chunksUpdated = 0;
+
+	private static void exploreNodes(ObjectArrayList<IChunkRenderer> queue, IChunkRenderer fatherNode, int directions, int activeFrame) {
+		if ((directions & Direction.set(Direction.DOWN)) != 0) {
+			IChunkRenderer adjacent = fatherNode.getAdjacent(Direction.DOWN);
+			visitNode(queue, adjacent, fatherNode, activeFrame, Direction.DOWN);
 		}
 
+		if ((directions & Direction.set(Direction.UP)) != 0) {
+			IChunkRenderer adjacent = fatherNode.getAdjacent(Direction.UP);
+			visitNode(queue, adjacent, fatherNode, activeFrame, Direction.UP);
+		}
+
+		if ((directions & Direction.set(Direction.NORTH)) != 0) {
+			IChunkRenderer adjacent = fatherNode.getAdjacent(Direction.NORTH);
+			visitNode(queue, adjacent, fatherNode, activeFrame, Direction.NORTH);
+		}
+
+		if ((directions & Direction.set(Direction.SOUTH)) != 0) {
+			IChunkRenderer adjacent = fatherNode.getAdjacent(Direction.SOUTH);
+			visitNode(queue, adjacent, fatherNode, activeFrame, Direction.SOUTH);
+		}
+
+		if ((directions & Direction.set(Direction.WEST)) != 0) {
+			IChunkRenderer adjacent = fatherNode.getAdjacent(Direction.WEST);
+			visitNode(queue, adjacent, fatherNode, activeFrame, Direction.WEST);
+		}
+
+		if ((directions & Direction.set(Direction.EAST)) != 0) {
+			IChunkRenderer adjacent = fatherNode.getAdjacent(Direction.EAST);
+			visitNode(queue, adjacent, fatherNode, activeFrame, Direction.EAST);
+		}
+	}
+
+	private static void visitNode(ObjectArrayList<IChunkRenderer> queue, IChunkRenderer adj, IChunkRenderer node, int activeFrame, int dir) {
+		if (adj.getFrame() != activeFrame && !adj.solidSection() && cullableFaces(node, dir)) {
+			if (chunksUpdated < 5 && adj.getRender().dirty) {
+				GlobalFlags.MESHING = true;
+				adj.queueRebuild();
+				GlobalFlags.MESHING = false;
+
+				adj.setDirty(false);
+				chunksUpdated++;
+			}
+
+			adj.setFrame(activeFrame);
+			queue.add(adj);
+		}
+	}
+
+	private static boolean cullableFaces(IChunkRenderer fatherNode, int dir) {
+		return (fatherNode.getSolidFaces() & (1 << dir)) == 0;
+	}
+
+	@Redirect(method = "sortAndRender", at = @At(value = "INVOKE", target = "Ljava/util/List;contains(Ljava/lang/Object;)Z"))
+	private boolean noopContains(List instance, Object o) {
 		return true;
 	}
 
-	private static int exploreNeighbors(ObjectArrayList<IChunkRenderer> queue, IChunkRenderer fatherNode, int directions, int activeFrame, int chunkUpdated) {
-		for (int dir = 0; dir < Direction.COUNT; dir++) {
-			if ((directions & (1 << dir)) == 0) {
-				continue;
-			}
+	@Inject(method = "sortAndRender", at = @At(value = "INVOKE", target = "Ljava/util/Arrays;sort([Ljava/lang/Object;Ljava/util/Comparator;)V"))
+	private void noopSort(ICamera camera, int renderPass, double partialTick, CallbackInfoReturnable<Integer> cir) {
+		ChunkRenderer chunkRenderer = this.sortedChunkRenderers[0];
 
-			IChunkRenderer adjacent = fatherNode.getAdjacent(dir);
-
-			if (adjacent != null && adjacent.getFrame() != activeFrame && !adjacent.solidSection() && cullableFaces(fatherNode, adjacent, dir)) {
-				if (chunkUpdated < 5 && adjacent.getRender().dirty) {
-					GlobalFlags.MESHING = true;
-					adjacent.queueRebuild();
-					GlobalFlags.MESHING = false;
-
-					adjacent.setDirty(false);
-					chunkUpdated++;
-				}
-
-				adjacent.setFrame(activeFrame);
-				queue.add(adjacent);
-			}
-		}
-
-		return chunkUpdated;
-	}
-
-	private static boolean cullableFaces(IChunkRenderer fatherNode, IChunkRenderer adjacent, int dir) {
-		return (fatherNode.getSolidFaces() & (1 << dir)) == 0 && (adjacent.getSolidFaces() & (1 << (dir ^ 1))) == 0;
+		this.sortedChunkRenderers = new ChunkRenderer[] {chunkRenderer};
 	}
 
 	/**
