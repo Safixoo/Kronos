@@ -119,8 +119,7 @@ public abstract class RenderGlobalMixin {
 				spawn.queueRebuild();
 			}
 			GlobalFlags.MESHING = false;
-
-			exploreNodes(queue, spawn, spawn.getAdjacentMask(), 0);
+			exploreNodes(queue, spawn, spawn.getAdjacentMask());
 			spawn.setFrame(activeFrame);
 			this.renderList.add(spawn.getRender());
 		}
@@ -145,6 +144,7 @@ public abstract class RenderGlobalMixin {
 
 			// TODO: Esto se podia optimizar con bitmath perturbadora.
 			int outwardDirections = getOutwardDirections(playerChunkX, playerChunkY, playerChunkZ, node.getRender());
+
 			int angleMask = 0;
 
 			// TODO: Porque esto sería necesario en primer lugar?
@@ -153,46 +153,48 @@ public abstract class RenderGlobalMixin {
 			}
 
 			outwardDirections &= node.getAdjacentMask();
+			outwardDirections &= ~node.getSolidFaces();
 
-			exploreNodes(queue, node, outwardDirections, angleMask);
+			// Logica rara, ni yo la entiendo.
+			if ((node.getSolidFaces() & angleMask) == 0) {
+				exploreNodes(queue, node, outwardDirections);
+			}
 		}
 	}
 
 	private static int chunksUpdated = 0;
 
-	private static void exploreNodes(ObjectArrayList<IChunkRenderer> queue, IChunkRenderer fatherNode, int directions, int angleMask) {
+	private static void exploreNodes(ObjectArrayList<IChunkRenderer> queue, IChunkRenderer fatherNode, int directions) {
 		if (directions == 0) {
 			return;
 		}
 
-		int solidFaces = fatherNode.getSolidFaces();
-
-		if (Direction.hasSet(directions, Direction.DOWN_SET) && notSolidFace(solidFaces, Direction.DOWN_SET | angleMask)) {
+		if (Direction.hasSet(directions, Direction.DOWN_SET)) {
 			IChunkRenderer adjacent = fatherNode.getAdjacent(Direction.DOWN);
 			visitNode(queue, adjacent, activeFrame, Direction.DOWN);
 		}
 
-		if (Direction.hasSet(directions, Direction.UP_SET) && notSolidFace(solidFaces, Direction.UP_SET | angleMask)) {
+		if (Direction.hasSet(directions, Direction.UP_SET)) {
 			IChunkRenderer adjacent = fatherNode.getAdjacent(Direction.UP);
 			visitNode(queue, adjacent, activeFrame, Direction.UP);
 		}
 
-		if (Direction.hasSet(directions, Direction.NORTH_SET) && notSolidFace(solidFaces, Direction.NORTH_SET | angleMask)) {
+		if (Direction.hasSet(directions, Direction.NORTH_SET)) {
 			IChunkRenderer adjacent = fatherNode.getAdjacent(Direction.NORTH);
 			visitNode(queue, adjacent, activeFrame, Direction.NORTH);
 		}
 
-		if (Direction.hasSet(directions, Direction.SOUTH_SET) && notSolidFace(solidFaces, Direction.SOUTH_SET | angleMask)) {
+		if (Direction.hasSet(directions, Direction.SOUTH_SET)) {
 			IChunkRenderer adjacent = fatherNode.getAdjacent(Direction.SOUTH);
 			visitNode(queue, adjacent, activeFrame, Direction.SOUTH);
 		}
 
-		if (Direction.hasSet(directions, Direction.WEST_SET) && notSolidFace(solidFaces, Direction.WEST_SET | angleMask)) {
+		if (Direction.hasSet(directions, Direction.WEST_SET)) {
 			IChunkRenderer adjacent = fatherNode.getAdjacent(Direction.WEST);
 			visitNode(queue, adjacent, activeFrame, Direction.WEST);
 		}
 
-		if (Direction.hasSet(directions, Direction.EAST_SET) && notSolidFace(solidFaces, Direction.EAST_SET | angleMask)) {
+		if (Direction.hasSet(directions, Direction.EAST_SET)) {
 			IChunkRenderer adjacent = fatherNode.getAdjacent(Direction.EAST);
 			visitNode(queue, adjacent, activeFrame, Direction.EAST);
 		}
