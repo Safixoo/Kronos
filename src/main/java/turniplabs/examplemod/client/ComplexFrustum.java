@@ -15,12 +15,12 @@ public class ComplexFrustum {
 
 		nxX = m.m03() + m.m00(); nxY = m.m13() + m.m10(); nxZ = m.m23() + m.m20(); nxW = m.m33() + m.m30();
 
-		double nxW = m.m33() + m.m30();
-		nxW += nxX >= 0 ? 16.0 : 0.0;
-		nxW += nxY >= 0 ? 16.0 : 0.0;
-		nxW += nxZ >= 0 ? 16.0 : 0.0;
-		nxW = -nxW;
-		ComplexFrustum.nxW = (float) nxW;
+		double nxW = 0;
+		if (nxX >= 0) nxW += 16.0;
+		if (nxY >= 0) nxW += 16.0;
+		if (nxZ >= 0) nxW += 16.0;
+
+		ComplexFrustum.nxW += (float) nxW;
 //		invW = 1.0f / nxW;
 //
 //		nxX *= invW;
@@ -29,12 +29,12 @@ public class ComplexFrustum {
 
 		pxX = m.m03() - m.m00(); pxY = m.m13() - m.m10(); pxZ = m.m23() - m.m20(); pxW = m.m33() - m.m30();
 
-		double pxW = (double) m.m33() - (double) m.m30();
-		pxW += pxX >= 0 ? 16.0 : 0.0;
-		pxW += pxY >= 0 ? 16.0 : 0.0;
-		pxW += pxZ >= 0 ? 16.0 : 0.0;
-		pxW = -pxW;
-		ComplexFrustum.pxW = (float) pxW;
+		double pxW = 0;
+		if (pxX >= 0) pxW += 16.0;
+		if (pxY >= 0) pxW += 16.0;
+		if (pxZ >= 0) pxW += 16.0;
+
+		ComplexFrustum.pxW += (float) pxW;
 //		invW = 1.0f / pxW;
 //
 //		pxX *= invW;
@@ -43,12 +43,12 @@ public class ComplexFrustum {
 
 		nyX = m.m03() + m.m01(); nyY = m.m13() + m.m11(); nyZ = m.m23() + m.m21(); nyW = m.m33() + m.m31();
 
-		double nyW = (double) m.m33() + (double) m.m31();
-		nyW += nyX >= 0 ? 16.0 : 0.0;
-		nyW += nyY >= 0 ? 16.0 : 0.0;
-		nyW += nyZ >= 0 ? 16.0 : 0.0;
-		nyW = -nyW;
-		ComplexFrustum.nyW = (float) nyW;
+		double nyW = 0;
+		if (nyX >= 0) nyW += 16.0;
+		if (nyY >= 0) nyW += 16.0;
+		if (nyZ >= 0) nyW += 16.0;
+
+		ComplexFrustum.nyW += (float) nyW;
 //		invW = 1.0f / nyW;
 //
 //		nyX *= invW;
@@ -57,12 +57,12 @@ public class ComplexFrustum {
 
 		pyX = m.m03() - m.m01(); pyY = m.m13() - m.m11(); pyZ = m.m23() - m.m21(); pyW = m.m33() - m.m31();
 
-		double pyW = (double) m.m33() - (double) m.m31();
-		pyW += pyX >= 0 ? 16.0 : 0.0;
-		pyW += pyY >= 0 ? 16.0 : 0.0;
-		pyW += pyZ >= 0 ? 16.0 : 0.0;
-		pyW = -pyW;
-		ComplexFrustum.pyW = (float) pyW;
+		double pyW = 0;
+		if (pyX >= 0) pyW += 16.0;
+		if (pyY >= 0) pyW += 16.0;
+		if (pyZ >= 0) pyW += 16.0;
+
+		ComplexFrustum.pyW += (float) pyW;
 //		invW = 1.0f / pyW;
 //
 //		pyX *= invW;
@@ -93,9 +93,9 @@ public class ComplexFrustum {
 	}
 
 	public static boolean testAab(float minX, float minY, float minZ) {
-		return  nxX * minX + nxY * minY + nxZ * minZ >= nxW &&
-				pxX * minX + pxY * minY + pxZ * minZ >= pxW &&
-				nyX * minX + nyY * minY + nyZ * minZ >= nyW &&
-				pyX * minX + pyY * minY + pyZ * minZ >= pyW;
+		return  nxX * minX + nxY * minY + nxZ * minZ >= -nxW &&
+				pxX * minX + pxY * minY + pxZ * minZ >= -pxW &&
+				nyX * minX + nyY * minY + nyZ * minZ >= -nyW &&
+				pyX * minX + pyY * minY + pyZ * minZ >= -pyW;
 	}
 }

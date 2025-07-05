@@ -106,7 +106,7 @@ public abstract class RenderGlobalMixin {
 
 		activeFrame++;
 		chunksUpdated = 0;
-		positionMap = ((IChunkRenderer)this.sortedChunkRenderers[0]).chunkMap();
+		positionMap = ((IChunkRenderer)this.chunkRenderers[0]).chunkMap();
 
 		float renderDistance = square(GL11.glGetFloat(GL11.GL_FOG_END));
 		IChunkRenderer spawn = (IChunkRenderer) positionMap.get(asLong(playerChunkX, playerChunkY, playerChunkZ));
@@ -120,7 +120,6 @@ public abstract class RenderGlobalMixin {
 			}
 			GlobalFlags.MESHING = false;
 			exploreNodes(queue, spawn, spawn.getAdjacentMask());
-			spawn.setFrame(activeFrame);
 			this.renderList.add(spawn.getRender());
 		}
 
@@ -136,29 +135,18 @@ public abstract class RenderGlobalMixin {
 			float distY = render.posY - playerY;
 			float distZ = render.posZ - playerZ;
 
-			if (!isSectionVisible(distX, distY, distZ, renderDistance)) {
+			if (!(isSectionVisible(distX, distY, distZ, renderDistance))) {
 				continue;
 			}
 
 			this.renderList.add(node.getRender());
 
-			// TODO: Esto se podia optimizar con bitmath perturbadora.
 			int outwardDirections = getOutwardDirections(playerChunkX, playerChunkY, playerChunkZ, node.getRender());
-
-			int angleMask = 0;
-
-			// TODO: Porque esto sería necesario en primer lugar?
-			if (playerChunkY != render.posY >> 4) {
-				angleMask = getAngleVisibilityMask(distX, distY, distZ);
-			}
-
 			outwardDirections &= node.getAdjacentMask();
 			outwardDirections &= ~node.getSolidFaces();
 
 			// Logica rara, ni yo la entiendo.
-			if ((node.getSolidFaces() & angleMask) == 0) {
-				exploreNodes(queue, node, outwardDirections);
-			}
+			exploreNodes(queue, node, outwardDirections);
 		}
 	}
 
@@ -202,7 +190,7 @@ public abstract class RenderGlobalMixin {
 
 	private static void visitNode(ObjectArrayList<IChunkRenderer> queue, IChunkRenderer adj, int activeFrame, int dir) {
 		if (adj.getFrame() != activeFrame && !adj.solidSection()) {
-			if (chunksUpdated < 5 && adj.isDirty()) {
+			if (chunksUpdated < 10 && adj.isDirty()) {
 				GlobalFlags.MESHING = true;
 				adj.queueRebuild();
 				GlobalFlags.MESHING = false;
@@ -214,6 +202,59 @@ public abstract class RenderGlobalMixin {
 			adj.setFrame(activeFrame);
 			queue.add(adj);
 		}
+	}
+
+	private static final float EPSILON = 32.0F;
+	private static final int MAX_RAY_SEARCH = 3;
+
+	// Minimun length for the ray be changing section where it's in.
+	private static final float SQRT_512 = (float) -Math.sqrt((16.0F * 16.0F) + (16.0F * 16.0F) + EPSILON);
+
+	private static boolean visibleByRaycast(ChunkRenderer render, float dX, float dY, float dZ) {
+		if (((IChunkRenderer)render).emptySection() || lastDistance < (96.0F * 96.0F)) {
+			return true;
+		}
+
+		dX += 8.0F;
+		dY += 8.0F;
+		dZ += 8.0F;
+
+		float length = SQRT_512 / (Math.abs(dX) + Math.abs(dY) + Math.abs(dZ));
+
+		dX *= length;
+		dY *= length;
+		dZ *= length;
+
+		float currentX = render.posX + dX;
+		float currentY = render.posY + dY;
+		float currentZ = render.posZ + dZ;
+
+		int sectionX = (int) currentX >> 4, sectionY = (int) currentY >> 4, sectionZ = (int) currentZ >> 4;
+		int rayCycles = 0;
+
+		while (isOpaque(sectionX, sectionY, sectionZ)) {
+			if (rayCycles >= MAX_RAY_SEARCH) {
+				return false;
+			}
+
+			currentX += dX;
+			currentY += dY;
+			currentZ += dZ;
+
+			sectionX = (int) currentX >> 4;
+			sectionY = (int) currentY >> 4;
+			sectionZ = (int) currentZ >> 4;
+
+			rayCycles++;
+		}
+
+		return true;
+	}
+
+	private static boolean isOpaque(int sectionX, int sectionY, int sectionZ) {
+		IChunkRenderer render = (IChunkRenderer) positionMap.get(asLong(sectionX, sectionY, sectionZ));
+
+		return render != null && render.getFrame() != activeFrame;
 	}
 
 	private static boolean notSolidFace(int solidFaces, int dir) {
@@ -421,20 +462,12 @@ public abstract class RenderGlobalMixin {
 		return ~angleOcclusionMask;
 	}
 
-
-
 	private static long asLong(int x, int y, int z) {
 		long l = 0L;
 		l |= ((long)x & 4194303L) << 42;
 		l |= ((long)y & 1048575L) << 0;
 		l |= ((long)z & 4194303L) << 20;
 		return l;
-	}
-
-	private static boolean isOpaque(int chunkX, int chunkY, int chunkZ) {
-		ChunkRenderer render = positionMap.get(asLong(chunkX, chunkY, chunkZ));
-
-		return render != null && ((IChunkRenderer) render).solidSection();
 	}
 
 	private static double intBound(double s, double ds) {

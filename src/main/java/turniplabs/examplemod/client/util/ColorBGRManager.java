@@ -1,5 +1,7 @@
 package turniplabs.examplemod.client.util;
 
+import net.minecraft.core.util.helper.MathHelper;
+
 public class ColorBGRManager {
 	private static final float NORMALIZED_TO_INTEGER = 255.0F;
 	private static final float INTEGER_TO_NORMALIZED = 1.0F / NORMALIZED_TO_INTEGER;
@@ -13,7 +15,7 @@ public class ColorBGRManager {
 	}
 
 	public static int multiplyColor(int color, float factor) {
-		return multiplyColor(color, (int) (factor * 256));
+		return multiplyColor(color, MathHelper.clamp((int) (factor * 256), 0, 256));
 	}
 
 	public static int multiplyColor(int color, int factor) {

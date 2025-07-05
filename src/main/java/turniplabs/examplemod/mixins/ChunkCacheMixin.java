@@ -12,7 +12,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import turniplabs.examplemod.client.util.BlocksFlags;
 
 @Mixin(value = ChunkCache.class, remap = false)
-public abstract class ChunkCacheMixin {
+public class ChunkCacheMixin {
 	@Shadow
 	@Final
 	private int chunkZ;
@@ -97,7 +97,7 @@ public abstract class ChunkCacheMixin {
 
 		int sectionIndex = sectionIndex(sectionX, sectionY, sectionZ);
 
-		if (sectionIndex < 27) {
+		if (sectionIndex >= 0 && sectionIndex < 27) {
 			return this.sectionBlocks[sectionIndex(sectionX, sectionY, sectionZ)][makeBlockIndex(x & 15, y & 15, z & 15)];
 		}
 

@@ -4,22 +4,26 @@ import net.minecraft.client.render.LightmapHelper;
 import net.minecraft.client.render.RenderBlockCache;
 import net.minecraft.client.render.block.color.BlockColorDispatcher;
 import net.minecraft.client.render.block.model.BlockModel;
+import net.minecraft.client.render.block.model.BlockModelGrass;
 import net.minecraft.client.render.texture.stitcher.IconCoordinate;
 import net.minecraft.core.block.Block;
 import net.minecraft.core.util.helper.Side;
 import net.minecraft.core.util.phys.AABB;
 import net.minecraft.core.world.chunk.ChunkCache;
 import org.spongepowered.asm.mixin.Unique;
+import turniplabs.examplemod.client.VertexWriterManager;
 import turniplabs.examplemod.client.renderer.meshing.FaceDataWriters;
 import turniplabs.examplemod.client.renderer.meshing.FaceWriterWrapper;
 import turniplabs.examplemod.client.renderer.meshing.ModelBoundsData;
 import turniplabs.examplemod.client.util.ColorBGRManager;
 import turniplabs.examplemod.client.util.Direction;
 import turniplabs.examplemod.client.util.interfaces.mixin.IBlockAABB;
+import turniplabs.examplemod.client.vertex.writer.TerrainVertexWriter;
 
 public class BlockRenderer {
 	public RenderBlockCache cache = new RenderBlockCache();
 	private ChunkCache chunkCache;
+
 	private boolean[] facesBlock;
 	private boolean useColor;
 
@@ -33,16 +37,8 @@ public class BlockRenderer {
 	private final ModelBoundsData modelData = new ModelBoundsData();
 
 	private void setModelBounds(int x, int y, int z, AABB bounds) {
-		double minX = bounds.minX + x;
-		double minY = bounds.minY + y;
-		double minZ = bounds.minZ + z;
-
-		double maxX = bounds.maxX + x;
-		double maxY = bounds.maxY + y;
-		double maxZ = bounds.maxZ + z;
-
-		this.modelData.setBoundsData(minX, minY, minZ, maxX, maxY, maxZ);
-		this.modelData.setBoundsData(bounds.minX, bounds.minY, bounds.minZ, bounds.maxX, bounds.maxY, bounds.maxZ);
+		this.modelData.setBoundsData(bounds.minX + x, bounds.minY + y, bounds.minZ + z, bounds.maxX + x, bounds.maxY + y, bounds.maxZ + z);
+		this.modelData.setBoundsDataExtra(bounds.minX, bounds.minY, bounds.minZ, bounds.maxX, bounds.maxY, bounds.maxZ);
 		this.modelData.setRender(this);
 	}
 
@@ -56,8 +52,11 @@ public class BlockRenderer {
 		int meta = this.chunkCache.getBlockMetadata(x, y, z);
 
 		for (int side = 0; side < Direction.COUNT; side++) {
-			this.useColor = blockModel.shouldSideBeColored(this.chunkCache, x, y, z, side, meta);
-			this.renderSideFaceAll(blockModel, bounds, this.modelData, x, y, z, side, ColorBGRManager.rgbToBgr(color));
+			if (blockModel instanceof BlockModelGrass) {
+				this.useColor = blockModel.shouldSideBeColored(this.chunkCache, x, y, z, side, meta);
+			}
+
+			this.renderSideFaceAll(blockModel, bounds, this.modelData, x, y, z, side, ColorBGRManager.rgbToBgr(color), meta);
 		}
 	}
 
@@ -69,7 +68,7 @@ public class BlockRenderer {
 		return this.facesBlock[side] || !this.chunkCache.isBlockOpaqueCube(x, y, z);
 	}
 
-	private void renderSideFaceAll(BlockModel<?> blockModel, AABB aabb, ModelBoundsData bounds, int x, int y, int z, int side, int color) {
+	private void renderSideFaceAll(BlockModel<?> blockModel, AABB aabb, ModelBoundsData bounds, int x, int y, int z, int side, int color, int meta) {
 		int dirX = Direction.x(side);
 		int dirY = Direction.y(side);
 		int dirZ = Direction.z(side);
@@ -78,10 +77,12 @@ public class BlockRenderer {
 			IconCoordinate tex = blockModel.getBlockTexture(this.chunkCache, x, y, z, Side.sides[side]);
 			Block<?> block = blockModel.block;
 
+			VertexWriterManager.getCurrentInstance().ensureCapacity(TerrainVertexWriter.STRIDE * 4);
+
 			if (side == 0) {
 				this.setupLightingFaster(block, x, y, z, side, dirX, dirY, dirZ, bounds.minYB, 0, 0, 1, bounds.maxZB, bounds.minZB, -1, 0, 0, 1.0F - bounds.minXB, 1.0F - bounds.maxXB, color);
 			} else if (side == 1) {
-				this.setupLightingFaster(block, x, y, z, side, dirX, dirY, dirZ, 1.0F - bounds.maxYB, 0, 0, 1, bounds.maxZB, bounds.minZ, 1, 0, 0, bounds.maxXB, bounds.minYB, color);
+				this.setupLightingFaster(block, x, y, z, side, dirX, dirY, dirZ, 1.0F - bounds.maxYB, 0, 0, 1, bounds.maxZB, bounds.minZB, 1, 0, 0, bounds.maxXB, bounds.minYB, color);
 			} else if (side == 2) {
 				this.setupLightingFaster(block, x, y, z, side, dirX, dirY, dirZ, bounds.minZB, -1, 0, 0, 1.0F - bounds.minXB, 1.0F - bounds.maxXB, 0, 1, 0, bounds.maxYB, bounds.minYB, color);
 			} else if (side == 3) {
@@ -92,7 +93,7 @@ public class BlockRenderer {
 				this.setupLightingFaster(block, x, y, z, side, dirX, dirY, dirZ, 1.0F - bounds.maxXB, 0, 0, 1, bounds.maxZB, bounds.minZB, 0, -1, 0, 1.0F - bounds.minYB, 1.0F - bounds.maxYB, color);
 			}
 
-			this.renderFacingFace(aabb, this.modelData, tex, FaceDataWriters.getWriterBySide(side));
+			this.renderFacingFace(this.modelData, tex, FaceDataWriters.getWriterBySide(side));
 		}
 	}
 
@@ -105,10 +106,10 @@ public class BlockRenderer {
 			this.prepareLightMap(block, block.emission == 0, x, y, z, dirX, dirY, dirZ, lefX, lefY, lefZ, topX, topY, topZ);
 		}
 
-		float lightTR = 1.0F;
-		float lightBR = 1.0F;
-		float lightBL = 1.0F;
-		float lightTL = 1.0F;
+		float lightTR;
+		float lightBR;
+		float lightBL;
+		float lightTL;
 
 		if (block.emission == 0) {
 			float dirB = this.cache.getBrightness(dirX, dirY, dirZ);
@@ -159,7 +160,7 @@ public class BlockRenderer {
 			lightTL = brightness;
 		}
 
-		color = ColorBGRManager.multiplyColor(color, 1.0F);
+		color = ColorBGRManager.multiplyColor(color, SIDE_LIGHT_MULTIPLIER[side]);
 
 		float tl = topP * lightTL + (1.0F - topP) * lightBL;
 		float tr = topP * lightTR + (1.0F - topP) * lightBR;
@@ -170,11 +171,15 @@ public class BlockRenderer {
 		float lbr = rigP * bl + (1.0F - rigP) * br;
 		float ltr = rigP * tl + (1.0F - rigP) * tr;
 
+		color &= 0x00_FF_FF_FF;
+
 		this.colorTopLeft = ColorBGRManager.multiplyColor(color, ltl);
 		this.colorBottomLeft = ColorBGRManager.multiplyColor(color, lbl);
 		this.colorBottomRight = ColorBGRManager.multiplyColor(color, lbr);
 		this.colorTopRight = ColorBGRManager.multiplyColor(color, ltr);
 	}
+
+	private static final float[] SIDE_LIGHT_MULTIPLIER = new float[] {0.5F, 1.0F, 0.8F, 0.8F, 0.6F, 0.6F};
 
 	@Unique
 	private void prepareLightMap(Block<?> block, boolean shouldAo, int x, int y, int z, int dirX, int dirY, int dirZ, int lefX, int lefY, int lefZ, int topX, int topY, int topZ) {
@@ -211,33 +216,16 @@ public class BlockRenderer {
 			this.lightMapCoordBottomLeft = LightmapHelper.avg(lmcCen, lmcLef, lmcBot, lmcBotLef);
 			this.lightMapCoordBottomRight = LightmapHelper.avg(lmcCen, lmcRig, lmcBot, lmcBotRig);
 		} else {
-			int lmc;
-
-			if (!block.isSolidRender()) {
-				lmc = block.getLightmapCoord(this.chunkCache, x, y, z);
-			} else {
-				lmc = block.getLightmapCoord(this.chunkCache, x + dirX, y + dirY, z + dirZ);
-			}
-
+			int lmc = block.getLightmapCoord(this.chunkCache, x + dirX, y + dirY, z + dirZ);;
 			this.lightMapCoordTopLeft = this.lightMapCoordBottomLeft = this.lightMapCoordBottomRight = this.lightMapCoordTopRight = lmc;
 		}
 	}
 
-	private void renderFacingFace(AABB bounds, ModelBoundsData data, IconCoordinate tex, FaceWriterWrapper writeOrder) {
-		double minU = tex.getSubIconU(bounds.minX);
-		double maxU = tex.getSubIconU(bounds.maxX);
-		double minV = tex.getSubIconV(bounds.minZ);
-		double maxV = tex.getSubIconV(bounds.maxZ);
-
-		if (bounds.minX < 0.0F || bounds.maxX > 1.0F) {
-			minU = tex.getIconUMin();
-			maxU = tex.getIconUMax();
-		}
-
-		if (bounds.minZ < 0.0F || bounds.maxZ > 1.0F) {
-			minV = tex.getIconVMin();
-			maxV = tex.getIconVMax();
-		}
+	private void renderFacingFace(ModelBoundsData data, IconCoordinate tex, FaceWriterWrapper writeOrder) {
+		double minU = tex.getIconUMin();
+		double maxU = tex.getIconUMax();
+		double minV = tex.getIconVMin();
+		double maxV = tex.getIconVMax();
 
 		writeOrder.setUV((float) minU, (float) minV, (float) maxU, (float) maxV);
 

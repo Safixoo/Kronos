@@ -120,7 +120,7 @@ public abstract class ChunkRendererMixin extends ChunkRenderer implements IChunk
 						}
 					}
 
-					solidVertices = solidWriter.getVertices();
+					this.solidVertices = solidWriter.getVertices();
 
 					BlockModel<?> model = BlockModelDispatcher.getInstance().getDispatch(Blocks.blocksList[blockId]);
 					int blockRenderPass = model.renderLayer();
@@ -131,8 +131,11 @@ public abstract class ChunkRendererMixin extends ChunkRenderer implements IChunk
 						VertexWriterManager.setCurrentInstance(translucentWriter);
 					}
 
-					this.renderBlock(Tessellator.instance, renderBlocks, model, x, y, z);
-					//renderBlockModel(model, x, y, z);
+					if (Blocks.solid[blockId]) {
+						renderBlockModel(model, x, y, z);
+					} else {
+						this.renderBlock(Tessellator.instance, renderBlocks, model, x, y, z);
+					}
 				}
 			}
 		}

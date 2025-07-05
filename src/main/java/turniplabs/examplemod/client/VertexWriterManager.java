@@ -36,7 +36,7 @@ public class VertexWriterManager {
 	public VertexWriterManager(int capacity) {
 		this.capacity = capacity;
 		this.vertexData = GLAllocation.createDirectByteBuffer(this.capacity);
-		this.vertexData.limit(this.capacity);
+		this.vertexData.clear();
 	}
 
 	public VertexWriterManager() {
@@ -75,6 +75,7 @@ public class VertexWriterManager {
 
 	public void addVertex() {
 		this.ensureCapacity(this.vertexFormat.getStride());
+		this.vertexData.position(this.offset);
 
 		this.vertexFormat.writeVertex(this.vertexData, this.offset);
 		this.vertices++;
@@ -90,12 +91,12 @@ public class VertexWriterManager {
 
 	public void grow() {
 		this.vertexData.position(0);
-		int newCapacity = this.capacity * 2;
-		ByteBuffer newBuffer = GLAllocation.createDirectByteBuffer(newCapacity);
+		long newCapacity = this.capacity * 2L;
+		ByteBuffer newBuffer = GLAllocation.createDirectByteBuffer((int) newCapacity);
 		newBuffer.put(this.vertexData);
-		newBuffer.limit(newCapacity);
+		newBuffer.limit((int) newCapacity);
 		this.vertexData = newBuffer;
-		this.capacity = newCapacity;
+		this.capacity = Math.toIntExact(newCapacity);
 	}
 
 	// <------------------------->

@@ -1,6 +1,8 @@
 package turniplabs.examplemod.client.renderer.meshing;
 
+import net.minecraft.core.util.helper.Side;
 import turniplabs.examplemod.client.renderer.meshing.facings.*;
+
 import static turniplabs.examplemod.client.util.Direction.*;
 
 public class FaceDataWriters {

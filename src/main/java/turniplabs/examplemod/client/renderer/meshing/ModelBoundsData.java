@@ -11,7 +11,6 @@ public class ModelBoundsData {
 	public float minYB, maxYB;
 	public float minZB, maxZB;
 
-	public FaceWriterWrapper faceWriteOrder;
 	public BlockRenderer render;
 
 	public ModelBoundsData() {
@@ -44,6 +43,17 @@ public class ModelBoundsData {
 	}
 
 	public void setBoundsData(double minX, double minY, double minZ, double maxX, double maxY, double maxZ) {
+		this.minX = (float) minX;
+		this.maxX = (float) maxX;
+
+		this.minY = (float) minY;
+		this.maxY = (float) maxY;
+
+		this.minZ = (float) minZ;
+		this.maxZ = (float) maxZ;
+	}
+
+	public void setBoundsDataExtra(double minX, double minY, double minZ, double maxX, double maxY, double maxZ) {
 		this.minXB = (float) minX;
 		this.maxXB = (float) maxX;
 
