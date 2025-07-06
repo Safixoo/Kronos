@@ -55,6 +55,10 @@ public class GlVertexBuffer {
 		this.hasData = true;
 	}
 
+	public void clearVertexData() {
+		GL45.nglNamedBufferData(this.vbo, 0, 0, GL15.GL_STREAM_DRAW);
+	}
+
 	public void clear() {
 		if (this.vbo >= 0) GL15.glDeleteBuffers(this.vbo);
 		if (this.vao >= 0) GL30.glDeleteVertexArrays(this.vao);

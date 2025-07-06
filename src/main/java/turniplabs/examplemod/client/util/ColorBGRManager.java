@@ -1,6 +1,7 @@
 package turniplabs.examplemod.client.util;
 
 import net.minecraft.core.util.helper.MathHelper;
+import org.lwjgl.system.JNI;
 
 public class ColorBGRManager {
 	private static final float NORMALIZED_TO_INTEGER = 255.0F;
@@ -36,7 +37,8 @@ public class ColorBGRManager {
 	}
 
 	public static int rgbToBgr(int color) {
-		return (color & 0xFF) << 16 | (color & 0x00FF00) | ((color & 0xFF0000) >> 16);
+		// (color & 0xFF) << 16 | (color & 0x00FF00) | ((color & 0xFF0000) >> 16)
+		return Integer.reverseBytes(color) >>> 8;
 	}
 
 	public static int normToInt(float color) {

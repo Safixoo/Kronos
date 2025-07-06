@@ -28,5 +28,9 @@ public interface IChunkRenderer {
 	void setDirty(boolean dirty);
 	void queueRebuild();
 
+	void connectNeighbors();
+	void disconnectNeighbors();
+
+
 	Long2ReferenceMap<ChunkRenderer> chunkMap();
 }

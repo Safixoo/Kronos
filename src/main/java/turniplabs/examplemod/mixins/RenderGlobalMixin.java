@@ -118,6 +118,7 @@ public abstract class RenderGlobalMixin {
 			if (spawn.isDirty()) {
 				spawn.queueRebuild();
 			}
+			spawn.setDirty(false);
 			GlobalFlags.MESHING = false;
 			exploreNodes(queue, spawn, spawn.getAdjacentMask());
 			this.renderList.add(spawn.getRender());
@@ -194,8 +195,6 @@ public abstract class RenderGlobalMixin {
 				GlobalFlags.MESHING = true;
 				adj.queueRebuild();
 				GlobalFlags.MESHING = false;
-
-				adj.setDirty(false);
 				chunksUpdated++;
 			}
 

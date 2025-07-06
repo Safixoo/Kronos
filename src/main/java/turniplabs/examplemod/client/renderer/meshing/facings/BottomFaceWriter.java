@@ -8,16 +8,13 @@ import turniplabs.examplemod.client.util.Direction;
 
 public class BottomFaceWriter extends FaceWriterWrapper {
 	@Override
-	public void colorizeQuad(BlockRenderer blockRenderer, ModelBoundsData bounds, Block<?> block, int x, int y, int z, int color) {
-		blockRenderer.colorizeQuad(block, x, y, z, Direction.DOWN, 0, -1, 0, bounds.minYB, 0, 0, 1, bounds.maxZB, bounds.minZB, -1, 0, 0, 1.0F - bounds.minXB, 1.0F - bounds.maxXB, color);
-	}
+	public void colorizeAndBufferQuad(BlockRenderer blockRenderer, ModelBoundsData modelData, Block<?> block, int x, int y, int z, int color) {
+		blockRenderer.colorizeQuad(block, x, y, z, Direction.DOWN, 0, -1, 0, modelData.minYB, 0, 0, 1, modelData.maxZB, modelData.minZB, -1, 0, 0, 1.0F - modelData.minXB, 1.0F - modelData.maxXB, color);
 
-	@Override
-	public void bufferQuad(ModelBoundsData modelData, int colorTopLeft, int colorBottomLeft, int colorBottomRight, int colorTopRight) {
-		this.vertexOne(modelData, colorTopLeft | 0xFF000000);
-		this.vertexTwo(modelData, colorBottomLeft | 0xFF000000);
-		this.vertexThree(modelData, colorBottomRight | 0xFF000000);
-		this.vertexFour(modelData, colorTopRight | 0xFF000000);
+		this.vertexOne(modelData, blockRenderer.colorTopLeft | 0xFF000000);
+		this.vertexTwo(modelData, blockRenderer.colorBottomLeft | 0xFF000000);
+		this.vertexThree(modelData, blockRenderer.colorBottomRight | 0xFF000000);
+		this.vertexFour(modelData, blockRenderer.colorTopRight | 0xFF000000);
 	}
 
 	public void vertexOne(ModelBoundsData model, int color) {

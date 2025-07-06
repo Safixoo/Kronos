@@ -8,8 +8,11 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import turniplabs.examplemod.client.renderer.gl.GlVertexBuffer;
 import turniplabs.examplemod.client.util.Direction;
 import turniplabs.examplemod.client.util.interfaces.mixin.IChunkRenderer;
+
+import javax.swing.*;
 
 
 @Mixin(value = ChunkRenderer.class, remap = false)
@@ -25,6 +28,8 @@ public abstract class ChunkRendererDefMixin implements IChunkRenderer {
 	private int frame = -1;
 	private int adjacentMask = 0;
 
+	private long putPosition = -1;
+
 	private static long asLong(int x, int y, int z) {
 		long l = 0L;
 		l |= ((long)x & 4194303L) << 42;
@@ -33,16 +38,50 @@ public abstract class ChunkRendererDefMixin implements IChunkRenderer {
 		return l;
 	}
 
-	@Inject(method = "setPos", at = @At("HEAD"))
-	private void addPos(int x, int y, int z, CallbackInfo ci) {
-		positionToRenderer.put(asLong(this.posX >> 4, this.posY >> 4, this.posZ >> 4), (ChunkRenderer) (Object)this);
-		this.connectNeighbors();
+	@Inject(method = "setPos", at = @At("TAIL"))
+	private void addPos(CallbackInfo ci) {
+		long position = asLong(this.posX >> 4, this.posY >> 4, this.posZ >> 4);
+
+		if (this.putPosition != position) {
+			if (this.putPosition != -1) {
+				positionToRenderer.put(this.putPosition, null);
+				this.setDirty(true);
+			}
+
+			this.connectNeighborsDirty();
+			positionToRenderer.put(position, (ChunkRenderer) (Object) this);
+		}
+
+		this.putPosition = position;
 	}
 
-	@Inject(method = "reset", at = @At("HEAD"))
+	@Inject(method = "delete", at = @At("TAIL"))
 	private void resetData(CallbackInfo ci) {
+		GlVertexBuffer translucentBuffer = this.translucentBuffer();
+		GlVertexBuffer solidBuffer = this.solidBuffer();
+
+		if (translucentBuffer != null) {
+			translucentBuffer.clearVertexData();
+			translucentBuffer.clear();
+		}
+
+		if (solidBuffer != null) {
+			solidBuffer.clearVertexData();
+			solidBuffer.clear();
+		}
+
+		for (int dir = 0; dir < Direction.COUNT; dir++) {
+			this.adjacentSections[dir] = null;
+
+			IChunkRenderer renderer = this.adjacentSections[dir];
+
+			if (renderer != null && renderer.getAdjacent(Direction.opposite(dir)) == this) {
+				renderer.setAdjacentNeighbor(null, Direction.opposite(dir));
+			}
+		}
+
 		positionToRenderer.put(asLong(this.posX >> 4, this.posY >> 4, this.posZ >> 4), null);
-		this.disconnectNeighbors();
+		this.disconnectNeighborsDirty();
 	}
 
 	@Override
@@ -60,7 +99,7 @@ public abstract class ChunkRendererDefMixin implements IChunkRenderer {
 		this.frame = frame;
 	}
 
-	private void connectNeighbors() {
+	public void connectNeighbors() {
 		for (int dir = 0; dir < Direction.COUNT; dir++) {
 			IChunkRenderer renderer = getSection(dir);
 
@@ -69,6 +108,32 @@ public abstract class ChunkRendererDefMixin implements IChunkRenderer {
 			}
 
 			this.setAdjacentNeighbor(renderer, dir);
+		}
+	}
+
+	public void connectNeighborsDirty() {
+		for (int dir = 0; dir < Direction.COUNT; dir++) {
+			IChunkRenderer renderer = getSection(dir);
+
+			if (renderer != null) {
+				renderer.setAdjacentNeighbor(this, Direction.opposite(dir));
+				renderer.setDirty(true);
+			}
+
+			this.setAdjacentNeighbor(renderer, dir);
+		}
+	}
+
+	public void disconnectNeighborsDirty() {
+		for (int dir = 0; dir < Direction.COUNT; dir++) {
+			IChunkRenderer renderer = getSectionActive(dir);
+
+			if (renderer != null) {
+				renderer.setAdjacentNeighbor(null, Direction.opposite(dir));
+				renderer.setDirty(true);
+			}
+
+			this.setAdjacentNeighbor(null, dir);
 		}
 	}
 
@@ -96,6 +161,10 @@ public abstract class ChunkRendererDefMixin implements IChunkRenderer {
 		return (IChunkRenderer) positionToRenderer.get(asLong(chunkX, chunkY, chunkZ));
 	}
 
+	private IChunkRenderer getSectionActive(int direction) {
+		return this.adjacentSections[direction];
+	}
+
 	@Override
 	public ChunkRenderer getRender() {
 		return (ChunkRenderer) (Object) this;
@@ -106,9 +175,9 @@ public abstract class ChunkRendererDefMixin implements IChunkRenderer {
 		return this.adjacentSections[direction];
 	}
 
-	private void disconnectNeighbors() {
+	public void disconnectNeighbors() {
 		for (int dir = 0; dir < Direction.COUNT; dir++) {
-			IChunkRenderer renderer = getSection(dir);
+			IChunkRenderer renderer = getSectionActive(dir);
 
 			if (renderer != null) {
 				renderer.setAdjacentNeighbor(null, Direction.opposite(dir));

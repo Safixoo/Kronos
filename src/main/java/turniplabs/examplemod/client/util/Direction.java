@@ -55,7 +55,7 @@ public class Direction {
 	}
 
 	public static int opposite(int direction) {
-		return OPPOSITE[direction];
+		return direction ^ 1;
 	}
 
 	public static int set(int direction) {

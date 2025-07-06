@@ -27,7 +27,10 @@ public class BlockRenderer {
 	private boolean[] facesBlock;
 	private boolean useColor;
 
-	private int colorTopLeft, colorTopRight, colorBottomLeft, colorBottomRight;
+	public int colorTopLeft;
+	public int colorTopRight;
+	public int colorBottomLeft;
+	public int colorBottomRight;
 
 	public int lightMapCoordTopLeft;
 	public int lightMapCoordBottomLeft;
@@ -87,8 +90,7 @@ public class BlockRenderer {
 			float maxV = (float) tex.getIconVMax();
 
 			quadWriter.setUV(minU, minV, maxU, maxV);
-			quadWriter.colorizeQuad(this, bounds, block, x, y, z, color);
-			quadWriter.bufferQuad(this.modelData, this.colorTopLeft, this.colorBottomLeft, this.colorBottomRight, this.colorTopRight);
+			quadWriter.colorizeAndBufferQuad(this, bounds, block, x, y, z, color);
 		}
 	}
 
@@ -97,7 +99,7 @@ public class BlockRenderer {
 			color = 0xFFFFFFFF;
 		}
 
-		if (false) {
+		if (LightmapHelper.isLightmapEnabled()) {
 			this.prepareLightMap(block, block.emission == 0, x, y, z, dirX, dirY, dirZ, lefX, lefY, lefZ, topX, topY, topZ);
 		}
 

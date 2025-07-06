@@ -57,17 +57,6 @@ public abstract class ChunkRendererMixin extends ChunkRenderer implements IChunk
 		this.empty[0] = true;
 		this.empty[1] = true;
 
-		ChunkSection chunkSection = this.world.getChunkFromBlockCoords(this.posX, this.posZ).getSection(this.posY >> 4);
-
-		if (chunkSection.blocks == null) {
-			this.compiled = true;
-			this.solidSection = false;
-			this.translucentVertices = 0;
-			this.solidVertices = 0;
-			this.emptySection = true;
-			return;
-		}
-
 		ChunkCache chunkcache = new ChunkCache(this.world, minX - 1, minY - 1, minZ - 1, maxX + 1, maxY + 1, maxZ + 1);
 
 		RenderBlocks renderBlocks = new RenderBlocks(chunkcache);
@@ -166,6 +155,7 @@ public abstract class ChunkRendererMixin extends ChunkRenderer implements IChunk
 		solidWriter.stopDrawing();
 
 		this.compiled = true;
+		this.dirty = false;
 	}
 
 	private void fillSolidBuffer(ByteBuffer vertexData, int vertices) {
