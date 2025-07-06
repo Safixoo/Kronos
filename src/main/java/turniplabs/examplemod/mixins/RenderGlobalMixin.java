@@ -333,8 +333,8 @@ public abstract class RenderGlobalMixin {
 	}
 
 	private int programId;
-	private int tex, camPos;
-	private static int angleMask;
+	private int u_TexId, u_CamPos;
+	private int u_FogEnd, u_FogStart, u_FogColor;
 
 	public void prepareAndCompileShader() {
 		this.programId = GL20.glCreateProgram();
@@ -367,29 +367,44 @@ public abstract class RenderGlobalMixin {
 
 	@Unique
 	public void glGetUniformLocation() {
-		this.camPos = GL20.glGetUniformLocation(this.programId, "u_CamPos");
-		this.tex = GL20.glGetUniformLocation(this.programId, "u_TexId");
+		this.u_CamPos = GL20.glGetUniformLocation(this.programId, "u_CamPos");
+		this.u_TexId = GL20.glGetUniformLocation(this.programId, "u_TexId");
+
+		this.u_FogEnd = GL20.glGetUniformLocation(this.programId, "u_FogEnd");
+		this.u_FogStart = GL20.glGetUniformLocation(this.programId, "u_FogStart");
+		this.u_FogColor = GL20.glGetUniformLocation(this.programId, "u_FogColor");
 	}
 
 	@Unique
 	public void setupUniforms(float posX, float posY, float posZ) {
-		GL20.glUniform1i(this.tex, 0);
-		GL20.glUniform3f(this.camPos, posX, posY, posZ);
+		GL20.glUniform1i(this.u_TexId, 0);
+		GL20.glUniform3f(this.u_CamPos, posX, posY, posZ);
+
+		GL20.glUniform1f(this.u_FogEnd, GL11.glGetFloat(GL11.GL_FOG_END));
+		GL20.glUniform1f(this.u_FogStart, GL11.glGetFloat(GL11.GL_FOG_START));
+
+		float[] fogColor = new float[4];
+
+		GL11.glGetFloatv(GL11.GL_FOG_COLOR, fogColor);
+		GL20.glUniform3f(this.u_FogColor, fogColor[0], fogColor[1], fogColor[2]);
 	}
 
 	@Unique
 	private static final String vertexShader =
 			"  #version 110    																						\n" +
 			"    																									\n" +
-			"  varying vec3 v_color;																				\n" +
-			"  varying vec2 v_textureUv;																			\n" +
+			"  varying vec3 v_Color;																				\n" +
+			"  varying vec2 v_TextureUv;																			\n" +
+			"  varying float v_Distance;																			\n" +
 			"  uniform vec3 u_CamPos;          																		\n" +
 			"     																									\n" +
 			"  void main() {    																					\n" +
-			"      gl_Position = gl_ModelViewProjectionMatrix * (gl_Vertex - vec4(u_CamPos, 0.0));	 		    	\n" +
+			"      vec4 position = gl_ModelViewMatrix * (gl_Vertex - vec4(u_CamPos, 0.0));	 		    			\n" +
+			"      gl_Position = gl_ProjectionMatrix * position;	 		    									\n" +
 			"	   					 																				\n" +
-			"      v_textureUv = gl_MultiTexCoord0.st;   															\n" +
-			"	   v_color = gl_Color.rgb; 																			\n" +
+			"      v_TextureUv = gl_MultiTexCoord0.st;   															\n" +
+			"	   v_Color = gl_Color.rgb; 																			\n" +
+			"	   v_Distance = length(position); 																\n" +
 			"  } 																									\n" +
 			"    																									\n" +
 			"      																									\n";
@@ -398,14 +413,21 @@ public abstract class RenderGlobalMixin {
 	private static final String fragmentShader =
 			"   #version 110																			  		  \n" +
 			"   																		  						  \n" +
-			"   varying vec3 v_color;																				  \n" +
-			"   varying vec2 v_textureUv;																		  \n" +
+			"   varying vec3 v_Color;																			  \n" +
+			"   varying vec2 v_TextureUv;																		  \n" +
+			"   varying float v_Distance;																	      \n" +
 			"  																									  \n" +
 			"   uniform sampler2D u_TexId;															 		      \n" +
-			"   uniform sampler2D u_LightId;															 		  \n" +
+			"   																					 		      \n" +
+			"   uniform float u_FogEnd;																 		      \n" +
+			"   uniform float u_FogStart;																 		  \n" +
+			"   uniform vec3 u_FogColor;																 		  \n" +
 			"   																			  					  \n" +
 			"   void main() {																			          \n" +
-			"   	gl_FragColor = vec4(v_color, 1.0) * texture2D(u_TexId, v_textureUv);						  \n" +
+			"   	vec4 blockColor = vec4(v_Color, 1.0) * texture2D(u_TexId, v_TextureUv);						  \n" +
+			"   	float factor = v_Distance < u_FogEnd ? smoothstep(u_FogStart, u_FogEnd, v_Distance) : 1.0;	  \n" +
+			"   																								  \n" +
+			"   	gl_FragColor = vec4(mix(blockColor.rgb, u_FogColor, factor), blockColor.a);	 						  \n" +
 			"   }																			   					  \n" +
 			"      																								  \n";
 

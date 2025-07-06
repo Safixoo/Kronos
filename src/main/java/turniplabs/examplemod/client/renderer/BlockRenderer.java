@@ -35,6 +35,7 @@ public class BlockRenderer {
 	public int lightMapCoordTopRight;
 
 	private final ModelBoundsData modelData = new ModelBoundsData();
+	private static final float[] SIDE_LIGHT_MULTIPLIER = new float[] {0.5F, 1.0F, 0.8F, 0.8F, 0.6F, 0.6F};
 
 	private void setModelBounds(int x, int y, int z, AABB bounds) {
 		this.modelData.setBoundsData(bounds.minX + x, bounds.minY + y, bounds.minZ + z, bounds.maxX + x, bounds.maxY + y, bounds.maxZ + z);
@@ -49,14 +50,14 @@ public class BlockRenderer {
 		this.facesBlock = ((IBlockAABB) bounds).blockBoundsCheck();
 		this.setModelBounds(x, y, z, bounds);
 
-		int meta = this.chunkCache.getBlockMetadata(x, y, z);
 
 		for (int side = 0; side < Direction.COUNT; side++) {
 			if (blockModel instanceof BlockModelGrass) {
+				int meta = this.chunkCache.getBlockMetadata(x, y, z);
 				this.useColor = blockModel.shouldSideBeColored(this.chunkCache, x, y, z, side, meta);
 			}
 
-			this.renderSideFaceAll(blockModel, bounds, this.modelData, x, y, z, side, ColorBGRManager.rgbToBgr(color), meta);
+			this.renderSideFaceAll(blockModel, this.modelData, x, y, z, side, ColorBGRManager.rgbToBgr(color));
 		}
 	}
 
@@ -68,7 +69,7 @@ public class BlockRenderer {
 		return this.facesBlock[side] || !this.chunkCache.isBlockOpaqueCube(x, y, z);
 	}
 
-	private void renderSideFaceAll(BlockModel<?> blockModel, AABB aabb, ModelBoundsData bounds, int x, int y, int z, int side, int color, int meta) {
+	private void renderSideFaceAll(BlockModel<?> blockModel, ModelBoundsData bounds, int x, int y, int z, int side, int color) {
 		int dirX = Direction.x(side);
 		int dirY = Direction.y(side);
 		int dirZ = Direction.z(side);
@@ -78,31 +79,25 @@ public class BlockRenderer {
 			Block<?> block = blockModel.block;
 
 			VertexWriterManager.getCurrentInstance().ensureCapacity(TerrainVertexWriter.STRIDE * 4);
+			FaceWriterWrapper quadWriter = FaceDataWriters.getWriterBySide(side);
 
-			if (side == 0) {
-				this.setupLightingFaster(block, x, y, z, side, dirX, dirY, dirZ, bounds.minYB, 0, 0, 1, bounds.maxZB, bounds.minZB, -1, 0, 0, 1.0F - bounds.minXB, 1.0F - bounds.maxXB, color);
-			} else if (side == 1) {
-				this.setupLightingFaster(block, x, y, z, side, dirX, dirY, dirZ, 1.0F - bounds.maxYB, 0, 0, 1, bounds.maxZB, bounds.minZB, 1, 0, 0, bounds.maxXB, bounds.minYB, color);
-			} else if (side == 2) {
-				this.setupLightingFaster(block, x, y, z, side, dirX, dirY, dirZ, bounds.minZB, -1, 0, 0, 1.0F - bounds.minXB, 1.0F - bounds.maxXB, 0, 1, 0, bounds.maxYB, bounds.minYB, color);
-			} else if (side == 3) {
-				this.setupLightingFaster(block, x, y, z, side, dirX, dirY, dirZ, 1.0F - bounds.maxZB, 0, 1, 0, bounds.maxYB, bounds.minYB, -1, 0, 0, 1.0F - bounds.minXB, 1.0F - bounds.maxXB, color);
-			} else if (side == 4) {
-				this.setupLightingFaster(block, x, y, z, side, dirX, dirY, dirZ, bounds.minXB, 0, 0, 1, bounds.maxZB, bounds.minZB, 0, 1, 0, bounds.maxYB, bounds.minYB, color);
-			} else {
-				this.setupLightingFaster(block, x, y, z, side, dirX, dirY, dirZ, 1.0F - bounds.maxXB, 0, 0, 1, bounds.maxZB, bounds.minZB, 0, -1, 0, 1.0F - bounds.minYB, 1.0F - bounds.maxYB, color);
-			}
+			float minU = (float) tex.getIconUMin();
+			float maxU = (float) tex.getIconUMax();
+			float minV = (float) tex.getIconVMin();
+			float maxV = (float) tex.getIconVMax();
 
-			this.renderFacingFace(this.modelData, tex, FaceDataWriters.getWriterBySide(side));
+			quadWriter.setUV(minU, minV, maxU, maxV);
+			quadWriter.colorizeQuad(this, bounds, block, x, y, z, color);
+			quadWriter.bufferQuad(this.modelData, this.colorTopLeft, this.colorBottomLeft, this.colorBottomRight, this.colorTopRight);
 		}
 	}
 
-	public void setupLightingFaster(Block<?> block, int x, int y, int z, int side, int dirX, int dirY, int dirZ, float depth, int topX, int topY, int topZ, float topP, float botP, int lefX, int lefY, int lefZ, float lefP, float rigP, int color) {
+	public void colorizeQuad(Block<?> block, int x, int y, int z, int side, int dirX, int dirY, int dirZ, float depth, int topX, int topY, int topZ, float topP, float botP, int lefX, int lefY, int lefZ, float lefP, float rigP, int color) {
 		if (!this.useColor) {
 			color = 0xFFFFFFFF;
 		}
 
-		if (LightmapHelper.isLightmapEnabled()) {
+		if (false) {
 			this.prepareLightMap(block, block.emission == 0, x, y, z, dirX, dirY, dirZ, lefX, lefY, lefZ, topX, topY, topZ);
 		}
 
@@ -179,9 +174,7 @@ public class BlockRenderer {
 		this.colorTopRight = ColorBGRManager.multiplyColor(color, ltr);
 	}
 
-	private static final float[] SIDE_LIGHT_MULTIPLIER = new float[] {0.5F, 1.0F, 0.8F, 0.8F, 0.6F, 0.6F};
 
-	@Unique
 	private void prepareLightMap(Block<?> block, boolean shouldAo, int x, int y, int z, int dirX, int dirY, int dirZ, int lefX, int lefY, int lefZ, int topX, int topY, int topZ) {
 		if (shouldAo) {
 			if (!block.isSolidRender()) {
@@ -216,23 +209,13 @@ public class BlockRenderer {
 			this.lightMapCoordBottomLeft = LightmapHelper.avg(lmcCen, lmcLef, lmcBot, lmcBotLef);
 			this.lightMapCoordBottomRight = LightmapHelper.avg(lmcCen, lmcRig, lmcBot, lmcBotRig);
 		} else {
-			int lmc = block.getLightmapCoord(this.chunkCache, x + dirX, y + dirY, z + dirZ);;
+			int lmc = block.getLightmapCoord(this.chunkCache, x + dirX, y + dirY, z + dirZ);
 			this.lightMapCoordTopLeft = this.lightMapCoordBottomLeft = this.lightMapCoordBottomRight = this.lightMapCoordTopRight = lmc;
 		}
 	}
 
 	private void renderFacingFace(ModelBoundsData data, IconCoordinate tex, FaceWriterWrapper writeOrder) {
-		double minU = tex.getIconUMin();
-		double maxU = tex.getIconUMax();
-		double minV = tex.getIconVMin();
-		double maxV = tex.getIconVMax();
 
-		writeOrder.setUV((float) minU, (float) minV, (float) maxU, (float) maxV);
-
-		writeOrder.vertexOne(data, this.colorTopLeft | 0xFF000000);
-		writeOrder.vertexTwo(data, this.colorBottomLeft | 0xFF000000);
-		writeOrder.vertexThree(data, this.colorBottomRight | 0xFF000000);
-		writeOrder.vertexFour(data, this.colorTopRight | 0xFF000000);
 	}
 
 	@Unique

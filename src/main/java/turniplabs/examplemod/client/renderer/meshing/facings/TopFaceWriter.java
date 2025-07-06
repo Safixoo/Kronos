@@ -1,23 +1,26 @@
 package turniplabs.examplemod.client.renderer.meshing.facings;
 
-import net.minecraft.client.render.LightmapHelper;
-import net.minecraft.core.util.phys.AABB;
+import net.minecraft.core.block.Block;
 import turniplabs.examplemod.client.VertexWriterManager;
+import turniplabs.examplemod.client.renderer.BlockRenderer;
 import turniplabs.examplemod.client.renderer.meshing.FaceWriterWrapper;
 import turniplabs.examplemod.client.renderer.meshing.ModelBoundsData;
+import turniplabs.examplemod.client.util.Direction;
 
-public class TopFaceWriter implements FaceWriterWrapper {
-	private float minU, minV, maxU, maxV;
-
+public class TopFaceWriter extends FaceWriterWrapper {
 	@Override
-	public void setUV(float minU, float minV, float maxU, float maxV) {
-		this.minU = minU;
-		this.minV = minV;
-		this.maxU = maxU;
-		this.maxV = maxV;
+	public void colorizeQuad(BlockRenderer blockRenderer, ModelBoundsData bounds, Block<?> block, int x, int y, int z, int color) {
+		blockRenderer.colorizeQuad(block, x, y, z, Direction.UP, 0, 1, 0, 1.0F - bounds.maxYB, 0, 0, 1, bounds.maxZB, bounds.minZB, 1, 0, 0, bounds.maxXB, bounds.minYB, color);
 	}
 
 	@Override
+	public void bufferQuad(ModelBoundsData modelData, int colorTopLeft, int colorBottomLeft, int colorBottomRight, int colorTopRight) {
+		this.vertexOne(modelData, colorTopLeft | 0xFF000000);
+		this.vertexTwo(modelData, colorBottomLeft | 0xFF000000);
+		this.vertexThree(modelData, colorBottomRight | 0xFF000000);
+		this.vertexFour(modelData, colorTopRight | 0xFF000000);
+	}
+
 	public void vertexOne(ModelBoundsData model, int color) {
 		VertexWriterManager man = VertexWriterManager.getCurrentInstance();
 
@@ -29,7 +32,6 @@ public class TopFaceWriter implements FaceWriterWrapper {
 		man.addVertex();
 	}
 
-	@Override
 	public void vertexTwo(ModelBoundsData model, int color) {
 		VertexWriterManager man = VertexWriterManager.getCurrentInstance();
 
@@ -41,7 +43,6 @@ public class TopFaceWriter implements FaceWriterWrapper {
 		man.addVertex();
 	}
 
-	@Override
 	public void vertexThree(ModelBoundsData model, int color) {
 		VertexWriterManager man = VertexWriterManager.getCurrentInstance();
 
@@ -53,7 +54,6 @@ public class TopFaceWriter implements FaceWriterWrapper {
 		man.addVertex();
 	}
 
-	@Override
 	public void vertexFour(ModelBoundsData model, int color) {
 		VertexWriterManager man = VertexWriterManager.getCurrentInstance();
 
