@@ -13,12 +13,7 @@
     "injects.TesselatorStandardMixin",
     "opts.OpenGlHelperMixin",
     "opts.RenderBlockCacheMixin",
-    "opts.rendering.ChunkCacheMixin",
-    "opts.rendering.ChunkRendererDefMixin",
-    "opts.rendering.ChunkRendererMixin",
-//    "opts.rendering.RenderGlobalMixin",
-
-    "opts.rewiring_renderer.GlobalMixin"
+    "opts.rendering.RenderGlobalMixin"
   ],
   "injectors": {
     "defaultRequire": 1
