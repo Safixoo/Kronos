@@ -63,7 +63,7 @@ public class Direction {
 	}
 
 	public static boolean hasSet(int num, int dir) {
-		return (num & dir) != 0;
+		return (num & (1 << dir)) != 0;
 	}
 
 	public static int x(int direction) {

@@ -20,4 +20,12 @@ public class Mth {
 	public static int getZ(long position) {
 		return (int) ((position >> 32L) & ((1 << 25L) - 1)) - (1 << 24);
 	}
+
+	public static double square(double num) {
+		return num * num;
+	}
+
+	public static float square(float num) {
+		return num * num;
+	}
 }

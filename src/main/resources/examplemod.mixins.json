@@ -6,21 +6,19 @@
   "mixins": [
   ],
   "client": [
-    "AABBMixin",
-    "BlockLogicMixin",
     "BlockModelMixin",
-    "BlocksMixin",
-    "ChunkCacheMixin",
-    "ChunkRendererDefMixin",
-    "ChunkRendererMixin",
-    "FrustumMixin",
-    "LightmapHelperMixin",
-    "MinecraftMixin",
-    "OpenGlHelperMixin",
-    "RenderBlockCacheMixin",
     "RenderBlocksMixin",
-    "RenderGlobalMixin",
-    "TesselatorStandardMixin"
+    "injects.AABBMixin",
+    "injects.BlockLogicMixin",
+    "injects.BlocksMixin",
+    "injects.FrustumMixin",
+    "injects.TesselatorStandardMixin",
+    "opts.OpenGlHelperMixin",
+    "opts.RenderBlockCacheMixin",
+    "opts.rendering.ChunkCacheMixin",
+    "opts.rendering.ChunkRendererDefMixin",
+    "opts.rendering.ChunkRendererMixin",
+    "opts.rendering.RenderGlobalMixin"
   ],
   "injectors": {
     "defaultRequire": 1
