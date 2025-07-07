@@ -40,6 +40,10 @@ public abstract class RenderGlobalMixin {
 	private ChunkRenderer[] chunkRenderers;
 	@Shadow
 	private int glRenderListBase;
+	@Shadow
+	private int renderersBeingRendered;
+	@Shadow
+	private int renderersLoaded;
 	private SectionManager manager;
 	private boolean shouldReload;
 
@@ -96,7 +100,17 @@ public abstract class RenderGlobalMixin {
 	 */
 	@Overwrite
 	public int sortAndRender(ICamera camera, int renderPass, double partialTick) {
+		if (renderPass == 0) {
+			this.manager.drawnSolidRenderers = 0;
+		}
+
 		this.manager.drawRenderPass(renderPass);
+
+		if (renderPass == 0) {
+			this.renderersBeingRendered = this.manager.drawnSolidRenderers;
+			this.renderersLoaded = this.manager.drawnSolidRenderers;
+		}
+
 		return 0;
 	}
 

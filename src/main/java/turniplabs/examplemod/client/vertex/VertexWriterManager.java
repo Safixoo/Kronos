@@ -1,7 +1,6 @@
-package turniplabs.examplemod.client;
+package turniplabs.examplemod.client.vertex;
 
 import net.minecraft.client.GLAllocation;
-import org.lwjgl.system.MemoryUtil;
 import turniplabs.examplemod.client.vertex.format.VertexFormat;
 
 import java.nio.ByteBuffer;

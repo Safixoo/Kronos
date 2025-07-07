@@ -3,12 +3,12 @@ package turniplabs.examplemod.client.render;
 import net.minecraft.client.render.RenderBlocks;
 import net.minecraft.client.render.block.model.BlockModel;
 import net.minecraft.client.render.block.model.BlockModelDispatcher;
+import net.minecraft.client.render.terrain.ChunkRenderer;
 import net.minecraft.client.render.tessellator.Tessellator;
 import net.minecraft.core.block.Blocks;
 import net.minecraft.core.world.World;
-import net.minecraft.core.world.chunk.ChunkCache;
-import net.minecraft.core.world.chunk.ChunkSection;
-import turniplabs.examplemod.client.VertexWriterManager;
+import turniplabs.examplemod.client.render.region.RegionRender;
+import turniplabs.examplemod.client.vertex.VertexWriterManager;
 import turniplabs.examplemod.client.render.data.SectionCache;
 import turniplabs.examplemod.client.render.gl.GlVertexBuffer;
 import turniplabs.examplemod.client.render.meshing.BlockRenderer;
@@ -20,7 +20,7 @@ import java.nio.ByteBuffer;
 
 // TODO: Bit-compress most data.
 public class SectionRender {
-	public int posX, posY, posZ;
+	public int sectionX, sectionY, sectionZ;
 
 	public int solidFaces;
 	public int adjacentMask;
@@ -30,11 +30,12 @@ public class SectionRender {
 	public boolean dirty, built, solidEmptySection;
 
 	public GlVertexBuffer solidBuffer, translucentBuffer;
+	public RegionRender region;
 
-	public SectionRender(int posX, int posY, int posZ) {
-		this.posX = posX;
-		this.posY = posY;
-		this.posZ = posZ;
+	public SectionRender(int sectionX, int sectionY, int sectionZ) {
+		this.sectionX = sectionX;
+		this.sectionY = sectionY;
+		this.sectionZ = sectionZ;
 	}
 
 	public void rebuild(BlockRenderer blockRenderer, World world) {
@@ -47,13 +48,15 @@ public class SectionRender {
 			return;
 		}
 
-		int minX = this.posX;
-		int minY = this.posY;
-		int minZ = this.posZ;
+		ChunkRenderer.updates++;
 
-		int maxX = this.posX + 16;
-		int maxY = this.posY + 16;
-		int maxZ = this.posZ + 16;
+		int minX = this.sectionX;
+		int minY = this.sectionY;
+		int minZ = this.sectionZ;
+
+		int maxX = this.sectionX + 16;
+		int maxY = this.sectionY + 16;
+		int maxZ = this.sectionZ + 16;
 
 		SectionCache sectionCache = new SectionCache(world, minX - 1, minY - 1, minZ - 1, maxX + 1, maxY + 1, maxZ + 1);
 
@@ -162,14 +165,21 @@ public class SectionRender {
 	}
 
 	private void fillSolidBuffer(ByteBuffer vertexData, int vertices) {
+		SectionManager manager = SectionManager.getCurrentInstance();
+
 		if (this.solidBuffer == null) {
+			manager.addMemory(vertices, DefaultVertexFormats.TERRAIN_FORMAT.getStride());
 			this.solidBuffer = new GlVertexBuffer(DefaultVertexFormats.TERRAIN_FORMAT);
 		}
+
 		this.solidBuffer.upload(vertexData, vertices);
 	}
 
 	private void fillTranslucentBuffer(ByteBuffer vertexData, int vertices) {
+		SectionManager manager = SectionManager.getCurrentInstance();
+
 		if (this.translucentBuffer == null) {
+			manager.addMemory(vertices, DefaultVertexFormats.TERRAIN_FORMAT.getStride());
 			this.translucentBuffer = new GlVertexBuffer(DefaultVertexFormats.TERRAIN_FORMAT);
 		}
 		this.translucentBuffer.upload(vertexData, vertices);
@@ -180,13 +190,17 @@ public class SectionRender {
 	}
 
 	public void clearRenderer() {
+		SectionManager manager = SectionManager.getCurrentInstance();
+
 		if (this.solidBuffer != null) {
+			manager.removeMemory(this.solidBuffer.vertexCount, DefaultVertexFormats.TERRAIN_FORMAT.getStride());
 			this.solidBuffer.clear();
 
 			this.solidBuffer = null;
 		}
 
 		if (this.translucentBuffer != null) {
+			manager.removeMemory(this.translucentBuffer.vertexCount, DefaultVertexFormats.TERRAIN_FORMAT.getStride());
 			this.translucentBuffer.clear();
 
 			this.translucentBuffer = null;

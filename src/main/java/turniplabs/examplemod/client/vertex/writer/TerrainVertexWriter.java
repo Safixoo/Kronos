@@ -1,7 +1,7 @@
 package turniplabs.examplemod.client.vertex.writer;
 
 import org.lwjgl.system.MemoryUtil;
-import turniplabs.examplemod.client.VertexWriterManager;
+import turniplabs.examplemod.client.vertex.VertexWriterManager;
 import turniplabs.examplemod.client.util.interfaces.IVertexWriter;
 
 import java.nio.ByteBuffer;

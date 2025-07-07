@@ -4,13 +4,13 @@ import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL20;
 import org.spongepowered.asm.mixin.Unique;
 
-public class ShaderTerrain {
+public class ShaderSectionTerrain {
 	private boolean shaderCreated;
 	private int programId;
 	private int u_TexId, u_CamPos;
 	private int u_FogEnd, u_FogStart, u_FogColor;
 
-	public ShaderTerrain() {
+	public ShaderSectionTerrain() {
 		this.prepareAndCompileShader();
 	}
 

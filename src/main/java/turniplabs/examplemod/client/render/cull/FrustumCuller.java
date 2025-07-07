@@ -1,8 +1,8 @@
-package turniplabs.examplemod.client;
+package turniplabs.examplemod.client.render.cull;
 
 import org.joml.Matrix4f;
 
-public class ComplexFrustum {
+public class FrustumCuller {
 	private static double nxX, nxY, nxZ, nxW;
 	private static double pxX, pxY, pxZ, pxW;
 	private static double nyX, nyY, nyZ, nyW;
@@ -19,7 +19,7 @@ public class ComplexFrustum {
 		if (nxY >= 0) nxW += 16.0;
 		if (nxZ >= 0) nxW += 16.0;
 
-		ComplexFrustum.nxW += nxW;
+		FrustumCuller.nxW += nxW;
 //		invW = 1.0f / nxW;
 //
 //		nxX *= invW;
@@ -33,7 +33,7 @@ public class ComplexFrustum {
 		if (pxY >= 0) pxW += 16.0;
 		if (pxZ >= 0) pxW += 16.0;
 
-		ComplexFrustum.pxW += pxW;
+		FrustumCuller.pxW += pxW;
 //		invW = 1.0f / pxW;
 //
 //		pxX *= invW;
@@ -47,7 +47,7 @@ public class ComplexFrustum {
 		if (nyY >= 0) nyW += 16.0;
 		if (nyZ >= 0) nyW += 16.0;
 
-		ComplexFrustum.nyW += nyW;
+		FrustumCuller.nyW += nyW;
 //		invW = 1.0f / nyW;
 //
 //		nyX *= invW;
@@ -61,7 +61,7 @@ public class ComplexFrustum {
 		if (pyY >= 0) pyW += 16.0;
 		if (pyZ >= 0) pyW += 16.0;
 
-		ComplexFrustum.pyW += pyW;
+		FrustumCuller.pyW += pyW;
 //		invW = 1.0f / pyW;
 //
 //		pyX *= invW;

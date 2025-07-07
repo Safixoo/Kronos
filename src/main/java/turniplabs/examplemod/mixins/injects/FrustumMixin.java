@@ -7,7 +7,7 @@ import org.spongepowered.asm.mixin.*;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import turniplabs.examplemod.client.ComplexFrustum;
+import turniplabs.examplemod.client.render.cull.FrustumCuller;
 
 import java.nio.FloatBuffer;
 
@@ -27,10 +27,6 @@ public class FrustumMixin {
 	@Unique
 	private final Matrix4f clippingMatrix = new Matrix4f();
 
-	/**
-	 * @author Safixo
-	 * @reason Remplazo con JOML
-	 */
 	@Inject(method = "calculateFrustum", at = @At("HEAD"))
 	private void calculateFrustum(CallbackInfo ci) {
 		this._proj.rewind();
@@ -44,7 +40,8 @@ public class FrustumMixin {
 
 		this.projectionMatrix.set(this._proj);
 		this.modelViewMatrix.set(this._modl);
+
 		this.projectionMatrix.mul(this.modelViewMatrix, this.clippingMatrix);
-		ComplexFrustum.set(this.clippingMatrix);
+		FrustumCuller.set(this.clippingMatrix);
 	}
 }

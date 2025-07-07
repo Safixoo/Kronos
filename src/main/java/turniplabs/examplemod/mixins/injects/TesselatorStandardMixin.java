@@ -8,8 +8,9 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import turniplabs.examplemod.client.VertexWriterManager;
+import turniplabs.examplemod.client.vertex.VertexWriterManager;
 
+// TODO: Rewrite injections completely, maybe use ASM to avoid allocations.
 @Mixin(value = TessellatorStandard.class, remap = false)
 public abstract class TesselatorStandardMixin extends TessellatorBase {
 
@@ -19,35 +20,19 @@ public abstract class TesselatorStandardMixin extends TessellatorBase {
 	@Shadow
 	public VertexData data;
 
-	@Shadow
-	private double offsetX;
+	@Shadow private double offsetX;
+	@Shadow private double offsetY;
+	@Shadow private double offsetZ;
 
-	@Shadow
-	private double offsetY;
+	@Shadow private double textureU;
+	@Shadow private double textureV;
 
-	@Shadow
-	private double offsetZ;
+	@Shadow private int color;
+	@Shadow private int lightmapCoord;
 
-	@Shadow
-	private double textureU;
-
-	@Shadow
-	private double textureV;
-
-	@Shadow
-	private int color;
-
-	@Shadow
-	private int lightmapCoord;
-
-	@Shadow
-	private byte normalX;
-
-	@Shadow
-	private byte normalY;
-
-	@Shadow
-	private byte normalZ;
+	@Shadow private byte normalX;
+	@Shadow private byte normalY;
+	@Shadow private byte normalZ;
 
 //	/**
 //	 * @author Safixo

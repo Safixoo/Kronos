@@ -2,9 +2,7 @@ package turniplabs.examplemod.client.render.cull;
 
 import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import net.minecraft.client.render.terrain.ChunkRenderer;
 import net.minecraft.core.util.helper.MathHelper;
-import turniplabs.examplemod.client.ComplexFrustum;
 import turniplabs.examplemod.client.render.SectionManager;
 import turniplabs.examplemod.client.render.SectionRender;
 import turniplabs.examplemod.client.util.Direction;
@@ -58,9 +56,9 @@ public class BFSCuller {
 		while (this.bfsQueue.size() > bfsIndex) {
 			SectionRender node = this.bfsQueue.get(bfsIndex++);
 
-			float distX = node.posX - cameraX;
-			float distY = node.posY - cameraY;
-			float distZ = node.posZ - cameraZ;
+			float distX = node.sectionX - cameraX;
+			float distY = node.sectionY - cameraY;
+			float distZ = node.sectionZ - cameraZ;
 
 			if (!(isSectionVisible(distX, distY, distZ, renderDistance))) {
 				continue;
@@ -116,20 +114,20 @@ public class BFSCuller {
 	private static int getOutwardDirections(int playerChunkX, int playerChunkY, int playerChunkZ, SectionRender render) {
 		int planes = 0;
 
-		planes |= (render.posX >> 4) <= playerChunkX ? Direction.set(Direction.WEST)  : 0;
-		planes |= (render.posX >> 4) >= playerChunkX ? Direction.set(Direction.EAST)  : 0;
+		planes |= (render.sectionX >> 4) <= playerChunkX ? Direction.set(Direction.WEST)  : 0;
+		planes |= (render.sectionX >> 4) >= playerChunkX ? Direction.set(Direction.EAST)  : 0;
 
-		planes |= (render.posY >> 4) <= playerChunkY ? Direction.set(Direction.DOWN)  : 0;
-		planes |= (render.posY >> 4) >= playerChunkY ? Direction.set(Direction.UP)    : 0;
+		planes |= (render.sectionY >> 4) <= playerChunkY ? Direction.set(Direction.DOWN)  : 0;
+		planes |= (render.sectionY >> 4) >= playerChunkY ? Direction.set(Direction.UP)    : 0;
 
-		planes |= (render.posZ >> 4) <= playerChunkZ ? Direction.set(Direction.NORTH) : 0;
-		planes |= (render.posZ >> 4) >= playerChunkZ ? Direction.set(Direction.SOUTH) : 0;
+		planes |= (render.sectionZ >> 4) <= playerChunkZ ? Direction.set(Direction.NORTH) : 0;
+		planes |= (render.sectionZ >> 4) >= playerChunkZ ? Direction.set(Direction.SOUTH) : 0;
 
 		return planes;
 	}
 
 	private boolean isSectionVisible(float distX, float distY, float distZ, float renderDistance) {
-		return withinRenderDistance(distX, distY, distZ) < renderDistance && ComplexFrustum.testAab(distX, distY, distZ);
+		return withinRenderDistance(distX, distY, distZ) < renderDistance && FrustumCuller.testAab(distX, distY, distZ);
 	}
 
 	private static float withinRenderDistance(float x, float y, float z) {

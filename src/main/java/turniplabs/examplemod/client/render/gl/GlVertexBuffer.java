@@ -136,4 +136,8 @@ public class GlVertexBuffer {
 	public void unbindVAO() {
 		GL30.glBindVertexArray(0);
 	}
+
+	public void uploadAt(ByteBuffer data, int offset) {
+		GL45.nglNamedBufferData(this.vbo, data.remaining(), MemoryUtil.memAddress(data) + offset, GL15.GL_STREAM_DRAW);
+	}
 }

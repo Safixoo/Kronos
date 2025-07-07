@@ -11,6 +11,7 @@ import turniplabs.examplemod.client.GlobalFlags;
 import turniplabs.examplemod.client.render.cull.BFSCuller;
 import turniplabs.examplemod.client.render.gl.GlVertexBuffer;
 import turniplabs.examplemod.client.render.meshing.BlockRenderer;
+import turniplabs.examplemod.client.render.region.RegionManager;
 import turniplabs.examplemod.client.util.Direction;
 import turniplabs.examplemod.client.util.Mth;
 
@@ -26,6 +27,7 @@ public class SectionManager {
 	private final BFSCuller bfsCuller = new BFSCuller();
 	private static SectionManager INSTANCE;
 
+	private final RegionManager regionManager = new RegionManager();
 	private final List<SectionRender> renderList = new ObjectArrayList<>();
 	private final Queue<SectionRender> updateList = new ArrayDeque<>(1024);
 
@@ -37,10 +39,14 @@ public class SectionManager {
 	private double cameraX, cameraY, cameraZ;
 	private double lastUpdateX, lastUpdateZ;
 
-	private ShaderTerrain terrainShader;
+	public int drawnSolidRenderers = 0;
+
+	private ShaderSectionTerrain terrainShader;
 
 	private long lastPositionCache = -1;
 	private SectionRender lastSectionCache;
+
+	private long vramAllocated;
 
 	public SectionManager(World world) {
 		INSTANCE = this;
@@ -55,6 +61,10 @@ public class SectionManager {
 		}
 
 		return INSTANCE;
+	}
+
+	public int allocatedSections() {
+		return this.sectionMap.size();
 	}
 
 	public void setWorld(World world) {
@@ -82,8 +92,21 @@ public class SectionManager {
 		}
 	}
 
+	// TODO: For block updates, don't update out of render bounds.
 	public boolean isSectionInBounds(int posX, int posY, int posZ) {
 		return false;
+	}
+
+	public void addMemory(int vertices, int stride) {
+		this.vramAllocated += (long) vertices * stride;
+	}
+
+	public void removeMemory(int vertices, int stride) {
+		this.vramAllocated -= (long) vertices * stride;
+	}
+
+	public long getMemory() {
+		return (this.vramAllocated / 1024L) / 1024L;
 	}
 
 	public void markDirty(int posX, int posY, int posZ) {
@@ -203,7 +226,7 @@ public class SectionManager {
 				}
 
 				// Remove sections in the symmetric opposite direction from the point we are adding sections.
-				if (newX < -this.renderDistance || newX > this.renderDistance || newZ < -this.renderDistance || newZ > this.renderDistance) {
+				if (newX <= -this.renderDistance || newX >= this.renderDistance || newZ <= -this.renderDistance || newZ >= this.renderDistance) {
 					for (int y = 0; y < 16; y++) {
 						this.removeRender(currentCameraX - x, y, currentCameraZ - z);
 					}
@@ -277,7 +300,7 @@ public class SectionManager {
 		}
 
 		if (this.terrainShader == null) {
-			this.terrainShader = new ShaderTerrain();
+			this.terrainShader = new ShaderSectionTerrain();
 		}
 
 		this.terrainShader.bindProgram();
@@ -303,10 +326,9 @@ public class SectionManager {
 		final GlVertexBuffer buffer = sectionRender.solidBuffer;
 
 		if (buffer != null && buffer.vertexCount != 0) {
+			this.drawnSolidRenderers++;
 			buffer.bindVAO();
 			buffer.draw();
-			//this.renderersLoaded++;
-			//this.renderersBeingRendered++;
 		}
 	}
 
@@ -345,9 +367,9 @@ public class SectionManager {
 	}
 
 	private SectionRender getSection(SectionRender section, int direction) {
-		int chunkX = (section.posX >>> 4) + Direction.x(direction);
-		int chunkY = (section.posY >>> 4) + Direction.y(direction);
-		int chunkZ = (section.posZ >>> 4) + Direction.z(direction);
+		int chunkX = (section.sectionX >>> 4) + Direction.x(direction);
+		int chunkY = (section.sectionY >>> 4) + Direction.y(direction);
+		int chunkZ = (section.sectionZ >>> 4) + Direction.z(direction);
 
 		return this.sectionMap.getOrDefault(asLong(chunkX, chunkY, chunkZ), null);
 	}

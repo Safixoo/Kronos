@@ -1,7 +1,7 @@
 package turniplabs.examplemod.client.render.meshing.facings;
 
 import net.minecraft.core.block.Block;
-import turniplabs.examplemod.client.VertexWriterManager;
+import turniplabs.examplemod.client.vertex.VertexWriterManager;
 import turniplabs.examplemod.client.render.meshing.BlockRenderer;
 import turniplabs.examplemod.client.render.meshing.FaceWriterWrapper;
 import turniplabs.examplemod.client.render.data.ModelBoundsData;
@@ -10,7 +10,7 @@ import turniplabs.examplemod.client.util.Direction;
 public class NorthFaceWriter extends FaceWriterWrapper {
 	@Override
 	public void colorizeAndBufferQuad(BlockRenderer blockRenderer, ModelBoundsData modelData, Block<?> block, int x, int y, int z, int color) {
-		blockRenderer.colorizeQuad(block, x, y, z, Direction.NORTH, 0, 0, -1, modelData.minZB, -1, 0, 0, 1.0F - modelData.minXB, 1.0F - modelData.maxXB, 0, 1, 0, modelData.maxYB, modelData.minYB, color);
+		blockRenderer.colorizeQuad(block, x, y, z, Direction.NORTH, 0, 0, -1, modelData.minZ, -1, 0, 0, 1.0F - modelData.minX, 1.0F - modelData.maxX, 0, 1, 0, modelData.maxY, modelData.minY, color);
 
 		this.vertexOne(modelData, blockRenderer.colorTopLeft | 0xFF000000);
 		this.vertexTwo(modelData, blockRenderer.colorBottomLeft | 0xFF000000);
@@ -21,7 +21,7 @@ public class NorthFaceWriter extends FaceWriterWrapper {
 	public void vertexOne(ModelBoundsData model, int color) {
 		VertexWriterManager man = VertexWriterManager.getCurrentInstance();
 
-		man.setPos(model.minX, model.maxY, model.minZ);
+		man.setPos(model.x0, model.y1, model.z0);
 		man.setUv(maxU, maxV);
 		man.setColor(color);
 		man.setLightMap(model.render.lightMapCoordTopLeft);
@@ -31,7 +31,7 @@ public class NorthFaceWriter extends FaceWriterWrapper {
 	public void vertexTwo(ModelBoundsData model, int color) {
 		VertexWriterManager man = VertexWriterManager.getCurrentInstance();
 
-		man.setPos(model.maxX, model.maxY, model.minZ);
+		man.setPos(model.x1, model.y1, model.z0);
 		man.setUv(minU, maxV);
 		man.setColor(color);
 		man.setLightMap(model.render.lightMapCoordBottomLeft);
@@ -42,7 +42,7 @@ public class NorthFaceWriter extends FaceWriterWrapper {
 	public void vertexThree(ModelBoundsData model, int color) {
 		VertexWriterManager man = VertexWriterManager.getCurrentInstance();
 
-		man.setPos(model.maxX, model.minY, model.minZ);
+		man.setPos(model.x1, model.y0, model.z0);
 		man.setUv(minU, minV);
 		man.setColor(color);
 		man.setLightMap(model.render.lightMapCoordBottomRight);
@@ -53,7 +53,7 @@ public class NorthFaceWriter extends FaceWriterWrapper {
 	public void vertexFour(ModelBoundsData model, int color) {
 		VertexWriterManager man = VertexWriterManager.getCurrentInstance();
 
-		man.setPos(model.minX, model.minY, model.minZ);
+		man.setPos(model.x0, model.y0, model.z0);
 		man.setUv(maxU, minV);
 		man.setColor(color);
 		man.setLightMap(model.render.lightMapCoordTopRight);
