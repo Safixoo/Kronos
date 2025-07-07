@@ -7,7 +7,9 @@ import net.minecraft.client.render.tessellator.Tessellator;
 import net.minecraft.core.block.Blocks;
 import net.minecraft.core.world.World;
 import net.minecraft.core.world.chunk.ChunkCache;
+import net.minecraft.core.world.chunk.ChunkSection;
 import turniplabs.examplemod.client.VertexWriterManager;
+import turniplabs.examplemod.client.render.data.SectionCache;
 import turniplabs.examplemod.client.render.gl.GlVertexBuffer;
 import turniplabs.examplemod.client.render.meshing.BlockRenderer;
 import turniplabs.examplemod.client.util.BlocksFlags;
@@ -37,6 +39,15 @@ public class SectionRender {
 	}
 
 	public void rebuild(BlockRenderer blockRenderer, World world) {
+		// If all neighbors aren't available, don't build.
+		if (this.adjacentMask != 0b111_111) {
+			this.solidEmptySection = false;
+			this.solidFaces = 0;
+			this.built = false;
+			this.dirty = false;
+			return;
+		}
+
 		int minX = this.posX;
 		int minY = this.posY;
 		int minZ = this.posZ;
@@ -45,12 +56,12 @@ public class SectionRender {
 		int maxY = this.posY + 16;
 		int maxZ = this.posZ + 16;
 
-		ChunkCache chunkcache = new ChunkCache(world, minX - 1, minY - 1, minZ - 1, maxX + 1, maxY + 1, maxZ + 1);
+		SectionCache sectionCache = new SectionCache(world, minX - 1, minY - 1, minZ - 1, maxX + 1, maxY + 1, maxZ + 1);
 
-		RenderBlocks renderBlocks = new RenderBlocks(chunkcache);
+		RenderBlocks renderBlocks = new RenderBlocks(sectionCache);
 		BlockModel.setRenderBlocks(renderBlocks);
 
-		blockRenderer.setChunkCache(chunkcache);
+		blockRenderer.setChunkCache(sectionCache);
 
 		VertexWriterManager solidWriter = VertexWriterManager.SOLID;
 		VertexWriterManager translucentWriter = VertexWriterManager.TRANSLUCENT;
@@ -64,7 +75,7 @@ public class SectionRender {
 		for (int y = minY; y < maxY; ++y) {
 			for (int z = minZ; z < maxZ; ++z) {
 				for (int x = minX; x < maxX; ++x) {
-					int blockId = chunkcache.getBlockId(x, y, z);
+					int blockId = sectionCache.getBlockId(x, y, z);
 
 					if (blockId == 0) {
 						continue;

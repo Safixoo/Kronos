@@ -64,12 +64,12 @@ public class ShaderTerrain {
 		GL20.glUseProgram(this.programId);
 	}
 
-	public void setupUniforms(float posX, float posY, float posZ) {
+	public void setupUniforms(float posX, float posY, float posZ, boolean noFog) {
 		GL20.glUniform1i(this.u_TexId, 0);
 		GL20.glUniform3f(this.u_CamPos, posX, posY, posZ);
 
-		GL20.glUniform1f(this.u_FogEnd, GL11.glGetFloat(GL11.GL_FOG_END));
-		GL20.glUniform1f(this.u_FogStart, GL11.glGetFloat(GL11.GL_FOG_START));
+		GL20.glUniform1f(this.u_FogEnd, noFog ? 1E+9F : GL11.glGetFloat(GL11.GL_FOG_END));
+		GL20.glUniform1f(this.u_FogStart, noFog ? 1E+9F : GL11.glGetFloat(GL11.GL_FOG_START));
 
 		float[] fogColor = new float[4];
 

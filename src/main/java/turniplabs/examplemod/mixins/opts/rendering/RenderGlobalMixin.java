@@ -74,8 +74,6 @@ public abstract class RenderGlobalMixin {
 		return planes;
 	}
 
-
-
 	/**
 	 * @author Safixo
 	 * @reason Avoid no sense and cull all together to avoid looping through the renderer too often.

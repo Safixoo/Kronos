@@ -1,6 +1,7 @@
 package turniplabs.examplemod.client.render;
 
 import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ReferenceCollection;
 import net.minecraft.client.Minecraft;
@@ -39,6 +40,9 @@ public class SectionManager {
 
 	private ShaderTerrain terrainShader;
 
+	private long lastPositionCache = -1;
+	private SectionRender lastSectionCache;
+
 	public SectionManager(World world) {
 		INSTANCE = this;
 
@@ -70,6 +74,7 @@ public class SectionManager {
 
 	public void removeRender(int posX, int posY, int posZ) {
 		long position = asLong(posX, posY, posZ);
+
 		SectionRender sectionRender = this.sectionMap.remove(position);
 
 		if (sectionRender != null) {
@@ -78,19 +83,42 @@ public class SectionManager {
 		}
 	}
 
-	public void addRender(int posX, int posY, int posZ) {
+	public boolean isSectionInBounds(int posX, int posY, int posZ) {
+		return false;
+	}
+
+	public void markDirty(int posX, int posY, int posZ) {
+		long position = asLong(posX, posY, posZ);
+		SectionRender sectionRender;
+
+		// Cache last entry, IDK if this were really necessary.
+		if (position == this.lastPositionCache) {
+			sectionRender = this.lastSectionCache;
+		} else {
+			this.lastSectionCache = sectionRender = this.sectionMap.get(position);
+			this.lastPositionCache = position;
+		}
+
+		if (sectionRender == null) {
+			sectionRender = this.addRender(posX, posY, posZ, true);
+			sectionRender.dirty = true;
+		}
+	}
+
+	public SectionRender addRender(int posX, int posY, int posZ, boolean trulyNew) {
 		long position = asLong(posX, posY, posZ);
 
-		SectionRender sectionRender = this.sectionMap.getOrDefault(position, null);
+		SectionRender sectionRender = trulyNew ? null : this.sectionMap.getOrDefault(position, null);
 
 		if (sectionRender == null) {
 			sectionRender = new SectionRender(posX * 16, posY * 16, posZ * 16);
-			sectionRender.dirty = true;
 
 			this.sectionMap.put(position, sectionRender);
+			this.connectNeighbors(sectionRender);
 		}
 
-		this.connectNeighbors(sectionRender);
+		sectionRender.dirty = true;
+		return sectionRender;
 	}
 
 	public void update(int renderDistance, double cameraX, double cameraY, double cameraZ, boolean worldChanged) {
@@ -114,8 +142,6 @@ public class SectionManager {
 
 		if (diffX + diffZ >= Mth.square(4.0)) {
 			this.generateSections();
-			this.lastUpdateX = cameraX;
-			this.lastUpdateZ = cameraZ;
 		}
 
 		this.bfsCuller.init(Mth.square(GL11.glGetFloat(GL11.GL_FOG_END)));
@@ -136,58 +162,52 @@ public class SectionManager {
 		GlobalFlags.MESHING = false;
 	}
 
+	private static int sign(int x) {
+		return (x >> 31) | 1;
+	}
+
+	// TODO:
+	//  - To remove unused sections add region system which only starts
+	//    in section regions with geometry and do a distance check to discard
+	// 	  too far away regions, doing it with sections is harder without a array it seems.
 	private void generateSections() {
-		int lastChunkCameraX = (int) this.lastUpdateX >>> 4;
-		int lastChunkCameraZ = (int) this.lastUpdateZ >>> 4;
+		int lastChunkCameraX = Math.floorDiv((int) this.lastUpdateX, 16);
+		int lastChunkCameraZ = Math.floorDiv((int) this.lastUpdateZ, 16);
 
-		int currentCameraX = (int) this.cameraX >>> 4;
-		int currentCameraZ = (int) this.cameraZ >>> 4;
+		int currentCameraX = Math.floorDiv((int) this.cameraX, 16);
+		int currentCameraZ = Math.floorDiv((int) this.cameraZ, 16);
 
-		// If current > last the diff is the amount of chunks added from +X (or +Z) to -X
-		// that would have to added, and if current < last, then the same but changed sign.
-		int diffX = (currentCameraX - lastChunkCameraX);
-		int diffZ = (currentCameraZ - lastChunkCameraZ);
-
-		int signX = sign(diffX);
-		int signZ = sign(diffZ);
+		// Doing currentCamera - lastChunkCamera is like generating a vector
+		// from the last camera check pos to the current.
+		int offsetX = (currentCameraX - lastChunkCameraX);
+		int offsetZ = (currentCameraZ - lastChunkCameraZ);
 
 		// Nothing has changed.
-		if (signX == 0 && signZ == 0) {
+		if (offsetX == 0 && offsetZ == 0) {
 			return;
 		}
 
 		// We scan all the render distance volume and if the diff between the last
 		// camera pos summed the xz pos index of the render distance volume goes out
 		// of bounds from the xz min-max index it means that it's a new or old section.
-		for (int x = -this.renderDistance; x < this.renderDistance; x++) {
-			for (int z = -this.renderDistance; z < this.renderDistance; z++) {
-				int newX = x + diffX;
-				int newZ = z + diffZ;
+		for (int x = -this.renderDistance; x <= this.renderDistance; x++) {
+			for (int z = -this.renderDistance; z <= this.renderDistance; z++) {
+				int newX = x + offsetX;
+				int newZ = z + offsetZ;
 
 				// Add new sections in distance.
-				if (newX > this.renderDistance || newX < -this.renderDistance) {
-					for (int y = 0; y < 16; y++) {
-						this.addRender(newX + lastChunkCameraX, y, newZ + lastChunkCameraZ);
-					}
-				}
-				if (newZ > this.renderDistance || newZ < -this.renderDistance) {
-					for (int y = 0; y < 16; y++) {
-						this.addRender(newX + lastChunkCameraX, y, newZ + lastChunkCameraZ);
-					}
-				}
+				if (newX <= -this.renderDistance || newX >= this.renderDistance) {
+					this.lastUpdateX = this.cameraX;
 
-				int oldX = x - diffX;
-				int oldZ = x - diffX;
-
-				// Remove out of render distance sections.
-				if (oldX > this.renderDistance || oldX < -this.renderDistance) {
 					for (int y = 0; y < 16; y++) {
-						this.removeRender(newX + lastChunkCameraX, y, newZ + lastChunkCameraZ);
+						this.addRender(currentCameraX + x, y, currentCameraZ + z, false);
 					}
 				}
-				if (oldZ > this.renderDistance || oldZ < -this.renderDistance) {
+				if (newZ <= -this.renderDistance || newZ >= this.renderDistance) {
+					this.lastUpdateZ = this.cameraZ;
+
 					for (int y = 0; y < 16; y++) {
-						this.addRender(newX + lastChunkCameraX, y, newZ + lastChunkCameraZ);
+						this.addRender(currentCameraX + x, y, currentCameraZ + z, false);
 					}
 				}
 			}
@@ -201,14 +221,10 @@ public class SectionManager {
 		for (int x = -this.renderDistance; x < this.renderDistance; x++) {
 			for (int z = -this.renderDistance; z < this.renderDistance; z++) {
 				for (int y = 0; y < 16; y++) {
-					this.addRender(cameraChunkX + x , y, cameraChunkZ + z);
+					this.addRender(cameraChunkX + x , y, cameraChunkZ + z, true     );
 				}
 			}
 		}
-	}
-
-	private static int sign(int num) {
-		return (num >> 31) | 1;
 	}
 
 	private void clearRenderer() {
@@ -222,8 +238,29 @@ public class SectionManager {
 	}
 
 	public void blockUpdate(int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
+		minX = Math.floorDiv(minX, 16);
+		minY = Math.floorDiv(minY, 16);
+		minZ = Math.floorDiv(minZ, 16);
 
+		maxX = Math.floorDiv(maxX, 16);
+		maxY = Math.floorDiv(maxY, 16);
+		maxZ = Math.floorDiv(maxZ, 16);
 
+		int chunkMinX = Math.min(minX, maxX);
+		int chunkMinY = Math.min(minY, maxY);
+		int chunkMinZ = Math.min(minZ, maxZ);
+
+		int chunkMaxX = Math.max(minX, maxX);
+		int chunkMaxY = Math.max(minY, maxY);
+		int chunkMaxZ = Math.max(minZ, maxZ);
+
+		for (int x = chunkMinX; x <= chunkMaxX; x++) {
+			for (int y = chunkMinY; y <= chunkMaxY; y++) {
+				for (int z = chunkMinZ; z <= chunkMaxZ; z++) {
+					this.markDirty(x, y, z);
+				}
+			}
+		}
 	}
 
 	public void drawRenderPass(int renderPass) {
@@ -232,9 +269,7 @@ public class SectionManager {
 		}
 
 		// Disables fog when option is active.
-		if (!Minecraft.getMinecraft().gameSettings.fog.value) {
-			GL11.glDisable(GL11.GL_FOG);
-		}
+		boolean noFog = !Minecraft.getMinecraft().gameSettings.fog.value;
 
 		// Look like terrain display lists have some of these states baked.
 		// With my VBO rendering this isn't the case.
@@ -248,7 +283,7 @@ public class SectionManager {
 		}
 
 		this.terrainShader.bindProgram();
-		this.terrainShader.setupUniforms((float) this.cameraX, (float) this.cameraY, (float) this.cameraZ);
+		this.terrainShader.setupUniforms((float) this.cameraX, (float) this.cameraY, (float) this.cameraZ, noFog);
 
 		// Renders in front-to-back in solid and back-to-front in translucent.
 		if (renderPass == 0) {
@@ -263,10 +298,6 @@ public class SectionManager {
 
 		GL30.glBindVertexArray(0);
 		this.terrainShader.unbindProgram();
-
-		if (Minecraft.getMinecraft().gameSettings.fog.value) {
-			GL11.glEnable(GL11.GL_FOG);
-		}
 	}
 
 	private void renderSolidTerrain(int index) {
@@ -293,19 +324,19 @@ public class SectionManager {
 
 	public void connectNeighbors(SectionRender render) {
 		for (int dir = 0; dir < Direction.COUNT; dir++) {
-			SectionRender renderer = this.getSection(render, dir);
+			SectionRender adjacent = this.getSection(render, dir);
 
-			if (renderer != null) {
-				renderer.setAdjacentNeighbor(render, Direction.opposite(dir));
+			if (adjacent != null) {
+				adjacent.setAdjacentNeighbor(render, Direction.opposite(dir));
 			}
 
-			render.setAdjacentNeighbor(renderer, dir);
+			render.setAdjacentNeighbor(adjacent, dir);
 		}
 	}
 
 	public void disconnectNeighbors(SectionRender render) {
 		for (int dir = 0; dir < Direction.COUNT; dir++) {
-			SectionRender renderer = this.getSection(render, dir);
+			SectionRender renderer = render.getAdjacent(dir);
 
 			if (renderer != null) {
 				renderer.setAdjacentNeighbor(null, Direction.opposite(dir));
@@ -316,11 +347,11 @@ public class SectionManager {
 	}
 
 	private SectionRender getSection(SectionRender section, int direction) {
-		int chunkX = (section.posX >> 4) + Direction.x(direction);
-		int chunkY = (section.posY >> 4) + Direction.y(direction);
-		int chunkZ = (section.posZ >> 4) + Direction.z(direction);
+		int chunkX = (section.posX >>> 4) + Direction.x(direction);
+		int chunkY = (section.posY >>> 4) + Direction.y(direction);
+		int chunkZ = (section.posZ >>> 4) + Direction.z(direction);
 
-		return this.sectionMap.get(asLong(chunkX, chunkY, chunkZ));
+		return this.sectionMap.getOrDefault(asLong(chunkX, chunkY, chunkZ), null);
 	}
 
 }

@@ -13,6 +13,7 @@ import net.minecraft.core.world.chunk.ChunkCache;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import turniplabs.examplemod.client.VertexWriterManager;
+import turniplabs.examplemod.client.render.data.SectionCache;
 import turniplabs.examplemod.client.render.meshing.BlockRenderer;
 import turniplabs.examplemod.client.render.gl.GlVertexBuffer;
 import turniplabs.examplemod.client.util.Direction;
@@ -56,7 +57,7 @@ public abstract class ChunkRendererMixin extends ChunkRenderer implements IChunk
 		this.empty[0] = true;
 		this.empty[1] = true;
 
-		ChunkCache chunkcache = new ChunkCache(this.world, minX - 1, minY - 1, minZ - 1, maxX + 1, maxY + 1, maxZ + 1);
+		SectionCache chunkcache = new SectionCache(this.world, minX - 1, minY - 1, minZ - 1, maxX + 1, maxY + 1, maxZ + 1);
 
 		RenderBlocks renderBlocks = new RenderBlocks(chunkcache);
 		BlockModel.setRenderBlocks(renderBlocks);

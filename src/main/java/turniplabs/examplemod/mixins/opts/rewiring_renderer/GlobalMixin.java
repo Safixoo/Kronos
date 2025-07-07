@@ -25,31 +25,22 @@ public abstract class GlobalMixin {
 	@Shadow
 	private WorldClient worldObj;
 	@Shadow
-	private int renderChunksWide;
-
-	@Shadow
-	public abstract void markDirty(int minX, int minY, int minZ, int maxX, int maxY, int maxZ);
-
-	@Shadow
 	private Integer renderDistance;
 	@Shadow
 	@Final
 	private Minecraft mc;
 	@Shadow
 	private int renderEntitiesStartupCounter;
-
 	@Shadow
 	public abstract void updateStars();
-
 	@Shadow
 	public abstract void deleteRenderListBase();
-
-	@Shadow
-	private int glRenderListBase;
 	@Shadow
 	public List<TileEntity> tileEntities;
 	@Shadow
 	private ChunkRenderer[] chunkRenderers;
+	@Shadow
+	private int glRenderListBase;
 	private SectionManager manager;
 	private boolean shouldReload;
 
@@ -61,6 +52,7 @@ public abstract class GlobalMixin {
 	public void loadRenderers() {
 		this.renderDistance = this.mc.gameSettings.renderDistance.value;
 
+		// Many functions access this array, to make
 		this.chunkRenderers = new ChunkRenderer[] {
 			new ChunkRendererLegacy(null, null, Integer.MIN_VALUE, Integer.MIN_VALUE, Integer.MIN_VALUE, 0, 0)
 		};
@@ -74,7 +66,9 @@ public abstract class GlobalMixin {
 		this.deleteRenderListBase();
 
 		this.tileEntities.clear();
-		this.glRenderListBase = GLAllocation.generateDisplayLists(331776);
+
+		// Don't add as many display lists as vanilla, as they won't be used for chunks.
+		this.glRenderListBase = GLAllocation.generateDisplayLists(4096);
 
 		BlockModelLeaves.setGraphicsLevel(this.mc.gameSettings.fancyGraphics.value == 1);
 
@@ -97,7 +91,6 @@ public abstract class GlobalMixin {
 		this.shouldReload = false;
 	}
 
-
 	/**
 	 * @author Safixo
 	 * @reason Rewire to our impl.
@@ -105,7 +98,6 @@ public abstract class GlobalMixin {
 	@Overwrite
 	public int sortAndRender(ICamera camera, int renderPass, double partialTick) {
 		this.manager.drawRenderPass(renderPass);
-
 		return 0;
 	}
 

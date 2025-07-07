@@ -13,6 +13,7 @@ import net.minecraft.core.world.chunk.ChunkCache;
 import org.spongepowered.asm.mixin.Unique;
 import turniplabs.examplemod.client.VertexWriterManager;
 import turniplabs.examplemod.client.render.data.ModelBoundsData;
+import turniplabs.examplemod.client.render.data.SectionCache;
 import turniplabs.examplemod.client.util.ColorBGRManager;
 import turniplabs.examplemod.client.util.Direction;
 import turniplabs.examplemod.client.util.interfaces.mixin.IBlockAABB;
@@ -20,7 +21,7 @@ import turniplabs.examplemod.client.vertex.writer.TerrainVertexWriter;
 
 public class BlockRenderer {
 	public RenderBlockCache cache = new RenderBlockCache();
-	private ChunkCache chunkCache;
+	private SectionCache chunkCache;
 
 	private boolean[] facesBlock;
 	private boolean useColor;
@@ -51,7 +52,6 @@ public class BlockRenderer {
 		this.facesBlock = ((IBlockAABB) bounds).blockBoundsCheck();
 		this.setModelBounds(x, y, z, bounds);
 
-
 		for (int side = 0; side < Direction.COUNT; side++) {
 			if (blockModel instanceof BlockModelGrass) {
 				int meta = this.chunkCache.getBlockMetadata(x, y, z);
@@ -62,7 +62,7 @@ public class BlockRenderer {
 		}
 	}
 
-	public void setChunkCache(ChunkCache chunkCache) {
+	public void setChunkCache(SectionCache chunkCache) {
 		this.chunkCache = chunkCache;
 	}
 

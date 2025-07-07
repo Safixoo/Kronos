@@ -42,11 +42,14 @@ public class SectionCache implements WorldSource {
 		for (int x = sectionX; x <= maxChunkX; x++) {
 			for (int z = sectionZ; z <= maxChunkZ; z++) {
 				for (int y = sectionY; y <= maxChunkY; y++) {
+					int relX = x - sectionX;
+					int relY = y - sectionY;
+					int relZ = z - sectionZ;
+
 					Chunk chunk = world.getChunkFromChunkCoords(x, z);
+					ChunkSection section = chunk.getSection((minY >> 4) + relY);
 
-					ChunkSection section = chunk.getSection((minY >> 4) + y);
-
-					int sectionIndex = sectionIndex(x, y, z);
+					int sectionIndex = sectionIndex(relX, relY, relZ);
 
 					if (section != null) {
 						if (section.blocks != null) {
@@ -74,7 +77,7 @@ public class SectionCache implements WorldSource {
 		}
 	}
 
-	private static int sectionIndex(int x, int y, int z) {
+	public static int sectionIndex(int x, int y, int z) {
 		return x + (z * 3) + (y * 9);
 	}
 
@@ -180,7 +183,18 @@ public class SectionCache implements WorldSource {
 
 	@Override
 	public int getBlockMetadata(int x, int y, int z) {
-		return this.sectionData[sectionIndex(x, y, z)][makeBlockIndex(x & 15, y & 15, z & 15)];
+		int offX = (x >> 4) - this.sectionX;
+		int offY = (y >> 4) - this.sectionY;
+		int offZ = (z >> 4) - this.sectionZ;
+
+		int sectionIndex = sectionIndex(offX, offY, offZ);
+
+		// Doesn't solve all issues with section indexing but avoid many ArrayOutOfBounds.
+		if (sectionIndex < 0 || sectionIndex >= 27) {
+			return 0;
+		}
+
+		return this.sectionData[sectionIndex][makeBlockIndex(x & 15, y & 15, z & 15)];
 	}
 
 	@Override
