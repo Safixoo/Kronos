@@ -141,7 +141,7 @@ public class BFSCuller {
 	}
 
 	private void visitNode(Queue<SectionRender> updateQueue, ObjectArrayList<SectionRender> queue, SectionRender adj) {
-		if (adj.currentFrame != activeFrame && !adj.solidEmptySection) {
+		if (adj.currentFrame != this.activeFrame && !adj.solidEmptySection) {
 			if (adj.dirty && this.chunksUpdated < MAX_UPDATE_QUEUES) {
 				updateQueue.add(adj);
 				this.chunksUpdated++;

@@ -10,7 +10,15 @@ public class ShaderTerrain {
 	private int u_TexId, u_CamPos;
 	private int u_FogEnd, u_FogStart, u_FogColor;
 
+	public ShaderTerrain() {
+		this.prepareAndCompileShader();
+	}
+
 	public void prepareAndCompileShader() {
+		if (this.shaderCreated) {
+			return;
+		}
+
 		this.programId = GL20.glCreateProgram();
 		int vertexShaderId = GL20.glCreateShader(GL20.GL_VERTEX_SHADER);
 		int fragmentShaderId = GL20.glCreateShader(GL20.GL_FRAGMENT_SHADER);
@@ -46,6 +54,14 @@ public class ShaderTerrain {
 		this.u_FogEnd = GL20.glGetUniformLocation(this.programId, "u_FogEnd");
 		this.u_FogStart = GL20.glGetUniformLocation(this.programId, "u_FogStart");
 		this.u_FogColor = GL20.glGetUniformLocation(this.programId, "u_FogColor");
+	}
+
+	public void unbindProgram() {
+		GL20.glUseProgram(0);
+	}
+
+	public void bindProgram() {
+		GL20.glUseProgram(this.programId);
 	}
 
 	public void setupUniforms(float posX, float posY, float posZ) {

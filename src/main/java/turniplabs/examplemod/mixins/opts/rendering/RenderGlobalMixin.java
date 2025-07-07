@@ -410,26 +410,6 @@ public abstract class RenderGlobalMixin {
 		return lastDistance < renderDistance && ComplexFrustum.testAab(distX, distY, distZ);
 	}
 
-	private static int getAngleVisibilityMask(float dx, float dy, float dz) {
-		int angleOcclusionMask = 0;
-
-		dx = Math.abs(dx - 8);
-		dy = Math.abs(dy - 8);
-		dz = Math.abs(dz - 8);
-
-		if (dx > dy || dz > dy) {
-			angleOcclusionMask |= Direction.DOWN_SET | Direction.UP_SET;
-		}
-		if (dx > dz || dy > dz) {
-			angleOcclusionMask |= Direction.SOUTH_SET | Direction.NORTH_SET;
-		}
-		if (dy > dx || dz > dx) {
-			angleOcclusionMask |= Direction.EAST_SET | Direction.WEST_SET;
-		}
-
-		return ~angleOcclusionMask;
-	}
-
 	private static long asLong(int x, int y, int z) {
 		long l = 0L;
 		l |= ((long)x & 4194303L) << 42;

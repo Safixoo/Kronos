@@ -6,8 +6,10 @@ import it.unimi.dsi.fastutil.objects.ReferenceCollection;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.world.World;
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL30;
 import turniplabs.examplemod.client.GlobalFlags;
 import turniplabs.examplemod.client.render.cull.BFSCuller;
+import turniplabs.examplemod.client.render.gl.GlVertexBuffer;
 import turniplabs.examplemod.client.render.meshing.BlockRenderer;
 import turniplabs.examplemod.client.util.Direction;
 import turniplabs.examplemod.client.util.Mth;
@@ -34,6 +36,8 @@ public class SectionManager {
 
 	private double cameraX, cameraY, cameraZ;
 	private double lastUpdateX, lastUpdateZ;
+
+	private ShaderTerrain terrainShader;
 
 	public SectionManager(World world) {
 		INSTANCE = this;
@@ -66,9 +70,12 @@ public class SectionManager {
 
 	public void removeRender(int posX, int posY, int posZ) {
 		long position = asLong(posX, posY, posZ);
-
 		SectionRender sectionRender = this.sectionMap.remove(position);
-		sectionRender.clearRenderer();
+
+		if (sectionRender != null) {
+			this.disconnectNeighbors(sectionRender);
+			sectionRender.clearRenderer();
+		}
 	}
 
 	public void addRender(int posX, int posY, int posZ) {
@@ -77,17 +84,28 @@ public class SectionManager {
 		SectionRender sectionRender = this.sectionMap.getOrDefault(position, null);
 
 		if (sectionRender == null) {
-			sectionRender = new SectionRender(posX, posY, posZ);
+			sectionRender = new SectionRender(posX * 16, posY * 16, posZ * 16);
 			sectionRender.dirty = true;
 
 			this.sectionMap.put(position, sectionRender);
 		}
+
+		this.connectNeighbors(sectionRender);
 	}
 
 	public void update(int renderDistance, double cameraX, double cameraY, double cameraZ, boolean worldChanged) {
+		this.cameraX = cameraX;
+		this.cameraY = cameraY;
+		this.cameraZ = cameraZ;
+
 		if (this.renderDistance != renderDistance || worldChanged) {
-			this.generateWholeVolume(cameraX, cameraZ);
+			this.renderDistance = renderDistance;
+			this.lastUpdateX = cameraX;
+			this.lastUpdateZ = cameraZ;
+
 			this.clearRenderer();
+			this.generateWholeVolume(cameraX, cameraZ);
+
 			return;
 		}
 
@@ -100,13 +118,10 @@ public class SectionManager {
 			this.lastUpdateZ = cameraZ;
 		}
 
-		this.cameraX = cameraX;
-		this.cameraY = cameraY;
-		this.cameraZ = cameraZ;
-		this.renderDistance = renderDistance;
-
-		this.bfsCuller.init(GL11.glGetFloat(GL11.GL_FOG_END));
+		this.bfsCuller.init(Mth.square(GL11.glGetFloat(GL11.GL_FOG_END)));
 		this.bfsCuller.updateRenderList(this.sectionMap, (float) cameraX, (float) cameraY, (float) cameraZ);
+
+		this.queueRebuilds();
 	}
 
 	// TODO: Implement off-thread chunk updates.
@@ -144,8 +159,8 @@ public class SectionManager {
 		// We scan all the render distance volume and if the diff between the last
 		// camera pos summed the xz pos index of the render distance volume goes out
 		// of bounds from the xz min-max index it means that it's a new or old section.
-		for (int x = -this.renderDistance; x < this.renderDistance; x -= signX) {
-			for (int z = -this.renderDistance; z < this.renderDistance; z -= signZ) {
+		for (int x = -this.renderDistance; x < this.renderDistance; x++) {
+			for (int z = -this.renderDistance; z < this.renderDistance; z++) {
 				int newX = x + diffX;
 				int newZ = z + diffZ;
 
@@ -211,18 +226,69 @@ public class SectionManager {
 
 	}
 
-	public void queueSectionUpdates() {
-		GlobalFlags.MESHING = true;
-
-		for (SectionRender render : this.updateList) {
-			render.rebuild(this.blockRenderer, this.worldObj);
+	public void drawRenderPass(int renderPass) {
+		if (this.renderList.isEmpty()) {
+			return;
 		}
 
-		GlobalFlags.MESHING = false;
+		// Disables fog when option is active.
+		if (!Minecraft.getMinecraft().gameSettings.fog.value) {
+			GL11.glDisable(GL11.GL_FOG);
+		}
+
+		// Look like terrain display lists have some of these states baked.
+		// With my VBO rendering this isn't the case.
+		if (renderPass == 1) {
+			GL11.glColorMask(true, true, true, true);
+			GL11.glEnable(GL11.GL_CULL_FACE);
+		}
+
+		if (this.terrainShader == null) {
+			this.terrainShader = new ShaderTerrain();
+		}
+
+		this.terrainShader.bindProgram();
+		this.terrainShader.setupUniforms((float) this.cameraX, (float) this.cameraY, (float) this.cameraZ);
+
+		// Renders in front-to-back in solid and back-to-front in translucent.
+		if (renderPass == 0) {
+			for (int i = 0; i < this.renderList.size(); i++) {
+				this.renderSolidTerrain(i);
+			}
+		} else {
+			for (int i = this.renderList.size() - 1; i >= 0; i--) {
+				this.renderTranslucentTerrain(i);
+			}
+		}
+
+		GL30.glBindVertexArray(0);
+		this.terrainShader.unbindProgram();
+
+		if (Minecraft.getMinecraft().gameSettings.fog.value) {
+			GL11.glEnable(GL11.GL_FOG);
+		}
 	}
 
-	public void drawRenderPass(int renderPass) {
+	private void renderSolidTerrain(int index) {
+		final SectionRender sectionRender = this.renderList.get(index);
+		final GlVertexBuffer buffer = sectionRender.solidBuffer;
 
+		if (buffer != null && buffer.vertexCount != 0) {
+			buffer.bindVAO();
+			buffer.draw();
+			//this.renderersLoaded++;
+			//this.renderersBeingRendered++;
+		}
+	}
+
+	private void renderTranslucentTerrain(int index) {
+		final SectionRender sectionRender = this.renderList.get(index);
+		final GlVertexBuffer buffer = sectionRender.translucentBuffer;
+
+		if (buffer != null && buffer.vertexCount != 0) {
+			buffer.bindVAO();
+			buffer.draw();
+		}
 	}
 
 	public void connectNeighbors(SectionRender render) {

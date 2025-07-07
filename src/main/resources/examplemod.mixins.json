@@ -3,8 +3,6 @@
   "minVersion": "0.8",
   "package": "turniplabs.examplemod.mixins",
   "compatibilityLevel": "JAVA_8",
-  "mixins": [
-  ],
   "client": [
     "BlockModelMixin",
     "RenderBlocksMixin",
@@ -18,7 +16,9 @@
     "opts.rendering.ChunkCacheMixin",
     "opts.rendering.ChunkRendererDefMixin",
     "opts.rendering.ChunkRendererMixin",
-    "opts.rendering.RenderGlobalMixin"
+//    "opts.rendering.RenderGlobalMixin",
+
+    "opts.rewiring_renderer.GlobalMixin"
   ],
   "injectors": {
     "defaultRequire": 1
