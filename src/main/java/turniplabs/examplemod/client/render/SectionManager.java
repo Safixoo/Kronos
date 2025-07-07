@@ -1,7 +1,6 @@
 package turniplabs.examplemod.client.render;
 
 import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
-import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ReferenceCollection;
 import net.minecraft.client.Minecraft;
@@ -162,14 +161,6 @@ public class SectionManager {
 		GlobalFlags.MESHING = false;
 	}
 
-	private static int sign(int x) {
-		return (x >> 31) | 1;
-	}
-
-	// TODO:
-	//  - To remove unused sections add region system which only starts
-	//    in section regions with geometry and do a distance check to discard
-	// 	  too far away regions, doing it with sections is harder without a array it seems.
 	private void generateSections() {
 		int lastChunkCameraX = Math.floorDiv((int) this.lastUpdateX, 16);
 		int lastChunkCameraZ = Math.floorDiv((int) this.lastUpdateZ, 16);
@@ -210,6 +201,13 @@ public class SectionManager {
 						this.addRender(currentCameraX + x, y, currentCameraZ + z, false);
 					}
 				}
+
+				// Remove sections in the symmetric opposite direction from the point we are adding sections.
+				if (newX < -this.renderDistance || newX > this.renderDistance || newZ < -this.renderDistance || newZ > this.renderDistance) {
+					for (int y = 0; y < 16; y++) {
+						this.removeRender(currentCameraX - x, y, currentCameraZ - z);
+					}
+				}
 			}
 		}
 	}
@@ -218,10 +216,10 @@ public class SectionManager {
 		int cameraChunkX = (int) cameraX >>> 4;
 		int cameraChunkZ = (int) cameraZ >>> 4;
 
-		for (int x = -this.renderDistance; x < this.renderDistance; x++) {
-			for (int z = -this.renderDistance; z < this.renderDistance; z++) {
+		for (int x = -this.renderDistance; x <= this.renderDistance; x++) {
+			for (int z = -this.renderDistance; z <= this.renderDistance; z++) {
 				for (int y = 0; y < 16; y++) {
-					this.addRender(cameraChunkX + x , y, cameraChunkZ + z, true     );
+					this.addRender(cameraChunkX + x , y, cameraChunkZ + z, true);
 				}
 			}
 		}

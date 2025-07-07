@@ -3,16 +3,15 @@ package turniplabs.examplemod.client;
 import org.joml.Matrix4f;
 
 public class ComplexFrustum {
-	private static float nxX, nxY, nxZ, nxW;
-	private static float pxX, pxY, pxZ, pxW;
-	private static float nyX, nyY, nyZ, nyW;
-	private static float pyX, pyY, pyZ, pyW;
+	private static double nxX, nxY, nxZ, nxW;
+	private static double pxX, pxY, pxZ, pxW;
+	private static double nyX, nyY, nyZ, nyW;
+	private static double pyX, pyY, pyZ, pyW;
 //	private static float nzX, nzY, nzZ, nzW;
 //	private static float pzX, pzY, pzZ, pzW;
 
 	public static void set(Matrix4f m) {
 		//float invW;
-
 		nxX = m.m03() + m.m00(); nxY = m.m13() + m.m10(); nxZ = m.m23() + m.m20(); nxW = m.m33() + m.m30();
 
 		double nxW = 0;
@@ -20,7 +19,7 @@ public class ComplexFrustum {
 		if (nxY >= 0) nxW += 16.0;
 		if (nxZ >= 0) nxW += 16.0;
 
-		ComplexFrustum.nxW += (float) nxW;
+		ComplexFrustum.nxW += nxW;
 //		invW = 1.0f / nxW;
 //
 //		nxX *= invW;
@@ -34,7 +33,7 @@ public class ComplexFrustum {
 		if (pxY >= 0) pxW += 16.0;
 		if (pxZ >= 0) pxW += 16.0;
 
-		ComplexFrustum.pxW += (float) pxW;
+		ComplexFrustum.pxW += pxW;
 //		invW = 1.0f / pxW;
 //
 //		pxX *= invW;
@@ -48,7 +47,7 @@ public class ComplexFrustum {
 		if (nyY >= 0) nyW += 16.0;
 		if (nyZ >= 0) nyW += 16.0;
 
-		ComplexFrustum.nyW += (float) nyW;
+		ComplexFrustum.nyW += nyW;
 //		invW = 1.0f / nyW;
 //
 //		nyX *= invW;
@@ -62,7 +61,7 @@ public class ComplexFrustum {
 		if (pyY >= 0) pyW += 16.0;
 		if (pyZ >= 0) pyW += 16.0;
 
-		ComplexFrustum.pyW += (float) pyW;
+		ComplexFrustum.pyW += pyW;
 //		invW = 1.0f / pyW;
 //
 //		pyX *= invW;

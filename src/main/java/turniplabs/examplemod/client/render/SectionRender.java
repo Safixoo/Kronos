@@ -18,19 +18,18 @@ import turniplabs.examplemod.client.vertex.format.DefaultVertexFormats;
 
 import java.nio.ByteBuffer;
 
+// TODO: Bit-compress most data.
 public class SectionRender {
 	public int posX, posY, posZ;
 
-	public int solidFaces = 0;
-
-	public int adjacentMask = 0;
+	public int solidFaces;
+	public int adjacentMask;
 	public int currentFrame;
 
 	public final SectionRender[] adjacentSections = new SectionRender[Direction.COUNT];
 	public boolean dirty, built, solidEmptySection;
 
-	public GlVertexBuffer solidBuffer;
-	public GlVertexBuffer translucentBuffer;
+	public GlVertexBuffer solidBuffer, translucentBuffer;
 
 	public SectionRender(int posX, int posY, int posZ) {
 		this.posX = posX;
@@ -152,18 +151,6 @@ public class SectionRender {
 		}
 	}
 
-	public void deleteRenderer() {
-		if (this.solidBuffer != null) {
-			this.solidBuffer.clearVertexData();
-			this.solidBuffer.clear();
-		}
-
-		if (this.translucentBuffer != null) {
-			this.translucentBuffer.clearVertexData();
-			this.translucentBuffer.clear();
-		}
-	}
-
 	public void setAdjacentNeighbor(SectionRender render, int direction) {
 		if (render == null) {
 			this.adjacentMask &= ~(1 << direction);
@@ -194,14 +181,12 @@ public class SectionRender {
 
 	public void clearRenderer() {
 		if (this.solidBuffer != null) {
-			this.solidBuffer.clearVertexData();
 			this.solidBuffer.clear();
 
 			this.solidBuffer = null;
 		}
 
 		if (this.translucentBuffer != null) {
-			this.translucentBuffer.clearVertexData();
 			this.translucentBuffer.clear();
 
 			this.translucentBuffer = null;

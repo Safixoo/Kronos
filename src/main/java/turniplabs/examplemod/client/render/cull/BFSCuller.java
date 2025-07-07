@@ -17,7 +17,7 @@ public class BFSCuller {
 	private List<SectionRender> renderList;
 	private Queue<SectionRender> updateList;
 
-	private static final int MAX_UPDATE_QUEUES = 10;
+	private static final int MAX_UPDATE_QUEUES = 6;
 
 	private float renderDistance;
 	private int chunksUpdated;
