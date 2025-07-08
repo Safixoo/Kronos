@@ -9,7 +9,7 @@ import java.nio.ByteBuffer;
 
 public class RegionAllocation {
 	private static final int STRIDE = TerrainVertexWriter.STRIDE;
-	private static final int MIN_ALLOC = 256 * STRIDE;
+	private static final int MIN_ALLOC = 1024 * STRIDE;
 
 	public final RegionVertexBuffer vertexBuffer;
 
@@ -49,9 +49,9 @@ public class RegionAllocation {
 		}
 
 		alloc.render = render;
-		this.uploadAllocation(alloc, vertexData);
+		this.uploadAllocation(alloc, vertexData, size);
 
-		return packDrawData(alloc.offset, alloc.size);
+		return packDrawData(size, alloc.offset);
 	}
 
 	private Allocation allocateNew(SectionRender render, int size) {
@@ -77,11 +77,11 @@ public class RegionAllocation {
 		long drawData;
 
 		if (alloc.size < size) {
+			this.uploadAllocation(alloc, data, size);
+			drawData = packDrawData(alloc.size, alloc.offset);
+		} else {
 			this.remove(render);
 			drawData = this.allocate(render, data, size);
-		} else {
-			this.uploadAllocation(alloc, data);
-			drawData = packDrawData(alloc.offset, alloc.size);
 		}
 
 		return drawData;
@@ -100,7 +100,7 @@ public class RegionAllocation {
 	public Allocation findRenderAlloc(SectionRender render) {
 		Allocation alloc = this.firstEntry;
 
-		while (alloc.render != render) {
+		while (alloc != null && alloc.render != render) {
 			alloc = alloc.next;
 		}
 
@@ -138,8 +138,8 @@ public class RegionAllocation {
 		alloc.next = renderAlloc.next;
 	}
 
-	public void uploadAllocation(Allocation alloc, ByteBuffer data) {
-		this.vertexBuffer.upload(data, alloc.offset * STRIDE, alloc.size * STRIDE);
+	public void uploadAllocation(Allocation alloc, ByteBuffer data, int size) {
+		this.vertexBuffer.upload(data, alloc.offset * STRIDE, size * STRIDE);
 	}
 
 	public class Allocation {

@@ -33,17 +33,7 @@ public class RegionVertexBuffer {
 	public void upload(ByteBuffer vertexData, int offset, int size) {
 		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, this.vboId);
 
-		if ((offset + size) >= this.capacity) {
-			System.err.println("GL BUFFER SIZE = " + this.capacity);
-			System.err.println("ALLOCATION SIZE = " + size);
-			System.err.println("ALLOCATION OFFSET = " + offset);
-		}
-
-		long point = GL30.nglMapBufferRange(GL15.GL_ARRAY_BUFFER, offset, size, GL30.GL_MAP_WRITE_BIT | GL30.GL_MAP_READ_BIT);
-
-		MemoryUtil.memCopy(MemoryUtil.memAddress(vertexData), point, size);
-		GL20.glUnmapBuffer(GL15.GL_ARRAY_BUFFER);
-
+		GL20.nglBufferSubData(GL15.GL_ARRAY_BUFFER, offset, size, MemoryUtil.memAddress(vertexData));
 		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
 	}
 

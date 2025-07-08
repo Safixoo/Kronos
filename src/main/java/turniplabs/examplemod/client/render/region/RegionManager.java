@@ -3,9 +3,9 @@ package turniplabs.examplemod.client.render.region;
 
 import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
 import it.unimi.dsi.fastutil.objects.*;
+import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL30;
 import turniplabs.examplemod.client.render.SectionManager;
-import turniplabs.examplemod.client.render.SectionRender;
 
 public class RegionManager {
 	public final Long2ReferenceOpenHashMap<RegionRender> regionMap = new Long2ReferenceOpenHashMap<>();
@@ -36,25 +36,31 @@ public class RegionManager {
 		this.regionRenders.add(render);
 	}
 
-	public void drawAllRegions() {
-		// Draw solid.
-		for (RegionRender region : this.regionRenders) {
-			if (region.solidFirst.isEmpty()) {
-				continue;
-			}
+	public void drawAllRegions(int renderPass) {
+		if (renderPass == 0) {
+			// Draw solid.
+			for (RegionRender region : this.regionRenders) {
+				if (region.solidEmptyDraw) {
+					continue;
+				}
 
-			region.bindSolid();
-			region.draw(region.solidFirst, region.solidCount);
+				region.bindSolid();
+				region.draw(region.solidFirst, region.solidCount);
+				region.solidEmptyDraw = true;
+			}
 		}
 
-		// Draw translucent.
-		for (RegionRender region : this.regionRenders) {
-			if (region.translucentFirst.isEmpty()) {
-				continue;
-			}
+		if (renderPass == 1) {
+			// Draw translucent.
+			for (RegionRender region : this.regionRenders) {
+				if (region.translucentEmptyDraw) {
+					continue;
+				}
 
-			region.bindTranslucent();
-			region.draw(region.translucentFirst, region.translucentCount);
+				region.bindTranslucent();
+				region.draw(region.translucentFirst, region.translucentCount);
+				region.translucentEmptyDraw = true;
+			}
 		}
 
 		GL30.glBindVertexArray(0);

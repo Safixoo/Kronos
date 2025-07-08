@@ -84,8 +84,10 @@ public class BFSCuller {
 		}
 
 		if (region.currentFrame != this.activeFrame) {
+			if (section.solidDraw != 0 || section.translucentDraw != 0) {
+				this.regionManager.addToDrawQueue(region);
+			}
 			region.currentFrame = this.activeFrame;
-			this.regionManager.addToDrawQueue(region);
 		}
 
 		if (section.solidDraw != 0) {

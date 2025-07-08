@@ -37,7 +37,6 @@ public class GlVertexBuffer {
 		}
 
 		this.vertexCount = vertexCount;
-
 		this.uploadBufferToDevice(buffer);
 	}
 

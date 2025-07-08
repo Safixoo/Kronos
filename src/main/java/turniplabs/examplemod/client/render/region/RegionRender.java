@@ -1,7 +1,9 @@
 package turniplabs.examplemod.client.render.region;
 
 import it.unimi.dsi.fastutil.ints.IntArrayList;
+import org.lwjgl.Sys;
 import org.lwjgl.opengl.GL15;
+import org.lwjgl.system.MemoryUtil;
 import turniplabs.examplemod.client.render.SectionRender;
 import turniplabs.examplemod.client.vertex.VertexWriterManager;
 import turniplabs.examplemod.client.vertex.writer.TerrainVertexWriter;
@@ -12,9 +14,11 @@ public class RegionRender {
 	private RegionAllocation translucentBuffer;
 	private RegionAllocation solidBuffer;
 
+	public boolean solidEmptyDraw = true;
 	public final IntArrayList solidCount = new IntArrayList();
 	public final IntArrayList solidFirst = new IntArrayList();
 
+	public boolean translucentEmptyDraw = true;
 	public final IntArrayList translucentCount = new IntArrayList();
 	public final IntArrayList translucentFirst = new IntArrayList();
 
@@ -86,10 +90,12 @@ public class RegionRender {
 
 	public void addSolidDraw(long drawData) {
 		this.addToBatch(this.solidFirst, this.solidCount, drawData);
+		this.solidEmptyDraw = false;
 	}
 
 	public void addTranslucentDraw(long drawData) {
 		this.addToBatch(this.translucentFirst, this.translucentCount, drawData);
+		this.translucentEmptyDraw = false;
 	}
 
 	public void bindSolid() {
@@ -106,7 +112,22 @@ public class RegionRender {
 	}
 
 	public void draw(IntArrayList first, IntArrayList count) {
-		GL15.glMultiDrawArrays(GL15.GL_QUADS, first.elements(), count.elements());
+		long firstPtr = MemoryUtil.nmemAlloc(64 * 4);
+		long countPtr = MemoryUtil.nmemAlloc(64 * 4);
+
+		int nonEmpty = 0;
+
+		for (int i = 0; i < first.size(); i++) {
+			if (count.getInt(i) == 0) {
+				continue;
+			}
+
+			MemoryUtil.memPutInt((nonEmpty * 4L) + firstPtr, first.getInt(i));
+			MemoryUtil.memPutInt((nonEmpty * 4L) + countPtr, count.getInt(i));
+			nonEmpty++;
+		}
+
+		GL15.nglMultiDrawArrays(GL15.GL_QUADS, firstPtr, countPtr, nonEmpty);
 
 		first.clear();
 		count.clear();

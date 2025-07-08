@@ -307,41 +307,9 @@ public class SectionManager {
 		this.terrainShader.bindProgram();
 		this.terrainShader.setupUniforms((float) this.cameraX, (float) this.cameraY, (float) this.cameraZ, noFog);
 
-		this.regionManager.drawAllRegions();
-
-//		// Renders in front-to-back in solid and back-to-front in translucent.
-//		if (renderPass == 0) {
-//			for (int i = 0; i < this.renderList.size(); i++) {
-//				this.renderSolidTerrain(i);
-//			}
-//		} else {
-//			for (int i = this.renderList.size() - 1; i >= 0; i--) {
-//				this.renderTranslucentTerrain(i);
-//			}
-//		}
+		this.regionManager.drawAllRegions(renderPass);
 		this.terrainShader.unbindProgram();
 	}
-
-//	private void renderSolidTerrain(int index) {
-//		final SectionRender sectionRender = this.renderList.get(index);
-//		final GlVertexBuffer buffer = sectionRender.solidBuffer;
-//
-//		if (buffer != null && buffer.vertexCount != 0) {
-//			this.drawnSolidRenderers++;
-//			buffer.bindVAO();
-//			buffer.draw();
-//		}
-//	}
-//
-//	private void renderTranslucentTerrain(int index) {
-//		final SectionRender sectionRender = this.renderList.get(index);
-//		final GlVertexBuffer buffer = sectionRender.translucentBuffer;
-//
-//		if (buffer != null && buffer.vertexCount != 0) {
-//			buffer.bindVAO();
-//			buffer.draw();
-//		}
-//	}
 
 	public void connectNeighbors(SectionRender render) {
 		for (int dir = 0; dir < Direction.COUNT; dir++) {
