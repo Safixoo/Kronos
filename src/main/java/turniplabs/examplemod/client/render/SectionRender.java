@@ -42,15 +42,6 @@ public class SectionRender {
 	}
 
 	public void rebuild(SectionManager sectionManager, BlockRenderer blockRenderer, World world) {
-		// If all neighbors aren't available, don't build.
-		if (this.adjacentMask != 0b111_111) {
-			this.solidEmptySection = false;
-			this.solidFaces = 0;
-			this.built = false;
-			this.dirty = true;
-			return;
-		}
-
 		ChunkRenderer.updates++;
 
 		int minX = this.blockX;

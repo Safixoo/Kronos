@@ -15,7 +15,7 @@ public class RegionManager {
 	private RegionRender lastRegion;
 
 	public RegionRender getRegion(int sectionX, int sectionY, int sectionZ) {
-		long position = SectionManager.asLong(sectionX >> 2, sectionY >> 2, sectionZ >> 2);
+		long position = SectionManager.asLong(sectionX >> 3, sectionY >> 1, sectionZ >> 3);
 		RegionRender region;
 
 		if (position == this.lastPosition) {
@@ -40,30 +40,28 @@ public class RegionManager {
 		if (renderPass == 0) {
 			// Draw solid.
 			for (RegionRender region : this.regionRenders) {
-				if (region.solidEmptyDraw) {
-					continue;
+				if (region.solidEmptyDraw != 0) {
+					region.bindSolid();
+					region.draw(region.solidFirst, region.solidCount, region.solidEmptyDraw);
+					region.solidEmptyDraw = 0;
 				}
-
-				region.bindSolid();
-				region.draw(region.solidFirst, region.solidCount);
-				region.solidEmptyDraw = true;
 			}
 		}
 
 		if (renderPass == 1) {
 			// Draw translucent.
 			for (RegionRender region : this.regionRenders) {
-				if (region.translucentEmptyDraw) {
-					continue;
+				if (region.translucentEmptyDraw != 0) {
+					region.bindTranslucent();
+					region.draw(region.translucentFirst, region.translucentCount, region.translucentEmptyDraw);
+					region.translucentEmptyDraw = 0;
 				}
-
-				region.bindTranslucent();
-				region.draw(region.translucentFirst, region.translucentCount);
-				region.translucentEmptyDraw = true;
 			}
+
+			// Assuming translucent is rendered last.
+			this.regionRenders.clear();
 		}
 
 		GL30.glBindVertexArray(0);
-		this.regionRenders.clear();
 	}
  }

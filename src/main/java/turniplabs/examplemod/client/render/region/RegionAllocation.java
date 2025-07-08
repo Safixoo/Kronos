@@ -1,6 +1,8 @@
 package turniplabs.examplemod.client.render.region;
 
+import org.lwjgl.opengl.GL45;
 import org.lwjgl.system.MemoryUtil;
+import turniplabs.examplemod.client.render.SectionManager;
 import turniplabs.examplemod.client.render.SectionRender;
 import turniplabs.examplemod.client.vertex.writer.TerrainVertexWriter;
 
@@ -20,24 +22,32 @@ public class RegionAllocation {
 	private Allocation lastEntry;
 	private Allocation freeAllocations;
 
+	private static RegionVertexBuffer sparseBuffer;
+
 	public RegionAllocation() {
 		this(MIN_ALLOC);
 	}
 
 	public RegionAllocation(int size) {
+		if (sparseBuffer == null) {
+			sparseBuffer = new RegionVertexBuffer(8 * 1024 * 1024);
+		}
+
 		this.vertexBuffer = new RegionVertexBuffer(Math.max(MIN_ALLOC, size));
 		this.capacity = Math.max(MIN_ALLOC, size);
 	}
 
 	public void resize() {
+		GL45.glCopyNamedBufferSubData(this.vertexBuffer.vboId, sparseBuffer.vboId, 0, 0, this.capacity);
 		this.vertexBuffer.allocateSpace(this.capacity *= 2);
+		GL45.glCopyNamedBufferSubData(sparseBuffer.vboId, this.vertexBuffer.vboId, 0, 0, this.capacity);
 
-		Allocation alloc = this.firstEntry;
-
-		while (alloc != null) {
-			alloc.render.dirty = true;
-			alloc = alloc.next;
-		}
+//		Allocation alloc = this.firstEntry;
+//
+//		while (alloc != null) {
+//			alloc.render.dirty = true;
+//			alloc = alloc.next;
+//		}
 	}
 
 	// Returns first << 32 | count.
@@ -58,6 +68,8 @@ public class RegionAllocation {
 		int maxOffset = this.offset / STRIDE;
 		int sizeInBytes = size * STRIDE;
 
+		SectionManager.getCurrentInstance().addMemory(size, TerrainVertexWriter.STRIDE);
+
 		while (this.capacity <= this.offset + sizeInBytes) {
 			this.resize();
 		}
@@ -76,7 +88,7 @@ public class RegionAllocation {
 		Allocation alloc = this.findRenderAlloc(render);
 		long drawData;
 
-		if (alloc.size < size) {
+		if (alloc.size >= size) {
 			this.uploadAllocation(alloc, data, size);
 			drawData = packDrawData(alloc.size, alloc.offset);
 		} else {

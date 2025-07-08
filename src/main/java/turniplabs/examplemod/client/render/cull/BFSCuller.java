@@ -19,7 +19,7 @@ public class BFSCuller {
 	private RegionManager regionManager;
 	private Queue<SectionRender> updateList;
 
-	private static final int MAX_UPDATE_QUEUES = 6;
+	private static final int MAX_UPDATE_QUEUES = 5;
 
 	private float renderDistance;
 	private int chunksUpdated;

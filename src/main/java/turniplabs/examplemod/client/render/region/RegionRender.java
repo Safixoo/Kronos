@@ -3,6 +3,7 @@ package turniplabs.examplemod.client.render.region;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import org.lwjgl.Sys;
 import org.lwjgl.opengl.GL15;
+import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
 import turniplabs.examplemod.client.render.SectionRender;
 import turniplabs.examplemod.client.vertex.VertexWriterManager;
@@ -14,13 +15,13 @@ public class RegionRender {
 	private RegionAllocation translucentBuffer;
 	private RegionAllocation solidBuffer;
 
-	public boolean solidEmptyDraw = true;
-	public final IntArrayList solidCount = new IntArrayList();
-	public final IntArrayList solidFirst = new IntArrayList();
+	public int solidEmptyDraw = 0;
+	public final long solidCount = MemoryUtil.nmemAlloc(64 * 4);
+	public final long solidFirst = MemoryUtil.nmemAlloc(64 * 4);
 
-	public boolean translucentEmptyDraw = true;
-	public final IntArrayList translucentCount = new IntArrayList();
-	public final IntArrayList translucentFirst = new IntArrayList();
+	public int translucentEmptyDraw = 0;
+	public final long translucentCount = MemoryUtil.nmemAlloc(64 * 4);
+	public final long translucentFirst = MemoryUtil.nmemAlloc(64 * 4);
 
 	private final RegionManager regionManager;
 
@@ -89,13 +90,11 @@ public class RegionRender {
 	}
 
 	public void addSolidDraw(long drawData) {
-		this.addToBatch(this.solidFirst, this.solidCount, drawData);
-		this.solidEmptyDraw = false;
+		this.addToBatch(this.solidFirst, this.solidCount, drawData, this.solidEmptyDraw++);
 	}
 
 	public void addTranslucentDraw(long drawData) {
-		this.addToBatch(this.translucentFirst, this.translucentCount, drawData);
-		this.translucentEmptyDraw = false;
+		this.addToBatch(this.translucentFirst, this.translucentCount, drawData, this.translucentEmptyDraw++);
 	}
 
 	public void bindSolid() {
@@ -106,31 +105,13 @@ public class RegionRender {
 		this.translucentBuffer.vertexBuffer.bind();
 	}
 
-	private void addToBatch(IntArrayList first, IntArrayList count, long drawData) {
-		count.add(RegionAllocation.unpackCount(drawData));
-		first.add(RegionAllocation.unpackFirst(drawData));
+	private void addToBatch(long first, long count, long drawData, int drawIndex) {
+		MemoryUtil.memPutInt(drawIndex * 4L + first, RegionAllocation.unpackFirst(drawData));
+		MemoryUtil.memPutInt(drawIndex * 4L + count, RegionAllocation.unpackCount(drawData));
 	}
 
-	public void draw(IntArrayList first, IntArrayList count) {
-		long firstPtr = MemoryUtil.nmemAlloc(64 * 4);
-		long countPtr = MemoryUtil.nmemAlloc(64 * 4);
-
-		int nonEmpty = 0;
-
-		for (int i = 0; i < first.size(); i++) {
-			if (count.getInt(i) == 0) {
-				continue;
-			}
-
-			MemoryUtil.memPutInt((nonEmpty * 4L) + firstPtr, first.getInt(i));
-			MemoryUtil.memPutInt((nonEmpty * 4L) + countPtr, count.getInt(i));
-			nonEmpty++;
-		}
-
-		GL15.nglMultiDrawArrays(GL15.GL_QUADS, firstPtr, countPtr, nonEmpty);
-
-		first.clear();
-		count.clear();
+	public void draw(long first, long count, int drawCount) {
+		GL15.nglMultiDrawArrays(GL15.GL_QUADS, first, count, drawCount);
 	}
 
 	public static int regionIndex(int x, int y, int z) {
