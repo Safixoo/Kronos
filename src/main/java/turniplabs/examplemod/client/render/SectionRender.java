@@ -20,11 +20,14 @@ import java.nio.ByteBuffer;
 
 // TODO: Bit-compress most data.
 public class SectionRender {
-	public int sectionX, sectionY, sectionZ;
+	public int blockX, blockY, blockZ;
 
 	public int solidFaces;
 	public int adjacentMask;
 	public int currentFrame;
+
+	public long translucentDraw;
+	public long solidDraw;
 
 	public final SectionRender[] adjacentSections = new SectionRender[Direction.COUNT];
 	public boolean dirty, built, solidEmptySection;
@@ -32,42 +35,39 @@ public class SectionRender {
 	public GlVertexBuffer solidBuffer, translucentBuffer;
 	public RegionRender region;
 
-	public SectionRender(int sectionX, int sectionY, int sectionZ) {
-		this.sectionX = sectionX;
-		this.sectionY = sectionY;
-		this.sectionZ = sectionZ;
+	public SectionRender(int blockX, int blockY, int blockZ) {
+		this.blockX = blockX;
+		this.blockY = blockY;
+		this.blockZ = blockZ;
 	}
 
-	public void rebuild(BlockRenderer blockRenderer, World world) {
+	public void rebuild(SectionManager sectionManager, BlockRenderer blockRenderer, World world) {
 		// If all neighbors aren't available, don't build.
 		if (this.adjacentMask != 0b111_111) {
 			this.solidEmptySection = false;
 			this.solidFaces = 0;
 			this.built = false;
-			this.dirty = false;
+			this.dirty = true;
 			return;
 		}
 
 		ChunkRenderer.updates++;
 
-		int minX = this.sectionX;
-		int minY = this.sectionY;
-		int minZ = this.sectionZ;
+		int minX = this.blockX;
+		int minY = this.blockY;
+		int minZ = this.blockZ;
 
-		int maxX = this.sectionX + 16;
-		int maxY = this.sectionY + 16;
-		int maxZ = this.sectionZ + 16;
+		int maxX = minX + 16;
+		int maxY = minY + 16;
+		int maxZ = minZ + 16;
 
 		SectionCache sectionCache = new SectionCache(world, minX - 1, minY - 1, minZ - 1, maxX + 1, maxY + 1, maxZ + 1);
-
 		RenderBlocks renderBlocks = new RenderBlocks(sectionCache);
 		BlockModel.setRenderBlocks(renderBlocks);
-
 		blockRenderer.setChunkCache(sectionCache);
 
 		VertexWriterManager solidWriter = VertexWriterManager.SOLID;
 		VertexWriterManager translucentWriter = VertexWriterManager.TRANSLUCENT;
-
 		this.prepareWriterForTerrain(solidWriter);
 		this.prepareWriterForTerrain(translucentWriter);
 
@@ -122,11 +122,21 @@ public class SectionRender {
 		this.solidEmptySection = solidBlocks == 4096 && solidWriter.getVertices() == 0;
 
 		if (solidWriter.getVertices() != 0) {
-			fillSolidBuffer(solidWriter.getVertexData(), solidWriter.getVertices());
+//			fillSolidBuffer(solidWriter.getVertexData(), solidWriter.getVertices());
+			if (this.region == null) {
+			 	this.region = sectionManager.getRegion(this.blockX >> 4, this.blockY >> 4, this.blockZ >> 4);
+			}
+
+			this.region.addSolidMesh(this, solidWriter);
 		}
 
 		if (translucentWriter.getVertices() != 0) {
-			fillTranslucentBuffer(translucentWriter.getVertexData(), translucentWriter.getVertices());
+//			fillTranslucentBuffer(translucentWriter.getVertexData(), translucentWriter.getVertices());
+			if (this.region == null) {
+				this.region = sectionManager.getRegion(this.blockX >> 4, this.blockY >> 4, this.blockZ >> 4);
+			}
+
+			this.region.addTranslucentMesh(this, translucentWriter);
 		}
 
 		translucentWriter.stopDrawing();

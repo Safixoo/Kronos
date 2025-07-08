@@ -12,6 +12,7 @@ import turniplabs.examplemod.client.render.cull.BFSCuller;
 import turniplabs.examplemod.client.render.gl.GlVertexBuffer;
 import turniplabs.examplemod.client.render.meshing.BlockRenderer;
 import turniplabs.examplemod.client.render.region.RegionManager;
+import turniplabs.examplemod.client.render.region.RegionRender;
 import turniplabs.examplemod.client.util.Direction;
 import turniplabs.examplemod.client.util.Mth;
 
@@ -28,7 +29,6 @@ public class SectionManager {
 	private static SectionManager INSTANCE;
 
 	private final RegionManager regionManager = new RegionManager();
-	private final List<SectionRender> renderList = new ObjectArrayList<>();
 	private final Queue<SectionRender> updateList = new ArrayDeque<>(1024);
 
 	private final BlockRenderer blockRenderer = new BlockRenderer();
@@ -51,7 +51,7 @@ public class SectionManager {
 	public SectionManager(World world) {
 		INSTANCE = this;
 
-		this.bfsCuller.setRenderingLists(this.renderList, this.updateList);
+		this.bfsCuller.setRenderingLists(this.regionManager, this.updateList);
 		this.worldObj = world;
 	}
 
@@ -61,6 +61,14 @@ public class SectionManager {
 		}
 
 		return INSTANCE;
+	}
+
+	public static RegionManager getRegionManager() {
+		return getCurrentInstance().regionManager;
+	}
+
+	public RegionRender getRegion(int sectionX, int sectionY, int sectionZ) {
+		return this.regionManager.getRegion(sectionX, sectionY, sectionZ);
 	}
 
 	public int allocatedSections() {
@@ -92,11 +100,6 @@ public class SectionManager {
 		}
 	}
 
-	// TODO: For block updates, don't update out of render bounds.
-	public boolean isSectionInBounds(int posX, int posY, int posZ) {
-		return false;
-	}
-
 	public void addMemory(int vertices, int stride) {
 		this.vramAllocated += (long) vertices * stride;
 	}
@@ -113,7 +116,7 @@ public class SectionManager {
 		long position = asLong(posX, posY, posZ);
 		SectionRender sectionRender;
 
-		// Cache last entry, IDK if this were really necessary.
+		// Cache last entry, IDR if this were really necessary.
 		if (position == this.lastPositionCache) {
 			sectionRender = this.lastSectionCache;
 		} else {
@@ -123,8 +126,9 @@ public class SectionManager {
 
 		if (sectionRender == null) {
 			sectionRender = this.addRender(posX, posY, posZ, true);
-			sectionRender.dirty = true;
 		}
+
+		sectionRender.dirty = true;
 	}
 
 	public SectionRender addRender(int posX, int posY, int posZ, boolean trulyNew) {
@@ -178,7 +182,7 @@ public class SectionManager {
 
 		SectionRender render;
 		while ((render = this.updateList.poll()) != null) {
-			render.rebuild(this.blockRenderer, this.worldObj);
+			render.rebuild(this, this.blockRenderer, this.worldObj);
 		}
 
 		GlobalFlags.MESHING = false;
@@ -201,9 +205,9 @@ public class SectionManager {
 			return;
 		}
 
-		// We scan all the render distance volume and if the diff between the last
-		// camera pos summed the xz pos index of the render distance volume goes out
-		// of bounds from the xz min-max index it means that it's a new or old section.
+		// We scan all the render distance volume and if the diff between the last camera pos summed the xz
+		// pos index of the render distance volume goes out of bounds from the xz min-max index it means
+		// that it's a new or old section.
 		for (int x = -this.renderDistance; x <= this.renderDistance; x++) {
 			for (int z = -this.renderDistance; z <= this.renderDistance; z++) {
 				int newX = x + offsetX;
@@ -225,8 +229,9 @@ public class SectionManager {
 					}
 				}
 
-				// Remove sections in the symmetric opposite direction from the point we are adding sections.
-				if (newX <= -this.renderDistance || newX >= this.renderDistance || newZ <= -this.renderDistance || newZ >= this.renderDistance) {
+				// Remove sections in the symmetric opposite direction from the point we are adding sections, this
+				// doesn't help tremendously, but it does something.
+				if (newX < -this.renderDistance || newX > this.renderDistance || newZ < -this.renderDistance || newZ > this.renderDistance) {
 					for (int y = 0; y < 16; y++) {
 						this.removeRender(currentCameraX - x, y, currentCameraZ - z);
 					}
@@ -285,10 +290,6 @@ public class SectionManager {
 	}
 
 	public void drawRenderPass(int renderPass) {
-		if (this.renderList.isEmpty()) {
-			return;
-		}
-
 		// Disables fog when option is active.
 		boolean noFog = !Minecraft.getMinecraft().gameSettings.fog.value;
 
@@ -306,41 +307,41 @@ public class SectionManager {
 		this.terrainShader.bindProgram();
 		this.terrainShader.setupUniforms((float) this.cameraX, (float) this.cameraY, (float) this.cameraZ, noFog);
 
-		// Renders in front-to-back in solid and back-to-front in translucent.
-		if (renderPass == 0) {
-			for (int i = 0; i < this.renderList.size(); i++) {
-				this.renderSolidTerrain(i);
-			}
-		} else {
-			for (int i = this.renderList.size() - 1; i >= 0; i--) {
-				this.renderTranslucentTerrain(i);
-			}
-		}
+		this.regionManager.drawAllRegions();
 
-		GL30.glBindVertexArray(0);
+//		// Renders in front-to-back in solid and back-to-front in translucent.
+//		if (renderPass == 0) {
+//			for (int i = 0; i < this.renderList.size(); i++) {
+//				this.renderSolidTerrain(i);
+//			}
+//		} else {
+//			for (int i = this.renderList.size() - 1; i >= 0; i--) {
+//				this.renderTranslucentTerrain(i);
+//			}
+//		}
 		this.terrainShader.unbindProgram();
 	}
 
-	private void renderSolidTerrain(int index) {
-		final SectionRender sectionRender = this.renderList.get(index);
-		final GlVertexBuffer buffer = sectionRender.solidBuffer;
-
-		if (buffer != null && buffer.vertexCount != 0) {
-			this.drawnSolidRenderers++;
-			buffer.bindVAO();
-			buffer.draw();
-		}
-	}
-
-	private void renderTranslucentTerrain(int index) {
-		final SectionRender sectionRender = this.renderList.get(index);
-		final GlVertexBuffer buffer = sectionRender.translucentBuffer;
-
-		if (buffer != null && buffer.vertexCount != 0) {
-			buffer.bindVAO();
-			buffer.draw();
-		}
-	}
+//	private void renderSolidTerrain(int index) {
+//		final SectionRender sectionRender = this.renderList.get(index);
+//		final GlVertexBuffer buffer = sectionRender.solidBuffer;
+//
+//		if (buffer != null && buffer.vertexCount != 0) {
+//			this.drawnSolidRenderers++;
+//			buffer.bindVAO();
+//			buffer.draw();
+//		}
+//	}
+//
+//	private void renderTranslucentTerrain(int index) {
+//		final SectionRender sectionRender = this.renderList.get(index);
+//		final GlVertexBuffer buffer = sectionRender.translucentBuffer;
+//
+//		if (buffer != null && buffer.vertexCount != 0) {
+//			buffer.bindVAO();
+//			buffer.draw();
+//		}
+//	}
 
 	public void connectNeighbors(SectionRender render) {
 		for (int dir = 0; dir < Direction.COUNT; dir++) {
@@ -367,9 +368,9 @@ public class SectionManager {
 	}
 
 	private SectionRender getSection(SectionRender section, int direction) {
-		int chunkX = (section.sectionX >>> 4) + Direction.x(direction);
-		int chunkY = (section.sectionY >>> 4) + Direction.y(direction);
-		int chunkZ = (section.sectionZ >>> 4) + Direction.z(direction);
+		int chunkX = (section.blockX >>> 4) + Direction.x(direction);
+		int chunkY = (section.blockY >>> 4) + Direction.y(direction);
+		int chunkZ = (section.blockZ >>> 4) + Direction.z(direction);
 
 		return this.sectionMap.getOrDefault(asLong(chunkX, chunkY, chunkZ), null);
 	}

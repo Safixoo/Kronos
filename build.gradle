@@ -30,6 +30,7 @@ loom {
 		named("client") {
 			vmArg("-XX:+UnlockDiagnosticVMOptions");
 			vmArg("-XX:+DebugNonSafepoints");
+			vmArg("-Dorg.lwjgl.util.Debug=true");
 		}
 	}
 }

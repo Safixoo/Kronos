@@ -2,9 +2,12 @@ package turniplabs.examplemod.client.render.cull;
 
 import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import net.minecraft.client.render.terrain.RenderRegion;
 import net.minecraft.core.util.helper.MathHelper;
 import turniplabs.examplemod.client.render.SectionManager;
 import turniplabs.examplemod.client.render.SectionRender;
+import turniplabs.examplemod.client.render.region.RegionManager;
+import turniplabs.examplemod.client.render.region.RegionRender;
 import turniplabs.examplemod.client.util.Direction;
 
 import java.util.List;
@@ -12,7 +15,8 @@ import java.util.Queue;
 
 public class BFSCuller {
 	private final ObjectArrayList<SectionRender> bfsQueue = new ObjectArrayList<>();
-	private List<SectionRender> renderList;
+
+	private RegionManager regionManager;
 	private Queue<SectionRender> updateList;
 
 	private static final int MAX_UPDATE_QUEUES = 6;
@@ -21,15 +25,14 @@ public class BFSCuller {
 	private int chunksUpdated;
 	private int activeFrame;
 
-	public void setRenderingLists(List<SectionRender> renderList, Queue<SectionRender> updateList) {
-		this.renderList = renderList;
+	public void setRenderingLists(RegionManager regionManager, Queue<SectionRender> updateList) {
+		this.regionManager = regionManager;
 		this.updateList = updateList;
 	}
 
 	public void init(float renderDistance) {
 		this.renderDistance = renderDistance;
 
-		this.renderList.clear();
 		this.updateList.clear();
 		this.bfsQueue.clear();
 
@@ -45,10 +48,10 @@ public class BFSCuller {
 		SectionRender spawn = sectionMap.get(SectionManager.asLong(playerChunkX, playerChunkY, playerChunkZ));
 
 		if (spawn != null) {
-			this.updateList.add(spawn);
 			exploreNodes(this.updateList, this.bfsQueue, spawn, spawn.adjacentMask);
+			this.updateList.add(spawn);
 
-			this.renderList.add(spawn);
+			this.queueRegionNode(spawn, spawn.region);
 		}
 
 		int bfsIndex = 0;
@@ -56,15 +59,15 @@ public class BFSCuller {
 		while (this.bfsQueue.size() > bfsIndex) {
 			SectionRender node = this.bfsQueue.get(bfsIndex++);
 
-			float distX = node.sectionX - cameraX;
-			float distY = node.sectionY - cameraY;
-			float distZ = node.sectionZ - cameraZ;
+			float distX = node.blockX - cameraX;
+			float distY = node.blockY - cameraY;
+			float distZ = node.blockZ - cameraZ;
 
 			if (!(isSectionVisible(distX, distY, distZ, renderDistance))) {
 				continue;
 			}
 
-			this.renderList.add(node);
+			this.queueRegionNode(node, node.region);
 
 			int outwardDirections = getOutwardDirections(playerChunkX, playerChunkY, playerChunkZ, node);
 
@@ -72,6 +75,25 @@ public class BFSCuller {
 			outwardDirections &= ~node.solidFaces;
 
 			exploreNodes(this.updateList, this.bfsQueue, node, outwardDirections);
+		}
+	}
+
+	private void queueRegionNode(SectionRender section, RegionRender region) {
+		if (region == null) {
+			return;
+		}
+
+		if (region.currentFrame != this.activeFrame) {
+			region.currentFrame = this.activeFrame;
+			this.regionManager.addToDrawQueue(region);
+		}
+
+		if (section.solidDraw != 0) {
+			region.addSolidDraw(section.solidDraw);
+		}
+
+		if (section.translucentDraw != 0) {
+			region.addTranslucentDraw(section.translucentDraw);
 		}
 	}
 
@@ -114,14 +136,14 @@ public class BFSCuller {
 	private static int getOutwardDirections(int playerChunkX, int playerChunkY, int playerChunkZ, SectionRender render) {
 		int planes = 0;
 
-		planes |= (render.sectionX >> 4) <= playerChunkX ? Direction.set(Direction.WEST)  : 0;
-		planes |= (render.sectionX >> 4) >= playerChunkX ? Direction.set(Direction.EAST)  : 0;
+		planes |= (render.blockX >> 4) <= playerChunkX ? Direction.set(Direction.WEST)  : 0;
+		planes |= (render.blockX >> 4) >= playerChunkX ? Direction.set(Direction.EAST)  : 0;
 
-		planes |= (render.sectionY >> 4) <= playerChunkY ? Direction.set(Direction.DOWN)  : 0;
-		planes |= (render.sectionY >> 4) >= playerChunkY ? Direction.set(Direction.UP)    : 0;
+		planes |= (render.blockY >> 4) <= playerChunkY ? Direction.set(Direction.DOWN)  : 0;
+		planes |= (render.blockY >> 4) >= playerChunkY ? Direction.set(Direction.UP)    : 0;
 
-		planes |= (render.sectionZ >> 4) <= playerChunkZ ? Direction.set(Direction.NORTH) : 0;
-		planes |= (render.sectionZ >> 4) >= playerChunkZ ? Direction.set(Direction.SOUTH) : 0;
+		planes |= (render.blockZ >> 4) <= playerChunkZ ? Direction.set(Direction.NORTH) : 0;
+		planes |= (render.blockZ >> 4) >= playerChunkZ ? Direction.set(Direction.SOUTH) : 0;
 
 		return planes;
 	}
