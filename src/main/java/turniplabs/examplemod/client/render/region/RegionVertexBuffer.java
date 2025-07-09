@@ -1,13 +1,10 @@
 package turniplabs.examplemod.client.render.region;
 
-import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL15;
 import org.lwjgl.opengl.GL20;
 import org.lwjgl.opengl.GL30;
 import org.lwjgl.system.MemoryUtil;
 import turniplabs.examplemod.client.vertex.format.DefaultVertexFormats;
-import turniplabs.examplemod.client.vertex.writer.TerrainVertexWriter;
-
 import java.nio.ByteBuffer;
 
 public class RegionVertexBuffer {
@@ -62,6 +59,10 @@ public class RegionVertexBuffer {
 	}
 
 	public void clear() {
+		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, this.vboId);
+		GL30.glBufferData(GL15.GL_ARRAY_BUFFER, 0, GL15.GL_STREAM_DRAW);
+		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
+
 		GL30.glDeleteBuffers(this.vboId);
 		GL30.glDeleteBuffers(this.vaoId);
 	}
