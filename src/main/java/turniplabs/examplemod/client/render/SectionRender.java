@@ -3,6 +3,7 @@ package turniplabs.examplemod.client.render;
 import net.minecraft.client.render.RenderBlocks;
 import net.minecraft.client.render.block.model.BlockModel;
 import net.minecraft.client.render.block.model.BlockModelDispatcher;
+import net.minecraft.client.render.block.model.BlockModelLeaves;
 import net.minecraft.client.render.terrain.ChunkRenderer;
 import net.minecraft.client.render.tessellator.Tessellator;
 import net.minecraft.core.block.Blocks;
@@ -95,7 +96,7 @@ public class SectionRender {
 						VertexWriterManager.setCurrentInstance(translucentWriter);
 					}
 
-					if (Blocks.solid[blockId]) {
+					if (Blocks.solid[blockId] || model instanceof BlockModelLeaves) {
 						blockRenderer.renderStandardBlock(model, model.block.getBoundsRaw(), x, y, z);
 					} else {
 						this.renderBlock(Tessellator.instance, renderBlocks, model, x, y, z);
@@ -113,7 +114,6 @@ public class SectionRender {
 		this.solidEmptySection = solidBlocks == 4096 && solidWriter.getVertices() == 0;
 
 		if (solidWriter.getVertices() != 0) {
-//			fillSolidBuffer(solidWriter.getVertexData(), solidWriter.getVertices());
 			if (this.region == null) {
 			 	this.region = sectionManager.getRegion(this.blockX >> 4, this.blockY >> 4, this.blockZ >> 4);
 			}
@@ -122,7 +122,6 @@ public class SectionRender {
 		}
 
 		if (translucentWriter.getVertices() != 0) {
-//			fillTranslucentBuffer(translucentWriter.getVertexData(), translucentWriter.getVertices());
 			if (this.region == null) {
 				this.region = sectionManager.getRegion(this.blockX >> 4, this.blockY >> 4, this.blockZ >> 4);
 			}

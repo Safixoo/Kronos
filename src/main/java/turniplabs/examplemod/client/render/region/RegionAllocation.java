@@ -1,7 +1,6 @@
 package turniplabs.examplemod.client.render.region;
 
 import org.lwjgl.opengl.GL45;
-import org.lwjgl.system.MemoryUtil;
 import turniplabs.examplemod.client.render.SectionManager;
 import turniplabs.examplemod.client.render.SectionRender;
 import turniplabs.examplemod.client.vertex.writer.TerrainVertexWriter;
@@ -15,22 +14,22 @@ public class RegionAllocation {
 
 	public final RegionVertexBuffer vertexBuffer;
 
-	private int offset;
-	private int capacity;
+	public int offset;
+	public int capacity;
 
 	private Allocation firstEntry;
 	private Allocation lastEntry;
 	private Allocation freeAllocations;
 
-	private static RegionVertexBuffer sparseBuffer;
+	public static RegionVertexBuffer spareBuffer;
 
 	public RegionAllocation() {
 		this(MIN_ALLOC);
 	}
 
 	public RegionAllocation(int size) {
-		if (sparseBuffer == null) {
-			sparseBuffer = new RegionVertexBuffer(8 * 1024 * 1024);
+		if (spareBuffer == null) {
+			spareBuffer = new RegionVertexBuffer(8 * 1024 * 1024);
 		}
 
 		this.vertexBuffer = new RegionVertexBuffer(Math.max(MIN_ALLOC, size));
@@ -38,16 +37,9 @@ public class RegionAllocation {
 	}
 
 	public void resize() {
-		GL45.glCopyNamedBufferSubData(this.vertexBuffer.vboId, sparseBuffer.vboId, 0, 0, this.capacity);
+		GL45.glCopyNamedBufferSubData(this.vertexBuffer.vboId, spareBuffer.vboId, 0, 0, this.capacity);
 		this.vertexBuffer.allocateSpace(this.capacity *= 2);
-		GL45.glCopyNamedBufferSubData(sparseBuffer.vboId, this.vertexBuffer.vboId, 0, 0, this.capacity);
-
-//		Allocation alloc = this.firstEntry;
-//
-//		while (alloc != null) {
-//			alloc.render.dirty = true;
-//			alloc = alloc.next;
-//		}
+		GL45.glCopyNamedBufferSubData(spareBuffer.vboId, this.vertexBuffer.vboId, 0, 0, this.capacity);
 	}
 
 	// Returns first << 32 | count.
@@ -88,9 +80,9 @@ public class RegionAllocation {
 		Allocation alloc = this.findRenderAlloc(render);
 		long drawData;
 
-		if (alloc.size >= size) {
+		if (alloc != null && alloc.size >= size) {
 			this.uploadAllocation(alloc, data, size);
-			drawData = packDrawData(alloc.size, alloc.offset);
+			drawData = packDrawData(size, alloc.offset);
 		} else {
 			this.remove(render);
 			drawData = this.allocate(render, data, size);
@@ -135,18 +127,26 @@ public class RegionAllocation {
 		Allocation alloc = this.firstEntry;
 
 		if (alloc.render == render) {
-			alloc.render = null;
 			this.firstEntry = alloc.next;
 			return;
 		}
 
-		while (alloc.next.render != render) {
+		while (alloc.next != null && alloc.next.render != render) {
 			alloc = alloc.next;
+		}
+
+		if (alloc.next == null) {
+			return;
 		}
 
 		Allocation renderAlloc = alloc.next;
 
-		this.freeAllocations.next = renderAlloc;
+		if (this.freeAllocations == null) {
+			this.freeAllocations = renderAlloc;
+		} else {
+			this.freeAllocations.next = renderAlloc;
+		}
+
 		alloc.next = renderAlloc.next;
 	}
 

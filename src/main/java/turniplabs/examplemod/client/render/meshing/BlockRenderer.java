@@ -5,11 +5,14 @@ import net.minecraft.client.render.RenderBlockCache;
 import net.minecraft.client.render.block.color.BlockColorDispatcher;
 import net.minecraft.client.render.block.model.BlockModel;
 import net.minecraft.client.render.block.model.BlockModelGrass;
+import net.minecraft.client.render.block.model.BlockModelLeaves;
+import net.minecraft.client.render.tessellator.Tessellator;
 import net.minecraft.client.render.texture.stitcher.IconCoordinate;
 import net.minecraft.core.block.Block;
 import net.minecraft.core.util.helper.Side;
 import net.minecraft.core.util.phys.AABB;
 import org.spongepowered.asm.mixin.Unique;
+import turniplabs.examplemod.client.util.BlocksFlags;
 import turniplabs.examplemod.client.vertex.VertexWriterManager;
 import turniplabs.examplemod.client.render.data.ModelBoundsData;
 import turniplabs.examplemod.client.render.data.SectionCache;
@@ -35,6 +38,8 @@ public class BlockRenderer {
 	public int lightMapCoordBottomRight;
 	public int lightMapCoordTopRight;
 
+	private boolean isLeaves;
+
 	private final ModelBoundsData modelData = new ModelBoundsData();
 	private static final float[] SIDE_LIGHT_MULTIPLIER = new float[] {0.5F, 1.0F, 0.8F, 0.8F, 0.6F, 0.6F};
 
@@ -51,13 +56,22 @@ public class BlockRenderer {
 		this.facesBlock = ((IBlockAABB) bounds).blockBoundsCheck();
 		this.setModelBounds(x, y, z, bounds);
 
+		boolean isGrass = blockModel instanceof BlockModelGrass;
+		boolean isLeaves = this.isLeaves = blockModel instanceof BlockModelLeaves;
+
 		for (int side = 0; side < Direction.COUNT; side++) {
-			if (blockModel instanceof BlockModelGrass) {
+			if (isGrass || isLeaves) {
 				int meta = this.chunkCache.getBlockMetadata(x, y, z);
 				this.useColor = blockModel.shouldSideBeColored(this.chunkCache, x, y, z, side, meta);
 			}
 
 			this.renderSideFaceAll(blockModel, this.modelData, x, y, z, side, ColorBGRManager.rgbToBgr(color));
+		}
+
+		if (isGrass) {
+			BlockModelGrass.useOverlay = true;
+			blockModel.renderStandardBlock(Tessellator.instance, blockModel.block.getBoundsRaw(), x, y, z);
+			BlockModelGrass.useOverlay = false;
 		}
 	}
 
@@ -86,7 +100,7 @@ public class BlockRenderer {
 			float minV = (float) tex.getIconVMin();
 			float maxV = (float) tex.getIconVMax();
 
-			quadWriter.setUV(minU, minV, maxU, maxV);
+			quadWriter.setUV(maxU, minV, minU, maxV);
 			quadWriter.colorizeAndBufferQuad(this, bounds, block, x, y, z, color);
 		}
 	}
@@ -100,12 +114,12 @@ public class BlockRenderer {
 			this.prepareLightMap(block, block.emission == 0, x, y, z, dirX, dirY, dirZ, lefX, lefY, lefZ, topX, topY, topZ);
 		}
 
-		float lightTR;
-		float lightBR;
-		float lightBL;
-		float lightTL;
+		float lightTR = 1.0f;
+		float lightBR = 1.0f;
+		float lightBL = 1.0f;
+		float lightTL = 1.0f;
 
-		if (block.emission == 0) {
+		if (!this.isLeaves && block.emission == 0) {
 			float dirB = this.cache.getBrightness(dirX, dirY, dirZ);
 			boolean lefT = this.cache.getOpacity(dirX + lefX, dirY + lefY, dirZ + lefZ);
 			boolean botT = this.cache.getOpacity(dirX - topX, dirY - topY, dirZ - topZ);
@@ -145,8 +159,14 @@ public class BlockRenderer {
 				lightBL = (lB + blB + dirB + bB) * 0.25F * lerp(depth, 1.0F, lightBL);
 
 			}
-		} else {
-			float brightness = this.cache.getBrightness(dirX, dirY, dirZ);
+		} else if (!this.isLeaves) {
+			float brightness;
+
+			if (!block.isSolidRender()) {
+				brightness = this.cache.getBrightness(0, 0, 0);
+			} else {
+				brightness = this.cache.getBrightness(dirX, dirY, dirZ);
+			}
 
 			lightTR = brightness;
 			lightBR = brightness;

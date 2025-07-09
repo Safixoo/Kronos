@@ -1,10 +1,8 @@
 package turniplabs.examplemod.client.render.region;
 
-import it.unimi.dsi.fastutil.ints.IntArrayList;
-import org.lwjgl.Sys;
 import org.lwjgl.opengl.GL15;
-import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
+import turniplabs.examplemod.client.render.SectionManager;
 import turniplabs.examplemod.client.render.SectionRender;
 import turniplabs.examplemod.client.vertex.VertexWriterManager;
 import turniplabs.examplemod.client.vertex.writer.TerrainVertexWriter;
@@ -47,6 +45,24 @@ public class RegionRender {
 
 	public int getChunkZ() {
 		return this.regionZ << 2;
+	}
+
+	public void clear() {
+		if (this.solidBuffer != null) {
+			SectionManager.getCurrentInstance().removeMemory(this.solidBuffer.offset, 1);
+			this.solidBuffer.vertexBuffer.clear();
+		}
+
+		if (this.translucentBuffer != null) {
+			SectionManager.getCurrentInstance().removeMemory(this.translucentBuffer.offset, 1);
+			this.translucentBuffer.vertexBuffer.clear();
+		}
+
+		MemoryUtil.nmemFree(this.solidFirst);
+		MemoryUtil.nmemFree(this.solidCount);
+
+		MemoryUtil.nmemFree(this.translucentFirst);
+		MemoryUtil.nmemFree(this.translucentCount);
 	}
 
 	private int getRegionIndex(SectionRender render) {

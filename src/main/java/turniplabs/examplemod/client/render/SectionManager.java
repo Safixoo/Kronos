@@ -1,15 +1,12 @@
 package turniplabs.examplemod.client.render;
 
 import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ReferenceCollection;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.world.World;
 import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL30;
 import turniplabs.examplemod.client.GlobalFlags;
 import turniplabs.examplemod.client.render.cull.BFSCuller;
-import turniplabs.examplemod.client.render.gl.GlVertexBuffer;
 import turniplabs.examplemod.client.render.meshing.BlockRenderer;
 import turniplabs.examplemod.client.render.region.RegionManager;
 import turniplabs.examplemod.client.render.region.RegionRender;
@@ -152,6 +149,8 @@ public class SectionManager {
 		this.cameraY = cameraY;
 		this.cameraZ = cameraZ;
 
+		this.regionManager.update(worldChanged);
+
 		if (this.renderDistance != renderDistance || worldChanged) {
 			this.renderDistance = renderDistance;
 			this.lastUpdateX = cameraX;
@@ -176,7 +175,9 @@ public class SectionManager {
 		this.queueRebuilds();
 	}
 
-	// TODO: Implement off-thread chunk updates.
+	// TODO:
+	//  - Implement off-thread chunk updates.
+	//  - Separate in meshing and writing to batch copies.
 	private void queueRebuilds() {
 		GlobalFlags.MESHING = true;
 

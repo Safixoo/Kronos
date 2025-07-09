@@ -61,6 +61,11 @@ public class RegionVertexBuffer {
 		GL30.glBindVertexArray(this.vaoId);
 	}
 
+	public void clear() {
+		GL30.glDeleteBuffers(this.vboId);
+		GL30.glDeleteBuffers(this.vaoId);
+	}
+
 	public void unbind() {
 		GL30.glBindVertexArray(0);
 	}

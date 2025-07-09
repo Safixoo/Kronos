@@ -1,9 +1,7 @@
 package turniplabs.examplemod.client.render.region;
 
-
 import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
 import it.unimi.dsi.fastutil.objects.*;
-import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL30;
 import turniplabs.examplemod.client.render.SectionManager;
 
@@ -15,7 +13,7 @@ public class RegionManager {
 	private RegionRender lastRegion;
 
 	public RegionRender getRegion(int sectionX, int sectionY, int sectionZ) {
-		long position = SectionManager.asLong(sectionX >> 3, sectionY >> 1, sectionZ >> 3);
+		long position = SectionManager.asLong(sectionX >> 2, sectionY >> 2, sectionZ >> 2);
 		RegionRender region;
 
 		if (position == this.lastPosition) {
@@ -27,6 +25,7 @@ public class RegionManager {
 
 		if (region == null) {
 			region = new RegionRender(this, sectionX, sectionY, sectionZ);
+			this.regionMap.put(position, region);
 		}
 
 		return region;
@@ -34,6 +33,22 @@ public class RegionManager {
 
 	public void addToDrawQueue(RegionRender render) {
 		this.regionRenders.add(render);
+	}
+
+	public void update(boolean worldUpdated) {
+		ReferenceCollection<RegionRender> regions = this.regionMap.values();
+
+		if (worldUpdated) {
+			for (RegionRender region : regions) {
+				region.clear();
+			}
+			if (RegionAllocation.spareBuffer != null) {
+				RegionAllocation.spareBuffer.clear();
+				RegionAllocation.spareBuffer = null;
+			}
+
+			this.regionMap.clear();
+		}
 	}
 
 	public void drawAllRegions(int renderPass) {
