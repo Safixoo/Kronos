@@ -42,9 +42,9 @@ public class RegionManager {
 			for (RegionRender region : regions) {
 				region.clear();
 			}
-			if (RegionAllocation.spareBuffer != null) {
-				RegionAllocation.spareBuffer.clear();
-				RegionAllocation.spareBuffer = null;
+			if (RegionAllocation.SPARE_BUFFER != null) {
+				RegionAllocation.SPARE_BUFFER.clear();
+				RegionAllocation.SPARE_BUFFER = null;
 			}
 
 			this.regionMap.clear();

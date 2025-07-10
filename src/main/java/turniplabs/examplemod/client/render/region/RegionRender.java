@@ -49,7 +49,7 @@ public class RegionRender {
 
 	public void addSolidMesh(SectionRender render, VertexWriterManager manager) {
 		if (this.solidBuffer == null) {
-			this.solidBuffer = new RegionAllocation(manager.getVertices() * TerrainVertexWriter.STRIDE, false);
+			this.solidBuffer = new RegionAllocation(manager.getVertices() * TerrainVertexWriter.STRIDE);
 		}
 
 		render.solidDraw = this.solidBuffer.renewAllocation(render, manager.getVertexData(), manager.getVertices());
@@ -57,9 +57,7 @@ public class RegionRender {
 
 	public void addTranslucentMesh(SectionRender render, VertexWriterManager manager) {
 		if (this.translucentBuffer == null) {
-			int max = Math.max(manager.getVertices() * TerrainVertexWriter.STRIDE, 8192);
-
-			this.translucentBuffer = new RegionAllocation(max, true);
+			this.translucentBuffer = new RegionAllocation(manager.getVertices() * TerrainVertexWriter.STRIDE);
 		}
 
 		render.translucentDraw = this.translucentBuffer.renewAllocation(render, manager.getVertexData(), manager.getVertices());

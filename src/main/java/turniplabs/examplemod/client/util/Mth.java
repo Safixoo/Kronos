@@ -28,4 +28,12 @@ public class Mth {
 	public static float square(float num) {
 		return num * num;
 	}
+
+	public static long lerp(long start, long end, float t) {
+		return (long) (start + (end - start) * t);
+	}
+
+	public static double smoothStep(double t) {
+		return t * t * (3.0f - 2.0f * t);
+	}
 }

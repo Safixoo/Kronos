@@ -44,6 +44,10 @@ public abstract class RenderGlobalMixin {
 	private int renderersBeingRendered;
 	@Shadow
 	private int renderersLoaded;
+
+	@Shadow
+	public abstract void markRenderersForNewPosition(int x, int y, int z);
+
 	private SectionManager manager;
 	private boolean shouldReload;
 
@@ -90,7 +94,7 @@ public abstract class RenderGlobalMixin {
 		double cameraY = camera.getY(partialTick);
 		double cameraZ = camera.getZ(partialTick);
 
-		this.manager.update(this.renderDistance, cameraX, cameraY, cameraZ, this.shouldReload);
+		this.manager.update(this.renderDistance, cameraX, cameraY, cameraZ, this.shouldReload, partialTick);
 		this.shouldReload = false;
 	}
 

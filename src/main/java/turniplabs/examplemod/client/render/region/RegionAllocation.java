@@ -1,6 +1,5 @@
 package turniplabs.examplemod.client.render.region;
 
-import net.minecraft.core.util.helper.MathHelper;
 import org.lwjgl.opengl.GL45;
 import turniplabs.examplemod.client.render.SectionManager;
 import turniplabs.examplemod.client.render.SectionRender;
@@ -11,7 +10,7 @@ import java.nio.ByteBuffer;
 
 public class RegionAllocation {
 	private static final int STRIDE = TerrainVertexWriter.STRIDE;
-	private static final int MIN_ALLOC = 16384;
+	private static final int MIN_ALLOC = 8192;
 
 	public final RegionVertexBuffer vertexBuffer;
 
@@ -22,21 +21,18 @@ public class RegionAllocation {
 	private Allocation lastEntry;
 	private Allocation freeAllocations;
 
-	public static RegionVertexBuffer spareBuffer;
+	public static final int SPARE_BUFFER_ALLOC = 1024 * 1024 * 16;
+	public static RegionVertexBuffer SPARE_BUFFER;
 
 	public RegionAllocation() {
-		this(MIN_ALLOC, false);
+		this(MIN_ALLOC);
 	}
 
-	public RegionAllocation(int size, boolean forceSize) {
+	public RegionAllocation(int size) {
 		int newCapacity = Math.max(MIN_ALLOC, size);
 
-		if (forceSize) {
-			newCapacity = size;
-		}
-
-		if (spareBuffer == null) {
-			spareBuffer = new RegionVertexBuffer(8 * 1024 * 1024);
+		if (SPARE_BUFFER == null) {
+			SPARE_BUFFER = new RegionVertexBuffer(SPARE_BUFFER_ALLOC);
 		}
 
 		this.vertexBuffer = new RegionVertexBuffer(newCapacity);
@@ -44,13 +40,32 @@ public class RegionAllocation {
 	}
 
 	public void resize(long size) {
-		long newSize = Math.max(this.capacity * 2, size);
+		long newSize = Math.max((this.capacity * 3) >>> 1, size);
+
+		if (newSize > SPARE_BUFFER_ALLOC && size <= SPARE_BUFFER_ALLOC) {
+			newSize = SPARE_BUFFER_ALLOC;
+		}
 
 		SectionManager.getCurrentInstance().removeMemory(this.capacity);
 
-		GL45.glCopyNamedBufferSubData(this.vertexBuffer.vboId, spareBuffer.vboId, 0, 0, this.offset);
+		if (newSize > SPARE_BUFFER_ALLOC) {
+			this.vertexBuffer.allocateSpace(newSize);
+
+			Allocation alloc = this.firstEntry;
+
+			while (alloc != null) {
+				alloc.render.dirty = true;
+				alloc = alloc.next;
+			}
+
+			this.capacity = newSize;
+
+			return;
+		}
+
+		GL45.glCopyNamedBufferSubData(this.vertexBuffer.vboId, SPARE_BUFFER.vboId, 0, 0, this.offset);
 		this.vertexBuffer.allocateSpace(newSize);
-		GL45.glCopyNamedBufferSubData(spareBuffer.vboId, this.vertexBuffer.vboId, 0, 0, this.offset);
+		GL45.glCopyNamedBufferSubData(SPARE_BUFFER.vboId, this.vertexBuffer.vboId, 0, 0, this.offset);
 
 		this.capacity = newSize;
 	}
@@ -59,7 +74,7 @@ public class RegionAllocation {
 	public long allocate(SectionRender render, ByteBuffer vertexData, int size) {
 		Allocation alloc = this.fitInFree(size);
 
-		if (alloc == null) {
+		if (alloc == null || alloc.size < size) {
 			alloc = this.allocateNew(render, size);
 		}
 

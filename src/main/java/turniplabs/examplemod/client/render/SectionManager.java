@@ -1,6 +1,8 @@
 package turniplabs.examplemod.client.render;
 
 import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
+import it.unimi.dsi.fastutil.longs.LongArrays;
 import it.unimi.dsi.fastutil.objects.ReferenceArrayList;
 import it.unimi.dsi.fastutil.objects.ReferenceList;
 import net.minecraft.client.Minecraft;
@@ -13,6 +15,8 @@ import turniplabs.examplemod.client.render.region.RegionManager;
 import turniplabs.examplemod.client.render.region.RegionRender;
 import turniplabs.examplemod.client.util.Direction;
 import turniplabs.examplemod.client.util.Mth;
+
+import java.util.Arrays;
 
 public class SectionManager {
 	// Could be replaced in a future with a smart indexed array, but without reusing objects as vanilla.
@@ -43,7 +47,13 @@ public class SectionManager {
 	private long vramUsed;
 	private long vramAllocated;
 
-	private static final int MAX_UPDATE_QUEUES = 3;
+	private static final int MAX_UPDATE_QUEUES = 5;
+
+	private final long[] lastFrameSamples = new long[32];
+
+	private int frameSampleInd;
+	private long lastFrameTime;
+	private long lastFrameBudget;
 
 	public SectionManager(World world) {
 		INSTANCE = this;
@@ -155,7 +165,7 @@ public class SectionManager {
 		return sectionRender;
 	}
 
-	public void update(int renderDistance, double cameraX, double cameraY, double cameraZ, boolean worldChanged) {
+	public void update(int renderDistance, double cameraX, double cameraY, double cameraZ, boolean worldChanged, float partialTick) {
 		this.cameraX = cameraX;
 		this.cameraY = cameraY;
 		this.cameraZ = cameraZ;
@@ -183,22 +193,59 @@ public class SectionManager {
 		this.bfsCuller.init(Mth.square(GL11.glGetFloat(GL11.GL_FOG_END)));
 		this.bfsCuller.updateRenderList(this.sectionMap, (float) cameraX, (float) cameraY, (float) cameraZ);
 
-		this.queueRebuilds();
+		this.queueRebuilds(partialTick);
 	}
 
 	// TODO:
 	//  - Implement off-thread chunk updates.
 	//  - Separate in meshing and writing to batch copies.
-	private void queueRebuilds() {
+	private void queueRebuilds(float partialTick) {
+		long currentTime = System.nanoTime();
+		long currentDiff = this.lastFrameTime == 0 ? 200_000_000 : currentTime - this.lastFrameTime;
+
+		this.addFrameSample(currentDiff);
+
+		long maxBudget = Math.min((this.getFrameMedian() * 3) >>> 3, 200_000_000);
+		long lerpedBudget = Mth.lerp(this.lastFrameBudget, maxBudget, partialTick);
+		long smoothedBudget = (long) (Mth.smoothStep(lerpedBudget / 200_001.0) * 200_000.0);
+
+		this.lastFrameBudget = smoothedBudget;
+		this.lastFrameTime = currentTime;
+
+		int maxSize = Math.min(MAX_UPDATE_QUEUES, this.updateList.size());
+		int i = 0;
+
 		GlobalFlags.MESHING = true;
 
-		for (int i = 0; i < Math.min(MAX_UPDATE_QUEUES, this.updateList.size()); i++) {
-			this.updateList.get(i).rebuild(this, this.blockRenderer, this.worldObj);
+		int samples = 0;
+		long timePassed = 0L;
+		long estimatedTime = 0L;
+
+		while (i < maxSize && timePassed < smoothedBudget && estimatedTime < smoothedBudget) {
+			currentTime = System.nanoTime();
+
+			this.updateList.get(i++).rebuild(this, this.blockRenderer, this.worldObj);
+
+			samples++;
+			timePassed += System.nanoTime() - currentTime;
+			estimatedTime = (timePassed / samples) * (maxSize - i);
 		}
 
 		this.updateList.clear();
 
 		GlobalFlags.MESHING = false;
+	}
+
+	public void addFrameSample(long currentDiff) {
+		this.lastFrameSamples[this.frameSampleInd++] = currentDiff;
+		this.frameSampleInd &= 31;
+	}
+
+	// Median should give a better result than prom for
+	// avoiding lag spikes it seems.
+	public long getFrameMedian() {
+		LongArrays.unstableSort(this.lastFrameSamples);
+		return this.lastFrameSamples[16];
 	}
 
 	private void generateSections() {
