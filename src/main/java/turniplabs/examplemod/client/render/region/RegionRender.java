@@ -21,30 +21,12 @@ public class RegionRender {
 	public final long translucentCount = MemoryUtil.nmemAlloc(256 * 4);
 	public int translucentEmptyDraw = 0;
 
-	private final RegionManager regionManager;
-
-	private long solidMask = 0;
-	private long translucentMask = 0;
 	public int currentFrame;
 
 	public RegionRender(RegionManager regionManager, int sectionX, int sectionY, int sectionZ) {
-		this.regionManager = regionManager;
-
 		this.regionX = sectionX >> 3;
 		this.regionY = sectionY >> 2;
 		this.regionZ = sectionZ >> 3;
-	}
-
-	public int getChunkX() {
-		return this.regionX << 3;
-	}
-
-	public int getChunkY() {
-		return this.regionY << 2;
-	}
-
-	public int getChunkZ() {
-		return this.regionZ << 3;
 	}
 
 	public void clear() {
@@ -65,23 +47,12 @@ public class RegionRender {
 		MemoryUtil.nmemFree(this.translucentCount);
 	}
 
-	private int getRegionIndex(SectionRender render) {
-		int relX = (render.blockX >> 4) - this.getChunkX();
-		int relY = (render.blockY >> 4) - this.getChunkY();
-		int relZ = (render.blockZ >> 4) - this.getChunkZ();
-
-		return regionIndex(relX, relY, relZ);
-	}
-
 	public void addSolidMesh(SectionRender render, VertexWriterManager manager) {
 		if (this.solidBuffer == null) {
 			this.solidBuffer = new RegionAllocation(manager.getVertices() * TerrainVertexWriter.STRIDE, false);
 		}
 
-		long regionBitIndex = 1L << getRegionIndex(render);
 		render.solidDraw = this.solidBuffer.renewAllocation(render, manager.getVertexData(), manager.getVertices());
-
-		this.solidMask |= regionBitIndex;
 	}
 
 	public void addTranslucentMesh(SectionRender render, VertexWriterManager manager) {
@@ -91,10 +62,7 @@ public class RegionRender {
 			this.translucentBuffer = new RegionAllocation(max, true);
 		}
 
-		long regionBitIndex = 1L << getRegionIndex(render);
 		render.translucentDraw = this.translucentBuffer.renewAllocation(render, manager.getVertexData(), manager.getVertices());
-
-		this.translucentMask |= regionBitIndex;
 	}
 
 	public void addSolidDraw(long drawData) {

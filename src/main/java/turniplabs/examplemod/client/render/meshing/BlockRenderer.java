@@ -43,7 +43,7 @@ public class BlockRenderer {
 	private boolean isLeaves;
 
 	private final ModelBoundsData modelData = new ModelBoundsData();
-	private static final float[] SIDE_LIGHT_MULTIPLIER = new float[] {0.5F, 1.0F, 0.8F, 0.8F, 0.6F, 0.6F};
+	private static final float[] SIDE_LIGHT_MULTIPLIER = new float[] {0.5F, 1.0F, 0.8F, 0.8F, 0.6F, 0.8F};
 
 	private void setModelBounds(int x, int y, int z, AABB bounds) {
 		this.modelData.setBoundsData(bounds.minX + x, bounds.minY + y, bounds.minZ + z, bounds.maxX + x, bounds.maxY + y, bounds.maxZ + z);
@@ -175,7 +175,6 @@ public class BlockRenderer {
 			lightTL = brightness;
 		}
 
-		color = ColorBGRManager.multiplyColor(color, SIDE_LIGHT_MULTIPLIER[side]);
 
 		float tl = topP * lightTL + (1.0F - topP) * lightBL;
 		float tr = topP * lightTR + (1.0F - topP) * lightBR;
@@ -187,11 +186,13 @@ public class BlockRenderer {
 		float ltr = rigP * tl + (1.0F - rigP) * tr;
 
 		color &= 0x00_FF_FF_FF;
+		color = ColorBGRManager.multiplyColor(color, SIDE_LIGHT_MULTIPLIER[side]);
 
 		this.colorTopLeft = ColorBGRManager.multiplyColor(color, ltl);
 		this.colorBottomLeft = ColorBGRManager.multiplyColor(color, lbl);
 		this.colorBottomRight = ColorBGRManager.multiplyColor(color, lbr);
 		this.colorTopRight = ColorBGRManager.multiplyColor(color, ltr);
+
 	}
 
 

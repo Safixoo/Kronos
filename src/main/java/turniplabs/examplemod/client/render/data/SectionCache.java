@@ -155,11 +155,12 @@ public class SectionCache implements WorldSource {
 			return 0;
 		}
 
-		int lighting = this.getLightmapSpecificCoord(x, y, z);
+		boolean litInterior = BlocksFlags.LIT_INTERIOR[blockId];
 
-		if (BlocksFlags.LIT_INTERIOR[blockId]) {
+		int lighting = !litInterior ? this.getLightmapSpecificCoord(x, y, z) : 0;
+
+		if (litInterior) {
 			lighting |= this.getLightmapSpecificCoord(x, y + 1, z);
-			lighting |= this.getLightmapSpecificCoord(x, y - 1, z);
 			lighting |= this.getLightmapSpecificCoord(x + 1, y, z);
 			lighting |= this.getLightmapSpecificCoord(x - 1, y, z);
 			lighting |= this.getLightmapSpecificCoord(x, y, z + 1);
