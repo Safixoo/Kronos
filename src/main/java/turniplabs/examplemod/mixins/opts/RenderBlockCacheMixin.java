@@ -7,40 +7,24 @@ import org.spongepowered.asm.mixin.*;
 
 @Mixin(value = RenderBlockCache.class, remap = false)
 public class RenderBlockCacheMixin {
-
-
-	@Shadow
-	private int offsetX;
-
-	@Shadow
-	private int offsetY;
-
-	@Shadow
-	private int offsetZ;
+	@Shadow private int offsetX;
+	@Shadow private int offsetY;
+	@Shadow private int offsetZ;
 
 	@Shadow
 	private Block<?> block;
-
 	@Shadow
 	private WorldSource access;
 
 	@Mutable
 	@Shadow
-	@Final
-	private boolean[] brightnessCached;
-
+	private @Final boolean[] brightnessCached;
 	@Mutable
 	@Shadow
-	@Final
-	private boolean[] opacityCached;
-
+	private @Final boolean[] opacityCached;
 	@Mutable
 	@Shadow
-	@Final
-	private boolean[] lightmapCoordCached;
-
-	@Unique
-	private static final boolean[] EMPTY_ARRAY = new boolean[27];
+	private @Final boolean[] lightmapCoordCached;
 
 	/**
 	 * @author Safixo
@@ -60,10 +44,5 @@ public class RenderBlockCacheMixin {
 			this.offsetZ = z;
 		}
 
-	}
-
-	@Unique
-	private static void fillBooleanArray(boolean[] array) {
-		System.arraycopy(EMPTY_ARRAY, 0, array, 0, 27);
 	}
 }

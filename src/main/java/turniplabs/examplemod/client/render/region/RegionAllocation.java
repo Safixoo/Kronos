@@ -1,5 +1,6 @@
 package turniplabs.examplemod.client.render.region;
 
+import net.minecraft.core.util.helper.MathHelper;
 import org.lwjgl.opengl.GL45;
 import turniplabs.examplemod.client.render.SectionManager;
 import turniplabs.examplemod.client.render.SectionRender;
@@ -10,12 +11,12 @@ import java.nio.ByteBuffer;
 
 public class RegionAllocation {
 	private static final int STRIDE = TerrainVertexWriter.STRIDE;
-	private static final int MIN_ALLOC = 1024 * STRIDE;
+	private static final int MIN_ALLOC = 16384;
 
 	public final RegionVertexBuffer vertexBuffer;
 
-	public int offset;
-	public int capacity;
+	public long offset;
+	public long capacity;
 
 	private Allocation firstEntry;
 	private Allocation lastEntry;
@@ -24,22 +25,34 @@ public class RegionAllocation {
 	public static RegionVertexBuffer spareBuffer;
 
 	public RegionAllocation() {
-		this(MIN_ALLOC);
+		this(MIN_ALLOC, false);
 	}
 
-	public RegionAllocation(int size) {
+	public RegionAllocation(int size, boolean forceSize) {
+		int newCapacity = Math.max(MIN_ALLOC, size);
+
+		if (forceSize) {
+			newCapacity = size;
+		}
+
 		if (spareBuffer == null) {
 			spareBuffer = new RegionVertexBuffer(8 * 1024 * 1024);
 		}
 
-		this.vertexBuffer = new RegionVertexBuffer(Math.max(MIN_ALLOC, size));
-		this.capacity = Math.max(MIN_ALLOC, size);
+		this.vertexBuffer = new RegionVertexBuffer(newCapacity);
+		this.capacity = newCapacity;
 	}
 
-	public void resize() {
-		GL45.glCopyNamedBufferSubData(this.vertexBuffer.vboId, spareBuffer.vboId, 0, 0, this.capacity);
-		this.vertexBuffer.allocateSpace(this.capacity *= 2);
-		GL45.glCopyNamedBufferSubData(spareBuffer.vboId, this.vertexBuffer.vboId, 0, 0, this.capacity);
+	public void resize(long size) {
+		long newSize = Math.max(this.capacity * 2, size);
+
+		SectionManager.getCurrentInstance().removeMemory(this.capacity);
+
+		GL45.glCopyNamedBufferSubData(this.vertexBuffer.vboId, spareBuffer.vboId, 0, 0, this.offset);
+		this.vertexBuffer.allocateSpace(newSize);
+		GL45.glCopyNamedBufferSubData(spareBuffer.vboId, this.vertexBuffer.vboId, 0, 0, this.offset);
+
+		this.capacity = newSize;
 	}
 
 	// Returns first << 32 | count.
@@ -53,17 +66,17 @@ public class RegionAllocation {
 		alloc.render = render;
 		this.uploadAllocation(alloc, vertexData, size);
 
-		return packDrawData(size, alloc.offset);
+		return packDrawData(size, (int) alloc.offset);
 	}
 
 	private Allocation allocateNew(SectionRender render, int size) {
-		int maxOffset = this.offset / STRIDE;
+		long maxOffset = this.offset / STRIDE;
 		int sizeInBytes = size * STRIDE;
 
-		SectionManager.getCurrentInstance().addMemory(size, TerrainVertexWriter.STRIDE);
+		SectionManager.getCurrentInstance().addUsedMemory(size * TerrainVertexWriter.STRIDE);
 
-		while (this.capacity <= this.offset + sizeInBytes) {
-			this.resize();
+		if (this.capacity < this.offset + sizeInBytes) {
+			this.resize(this.offset + sizeInBytes);
 		}
 
 		Allocation newAlloc = new Allocation(render, maxOffset, size);
@@ -82,9 +95,11 @@ public class RegionAllocation {
 
 		if (alloc != null && alloc.size >= size) {
 			this.uploadAllocation(alloc, data, size);
-			drawData = packDrawData(size, alloc.offset);
+			drawData = packDrawData(size, (int) alloc.offset);
 		} else {
-			this.remove(render);
+			if (alloc != null) {
+				this.remove(render);
+			}
 			drawData = this.allocate(render, data, size);
 		}
 
@@ -94,14 +109,30 @@ public class RegionAllocation {
 	private @Nullable Allocation fitInFree(int spaceNeeded) {
 		Allocation alloc = this.freeAllocations;
 
-		while (alloc != null && alloc.size < spaceNeeded) {
+		if (alloc == null) {
+			return null;
+		}
+
+		if (alloc.size >= spaceNeeded) {
+			this.freeAllocations = this.freeAllocations.next;
+			return alloc;
+		}
+
+		while (alloc.next != null && alloc.next.size < spaceNeeded) {
 			alloc = alloc.next;
 		}
 
-		return alloc;
+		Allocation returnAlloc = null;
+
+		if (alloc.next != null) {
+			returnAlloc = alloc.next;
+			alloc.next = alloc.next.next;
+		}
+
+		return returnAlloc;
 	}
 
-	public Allocation findRenderAlloc(SectionRender render) {
+	public @Nullable Allocation findRenderAlloc(SectionRender render) {
 		Allocation alloc = this.firstEntry;
 
 		while (alloc != null && alloc.render != render) {
@@ -127,6 +158,7 @@ public class RegionAllocation {
 		Allocation alloc = this.firstEntry;
 
 		if (alloc.render == render) {
+			alloc.render = null;
 			this.firstEntry = alloc.next;
 			return;
 		}
@@ -140,11 +172,19 @@ public class RegionAllocation {
 		}
 
 		Allocation renderAlloc = alloc.next;
+		renderAlloc.render = null;
+		renderAlloc.next = null;
 
 		if (this.freeAllocations == null) {
 			this.freeAllocations = renderAlloc;
 		} else {
-			this.freeAllocations.next = renderAlloc;
+			Allocation lastAlloc = this.freeAllocations;
+
+			while (lastAlloc.next != null) {
+				lastAlloc = lastAlloc.next;
+			}
+
+			lastAlloc.next = renderAlloc;
 		}
 
 		alloc.next = renderAlloc.next;
@@ -158,7 +198,7 @@ public class RegionAllocation {
 		public Allocation next;
 		public SectionRender render;
 
-		public Allocation(SectionRender render, int offset, int size) {
+		public Allocation(SectionRender render, long offset, int size) {
 			this.render = render;
 			this.offset = offset;
 			this.size = size;
@@ -166,7 +206,7 @@ public class RegionAllocation {
 
 		// Size and offset are written in vertex amount and not bytes to
 		// avoid division to translate byte sizes to vertex counts.
-		public int offset;
+		public long offset;
 		public int size;
 	}
 }

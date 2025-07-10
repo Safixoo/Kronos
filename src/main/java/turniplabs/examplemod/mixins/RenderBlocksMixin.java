@@ -1,22 +1,17 @@
 package turniplabs.examplemod.mixins;
 
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.render.LightmapHelper;
 import net.minecraft.client.render.RenderBlockCache;
 import net.minecraft.client.render.RenderBlocks;
 import net.minecraft.client.render.block.color.BlockColorDispatcher;
-import net.minecraft.client.render.block.color.BlockColorLeavesOak;
 import net.minecraft.client.render.block.model.BlockModel;
 import net.minecraft.client.render.tessellator.Tessellator;
 import net.minecraft.client.render.texture.stitcher.IconCoordinate;
 import net.minecraft.core.block.Block;
-import net.minecraft.core.block.BlockLogicLeavesOak;
-import net.minecraft.core.block.Blocks;
 import net.minecraft.core.enums.LightLayer;
 import net.minecraft.core.util.helper.Side;
 import net.minecraft.core.util.phys.AABB;
 import net.minecraft.core.world.WorldSource;
-import org.lwjgl.Sys;
 import org.spongepowered.asm.mixin.*;
 import turniplabs.examplemod.client.util.Direction;
 import turniplabs.examplemod.client.util.interfaces.mixin.IBlockAABB;

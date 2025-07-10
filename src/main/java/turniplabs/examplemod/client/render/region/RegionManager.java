@@ -13,7 +13,7 @@ public class RegionManager {
 	private RegionRender lastRegion;
 
 	public RegionRender getRegion(int sectionX, int sectionY, int sectionZ) {
-		long position = SectionManager.asLong(sectionX >> 2, sectionY >> 2, sectionZ >> 2);
+		long position = SectionManager.asLong(sectionX >> 3, sectionY >> 2, sectionZ >> 3);
 		RegionRender region;
 
 		if (position == this.lastPosition) {
@@ -58,6 +58,9 @@ public class RegionManager {
 				if (region.solidEmptyDraw != 0) {
 					region.bindSolid();
 					region.draw(region.solidFirst, region.solidCount, region.solidEmptyDraw);
+
+					SectionManager.getCurrentInstance().drawnSolidRenderers += region.solidEmptyDraw;
+
 					region.solidEmptyDraw = 0;
 				}
 			}
@@ -69,6 +72,7 @@ public class RegionManager {
 				if (region.translucentEmptyDraw != 0) {
 					region.bindTranslucent();
 					region.draw(region.translucentFirst, region.translucentCount, region.translucentEmptyDraw);
+
 					region.translucentEmptyDraw = 0;
 				}
 			}

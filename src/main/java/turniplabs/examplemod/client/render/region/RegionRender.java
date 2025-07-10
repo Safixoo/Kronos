@@ -13,13 +13,13 @@ public class RegionRender {
 	private RegionAllocation translucentBuffer;
 	private RegionAllocation solidBuffer;
 
+	public final long solidFirst = MemoryUtil.nmemAlloc(256 * 4);
+	public final long solidCount = MemoryUtil.nmemAlloc(256 * 4);
 	public int solidEmptyDraw = 0;
-	public final long solidCount = MemoryUtil.nmemAlloc(64 * 4);
-	public final long solidFirst = MemoryUtil.nmemAlloc(64 * 4);
 
+	public final long translucentFirst = MemoryUtil.nmemAlloc(256 * 4);
+	public final long translucentCount = MemoryUtil.nmemAlloc(256 * 4);
 	public int translucentEmptyDraw = 0;
-	public final long translucentCount = MemoryUtil.nmemAlloc(64 * 4);
-	public final long translucentFirst = MemoryUtil.nmemAlloc(64 * 4);
 
 	private final RegionManager regionManager;
 
@@ -30,13 +30,13 @@ public class RegionRender {
 	public RegionRender(RegionManager regionManager, int sectionX, int sectionY, int sectionZ) {
 		this.regionManager = regionManager;
 
-		this.regionX = sectionX >> 2;
+		this.regionX = sectionX >> 3;
 		this.regionY = sectionY >> 2;
-		this.regionZ = sectionZ >> 2;
+		this.regionZ = sectionZ >> 3;
 	}
 
 	public int getChunkX() {
-		return this.regionX << 2;
+		return this.regionX << 3;
 	}
 
 	public int getChunkY() {
@@ -44,17 +44,17 @@ public class RegionRender {
 	}
 
 	public int getChunkZ() {
-		return this.regionZ << 2;
+		return this.regionZ << 3;
 	}
 
 	public void clear() {
 		if (this.solidBuffer != null) {
-			SectionManager.getCurrentInstance().removeMemory(this.solidBuffer.offset, 1);
+			SectionManager.getCurrentInstance().removeUsedMemory(this.solidBuffer.offset);
 			this.solidBuffer.vertexBuffer.clear();
 		}
 
 		if (this.translucentBuffer != null) {
-			SectionManager.getCurrentInstance().removeMemory(this.translucentBuffer.offset, 1);
+			SectionManager.getCurrentInstance().removeUsedMemory(this.translucentBuffer.offset);
 			this.translucentBuffer.vertexBuffer.clear();
 		}
 
@@ -75,32 +75,24 @@ public class RegionRender {
 
 	public void addSolidMesh(SectionRender render, VertexWriterManager manager) {
 		if (this.solidBuffer == null) {
-			this.solidBuffer = new RegionAllocation(manager.getVertices() * TerrainVertexWriter.STRIDE);
+			this.solidBuffer = new RegionAllocation(manager.getVertices() * TerrainVertexWriter.STRIDE, false);
 		}
 
 		long regionBitIndex = 1L << getRegionIndex(render);
-
-		if ((this.solidMask & regionBitIndex) == 0) {
-			render.solidDraw = this.solidBuffer.allocate(render, manager.getVertexData(), manager.getVertices());
-		} else {
-			render.solidDraw = this.solidBuffer.renewAllocation(render, manager.getVertexData(), manager.getVertices());
-		}
+		render.solidDraw = this.solidBuffer.renewAllocation(render, manager.getVertexData(), manager.getVertices());
 
 		this.solidMask |= regionBitIndex;
 	}
 
 	public void addTranslucentMesh(SectionRender render, VertexWriterManager manager) {
 		if (this.translucentBuffer == null) {
-			this.translucentBuffer = new RegionAllocation(manager.getVertices() * TerrainVertexWriter.STRIDE);
+			int max = Math.max(manager.getVertices() * TerrainVertexWriter.STRIDE, 8192);
+
+			this.translucentBuffer = new RegionAllocation(max, true);
 		}
 
 		long regionBitIndex = 1L << getRegionIndex(render);
-
-		if ((this.translucentMask & regionBitIndex) == 0) {
-			render.translucentDraw = this.translucentBuffer.allocate(render, manager.getVertexData(), manager.getVertices());
-		} else {
-			render.translucentDraw = this.translucentBuffer.renewAllocation(render, manager.getVertexData(), manager.getVertices());
-		}
+		render.translucentDraw = this.translucentBuffer.renewAllocation(render, manager.getVertexData(), manager.getVertices());
 
 		this.translucentMask |= regionBitIndex;
 	}

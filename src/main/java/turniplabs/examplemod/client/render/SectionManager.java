@@ -1,7 +1,8 @@
 package turniplabs.examplemod.client.render;
 
 import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
-import it.unimi.dsi.fastutil.objects.ReferenceCollection;
+import it.unimi.dsi.fastutil.objects.ReferenceArrayList;
+import it.unimi.dsi.fastutil.objects.ReferenceList;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.world.World;
 import org.lwjgl.opengl.GL11;
@@ -13,10 +14,6 @@ import turniplabs.examplemod.client.render.region.RegionRender;
 import turniplabs.examplemod.client.util.Direction;
 import turniplabs.examplemod.client.util.Mth;
 
-import java.util.ArrayDeque;
-import java.util.List;
-import java.util.Queue;
-
 public class SectionManager {
 	// Could be replaced in a future with a smart indexed array, but without reusing objects as vanilla.
 	// (as that becomes a real pain mostly with bfs culling).
@@ -26,7 +23,7 @@ public class SectionManager {
 	private static SectionManager INSTANCE;
 
 	private final RegionManager regionManager = new RegionManager();
-	private final Queue<SectionRender> updateList = new ArrayDeque<>(1024);
+	private final ReferenceList<SectionRender> updateList = new ReferenceArrayList<>(1024);
 
 	private final BlockRenderer blockRenderer = new BlockRenderer();
 	private World worldObj;
@@ -43,7 +40,10 @@ public class SectionManager {
 	private long lastPositionCache = -1;
 	private SectionRender lastSectionCache;
 
+	private long vramUsed;
 	private long vramAllocated;
+
+	private static final int MAX_UPDATE_QUEUES = 3;
 
 	public SectionManager(World world) {
 		INSTANCE = this;
@@ -93,19 +93,30 @@ public class SectionManager {
 
 		if (sectionRender != null) {
 			this.disconnectNeighbors(sectionRender);
-			sectionRender.clearRenderer();
 		}
 	}
 
-	public void addMemory(int vertices, int stride) {
-		this.vramAllocated += (long) vertices * stride;
+	public void addUsedMemory(int bytes) {
+		this.vramUsed += bytes;
 	}
 
-	public void removeMemory(int vertices, int stride) {
-		this.vramAllocated -= (long) vertices * stride;
+	public void removeUsedMemory(long bytes) {
+		this.vramUsed -= bytes;
 	}
 
-	public long getMemory() {
+	public void addMemory(long bytes) {
+		this.vramAllocated += bytes;
+	}
+
+	public void removeMemory(long bytes) {
+		this.vramAllocated -= bytes;
+	}
+
+	public long getMemoryUsed() {
+		return (this.vramUsed / 1024L) / 1024L;
+	}
+
+	public long getMemoryTotal() {
 		return (this.vramAllocated / 1024L) / 1024L;
 	}
 
@@ -181,10 +192,11 @@ public class SectionManager {
 	private void queueRebuilds() {
 		GlobalFlags.MESHING = true;
 
-		SectionRender render;
-		while ((render = this.updateList.poll()) != null) {
-			render.rebuild(this, this.blockRenderer, this.worldObj);
+		for (int i = 0; i < Math.min(MAX_UPDATE_QUEUES, this.updateList.size()); i++) {
+			this.updateList.get(i).rebuild(this, this.blockRenderer, this.worldObj);
 		}
+
+		this.updateList.clear();
 
 		GlobalFlags.MESHING = false;
 	}
@@ -255,12 +267,6 @@ public class SectionManager {
 	}
 
 	private void clearRenderer() {
-		ReferenceCollection<SectionRender> sectionRenders = this.sectionMap.values();
-
-		for (SectionRender render : sectionRenders) {
-			render.clearRenderer();
-		}
-
 		this.sectionMap.clear();
 	}
 

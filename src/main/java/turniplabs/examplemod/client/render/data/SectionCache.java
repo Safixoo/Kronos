@@ -16,10 +16,13 @@ import org.jetbrains.annotations.Nullable;
 import turniplabs.examplemod.client.util.BlocksFlags;
 
 public class SectionCache implements WorldSource {
+	private Chunk[] chunks = new Chunk[3 * 3];
+
 	private final World worldObj;
 	private final int sectionX, sectionY, sectionZ;
 
 	private final short[][] sectionBlocks = new short[3 * 3 * 3][0];
+	private short[] mainSectionBlocks = new short[0];
 
 	private final byte[][] sectionData = new byte[3 * 3 * 3][0];
 	private final byte[][] skyLightmap = new byte[3 * 3 * 3][0];
@@ -31,24 +34,34 @@ public class SectionCache implements WorldSource {
 	public SectionCache(World world, int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
 		this.worldObj = world;
 
-		int sectionX = this.sectionX = Math.floorDiv(minX, 16);
-		int sectionY = this.sectionY = Math.floorDiv(minY, 16);
-		int sectionZ = this.sectionZ = Math.floorDiv(minZ, 16);
+		this.sectionX = Math.floorDiv(minX, 16);
+		this.sectionY = Math.floorDiv(minY, 16);
+		this.sectionZ = Math.floorDiv(minZ, 16);
 
+		this.fillData(world, minX, minY, minZ, maxX, maxY, maxZ);
+	}
+
+	public void fillData(World world, int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
 		int maxChunkX = Math.floorDiv(maxX, 16);
-		int maxChunkY = Math.floorDiv(maxY, 16);
 		int maxChunkZ = Math.floorDiv(maxZ, 16);
+		int maxChunkY = Math.floorDiv(maxY, 16);
 
-		for (int x = sectionX; x <= maxChunkX; x++) {
-			for (int z = sectionZ; z <= maxChunkZ; z++) {
-				for (int y = sectionY; y <= maxChunkY; y++) {
-					int relX = x - sectionX;
-					int relY = y - sectionY;
-					int relZ = z - sectionZ;
+		for (int x = this.sectionX; x <= maxChunkX; x++) {
+			for (int z = this.sectionZ; z <= maxChunkZ; z++) {
+				for (int y = this.sectionY; y <= maxChunkY; y++) {
+					int relX = x - this.sectionX;
+					int relY = y - this.sectionY;
+					int relZ = z - this.sectionZ;
 
-					Chunk chunk = world.getChunkFromChunkCoords(x, z);
+					Chunk chunk;
+
+					if (this.chunks[sectionIndex(relX, 0, relZ)] == null) {
+						chunk = this.chunks[sectionIndex(relX, 0, relZ)] = world.getChunkFromChunkCoords(x, z);
+					} else {
+						chunk = this.chunks[sectionIndex(relX, 0, relZ)];
+					}
+
 					ChunkSection section = chunk.getSection((minY >> 4) + relY);
-
 					int sectionIndex = sectionIndex(relX, relY, relZ);
 
 					if (section != null) {
@@ -71,7 +84,7 @@ public class SectionCache implements WorldSource {
 						this.skyLightmap[sectionIndex] = DEFAULT_SHORT_ARRAY;
 						this.blockLightmap[sectionIndex] = DEFAULT_SHORT_ARRAY;
 					}
-
+					this.mainSectionBlocks = this.sectionBlocks[sectionIndex(1, 1, 1)];
 				}
 			}
 		}
@@ -108,6 +121,10 @@ public class SectionCache implements WorldSource {
 		}
 
 		return 0;
+	}
+
+	public int getBlockIdMain(int x, int y, int z) {
+		return this.mainSectionBlocks[makeBlockIndex(x & 15, y & 15, z & 15)];
 	}
 
 	@Override
@@ -199,9 +216,7 @@ public class SectionCache implements WorldSource {
 
 	@Override
 	public Material getBlockMaterial(int x, int y, int z) {
-		// Could be made a LUT?
-		int blockId = this.getBlockId(x, y, z);
-		return blockId == 0 ? Material.air : Blocks.getBlock(blockId).getMaterial();
+		return BlocksFlags.MATERIAL[this.getBlockId(x, y, z)];
 	}
 
 	@Override

@@ -2,6 +2,7 @@ package turniplabs.examplemod.client.render.meshing;
 
 import net.minecraft.client.render.LightmapHelper;
 import net.minecraft.client.render.RenderBlockCache;
+import net.minecraft.client.render.block.color.BlockColor;
 import net.minecraft.client.render.block.color.BlockColorDispatcher;
 import net.minecraft.client.render.block.model.BlockModel;
 import net.minecraft.client.render.block.model.BlockModelGrass;
@@ -12,6 +13,7 @@ import net.minecraft.core.block.Block;
 import net.minecraft.core.util.helper.Side;
 import net.minecraft.core.util.phys.AABB;
 import org.spongepowered.asm.mixin.Unique;
+import turniplabs.examplemod.client.render.data.BlockLightCache;
 import turniplabs.examplemod.client.util.BlocksFlags;
 import turniplabs.examplemod.client.vertex.VertexWriterManager;
 import turniplabs.examplemod.client.render.data.ModelBoundsData;
@@ -22,7 +24,7 @@ import turniplabs.examplemod.client.util.interfaces.mixin.IBlockAABB;
 import turniplabs.examplemod.client.vertex.writer.TerrainVertexWriter;
 
 public class BlockRenderer {
-	public RenderBlockCache cache = new RenderBlockCache();
+	public BlockLightCache cache = new BlockLightCache();
 	private SectionCache chunkCache;
 
 	private boolean[] facesBlock;
@@ -49,10 +51,10 @@ public class BlockRenderer {
 		this.modelData.setRender(this);
 	}
 
-	public void renderStandardBlock(BlockModel<?> blockModel, AABB bounds, int x, int y, int z) {
-		int color = BlockColorDispatcher.getInstance().getDispatch(blockModel.block).getWorldColor(this.chunkCache, x, y, z);
+	public void renderStandardBlock(Block<?> block, BlockColor blockColor, BlockModel<?> blockModel, AABB bounds, int x, int y, int z) {
+		int color = blockColor.getWorldColor(this.chunkCache, x, y, z);
 
-		this.cache.setupCache(blockModel.block, this.chunkCache, x, y, z);
+		this.cache.setupCache(this.chunkCache, x, y, z);
 		this.facesBlock = ((IBlockAABB) bounds).blockBoundsCheck();
 		this.setModelBounds(x, y, z, bounds);
 
@@ -65,14 +67,14 @@ public class BlockRenderer {
 				this.useColor = blockModel.shouldSideBeColored(this.chunkCache, x, y, z, side, meta);
 			}
 
-			this.renderSideFaceAll(blockModel, this.modelData, x, y, z, side, ColorBGRManager.rgbToBgr(color));
+			this.renderSideFaceAll(block, blockModel, this.modelData, x, y, z, side, ColorBGRManager.rgbToBgr(color));
 		}
 
-		if (isGrass) {
-			BlockModelGrass.useOverlay = true;
-			blockModel.renderStandardBlock(Tessellator.instance, blockModel.block.getBoundsRaw(), x, y, z);
-			BlockModelGrass.useOverlay = false;
-		}
+//		if (isGrass) {
+//			BlockModelGrass.useOverlay = true;
+//			blockModel.renderStandardBlock(Tessellator.instance, blockModel.block.getBoundsRaw(), x, y, z);
+//			BlockModelGrass.useOverlay = false;
+//		}
 	}
 
 	public void setChunkCache(SectionCache chunkCache) {
@@ -83,14 +85,13 @@ public class BlockRenderer {
 		return this.facesBlock[side] || !this.chunkCache.isBlockOpaqueCube(x, y, z);
 	}
 
-	private void renderSideFaceAll(BlockModel<?> blockModel, ModelBoundsData bounds, int x, int y, int z, int side, int color) {
+	private void renderSideFaceAll(Block<?> block, BlockModel<?> blockModel, ModelBoundsData bounds, int x, int y, int z, int side, int color) {
 		int dirX = Direction.x(side);
 		int dirY = Direction.y(side);
 		int dirZ = Direction.z(side);
 
 		if (this.shouldDrawSide(x + dirX, y + dirY, z + dirZ, side)) {
 			IconCoordinate tex = blockModel.getBlockTexture(this.chunkCache, x, y, z, Side.sides[side]);
-			Block<?> block = blockModel.block;
 
 			VertexWriterManager.getCurrentInstance().ensureCapacity(TerrainVertexWriter.STRIDE * 4);
 			FaceWriterWrapper quadWriter = FaceDataWriters.getWriterBySide(side);

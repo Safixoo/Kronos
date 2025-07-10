@@ -1,13 +1,17 @@
 package turniplabs.examplemod.client.render;
 
 import net.minecraft.client.render.RenderBlocks;
+import net.minecraft.client.render.block.color.BlockColor;
+import net.minecraft.client.render.block.color.BlockColorDispatcher;
 import net.minecraft.client.render.block.model.BlockModel;
 import net.minecraft.client.render.block.model.BlockModelDispatcher;
 import net.minecraft.client.render.block.model.BlockModelLeaves;
 import net.minecraft.client.render.terrain.ChunkRenderer;
 import net.minecraft.client.render.tessellator.Tessellator;
+import net.minecraft.core.block.Block;
 import net.minecraft.core.block.Blocks;
 import net.minecraft.core.world.World;
+import net.minecraft.core.world.chunk.ChunkSection;
 import turniplabs.examplemod.client.render.region.RegionRender;
 import turniplabs.examplemod.client.vertex.VertexWriterManager;
 import turniplabs.examplemod.client.render.data.SectionCache;
@@ -23,17 +27,16 @@ import java.nio.ByteBuffer;
 public class SectionRender {
 	public int blockX, blockY, blockZ;
 
-	public int solidFaces;
-	public int adjacentMask;
+	public int adjacentMask, solidFaces;
 	public int currentFrame;
 
 	public long translucentDraw;
 	public long solidDraw;
 
 	public final SectionRender[] adjacentSections = new SectionRender[Direction.COUNT];
-	public boolean dirty, built, solidEmptySection;
+	private SectionCache sectionCache;
 
-	public GlVertexBuffer solidBuffer, translucentBuffer;
+	public boolean dirty, solidEmptySection;
 	public RegionRender region;
 
 	public SectionRender(int blockX, int blockY, int blockZ) {
@@ -53,6 +56,12 @@ public class SectionRender {
 		int maxY = minY + 16;
 		int maxZ = minZ + 16;
 
+		if (this.sectionCache == null) {
+			this.sectionCache = new SectionCache(world, minX - 1, minY - 1, minZ - 1, maxX + 1, maxY + 1, maxZ + 1);
+		} else {
+			this.sectionCache.fillData(world, minX - 1, minY - 1, minZ - 1, maxX + 1, maxY + 1, maxZ + 1);
+		}
+
 		SectionCache sectionCache = new SectionCache(world, minX - 1, minY - 1, minZ - 1, maxX + 1, maxY + 1, maxZ + 1);
 		RenderBlocks renderBlocks = new RenderBlocks(sectionCache);
 		BlockModel.setRenderBlocks(renderBlocks);
@@ -66,10 +75,14 @@ public class SectionRender {
 		int solidBlocks = 0;
 		int[] solidFaces = new int[Direction.COUNT];
 
+		int lastBlockId = -1;
+		BlockColor lastBlockColor = null;
+		BlockModel<?> lastModel = null;
+
 		for (int y = minY; y < maxY; ++y) {
 			for (int z = minZ; z < maxZ; ++z) {
 				for (int x = minX; x < maxX; ++x) {
-					int blockId = sectionCache.getBlockId(x, y, z);
+					int blockId = sectionCache.getBlockIdMain(x, y, z);
 
 					if (blockId == 0) {
 						continue;
@@ -87,7 +100,20 @@ public class SectionRender {
 						if (z == minZ) solidFaces[Direction.NORTH]++;
 					}
 
-					BlockModel<?> model = BlockModelDispatcher.getInstance().getDispatch(Blocks.getBlock(blockId));
+					BlockColor blockColor;
+					BlockModel<?> blockModel;
+					Block<?> block = Blocks.getBlock(blockId);
+
+					if (lastBlockId == blockId) {
+						blockModel = lastModel;
+						blockColor = lastBlockColor;
+					} else {
+						blockModel = lastModel = BlockModelDispatcher.getInstance().getDispatch(block);
+						blockColor = lastBlockColor = BlockColorDispatcher.getInstance().getDispatch(blockModel.block);
+						lastBlockId = blockId;
+					}
+
+					BlockModel<?> model = blockModel;
 					int blockRenderPass = model.renderLayer();
 
 					if (blockRenderPass == 0) {
@@ -96,8 +122,8 @@ public class SectionRender {
 						VertexWriterManager.setCurrentInstance(translucentWriter);
 					}
 
-					if (Blocks.solid[blockId] || model instanceof BlockModelLeaves) {
-						blockRenderer.renderStandardBlock(model, model.block.getBoundsRaw(), x, y, z);
+					if (BlocksFlags.SOLID[blockId] || model instanceof BlockModelLeaves) {
+						blockRenderer.renderStandardBlock(block, blockColor, model, model.block.getBoundsRaw(), x, y, z);
 					} else {
 						this.renderBlock(Tessellator.instance, renderBlocks, model, x, y, z);
 					}
@@ -132,7 +158,6 @@ public class SectionRender {
 		translucentWriter.stopDrawing();
 		solidWriter.stopDrawing();
 
-		this.built = true;
 		this.dirty = false;
 	}
 
@@ -164,46 +189,7 @@ public class SectionRender {
 		this.adjacentSections[direction] = render;
 	}
 
-	private void fillSolidBuffer(ByteBuffer vertexData, int vertices) {
-		SectionManager manager = SectionManager.getCurrentInstance();
-
-		if (this.solidBuffer == null) {
-			manager.addMemory(vertices, DefaultVertexFormats.TERRAIN_FORMAT.getStride());
-			this.solidBuffer = new GlVertexBuffer(DefaultVertexFormats.TERRAIN_FORMAT);
-		}
-
-		this.solidBuffer.upload(vertexData, vertices);
-	}
-
-	private void fillTranslucentBuffer(ByteBuffer vertexData, int vertices) {
-		SectionManager manager = SectionManager.getCurrentInstance();
-
-		if (this.translucentBuffer == null) {
-			manager.addMemory(vertices, DefaultVertexFormats.TERRAIN_FORMAT.getStride());
-			this.translucentBuffer = new GlVertexBuffer(DefaultVertexFormats.TERRAIN_FORMAT);
-		}
-		this.translucentBuffer.upload(vertexData, vertices);
-	}
-
 	public SectionRender getAdjacent(int direction) {
 		return this.adjacentSections[direction];
-	}
-
-	public void clearRenderer() {
-		SectionManager manager = SectionManager.getCurrentInstance();
-
-		if (this.solidBuffer != null) {
-			manager.removeMemory(this.solidBuffer.vertexCount, DefaultVertexFormats.TERRAIN_FORMAT.getStride());
-			this.solidBuffer.clear();
-
-			this.solidBuffer = null;
-		}
-
-		if (this.translucentBuffer != null) {
-			manager.removeMemory(this.translucentBuffer.vertexCount, DefaultVertexFormats.TERRAIN_FORMAT.getStride());
-			this.translucentBuffer.clear();
-
-			this.translucentBuffer = null;
-		}
 	}
 }

@@ -1,8 +1,8 @@
 package turniplabs.examplemod.client.render.cull;
 
 import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import net.minecraft.client.render.terrain.RenderRegion;
+import it.unimi.dsi.fastutil.objects.ReferenceArrayList;
+import it.unimi.dsi.fastutil.objects.ReferenceList;
 import net.minecraft.core.util.helper.MathHelper;
 import turniplabs.examplemod.client.render.SectionManager;
 import turniplabs.examplemod.client.render.SectionRender;
@@ -11,21 +11,17 @@ import turniplabs.examplemod.client.render.region.RegionRender;
 import turniplabs.examplemod.client.util.Direction;
 
 import java.util.List;
-import java.util.Queue;
 
 public class BFSCuller {
-	private final ObjectArrayList<SectionRender> bfsQueue = new ObjectArrayList<>();
+	private final BFSQueue bfsQueue = new BFSQueue();
 
 	private RegionManager regionManager;
-	private Queue<SectionRender> updateList;
-
-	private static final int MAX_UPDATE_QUEUES = 5;
+	private ReferenceList<SectionRender> updateList;
 
 	private float renderDistance;
-	private int chunksUpdated;
 	private int activeFrame;
 
-	public void setRenderingLists(RegionManager regionManager, Queue<SectionRender> updateList) {
+	public void setRenderingLists(RegionManager regionManager, ReferenceList<SectionRender> updateList) {
 		this.regionManager = regionManager;
 		this.updateList = updateList;
 	}
@@ -36,8 +32,34 @@ public class BFSCuller {
 		this.updateList.clear();
 		this.bfsQueue.clear();
 
-		this.chunksUpdated = 0;
 		this.activeFrame++;
+	}
+
+	private static void bfsSearch(ReferenceList<SectionRender> updateList, BFSQueue bfsQueue, RegionManager regionManager,
+								  float cameraX, float cameraY, float cameraZ,
+								  int playerChunkX, int playerChunkY, int playerChunkZ,
+								  float renderDistance, int activeFrame) {
+		int bfsIndex = 0;
+
+		SectionRender node;
+		while ((node = bfsQueue.get(bfsIndex++)) != null) {
+			float distX = node.blockX - cameraX;
+			float distY = node.blockY - cameraY;
+			float distZ = node.blockZ - cameraZ;
+
+			if (!(isSectionVisible(distX, distY, distZ, renderDistance))) {
+				continue;
+			}
+
+			queueRegionNode(node, node.region, regionManager, activeFrame);
+
+			int outwardDirections = getOutwardDirections(playerChunkX, playerChunkY, playerChunkZ, node);
+
+			outwardDirections &= node.adjacentMask;
+			outwardDirections &= ~node.solidFaces;
+
+			exploreNodes(updateList, bfsQueue, node, outwardDirections, activeFrame);
+		}
 	}
 
 	public void updateRenderList(Long2ReferenceOpenHashMap<SectionRender> sectionMap, float cameraX, float cameraY, float cameraZ) {
@@ -48,46 +70,29 @@ public class BFSCuller {
 		SectionRender spawn = sectionMap.get(SectionManager.asLong(playerChunkX, playerChunkY, playerChunkZ));
 
 		if (spawn != null) {
-			exploreNodes(this.updateList, this.bfsQueue, spawn, spawn.adjacentMask);
-			this.updateList.add(spawn);
+			exploreNodes(this.updateList, this.bfsQueue, spawn, spawn.adjacentMask, this.activeFrame);
 
-			this.queueRegionNode(spawn, spawn.region);
-		}
-
-		int bfsIndex = 0;
-
-		while (this.bfsQueue.size() > bfsIndex) {
-			SectionRender node = this.bfsQueue.get(bfsIndex++);
-
-			float distX = node.blockX - cameraX;
-			float distY = node.blockY - cameraY;
-			float distZ = node.blockZ - cameraZ;
-
-			if (!(isSectionVisible(distX, distY, distZ, renderDistance))) {
-				continue;
+			if (spawn.dirty) {
+				this.updateList.add(spawn);
 			}
 
-			this.queueRegionNode(node, node.region);
-
-			int outwardDirections = getOutwardDirections(playerChunkX, playerChunkY, playerChunkZ, node);
-
-			outwardDirections &= node.adjacentMask;
-			outwardDirections &= ~node.solidFaces;
-
-			exploreNodes(this.updateList, this.bfsQueue, node, outwardDirections);
+			queueRegionNode(spawn, spawn.region, this.regionManager, this.activeFrame);
 		}
+
+		bfsSearch(this.updateList, this.bfsQueue, this.regionManager, cameraX, cameraY, cameraZ,
+			playerChunkX, playerChunkY, playerChunkZ, this.renderDistance, this.activeFrame);
 	}
 
-	private void queueRegionNode(SectionRender section, RegionRender region) {
+	private static void queueRegionNode(SectionRender section, RegionRender region, RegionManager regionManager, int activeFrame) {
 		if (region == null) {
 			return;
 		}
 
-		if (region.currentFrame != this.activeFrame) {
-			if (section.solidDraw != 0 || section.translucentDraw != 0) {
-				this.regionManager.addToDrawQueue(region);
+		if (region.currentFrame != activeFrame) {
+			if ((section.solidDraw | section.translucentDraw) != 0) {
+				regionManager.addToDrawQueue(region);
 			}
-			region.currentFrame = this.activeFrame;
+			region.currentFrame = activeFrame;
 		}
 
 		if (section.solidDraw != 0) {
@@ -99,39 +104,41 @@ public class BFSCuller {
 		}
 	}
 
-	private void exploreNodes(Queue<SectionRender> updateQueue, ObjectArrayList<SectionRender> queue, SectionRender fatherNode, int directions) {
+	private static void exploreNodes(List<SectionRender> updateQueue, BFSQueue queue, SectionRender fatherNode, int directions, int activeFrame) {
 		if (directions == 0) {
 			return;
 		}
 
+		queue.verifyCapacity(6);
+
 		if (Direction.hasSet(directions, Direction.DOWN)) {
 			SectionRender adjacent = fatherNode.getAdjacent(Direction.DOWN);
-			this.visitNode(updateQueue, queue, adjacent);
+			visitNode(updateQueue, queue, adjacent, activeFrame);
 		}
 
 		if (Direction.hasSet(directions, Direction.UP)) {
 			SectionRender adjacent = fatherNode.getAdjacent(Direction.UP);
-			this.visitNode(updateQueue, queue, adjacent);
+			visitNode(updateQueue, queue, adjacent, activeFrame);
 		}
 
 		if (Direction.hasSet(directions, Direction.NORTH)) {
 			SectionRender adjacent = fatherNode.getAdjacent(Direction.NORTH);
-			this.visitNode(updateQueue, queue, adjacent);
+			visitNode(updateQueue, queue, adjacent, activeFrame);
 		}
 
 		if (Direction.hasSet(directions, Direction.SOUTH)) {
 			SectionRender adjacent = fatherNode.getAdjacent(Direction.SOUTH);
-			this.visitNode(updateQueue, queue, adjacent);
+			visitNode(updateQueue, queue, adjacent, activeFrame);
 		}
 
 		if (Direction.hasSet(directions, Direction.WEST)) {
 			SectionRender adjacent = fatherNode.getAdjacent(Direction.WEST);
-			this.visitNode(updateQueue, queue, adjacent);
+			visitNode(updateQueue, queue, adjacent, activeFrame);
 		}
 
 		if (Direction.hasSet(directions, Direction.EAST)) {
 			SectionRender adjacent = fatherNode.getAdjacent(Direction.EAST);
-			this.visitNode(updateQueue, queue, adjacent);
+			visitNode(updateQueue, queue, adjacent, activeFrame);
 		}
 	}
 
@@ -150,7 +157,7 @@ public class BFSCuller {
 		return planes;
 	}
 
-	private boolean isSectionVisible(float distX, float distY, float distZ, float renderDistance) {
+	private static boolean isSectionVisible(float distX, float distY, float distZ, float renderDistance) {
 		return withinRenderDistance(distX, distY, distZ) < renderDistance && FrustumCuller.testAab(distX, distY, distZ);
 	}
 
@@ -162,15 +169,14 @@ public class BFSCuller {
 		return (x * x) + (y * y) + (z * z);
 	}
 
-	private void visitNode(Queue<SectionRender> updateQueue, ObjectArrayList<SectionRender> queue, SectionRender adj) {
-		if (adj.currentFrame != this.activeFrame && !adj.solidEmptySection) {
-			if (adj.dirty && this.chunksUpdated < MAX_UPDATE_QUEUES) {
+	private static void visitNode(List<SectionRender> updateQueue, BFSQueue queue, SectionRender adj, int activeFrame) {
+		if (adj.currentFrame != activeFrame && !adj.solidEmptySection) {
+			if (adj.dirty) {
 				updateQueue.add(adj);
-				this.chunksUpdated++;
 			}
 
-			adj.currentFrame = this.activeFrame;
-			queue.add(adj);
+			adj.currentFrame = activeFrame;
+			queue.addToQueueUnsafe(adj);
 		}
 	}
 }

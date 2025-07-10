@@ -4,6 +4,7 @@ import org.lwjgl.opengl.GL15;
 import org.lwjgl.opengl.GL20;
 import org.lwjgl.opengl.GL30;
 import org.lwjgl.system.MemoryUtil;
+import turniplabs.examplemod.client.render.SectionManager;
 import turniplabs.examplemod.client.vertex.format.DefaultVertexFormats;
 import java.nio.ByteBuffer;
 
@@ -12,22 +13,24 @@ public class RegionVertexBuffer {
 	public final int vboId;
 	public int vaoId;
 
-	private int capacity;
+	private long capacity;
 
 	public RegionVertexBuffer(int size) {
 		this.vboId = GL15.glGenBuffers();
 		this.allocateSpace(size);
 	}
 
-	public void allocateSpace(int space) {
+	public void allocateSpace(long space) {
 		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, this.vboId);
-		GL15.glBufferData(GL15.GL_ARRAY_BUFFER, space, GL15.GL_DYNAMIC_DRAW);
+		GL15.glBufferData(GL15.GL_ARRAY_BUFFER, space, GL15.GL_STATIC_DRAW);
 		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
+
+		SectionManager.getCurrentInstance().addMemory(space);
 
 		this.capacity = space;
 	}
 
-	public void upload(ByteBuffer vertexData, int offset, int size) {
+	public void upload(ByteBuffer vertexData, long offset, int size) {
 		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, this.vboId);
 
 		GL20.nglBufferSubData(GL15.GL_ARRAY_BUFFER, offset, size, MemoryUtil.memAddress(vertexData));
@@ -62,6 +65,8 @@ public class RegionVertexBuffer {
 		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, this.vboId);
 		GL30.glBufferData(GL15.GL_ARRAY_BUFFER, 0, GL15.GL_STREAM_DRAW);
 		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
+
+		SectionManager.getCurrentInstance().removeMemory(this.capacity);
 
 		GL30.glDeleteBuffers(this.vboId);
 		GL30.glDeleteBuffers(this.vaoId);
