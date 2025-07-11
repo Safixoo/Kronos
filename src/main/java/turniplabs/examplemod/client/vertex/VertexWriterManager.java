@@ -1,6 +1,7 @@
 package turniplabs.examplemod.client.vertex;
 
 import net.minecraft.client.GLAllocation;
+import turniplabs.examplemod.client.util.Direction;
 import turniplabs.examplemod.client.vertex.format.VertexFormat;
 
 import java.nio.ByteBuffer;
@@ -27,8 +28,14 @@ public class VertexWriterManager {
 
 	private static final VertexWriterManager DEFAULT_INSTANCE = new VertexWriterManager();
 
-	public static final VertexWriterManager SOLID = new VertexWriterManager();
+	public static final VertexWriterManager[] SOLID = new VertexWriterManager[Direction.COUNT + 1];
 	public static final VertexWriterManager TRANSLUCENT = new VertexWriterManager();
+
+	static {
+		for (int dir = 0; dir < Direction.COUNT + 1; dir++) {
+			SOLID[dir] = new VertexWriterManager();
+		}
+	}
 
 	private static VertexWriterManager CURRENT_INSTANCE;
 

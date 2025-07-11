@@ -1,6 +1,7 @@
 package turniplabs.examplemod.client.render.region;
 
 import org.lwjgl.opengl.GL45;
+import org.lwjgl.system.MemoryUtil;
 import turniplabs.examplemod.client.render.SectionManager;
 import turniplabs.examplemod.client.render.SectionRender;
 import turniplabs.examplemod.client.vertex.writer.TerrainVertexWriter;
@@ -10,7 +11,7 @@ import java.nio.ByteBuffer;
 
 public class RegionAllocation {
 	private static final int STRIDE = TerrainVertexWriter.STRIDE;
-	private static final int MIN_ALLOC = 8192;
+	private static final int MIN_ALLOC = 16000;
 
 	public final RegionVertexBuffer vertexBuffer;
 
@@ -21,7 +22,7 @@ public class RegionAllocation {
 	private Allocation lastEntry;
 	private Allocation freeAllocations;
 
-	public static final int SPARE_BUFFER_ALLOC = 1024 * 1024 * 16;
+	public static final int SPARE_BUFFER_ALLOC = 1024 * 1024 * 24;
 	public static RegionVertexBuffer SPARE_BUFFER;
 
 	public RegionAllocation() {
@@ -71,20 +72,21 @@ public class RegionAllocation {
 	}
 
 	// Returns first << 32 | count.
-	public long allocate(SectionRender render, ByteBuffer vertexData, int size) {
+	public long allocate(SectionRender render, ByteBuffer vertexData, int size, int side) {
 		Allocation alloc = this.fitInFree(size);
 
 		if (alloc == null || alloc.size < size) {
-			alloc = this.allocateNew(render, size);
+			alloc = this.allocateNew(render, size, side);
 		}
 
 		alloc.render = render;
+		alloc.side = side;
 		this.uploadAllocation(alloc, vertexData, size);
 
 		return packDrawData(size, (int) alloc.offset);
 	}
 
-	private Allocation allocateNew(SectionRender render, int size) {
+	private Allocation allocateNew(SectionRender render, int size, int side) {
 		long maxOffset = this.offset / STRIDE;
 		int sizeInBytes = size * STRIDE;
 
@@ -94,7 +96,7 @@ public class RegionAllocation {
 			this.resize(this.offset + sizeInBytes);
 		}
 
-		Allocation newAlloc = new Allocation(render, maxOffset, size);
+		Allocation newAlloc = new Allocation(render, maxOffset, size, side);
 		this.offset += sizeInBytes;
 
 		if (this.firstEntry == null) {
@@ -104,18 +106,18 @@ public class RegionAllocation {
 		return this.lastEntry = this.lastEntry.next = newAlloc;
 	}
 
-	public long renewAllocation(SectionRender render, ByteBuffer data, int size) {
-		Allocation alloc = this.findRenderAlloc(render);
+	public long renewAllocation(SectionRender render, ByteBuffer data, int size, int side) {
+		Allocation alloc = this.findRenderAlloc(render, side);
 		long drawData;
 
-		if (alloc != null && alloc.size >= size) {
+		if (alloc != null && alloc.side == side && alloc.render == render && alloc.size >= size) {
 			this.uploadAllocation(alloc, data, size);
 			drawData = packDrawData(size, (int) alloc.offset);
 		} else {
 			if (alloc != null) {
 				this.remove(render);
 			}
-			drawData = this.allocate(render, data, size);
+			drawData = this.allocate(render, data, size, side);
 		}
 
 		return drawData;
@@ -147,10 +149,10 @@ public class RegionAllocation {
 		return returnAlloc;
 	}
 
-	public @Nullable Allocation findRenderAlloc(SectionRender render) {
+	public @Nullable Allocation findRenderAlloc(SectionRender render, int side) {
 		Allocation alloc = this.firstEntry;
 
-		while (alloc != null && alloc.render != render) {
+		while (alloc != null && alloc.render != render && alloc.side != side) {
 			alloc = alloc.next;
 		}
 
@@ -174,6 +176,7 @@ public class RegionAllocation {
 
 		if (alloc.render == render) {
 			alloc.render = null;
+			alloc.side = -1;
 			this.firstEntry = alloc.next;
 			return;
 		}
@@ -188,6 +191,7 @@ public class RegionAllocation {
 
 		Allocation renderAlloc = alloc.next;
 		renderAlloc.render = null;
+		renderAlloc.side = -1;
 		renderAlloc.next = null;
 
 		if (this.freeAllocations == null) {
@@ -213,8 +217,9 @@ public class RegionAllocation {
 		public Allocation next;
 		public SectionRender render;
 
-		public Allocation(SectionRender render, long offset, int size) {
+		public Allocation(SectionRender render, long offset, int size, int side) {
 			this.render = render;
+			this.side = side;
 			this.offset = offset;
 			this.size = size;
 		}
@@ -223,5 +228,6 @@ public class RegionAllocation {
 		// avoid division to translate byte sizes to vertex counts.
 		public long offset;
 		public int size;
+		public int side;
 	}
 }

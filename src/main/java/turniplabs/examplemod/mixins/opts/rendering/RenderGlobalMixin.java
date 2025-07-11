@@ -104,15 +104,12 @@ public abstract class RenderGlobalMixin {
 	 */
 	@Overwrite
 	public int sortAndRender(ICamera camera, int renderPass, double partialTick) {
-		if (renderPass == 0) {
-			this.manager.drawnSolidRenderers = 0;
-		}
-
 		this.manager.drawRenderPass(renderPass);
 
 		if (renderPass == 0) {
 			this.renderersBeingRendered = this.manager.drawnSolidRenderers;
 			this.renderersLoaded = this.manager.drawnSolidRenderers;
+			this.manager.drawnSolidRenderers = 0;
 		}
 
 		return 0;

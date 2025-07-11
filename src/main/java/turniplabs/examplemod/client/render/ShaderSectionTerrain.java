@@ -66,10 +66,13 @@ public class ShaderSectionTerrain {
 
 	public void setupUniforms(float posX, float posY, float posZ, boolean noFog) {
 		GL20.glUniform1i(this.u_TexId, 0);
-		GL20.glUniform3f(this.u_CamPos, posX, posY, posZ);
+		GL20.glUniform4f(this.u_CamPos, -posX, -posY, -posZ, 0);
 
-		GL20.glUniform1f(this.u_FogEnd, noFog ? 1E+12F : GL11.glGetFloat(GL11.GL_FOG_END));
-		GL20.glUniform1f(this.u_FogStart, noFog ? 1E+12F : GL11.glGetFloat(GL11.GL_FOG_START));
+		float fogEnd = GL11.glGetFloat(GL11.GL_FOG_END);
+		float fogStart = GL11.glGetFloat(GL11.GL_FOG_START);
+
+		GL20.glUniform1f(this.u_FogEnd, noFog ? 1E+12F : fogEnd);
+		GL20.glUniform1f(this.u_FogStart, noFog ? 1E+12F : fogStart);
 
 		float[] fogColor = new float[4];
 
@@ -84,10 +87,10 @@ public class ShaderSectionTerrain {
 			"  varying vec3 v_Color;																				\n" +
 			"  varying vec2 v_TextureUv;																			\n" +
 			"  varying float v_Distance;																			\n" +
-			"  uniform vec3 u_CamPos;          																		\n" +
+			"  uniform vec4 u_CamPos;          																		\n" +
 			"     																									\n" +
 			"  void main() {    																					\n" +
-			"      vec4 position = gl_ModelViewMatrix * (gl_Vertex - vec4(u_CamPos, 0.0));	 		    			\n" +
+			"      vec4 position = gl_ModelViewMatrix * (gl_Vertex + u_CamPos);	 		    						\n" +
 			"      gl_Position = gl_ProjectionMatrix * position;	 		    									\n" +
 			"	   					 																				\n" +
 			"      v_TextureUv = gl_MultiTexCoord0.st;   															\n" +
@@ -112,10 +115,11 @@ public class ShaderSectionTerrain {
 			"   uniform vec3 u_FogColor;																 		  \n" +
 			"   																			  					  \n" +
 			"   void main() {																			          \n" +
-			"   	vec4 blockColor = vec4(v_Color, 1.0) * texture2D(u_TexId, v_TextureUv);						  \n" +
-			"   	float factor = v_Distance < u_FogEnd ? smoothstep(u_FogStart, u_FogEnd, v_Distance) : 1.0;	  \n" +
+			"   	vec4 blockTexture = texture2D(u_TexId, v_TextureUv);						                  \n" +
+			"   	vec3 blockColor = v_Color * blockTexture.rgb;						  						  \n" +
+			"   	float factor = smoothstep(u_FogStart, u_FogEnd, v_Distance);								  \n" +
 			"   																								  \n" +
-			"   	gl_FragColor = vec4(mix(blockColor.rgb, u_FogColor, factor), blockColor.a);	 				  \n" +
+			"   	gl_FragColor = vec4(mix(blockColor, u_FogColor, factor), blockTexture.a);	 				  \n" +
 			"   }																			   					  \n" +
 			"      																								  \n";
 }

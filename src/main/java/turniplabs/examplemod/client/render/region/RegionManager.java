@@ -59,8 +59,6 @@ public class RegionManager {
 					region.bindSolid();
 					region.draw(region.solidFirst, region.solidCount, region.solidEmptyDraw);
 
-					SectionManager.getCurrentInstance().drawnSolidRenderers += region.solidEmptyDraw;
-
 					region.solidEmptyDraw = 0;
 				}
 			}

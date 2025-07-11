@@ -29,7 +29,7 @@ public class Mth {
 		return num * num;
 	}
 
-	public static long lerp(long start, long end, float t) {
+	public static long lerp(long start, long end, double t) {
 		return (long) (start + (end - start) * t);
 	}
 

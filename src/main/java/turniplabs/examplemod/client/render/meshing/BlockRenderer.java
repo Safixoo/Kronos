@@ -91,8 +91,9 @@ public class BlockRenderer {
 		int dirZ = Direction.z(side);
 
 		if (this.shouldDrawSide(x + dirX, y + dirY, z + dirZ, side)) {
-			IconCoordinate tex = blockModel.getBlockTexture(this.chunkCache, x, y, z, Side.sides[side]);
+			VertexWriterManager.setCurrentInstance(VertexWriterManager.SOLID[side]);
 
+			IconCoordinate tex = blockModel.getBlockTexture(this.chunkCache, x, y, z, Side.sides[side]);
 			VertexWriterManager.getCurrentInstance().ensureCapacity(TerrainVertexWriter.STRIDE * 4);
 			FaceWriterWrapper quadWriter = FaceDataWriters.getWriterBySide(side);
 

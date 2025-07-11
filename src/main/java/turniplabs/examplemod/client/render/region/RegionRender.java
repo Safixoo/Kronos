@@ -13,8 +13,8 @@ public class RegionRender {
 	private RegionAllocation translucentBuffer;
 	private RegionAllocation solidBuffer;
 
-	public final long solidFirst = MemoryUtil.nmemAlloc(256 * 4);
-	public final long solidCount = MemoryUtil.nmemAlloc(256 * 4);
+	public final long solidFirst = MemoryUtil.nmemAlloc(256 * 4 * 7);
+	public final long solidCount = MemoryUtil.nmemAlloc(256 * 4 * 7);
 	public int solidEmptyDraw = 0;
 
 	public final long translucentFirst = MemoryUtil.nmemAlloc(256 * 4);
@@ -47,12 +47,12 @@ public class RegionRender {
 		MemoryUtil.nmemFree(this.translucentCount);
 	}
 
-	public void addSolidMesh(SectionRender render, VertexWriterManager manager) {
+	public void addSolidMesh(SectionRender render, VertexWriterManager manager, int side) {
 		if (this.solidBuffer == null) {
 			this.solidBuffer = new RegionAllocation(manager.getVertices() * TerrainVertexWriter.STRIDE);
 		}
 
-		render.solidDraw = this.solidBuffer.renewAllocation(render, manager.getVertexData(), manager.getVertices());
+		render.solidDraw[side] = this.solidBuffer.renewAllocation(render, manager.getVertexData(), manager.getVertices(), side);
 	}
 
 	public void addTranslucentMesh(SectionRender render, VertexWriterManager manager) {
@@ -60,7 +60,7 @@ public class RegionRender {
 			this.translucentBuffer = new RegionAllocation(manager.getVertices() * TerrainVertexWriter.STRIDE);
 		}
 
-		render.translucentDraw = this.translucentBuffer.renewAllocation(render, manager.getVertexData(), manager.getVertices());
+		render.translucentDraw = this.translucentBuffer.renewAllocation(render, manager.getVertexData(), manager.getVertices(), 0);
 	}
 
 	public void addSolidDraw(long drawData) {

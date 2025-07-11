@@ -31,7 +31,9 @@ public class SectionRender {
 	public int currentFrame;
 
 	public long translucentDraw;
-	public long solidDraw;
+	public long[] solidDraw = new long[Direction.COUNT + 1];
+
+	public int solidMask;
 
 	public final SectionRender[] adjacentSections = new SectionRender[Direction.COUNT];
 	private SectionCache sectionCache;
@@ -67,9 +69,12 @@ public class SectionRender {
 		BlockModel.setRenderBlocks(renderBlocks);
 		blockRenderer.setChunkCache(sectionCache);
 
-		VertexWriterManager solidWriter = VertexWriterManager.SOLID;
 		VertexWriterManager translucentWriter = VertexWriterManager.TRANSLUCENT;
-		this.prepareWriterForTerrain(solidWriter);
+
+		for (int dir = 0; dir <= Direction.COUNT; dir++) {
+			this.prepareWriterForTerrain(VertexWriterManager.SOLID[dir]);
+		}
+
 		this.prepareWriterForTerrain(translucentWriter);
 
 		int solidBlocks = 0;
@@ -116,15 +121,17 @@ public class SectionRender {
 					BlockModel<?> model = blockModel;
 					int blockRenderPass = model.renderLayer();
 
-					if (blockRenderPass == 0) {
-						VertexWriterManager.setCurrentInstance(solidWriter);
-					} else {
+					if (blockRenderPass != 0) {
 						VertexWriterManager.setCurrentInstance(translucentWriter);
 					}
 
 					if (BlocksFlags.SOLID[blockId] || model instanceof BlockModelLeaves) {
 						blockRenderer.renderStandardBlock(block, blockColor, model, model.block.getBoundsRaw(), x, y, z);
 					} else {
+						if (blockRenderPass == 0) {
+							VertexWriterManager.setCurrentInstance(VertexWriterManager.SOLID[Direction.COUNT]);
+						}
+
 						this.renderBlock(Tessellator.instance, renderBlocks, model, x, y, z);
 					}
 				}
@@ -137,14 +144,26 @@ public class SectionRender {
 			}
 		}
 
-		this.solidEmptySection = solidBlocks == 4096 && solidWriter.getVertices() == 0;
+		int sumVertices = 0;
 
-		if (solidWriter.getVertices() != 0) {
+		for (int dir = 0; dir <= Direction.COUNT; dir++) {
+			sumVertices += VertexWriterManager.SOLID[dir].getVertices();
+		}
+
+		this.solidEmptySection = solidBlocks == 4096 && sumVertices == 0;
+
+		if (sumVertices != 0) {
 			if (this.region == null) {
 			 	this.region = sectionManager.getRegion(this.blockX >> 4, this.blockY >> 4, this.blockZ >> 4);
 			}
 
-			this.region.addSolidMesh(this, solidWriter);
+			for (int dir = 0; dir <= Direction.COUNT; dir++) {
+				if (VertexWriterManager.SOLID[dir].getVertices() != 0) {
+					this.region.addSolidMesh(this, VertexWriterManager.SOLID[dir], dir);
+					this.solidMask |= 1 << dir;
+				}
+			}
+
 		}
 
 		if (translucentWriter.getVertices() != 0) {
@@ -156,7 +175,10 @@ public class SectionRender {
 		}
 
 		translucentWriter.stopDrawing();
-		solidWriter.stopDrawing();
+
+		for (int dir = 0; dir < Direction.COUNT + 1; dir++) {
+			VertexWriterManager.SOLID[dir].stopDrawing();
+		}
 
 		this.dirty = false;
 	}

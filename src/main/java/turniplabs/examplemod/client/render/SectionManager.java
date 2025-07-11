@@ -10,6 +10,7 @@ import net.minecraft.core.world.World;
 import org.lwjgl.opengl.GL11;
 import turniplabs.examplemod.client.GlobalFlags;
 import turniplabs.examplemod.client.render.cull.BFSCuller;
+import turniplabs.examplemod.client.render.cull.UpdateQueue;
 import turniplabs.examplemod.client.render.meshing.BlockRenderer;
 import turniplabs.examplemod.client.render.region.RegionManager;
 import turniplabs.examplemod.client.render.region.RegionRender;
@@ -27,7 +28,6 @@ public class SectionManager {
 	private static SectionManager INSTANCE;
 
 	private final RegionManager regionManager = new RegionManager();
-	private final ReferenceList<SectionRender> updateList = new ReferenceArrayList<>(1024);
 
 	private final BlockRenderer blockRenderer = new BlockRenderer();
 	private World worldObj;
@@ -47,7 +47,7 @@ public class SectionManager {
 	private long vramUsed;
 	private long vramAllocated;
 
-	private static final int MAX_UPDATE_QUEUES = 5;
+	private static final int MAX_UPDATE_QUEUES = 6;
 
 	private final long[] lastFrameSamples = new long[32];
 
@@ -58,7 +58,7 @@ public class SectionManager {
 	public SectionManager(World world) {
 		INSTANCE = this;
 
-		this.bfsCuller.setRenderingLists(this.regionManager, this.updateList);
+		this.bfsCuller.setRenderingLists(this.regionManager);
 		this.worldObj = world;
 	}
 
@@ -72,6 +72,21 @@ public class SectionManager {
 
 	public static RegionManager getRegionManager() {
 		return getCurrentInstance().regionManager;
+	}
+
+	public SectionRender getSection(int sectionX, int sectionY, int sectionZ) {
+		long position = asLong(sectionX, sectionY, sectionZ);
+		SectionRender sectionRender;
+
+		// Cache last entry, IDR if this were really necessary.
+		if (position == this.lastPositionCache) {
+			sectionRender = this.lastSectionCache;
+		} else {
+			this.lastSectionCache = sectionRender = this.sectionMap.getOrDefault(position, null);
+			this.lastPositionCache = position;
+		}
+
+		return sectionRender;
 	}
 
 	public RegionRender getRegion(int sectionX, int sectionY, int sectionZ) {
@@ -205,14 +220,14 @@ public class SectionManager {
 
 		this.addFrameSample(currentDiff);
 
-		long maxBudget = Math.min((this.getFrameMedian() * 3) >>> 3, 200_000_000);
+		long maxBudget = Math.min((this.getFrameMedian() * 3) >>> 3, 250_000_000);
 		long lerpedBudget = Mth.lerp(this.lastFrameBudget, maxBudget, partialTick);
-		long smoothedBudget = (long) (Mth.smoothStep(lerpedBudget / 200_001.0) * 200_000.0);
+		long smoothedBudget = (long) (Mth.smoothStep(lerpedBudget / 250_001.0) * 250_000.0);
 
 		this.lastFrameBudget = smoothedBudget;
 		this.lastFrameTime = currentTime;
 
-		int maxSize = Math.min(MAX_UPDATE_QUEUES, this.updateList.size());
+		int maxSize = Math.min(MAX_UPDATE_QUEUES, UpdateQueue.size() - 1);
 		int i = 0;
 
 		GlobalFlags.MESHING = true;
@@ -224,14 +239,14 @@ public class SectionManager {
 		while (i < maxSize && timePassed < smoothedBudget && estimatedTime < smoothedBudget) {
 			currentTime = System.nanoTime();
 
-			this.updateList.get(i++).rebuild(this, this.blockRenderer, this.worldObj);
+			UpdateQueue.get(i++).rebuild(this, this.blockRenderer, this.worldObj);
 
 			samples++;
 			timePassed += System.nanoTime() - currentTime;
-			estimatedTime = (timePassed / samples) * (maxSize - i);
+			estimatedTime = (timePassed / samples) * (MAX_UPDATE_QUEUES - i);
 		}
 
-		this.updateList.clear();
+		UpdateQueue.clear();
 
 		GlobalFlags.MESHING = false;
 	}
