@@ -7,7 +7,7 @@ import turniplabs.examplemod.client.render.SectionManager;
 
 public class RegionManager {
 	public final Long2ReferenceOpenHashMap<RegionRender> regionMap = new Long2ReferenceOpenHashMap<>();
-	private final ReferenceList<RegionRender> regionRenders = new ReferenceArrayList<>();
+	public final ReferenceList<RegionRender> regionRenders = new ReferenceArrayList<>();
 
 	private long lastPosition = -1;
 	private RegionRender lastRegion;
@@ -58,8 +58,6 @@ public class RegionManager {
 				if (region.solidEmptyDraw != 0) {
 					region.bindSolid();
 					region.draw(region.solidFirst, region.solidCount, region.solidEmptyDraw);
-
-					region.solidEmptyDraw = 0;
 				}
 			}
 		}
@@ -70,13 +68,8 @@ public class RegionManager {
 				if (region.translucentEmptyDraw != 0) {
 					region.bindTranslucent();
 					region.draw(region.translucentFirst, region.translucentCount, region.translucentEmptyDraw);
-
-					region.translucentEmptyDraw = 0;
 				}
 			}
-
-			// Assuming translucent is rendered last.
-			this.regionRenders.clear();
 		}
 
 		GL30.glBindVertexArray(0);

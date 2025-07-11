@@ -11,17 +11,13 @@ import net.minecraft.client.render.tessellator.Tessellator;
 import net.minecraft.core.block.Block;
 import net.minecraft.core.block.Blocks;
 import net.minecraft.core.world.World;
-import net.minecraft.core.world.chunk.ChunkSection;
 import turniplabs.examplemod.client.render.region.RegionRender;
 import turniplabs.examplemod.client.vertex.VertexWriterManager;
 import turniplabs.examplemod.client.render.data.SectionCache;
-import turniplabs.examplemod.client.render.gl.GlVertexBuffer;
 import turniplabs.examplemod.client.render.meshing.BlockRenderer;
 import turniplabs.examplemod.client.util.BlocksFlags;
 import turniplabs.examplemod.client.util.Direction;
 import turniplabs.examplemod.client.vertex.format.DefaultVertexFormats;
-
-import java.nio.ByteBuffer;
 
 // TODO: Bit-compress most data.
 public class SectionRender {
@@ -30,10 +26,10 @@ public class SectionRender {
 	public int adjacentMask, solidFaces;
 	public int currentFrame;
 
-	public long translucentDraw;
-	public long[] solidDraw = new long[Direction.COUNT + 1];
+	public long translucentDrawData;
+	public int solidDrawMask;
 
-	public int solidMask;
+	public long[] solidDrawFaces = new long[Direction.COUNT + 1];
 
 	public final SectionRender[] adjacentSections = new SectionRender[Direction.COUNT];
 	private SectionCache sectionCache;
@@ -160,7 +156,7 @@ public class SectionRender {
 			for (int dir = 0; dir <= Direction.COUNT; dir++) {
 				if (VertexWriterManager.SOLID[dir].getVertices() != 0) {
 					this.region.addSolidMesh(this, VertexWriterManager.SOLID[dir], dir);
-					this.solidMask |= 1 << dir;
+					this.solidDrawMask |= 1 << dir;
 				}
 			}
 

@@ -13,8 +13,8 @@ public class RegionRender {
 	private RegionAllocation translucentBuffer;
 	private RegionAllocation solidBuffer;
 
-	public final long solidFirst = MemoryUtil.nmemAlloc(256 * 4 * 7);
-	public final long solidCount = MemoryUtil.nmemAlloc(256 * 4 * 7);
+	public final long solidFirst;
+	public final long solidCount;
 	public int solidEmptyDraw = 0;
 
 	public final long translucentFirst = MemoryUtil.nmemAlloc(256 * 4);
@@ -27,6 +27,11 @@ public class RegionRender {
 		this.regionX = sectionX >> 3;
 		this.regionY = sectionY >> 2;
 		this.regionZ = sectionZ >> 3;
+
+		long ptrSolidData = MemoryUtil.nmemAlloc(256 * 4 * 14);
+
+		this.solidFirst = ptrSolidData;
+		this.solidCount = ptrSolidData + (256 * 4 * 7);
 	}
 
 	public void clear() {
@@ -41,7 +46,6 @@ public class RegionRender {
 		}
 
 		MemoryUtil.nmemFree(this.solidFirst);
-		MemoryUtil.nmemFree(this.solidCount);
 
 		MemoryUtil.nmemFree(this.translucentFirst);
 		MemoryUtil.nmemFree(this.translucentCount);
@@ -52,7 +56,7 @@ public class RegionRender {
 			this.solidBuffer = new RegionAllocation(manager.getVertices() * TerrainVertexWriter.STRIDE);
 		}
 
-		render.solidDraw[side] = this.solidBuffer.renewAllocation(render, manager.getVertexData(), manager.getVertices(), side);
+		render.solidDrawFaces[side] = this.solidBuffer.renewAllocation(render, manager.getVertexData(), manager.getVertices(), side);
 	}
 
 	public void addTranslucentMesh(SectionRender render, VertexWriterManager manager) {
@@ -60,11 +64,11 @@ public class RegionRender {
 			this.translucentBuffer = new RegionAllocation(manager.getVertices() * TerrainVertexWriter.STRIDE);
 		}
 
-		render.translucentDraw = this.translucentBuffer.renewAllocation(render, manager.getVertexData(), manager.getVertices(), 0);
+		render.translucentDrawData = this.translucentBuffer.renewAllocation(render, manager.getVertexData(), manager.getVertices(), 0);
 	}
 
 	public void addSolidDraw(long drawData) {
-		this.addToBatch(this.solidFirst, this.solidCount, drawData, this.solidEmptyDraw++);
+		this.addToBatch(this.solidFirst, this.solidFirst + (256 * 4 * 7), drawData, this.solidEmptyDraw++);
 	}
 
 	public void addTranslucentDraw(long drawData) {
@@ -80,8 +84,8 @@ public class RegionRender {
 	}
 
 	private void addToBatch(long first, long count, long drawData, int drawIndex) {
-		MemoryUtil.memPutInt(drawIndex * 4L + first, RegionAllocation.unpackFirst(drawData));
-		MemoryUtil.memPutInt(drawIndex * 4L + count, RegionAllocation.unpackCount(drawData));
+		MemoryUtil.memPutInt((drawIndex << 2L) + first, RegionAllocation.unpackFirst(drawData));
+		MemoryUtil.memPutInt((drawIndex << 2L) + count, RegionAllocation.unpackCount(drawData));
 	}
 
 	public void draw(long first, long count, int drawCount) {

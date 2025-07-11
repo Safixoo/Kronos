@@ -6,6 +6,9 @@ import it.unimi.dsi.fastutil.longs.LongArrays;
 import it.unimi.dsi.fastutil.objects.ReferenceArrayList;
 import it.unimi.dsi.fastutil.objects.ReferenceList;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.entity.player.PlayerLocal;
+import net.minecraft.core.item.ItemEgg;
+import net.minecraft.core.player.inventory.container.ContainerInventory;
 import net.minecraft.core.world.World;
 import org.lwjgl.opengl.GL11;
 import turniplabs.examplemod.client.GlobalFlags;
@@ -205,8 +208,13 @@ public class SectionManager {
 			this.generateSections();
 		}
 
-		this.bfsCuller.init(Mth.square(GL11.glGetFloat(GL11.GL_FOG_END)));
-		this.bfsCuller.updateRenderList(this.sectionMap, (float) cameraX, (float) cameraY, (float) cameraZ);
+		PlayerLocal playerLocal = Minecraft.getMinecraft().thePlayer;
+		ContainerInventory inventory = playerLocal.inventory;
+
+		if (inventory == null || inventory.getCurrentItem() == null || !(inventory.getCurrentItem().getItem() instanceof ItemEgg)) {
+			this.bfsCuller.init((int) cameraX, (int) cameraZ, Mth.square(GL11.glGetFloat(GL11.GL_FOG_END)), renderDistance);
+			this.bfsCuller.updateRenderList(this.sectionMap, (float) cameraX, (float) cameraY, (float) cameraZ);
+		}
 
 		this.queueRebuilds(partialTick);
 	}

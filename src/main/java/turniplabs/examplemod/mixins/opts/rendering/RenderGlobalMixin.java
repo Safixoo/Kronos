@@ -88,7 +88,7 @@ public abstract class RenderGlobalMixin {
 	 */
 	@Overwrite
 	public void clipRenderersByFrustum(CameraFrustum frustum, float partialTick) {
-		ICamera camera = Minecraft.getMinecraft().activeCamera;
+		ICamera camera = this.mc.activeCamera;
 
 		double cameraX = camera.getX(partialTick);
 		double cameraY = camera.getY(partialTick);

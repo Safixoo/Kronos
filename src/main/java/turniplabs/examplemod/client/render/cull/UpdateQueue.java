@@ -6,27 +6,27 @@ import java.util.Arrays;
 
 public class UpdateQueue {
 	public static final SectionRender[] UPDATE_QUEUE = new SectionRender[8];
-	public static int POSITION = 0;
+	public static int UPDATE_POSITION = 0;
 
 	public static void addToQueue(SectionRender render) {
-		if (POSITION == 8) {
+		if (UPDATE_POSITION == 8) {
 			return;
 		}
 
-		UPDATE_QUEUE[POSITION++] = render;
+		UPDATE_QUEUE[UPDATE_POSITION++] = render;
 	}
 
 	public static void addToQueueUnsafe(SectionRender render) {
-		UPDATE_QUEUE[POSITION++] = render;
+		UPDATE_QUEUE[UPDATE_POSITION++] = render;
 	}
 
 	public static boolean hasSpace() {
-		return POSITION != 8;
+		return UPDATE_POSITION != 8;
 	}
 
 	public static void clear() {
 		Arrays.fill(UPDATE_QUEUE, null);
-		POSITION = 0;
+		UPDATE_POSITION = 0;
 	}
 
 	public static SectionRender get(int pos) {
@@ -34,6 +34,6 @@ public class UpdateQueue {
 	}
 
 	public static int size() {
-		return POSITION;
+		return UPDATE_POSITION;
 	}
 }

@@ -9,24 +9,33 @@ import turniplabs.examplemod.client.render.region.RegionRender;
 import turniplabs.examplemod.client.util.Direction;
 import turniplabs.examplemod.client.util.Mth;
 
+import static org.joml.Math.fma;
+
 public class BFSCuller {
 	private final BFSQueue bfsQueue = new BFSQueue();
-
 	private RegionManager regionManager;
 
-	private float renderDistance;
+	private float fogEnd;
 	private int activeFrame;
 
 	public void setRenderingLists(RegionManager regionManager) {
 		this.regionManager = regionManager;
 	}
 
-	public void init(float renderDistance) {
-		this.renderDistance = renderDistance;
+	public void init(int cameraX, int cameraZ, float fogEnd, int renderDistance) {
+		this.fogEnd = fogEnd;
 
 		UpdateQueue.clear();
-		this.bfsQueue.clear();
+		BFSVisArray.start(cameraX >> 4, cameraZ >> 4, renderDistance);
 
+		for (RegionRender render : this.regionManager.regionRenders) {
+			render.translucentEmptyDraw = 0;
+			render.solidEmptyDraw = 0;
+		}
+
+		this.regionManager.regionRenders.clear();
+
+		this.bfsQueue.clear();
 		this.activeFrame++;
 	}
 
@@ -47,8 +56,10 @@ public class BFSCuller {
 				continue;
 			}
 
-			if (node.blockY < cameraY && sumUpAllDirections(node.solidMask) > 2 && distance >= Mth.square(90.0f)) {
-				if (!visibleByRayCast(node.blockX, node.blockY, node.blockZ, (int) cameraX, (int) cameraY, (int) cameraZ, activeFrame)) {
+			BFSVisArray.setVisible(node.blockX >> 4, node.blockY >> 4, node.blockZ >> 4);
+
+			if (distance >= Mth.square(128.0f) && node.blockY < cameraY && node.solidDrawMask != 0) {
+				if (!visibleByRayCast(node.blockX + 8, node.blockY + 8, node.blockZ + 8, (int) cameraX, (int) cameraY, (int) cameraZ)) {
 					continue;
 				}
 			}
@@ -86,7 +97,7 @@ public class BFSCuller {
 		}
 
 		bfsSearch(this.bfsQueue, this.regionManager, cameraX, cameraY, cameraZ,
-			playerX, playerY, playerZ, this.renderDistance, this.activeFrame);
+			playerX, playerY, playerZ, this.fogEnd, this.activeFrame);
 	}
 
 	private static void queueRegionNode(SectionRender section, RegionRender region, RegionManager regionManager, int activeFrame, int playerX, int playerY, int playerZ) {
@@ -95,28 +106,25 @@ public class BFSCuller {
 		}
 
 		if (region.currentFrame != activeFrame) {
-			if ((section.solidMask | section.translucentDraw) != 0) {
+			if ((section.solidDrawMask | section.translucentDrawData) != 0) {
 				regionManager.addToDrawQueue(region);
 			}
 			region.currentFrame = activeFrame;
 		}
 
-
-		if (section.solidMask != 0) {
-			int visibleFaces = getVisibleFaces(playerX, playerY, playerZ, section.blockX, section.blockY, section.blockZ) & section.solidMask;
+		if (section.solidDrawMask != 0) {
+			int visibleFaces = getVisibleFaces(playerX, playerY, playerZ, section.blockX, section.blockY, section.blockZ) & section.solidDrawMask;
 			SectionManager.getCurrentInstance().drawnSolidRenderers++;
 
 			for (int dir = 0; dir <= Direction.COUNT; dir++) {
-				if ((visibleFaces & (1 << dir)) == 0) {
-					continue;
+				if ((visibleFaces & (1 << dir)) != 0) {
+					region.addSolidDraw(section.solidDrawFaces[dir]);
 				}
-
-				region.addSolidDraw(section.solidDraw[dir]);
 			}
 		}
 
-		if (section.translucentDraw != 0) {
-			region.addTranslucentDraw(section.translucentDraw);
+		if (section.translucentDrawData != 0) {
+			region.addTranslucentDraw(section.translucentDrawData);
 		}
 	}
 
@@ -199,9 +207,7 @@ public class BFSCuller {
 		return withinRenderDistance(distX, distY, distZ) < renderDistance && FrustumCuller.testAab(distX, distY, distZ);
 	}
 
-	private static boolean visibleByRayCast(int x1, int y1, int z1, int x2, int y2, int z2, int activeFrame) {
-		int x = x1, y = y1, z = z1;
-
+	private static boolean visibleByRayCast(int x1, int y1, int z1, int x2, int y2, int z2) {
 		int dX = x2 - x1;
 		int dY = y2 - y1;
 		int dZ = z2 - z1;
@@ -210,107 +216,100 @@ public class BFSCuller {
 		int incY = sign(dY);
 		int incZ = sign(dZ);
 
-		int absX = Math.abs(dX);
-		int absY = Math.abs(dY);
-		int absZ = Math.abs(dZ);
+		int lenX = Math.abs(dX);
+		int lenY = Math.abs(dY);
+		int lenZ = Math.abs(dZ);
 
-		int sumX = absX << 1;
-		int sumY = absY << 1;
-		int sumZ = absZ << 1;
+		int sumX = lenX << 4;
+		int sumY = lenY << 4;
+		int sumZ = lenZ << 4;
 
-		if (absX >= absY && absX >= absZ) {
-			int errY = sumY - absX;
-			int errZ = sumZ - absX;
-			int valid = 0;
+		int valid = 0;
 
-			for (int i = 0; i < absX; i++) {
-				x += incX;
+		if (lenX >= lenY && lenX >= lenZ) {
+			int errY = sumY - lenX;
+			int errZ = sumZ - lenX;
+
+			for (int i = 0; i < lenX; i++) {
+				x1 += incX;
 
 				if (errY > 0) {
-					y += incY;
+					y1 += incY;
 					errY -= sumX;
 				}
 				if (errZ > 0) {
-					z += incZ;
+					z1 += incZ;
 					errZ -= sumX;
 				}
 
 				errY += sumY;
 				errZ += sumZ;
 
-				SectionRender sectionRender = SectionManager.getCurrentInstance().getSection(x >> 4, y >> 4, z >> 4);
-
-				if (sectionRender.currentFrame != activeFrame) {
+				if (!BFSVisArray.getVisible(x1 >> 4, y1 >> 4, z1 >> 4)) {
 					return false;
 				} else {
-					if (++valid > 15) {
+					if (++valid > 8) {
 						break;
 					}
 				}
 			}
-		} else if (absY >= absX && absY >= absZ) {
-			int errX = sumX - absY;
-			int errZ = sumZ - absY;
-			int valid = 0;
+		} else if (lenY >= lenX && lenY >= lenZ) {
+			int errX = sumX - lenY;
+			int errZ = sumZ - lenY;
 
-			for (int i = 0; i < absY; i++) {
-				y += incY;
+			for (int i = 0; i < lenY; i++) {
+				y1 += incY;
 
 				if (errX > 0) {
-					x += incX;
+					x1 += incX;
 					errX -= sumY;
 				}
 				if (errZ > 0) {
-					z += incZ;
+					z1 += incZ;
 					errZ -= sumY;
 				}
 
 				errX += sumX;
 				errZ += sumZ;
 
-				SectionRender sectionRender = SectionManager.getCurrentInstance().getSection(x >> 4, y >> 4, z >> 4);
-
-				if (sectionRender.currentFrame != activeFrame) {
+				if (!BFSVisArray.getVisible(x1 >> 4, y1 >> 4, z1 >> 4)) {
 					return false;
 				} else {
-					if (++valid > 15) {
+					if (++valid > 8) {
 						break;
 					}
 				}
 			}
 		} else {
-			int errY = sumY - absZ;
-			int errX = sumX - absZ;
-			int valid = 0;
+			int errY = sumY - lenZ;
+			int errX = sumX - lenZ;
 
-			for (int i = 0; i < absZ; i++) {
-				z += incZ;
+			for (int i = 0; i < lenZ; i++) {
+				z1 += incZ;
 
 				if (errY > 0) {
-					y += incY;
+					y1 += incY;
 					errY -= sumZ;
 				}
 				if (errX > 0) {
-					x += incX;
+					x1 += incX;
 					errX -= sumZ;
 				}
 
 				errY += sumY;
 				errX += sumX;
 
-				SectionRender sectionRender = SectionManager.getCurrentInstance().getSection(x >> 4, y >> 4, z >> 4);
-
-				if (sectionRender.currentFrame != activeFrame) {
+				if (!BFSVisArray.getVisible(x1 >> 4, y1 >> 4, z1 >> 4)) {
 					return false;
 				} else {
-					if (++valid > 15) {
+					if (++valid > 8) {
 						break;
 					}
 				}
 			}
 		}
 
-		return true; // Replace with hit test logic as needed
+		return true;
 	}
 
 	private static int sign(int num) {
@@ -322,7 +321,7 @@ public class BFSCuller {
 		y += 8.0F;
 		z += 8.0F;
 
-		return (x * x) + (y * y) + (z * z);
+		return fma(x, x, fma(y, y, z * z));
 	}
 
 	private static void visitNode(BFSQueue queue, SectionRender adj, int activeFrame) {

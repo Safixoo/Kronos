@@ -1,20 +1,15 @@
 package turniplabs.examplemod.client.render.meshing;
 
 import net.minecraft.client.render.LightmapHelper;
-import net.minecraft.client.render.RenderBlockCache;
 import net.minecraft.client.render.block.color.BlockColor;
-import net.minecraft.client.render.block.color.BlockColorDispatcher;
 import net.minecraft.client.render.block.model.BlockModel;
 import net.minecraft.client.render.block.model.BlockModelGrass;
 import net.minecraft.client.render.block.model.BlockModelLeaves;
-import net.minecraft.client.render.tessellator.Tessellator;
 import net.minecraft.client.render.texture.stitcher.IconCoordinate;
 import net.minecraft.core.block.Block;
 import net.minecraft.core.util.helper.Side;
 import net.minecraft.core.util.phys.AABB;
-import org.spongepowered.asm.mixin.Unique;
 import turniplabs.examplemod.client.render.data.BlockLightCache;
-import turniplabs.examplemod.client.util.BlocksFlags;
 import turniplabs.examplemod.client.vertex.VertexWriterManager;
 import turniplabs.examplemod.client.render.data.ModelBoundsData;
 import turniplabs.examplemod.client.render.data.SectionCache;
@@ -51,12 +46,12 @@ public class BlockRenderer {
 		this.modelData.setRender(this);
 	}
 
-	public void renderStandardBlock(Block<?> block, BlockColor blockColor, BlockModel<?> blockModel, AABB bounds, int x, int y, int z) {
+	public void renderStandardBlock(Block<?> block, BlockColor blockColor, BlockModel<?> blockModel, AABB aabb, int x, int y, int z) {
 		int color = blockColor.getWorldColor(this.chunkCache, x, y, z);
 
 		this.cache.setupCache(this.chunkCache, x, y, z);
-		this.facesBlock = ((IBlockAABB) bounds).blockBoundsCheck();
-		this.setModelBounds(x, y, z, bounds);
+		this.facesBlock = ((IBlockAABB) aabb).blockBoundsCheck();
+		this.setModelBounds(x, y, z, aabb);
 
 		boolean isGrass = blockModel instanceof BlockModelGrass;
 		boolean isLeaves = this.isLeaves = blockModel instanceof BlockModelLeaves;
@@ -67,7 +62,7 @@ public class BlockRenderer {
 				this.useColor = blockModel.shouldSideBeColored(this.chunkCache, x, y, z, side, meta);
 			}
 
-			this.renderSideFaceAll(block, blockModel, this.modelData, x, y, z, side, ColorBGRManager.rgbToBgr(color));
+			this.renderSideFaceAll(block, blockModel, aabb, this.modelData, x, y, z, side, ColorBGRManager.rgbToBgr(color));
 		}
 
 //		if (isGrass) {
@@ -81,16 +76,16 @@ public class BlockRenderer {
 		this.chunkCache = chunkCache;
 	}
 
-	private boolean shouldDrawSide(int x, int y, int z, int side) {
-		return this.facesBlock[side] || !this.chunkCache.isBlockOpaqueCube(x, y, z);
+	private boolean shouldDrawSide(int x, int y, int z, int side, BlockModel<?> block, AABB aabb) {
+		return block.shouldSideBeRendered(this.chunkCache, aabb, x, y, z, side);
 	}
 
-	private void renderSideFaceAll(Block<?> block, BlockModel<?> blockModel, ModelBoundsData bounds, int x, int y, int z, int side, int color) {
+	private void renderSideFaceAll(Block<?> block, BlockModel<?> blockModel, AABB aabb, ModelBoundsData bounds, int x, int y, int z, int side, int color) {
 		int dirX = Direction.x(side);
 		int dirY = Direction.y(side);
 		int dirZ = Direction.z(side);
 
-		if (this.shouldDrawSide(x + dirX, y + dirY, z + dirZ, side)) {
+		if (this.shouldDrawSide(x + dirX, y + dirY, z + dirZ, side, blockModel, aabb)) {
 			VertexWriterManager.setCurrentInstance(VertexWriterManager.SOLID[side]);
 
 			IconCoordinate tex = blockModel.getBlockTexture(this.chunkCache, x, y, z, Side.sides[side]);
@@ -155,10 +150,10 @@ public class BlockRenderer {
 				tlB = topT && lefT ? lB : this.cache.getBrightness(lefX + topX, lefY + topY, lefZ + topZ);
 				brB = botT && rigT ? rB : this.cache.getBrightness(-lefX - topX, -lefY - topY, -lefZ - topZ);
 				trB = topT && rigT ? rB : this.cache.getBrightness(-lefX + topX, -lefY + topY, -lefZ + topZ);
-				lightTL = (tlB + lB + tB + dirB) * 0.25F * lerp(depth, 1.0F, lightTL);
-				lightTR = (tB + dirB + trB + rB) * 0.25F * lerp(depth, 1.0F, lightTR);
-				lightBR = (dirB + bB + rB + brB) * 0.25F * lerp(depth, 1.0F, lightBR);
-				lightBL = (lB + blB + dirB + bB) * 0.25F * lerp(depth, 1.0F, lightBL);
+				lightTL = (tlB + lB + tB + dirB) * 0.25F * lerp(depth, lightTL);
+				lightTR = (tB + dirB + trB + rB) * 0.25F * lerp(depth, lightTR);
+				lightBR = (dirB + bB + rB + brB) * 0.25F * lerp(depth, lightBR);
+				lightBL = (lB + blB + dirB + bB) * 0.25F * lerp(depth, lightBL);
 
 			}
 		} else if (!this.isLeaves) {
@@ -236,12 +231,7 @@ public class BlockRenderer {
 		}
 	}
 
-	private void renderFacingFace(ModelBoundsData data, IconCoordinate tex, FaceWriterWrapper writeOrder) {
-
-	}
-
-	@Unique
-	private static float lerp(float a, float b, float t) {
-		return a + t * (b - a);
+	private static float lerp(float a, float t) {
+		return a + t * (1.0f - a);
 	}
 }
