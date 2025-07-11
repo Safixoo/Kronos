@@ -41,9 +41,16 @@ public class BFSCuller {
 			float distX = node.blockX - cameraX;
 			float distY = node.blockY - cameraY;
 			float distZ = node.blockZ - cameraZ;
+			float distance = withinRenderDistance(distX, distY, distZ);
 
-			if (!(isSectionVisible(distX, distY, distZ, renderDistance))) {
+			if (distance >= renderDistance || !FrustumCuller.testAab(distX, distY, distZ)) {
 				continue;
+			}
+
+			if (node.blockY < cameraY && sumUpAllDirections(node.solidMask) > 2 && distance >= Mth.square(90.0f)) {
+				if (!visibleByRayCast(node.blockX, node.blockY, node.blockZ, (int) cameraX, (int) cameraY, (int) cameraZ, activeFrame)) {
+					continue;
+				}
 			}
 
 			int outwardDirections = getOutwardDirections(playerChunkX, playerChunkY, playerChunkZ, node);
@@ -55,6 +62,10 @@ public class BFSCuller {
 
 			exploreNodes(bfsQueue, node, outwardDirections, activeFrame);
 		}
+	}
+
+	public static int sumUpAllDirections(int mask) {
+		return (mask & 1) + ((mask >> 1) & 1) + ((mask >> 2) & 1) + ((mask >> 3) & 1) + ((mask >> 4) & 1) + ((mask >> 5) & 1);
 	}
 
 	public void updateRenderList(Long2ReferenceOpenHashMap<SectionRender> sectionMap, float cameraX, float cameraY, float cameraZ) {
@@ -186,6 +197,124 @@ public class BFSCuller {
 
 	private static boolean isSectionVisible(float distX, float distY, float distZ, float renderDistance) {
 		return withinRenderDistance(distX, distY, distZ) < renderDistance && FrustumCuller.testAab(distX, distY, distZ);
+	}
+
+	private static boolean visibleByRayCast(int x1, int y1, int z1, int x2, int y2, int z2, int activeFrame) {
+		int x = x1, y = y1, z = z1;
+
+		int dX = x2 - x1;
+		int dY = y2 - y1;
+		int dZ = z2 - z1;
+
+		int incX = sign(dX);
+		int incY = sign(dY);
+		int incZ = sign(dZ);
+
+		int absX = Math.abs(dX);
+		int absY = Math.abs(dY);
+		int absZ = Math.abs(dZ);
+
+		int sumX = absX << 1;
+		int sumY = absY << 1;
+		int sumZ = absZ << 1;
+
+		if (absX >= absY && absX >= absZ) {
+			int errY = sumY - absX;
+			int errZ = sumZ - absX;
+			int valid = 0;
+
+			for (int i = 0; i < absX; i++) {
+				x += incX;
+
+				if (errY > 0) {
+					y += incY;
+					errY -= sumX;
+				}
+				if (errZ > 0) {
+					z += incZ;
+					errZ -= sumX;
+				}
+
+				errY += sumY;
+				errZ += sumZ;
+
+				SectionRender sectionRender = SectionManager.getCurrentInstance().getSection(x >> 4, y >> 4, z >> 4);
+
+				if (sectionRender.currentFrame != activeFrame) {
+					return false;
+				} else {
+					if (++valid > 15) {
+						break;
+					}
+				}
+			}
+		} else if (absY >= absX && absY >= absZ) {
+			int errX = sumX - absY;
+			int errZ = sumZ - absY;
+			int valid = 0;
+
+			for (int i = 0; i < absY; i++) {
+				y += incY;
+
+				if (errX > 0) {
+					x += incX;
+					errX -= sumY;
+				}
+				if (errZ > 0) {
+					z += incZ;
+					errZ -= sumY;
+				}
+
+				errX += sumX;
+				errZ += sumZ;
+
+				SectionRender sectionRender = SectionManager.getCurrentInstance().getSection(x >> 4, y >> 4, z >> 4);
+
+				if (sectionRender.currentFrame != activeFrame) {
+					return false;
+				} else {
+					if (++valid > 15) {
+						break;
+					}
+				}
+			}
+		} else {
+			int errY = sumY - absZ;
+			int errX = sumX - absZ;
+			int valid = 0;
+
+			for (int i = 0; i < absZ; i++) {
+				z += incZ;
+
+				if (errY > 0) {
+					y += incY;
+					errY -= sumZ;
+				}
+				if (errX > 0) {
+					x += incX;
+					errX -= sumZ;
+				}
+
+				errY += sumY;
+				errX += sumX;
+
+				SectionRender sectionRender = SectionManager.getCurrentInstance().getSection(x >> 4, y >> 4, z >> 4);
+
+				if (sectionRender.currentFrame != activeFrame) {
+					return false;
+				} else {
+					if (++valid > 15) {
+						break;
+					}
+				}
+			}
+		}
+
+		return true; // Replace with hit test logic as needed
+	}
+
+	private static int sign(int num) {
+		return (num >> 31) | 1;
 	}
 
 	private static float withinRenderDistance(float x, float y, float z) {
