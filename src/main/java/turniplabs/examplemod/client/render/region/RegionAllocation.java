@@ -2,6 +2,7 @@ package turniplabs.examplemod.client.render.region;
 
 import org.lwjgl.opengl.GL45;
 import org.lwjgl.system.MemoryUtil;
+import turniplabs.examplemod.client.render.SectionFlags;
 import turniplabs.examplemod.client.render.SectionManager;
 import turniplabs.examplemod.client.render.SectionRender;
 import turniplabs.examplemod.client.vertex.writer.TerrainVertexWriter;
@@ -41,6 +42,10 @@ public class RegionAllocation {
 	}
 
 	public void resize(long size) {
+		if (SPARE_BUFFER == null) {
+			return;
+		}
+
 		long newSize = Math.max((this.capacity * 3) >>> 1, size);
 
 		if (newSize > SPARE_BUFFER_ALLOC && size <= SPARE_BUFFER_ALLOC) {
@@ -55,7 +60,7 @@ public class RegionAllocation {
 			Allocation alloc = this.firstEntry;
 
 			while (alloc != null) {
-				alloc.render.dirty = true;
+				alloc.render.flags = SectionFlags.setDirty(alloc.render.flags, true);
 				alloc = alloc.next;
 			}
 

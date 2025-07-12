@@ -64,7 +64,7 @@ public class RegionRender {
 			this.translucentBuffer = new RegionAllocation(manager.getVertices() * TerrainVertexWriter.STRIDE);
 		}
 
-		render.translucentDrawData = this.translucentBuffer.renewAllocation(render, manager.getVertexData(), manager.getVertices(), 0);
+		render.transDrawData = this.translucentBuffer.renewAllocation(render, manager.getVertexData(), manager.getVertices(), 0);
 	}
 
 	public void addSolidDraw(long drawData) {

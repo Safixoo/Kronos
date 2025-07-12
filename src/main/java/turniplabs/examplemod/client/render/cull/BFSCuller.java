@@ -2,6 +2,7 @@ package turniplabs.examplemod.client.render.cull;
 
 import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
 import net.minecraft.core.util.helper.MathHelper;
+import turniplabs.examplemod.client.render.SectionFlags;
 import turniplabs.examplemod.client.render.SectionManager;
 import turniplabs.examplemod.client.render.SectionRender;
 import turniplabs.examplemod.client.render.region.RegionManager;
@@ -58,18 +59,20 @@ public class BFSCuller {
 
 			BFSVisArray.setVisible(node.blockX >> 4, node.blockY >> 4, node.blockZ >> 4);
 
-			if (distance >= Mth.square(128.0f) && node.blockY < cameraY && node.solidDrawMask != 0) {
-				if (!visibleByRayCast(node.blockX + 8, node.blockY + 8, node.blockZ + 8, (int) cameraX, (int) cameraY, (int) cameraZ)) {
+			int flags = node.flags;
+
+			if (distance >= Mth.square(128) && SectionFlags.getDrawableFaces(flags) != 0) {
+				if (!visibleByRayCast(node.blockX + 8, node.blockY + 8, node.blockZ + 8, playerChunkX, playerChunkY, playerChunkZ)) {
 					continue;
 				}
 			}
 
 			int outwardDirections = getOutwardDirections(playerChunkX, playerChunkY, playerChunkZ, node);
 
-			queueRegionNode(node, node.region, regionManager, activeFrame, playerChunkX, playerChunkY, playerChunkZ);
+			queueRegionNode(node, flags, regionManager, activeFrame, playerChunkX, playerChunkY, playerChunkZ);
 
-			outwardDirections &= node.adjacentMask;
-			outwardDirections &= ~node.solidFaces;
+			outwardDirections &= SectionFlags.getAdjacentMask(flags);
+			outwardDirections &= ~SectionFlags.getSolidFaces(flags);
 
 			exploreNodes(bfsQueue, node, outwardDirections, activeFrame);
 		}
@@ -87,33 +90,38 @@ public class BFSCuller {
 		SectionRender spawn = sectionMap.get(SectionManager.asLong(playerX >> 4, playerY >> 4, playerZ >> 4));
 
 		if (spawn != null) {
-			exploreNodes(this.bfsQueue, spawn, spawn.adjacentMask, this.activeFrame);
+			int flags = spawn.flags;
 
-			if (spawn.dirty) {
+			exploreNodes(this.bfsQueue, spawn, SectionFlags.getAdjacentMask(flags), this.activeFrame);
+
+			if (SectionFlags.isDirty(flags)) {
 				UpdateQueue.addToQueueUnsafe(spawn);
 			}
 
-			queueRegionNode(spawn, spawn.region, this.regionManager, this.activeFrame, playerX, playerY, playerZ);
+			queueRegionNode(spawn, flags, this.regionManager, this.activeFrame, playerX, playerY, playerZ);
 		}
 
-		bfsSearch(this.bfsQueue, this.regionManager, cameraX, cameraY, cameraZ,
-			playerX, playerY, playerZ, this.fogEnd, this.activeFrame);
+		bfsSearch(this.bfsQueue, this.regionManager, cameraX, cameraY, cameraZ, playerX, playerY, playerZ,
+                  this.fogEnd, this.activeFrame);
 	}
 
-	private static void queueRegionNode(SectionRender section, RegionRender region, RegionManager regionManager, int activeFrame, int playerX, int playerY, int playerZ) {
-		if (region == null) {
+	private static void queueRegionNode(SectionRender section, int flags, RegionManager regionManager, int activeFrame, int playerX, int playerY, int playerZ) {
+		if (!SectionFlags.hasRegion(flags)) {
 			return;
 		}
 
+		RegionRender region = section.region;
+
 		if (region.currentFrame != activeFrame) {
-			if ((section.solidDrawMask | section.translucentDrawData) != 0) {
+			region.currentFrame = activeFrame;
+
+			if (SectionFlags.hasPassesNonEmpty(flags)) {
 				regionManager.addToDrawQueue(region);
 			}
-			region.currentFrame = activeFrame;
 		}
 
-		if (section.solidDrawMask != 0) {
-			int visibleFaces = getVisibleFaces(playerX, playerY, playerZ, section.blockX, section.blockY, section.blockZ) & section.solidDrawMask;
+		if ((SectionFlags.getPassesNonEmpty(flags) & 0b01) != 0) {
+			int visibleFaces = getVisibleFaces(playerX, playerY, playerZ, section.blockX, section.blockY, section.blockZ) & SectionFlags.getDrawableFaces(flags);
 			SectionManager.getCurrentInstance().drawnSolidRenderers++;
 
 			for (int dir = 0; dir <= Direction.COUNT; dir++) {
@@ -123,8 +131,8 @@ public class BFSCuller {
 			}
 		}
 
-		if (section.translucentDrawData != 0) {
-			region.addTranslucentDraw(section.translucentDrawData);
+		if ((SectionFlags.getPassesNonEmpty(flags) & 0b10) != 0) {
+			region.addTranslucentDraw(section.transDrawData);
 		}
 	}
 
@@ -158,33 +166,27 @@ public class BFSCuller {
 		queue.verifyCapacity(Direction.COUNT);
 
 		if (Direction.hasSet(directions, Direction.DOWN)) {
-			SectionRender adjacent = fatherNode.getAdjacent(Direction.DOWN);
-			visitNode(queue, adjacent, activeFrame);
+			visitNode(queue, fatherNode.adjacentDown, activeFrame);
 		}
 
 		if (Direction.hasSet(directions, Direction.UP)) {
-			SectionRender adjacent = fatherNode.getAdjacent(Direction.UP);
-			visitNode(queue, adjacent, activeFrame);
+			visitNode(queue, fatherNode.adjacentUp, activeFrame);
 		}
 
 		if (Direction.hasSet(directions, Direction.NORTH)) {
-			SectionRender adjacent = fatherNode.getAdjacent(Direction.NORTH);
-			visitNode(queue, adjacent, activeFrame);
+			visitNode(queue, fatherNode.adjacentNorth, activeFrame);
 		}
 
 		if (Direction.hasSet(directions, Direction.SOUTH)) {
-			SectionRender adjacent = fatherNode.getAdjacent(Direction.SOUTH);
-			visitNode(queue, adjacent, activeFrame);
+			visitNode(queue, fatherNode.adjacentSouth, activeFrame);
 		}
 
 		if (Direction.hasSet(directions, Direction.WEST)) {
-			SectionRender adjacent = fatherNode.getAdjacent(Direction.WEST);
-			visitNode(queue, adjacent, activeFrame);
+			visitNode(queue, fatherNode.adjacentWest, activeFrame);
 		}
 
 		if (Direction.hasSet(directions, Direction.EAST)) {
-			SectionRender adjacent = fatherNode.getAdjacent(Direction.EAST);
-			visitNode(queue, adjacent, activeFrame);
+			visitNode(queue, fatherNode.adjacentEast, activeFrame);
 		}
 	}
 
@@ -201,10 +203,6 @@ public class BFSCuller {
 		planes |= (render.blockZ >> 4) >= (playerChunkZ >> 4) ? Direction.set(Direction.SOUTH) : 0;
 
 		return planes;
-	}
-
-	private static boolean isSectionVisible(float distX, float distY, float distZ, float renderDistance) {
-		return withinRenderDistance(distX, distY, distZ) < renderDistance && FrustumCuller.testAab(distX, distY, distZ);
 	}
 
 	private static boolean visibleByRayCast(int x1, int y1, int z1, int x2, int y2, int z2) {
@@ -325,12 +323,15 @@ public class BFSCuller {
 	}
 
 	private static void visitNode(BFSQueue queue, SectionRender adj, int activeFrame) {
-		if (adj.currentFrame != activeFrame && !adj.solidEmptySection) {
-			if (UpdateQueue.hasSpace() && adj.dirty) {
+		int flags;
+
+		if (adj.currentFrame != activeFrame && !SectionFlags.isEmptySolid(flags = adj.flags)) {
+			adj.currentFrame = activeFrame;
+
+			if (UpdateQueue.hasSpace() && SectionFlags.isDirty(flags)) {
 				UpdateQueue.addToQueueUnsafe(adj);
 			}
 
-			adj.currentFrame = activeFrame;
 			queue.addToQueueUnsafe(adj);
 		}
 	}

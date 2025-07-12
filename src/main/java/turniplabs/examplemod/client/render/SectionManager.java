@@ -13,7 +13,9 @@ import net.minecraft.core.world.World;
 import org.lwjgl.opengl.GL11;
 import turniplabs.examplemod.client.GlobalFlags;
 import turniplabs.examplemod.client.render.cull.BFSCuller;
+import turniplabs.examplemod.client.render.cull.BFSQueue;
 import turniplabs.examplemod.client.render.cull.UpdateQueue;
+import turniplabs.examplemod.client.render.data.FogData;
 import turniplabs.examplemod.client.render.meshing.BlockRenderer;
 import turniplabs.examplemod.client.render.region.RegionManager;
 import turniplabs.examplemod.client.render.region.RegionRender;
@@ -75,21 +77,6 @@ public class SectionManager {
 
 	public static RegionManager getRegionManager() {
 		return getCurrentInstance().regionManager;
-	}
-
-	public SectionRender getSection(int sectionX, int sectionY, int sectionZ) {
-		long position = asLong(sectionX, sectionY, sectionZ);
-		SectionRender sectionRender;
-
-		// Cache last entry, IDR if this were really necessary.
-		if (position == this.lastPositionCache) {
-			sectionRender = this.lastSectionCache;
-		} else {
-			this.lastSectionCache = sectionRender = this.sectionMap.getOrDefault(position, null);
-			this.lastPositionCache = position;
-		}
-
-		return sectionRender;
 	}
 
 	public RegionRender getRegion(int sectionX, int sectionY, int sectionZ) {
@@ -164,7 +151,7 @@ public class SectionManager {
 			sectionRender = this.addRender(posX, posY, posZ, true);
 		}
 
-		sectionRender.dirty = true;
+		sectionRender.flags = SectionFlags.setDirty(sectionRender.flags, true);
 	}
 
 	public SectionRender addRender(int posX, int posY, int posZ, boolean trulyNew) {
@@ -179,7 +166,7 @@ public class SectionManager {
 			this.connectNeighbors(sectionRender);
 		}
 
-		sectionRender.dirty = true;
+		sectionRender.flags = SectionFlags.setDirty(sectionRender.flags, true);
 		return sectionRender;
 	}
 
@@ -197,8 +184,6 @@ public class SectionManager {
 
 			this.clearRenderer();
 			this.generateWholeVolume(cameraX, cameraZ);
-
-			return;
 		}
 
 		double diffX = Mth.square(cameraX - this.lastUpdateX);
@@ -212,7 +197,7 @@ public class SectionManager {
 		ContainerInventory inventory = playerLocal.inventory;
 
 		if (inventory == null || inventory.getCurrentItem() == null || !(inventory.getCurrentItem().getItem() instanceof ItemEgg)) {
-			this.bfsCuller.init((int) cameraX, (int) cameraZ, Mth.square(GL11.glGetFloat(GL11.GL_FOG_END)), renderDistance);
+			this.bfsCuller.init((int) cameraX, (int) cameraZ, Mth.square(FogData.fogEnd), renderDistance);
 			this.bfsCuller.updateRenderList(this.sectionMap, (float) cameraX, (float) cameraY, (float) cameraZ);
 		}
 

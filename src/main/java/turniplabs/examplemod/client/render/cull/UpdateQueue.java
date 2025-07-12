@@ -21,7 +21,7 @@ public class UpdateQueue {
 	}
 
 	public static boolean hasSpace() {
-		return UPDATE_POSITION != 8;
+		return UPDATE_POSITION < 8;
 	}
 
 	public static void clear() {

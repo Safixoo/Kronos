@@ -3,6 +3,7 @@ package turniplabs.examplemod.client.render;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL20;
 import org.spongepowered.asm.mixin.Unique;
+import turniplabs.examplemod.client.render.data.FogData;
 
 public class ShaderSectionTerrain {
 	private boolean shaderCreated;
@@ -68,15 +69,10 @@ public class ShaderSectionTerrain {
 		GL20.glUniform1i(this.u_TexId, 0);
 		GL20.glUniform4f(this.u_CamPos, -posX, -posY, -posZ, 0);
 
-		float fogEnd = GL11.glGetFloat(GL11.GL_FOG_END);
-		float fogStart = GL11.glGetFloat(GL11.GL_FOG_START);
+		GL20.glUniform1f(this.u_FogEnd, noFog ? 1E+12F : FogData.fogEnd);
+		GL20.glUniform1f(this.u_FogStart, noFog ? 1E+12F : FogData.fogStart);
 
-		GL20.glUniform1f(this.u_FogEnd, noFog ? 1E+12F : fogEnd);
-		GL20.glUniform1f(this.u_FogStart, noFog ? 1E+12F : fogStart);
-
-		float[] fogColor = new float[4];
-
-		GL11.glGetFloatv(GL11.GL_FOG_COLOR, fogColor);
+		float[] fogColor = FogData.fogColor;
 		GL20.glUniform3f(this.u_FogColor, fogColor[0], fogColor[1], fogColor[2]);
 	}
 

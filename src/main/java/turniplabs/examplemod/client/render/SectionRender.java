@@ -19,22 +19,19 @@ import turniplabs.examplemod.client.util.BlocksFlags;
 import turniplabs.examplemod.client.util.Direction;
 import turniplabs.examplemod.client.vertex.format.DefaultVertexFormats;
 
-// TODO: Bit-compress most data.
 public class SectionRender {
 	public int blockX, blockY, blockZ;
+	public int flags;
 
-	public int adjacentMask, solidFaces;
 	public int currentFrame;
 
-	public long translucentDrawData;
-	public int solidDrawMask;
-
+	public long transDrawData;
 	public long[] solidDrawFaces = new long[Direction.COUNT + 1];
 
-	public final SectionRender[] adjacentSections = new SectionRender[Direction.COUNT];
-	private SectionCache sectionCache;
+	public SectionRender adjacentDown, adjacentUp, adjacentNorth,
+                        adjacentSouth, adjacentWest, adjacentEast;
 
-	public boolean dirty, solidEmptySection;
+	private SectionCache sectionCache;
 	public RegionRender region;
 
 	public SectionRender(int blockX, int blockY, int blockZ) {
@@ -134,11 +131,15 @@ public class SectionRender {
 			}
 		}
 
+		int solidFacesMask = 0;
+
 		for (int dir = 0; dir < Direction.COUNT; dir++) {
 			if (solidFaces[dir] == 256) {
-				this.solidFaces |= 1 << dir;
+				solidFacesMask |= 1 << dir;
 			}
 		}
+
+		this.flags = SectionFlags.setSolidFaces(this.flags, solidFacesMask);
 
 		int sumVertices = 0;
 
@@ -146,37 +147,46 @@ public class SectionRender {
 			sumVertices += VertexWriterManager.SOLID[dir].getVertices();
 		}
 
-		this.solidEmptySection = solidBlocks == 4096 && sumVertices == 0;
+		this.flags = SectionFlags.setEmptySolid(this.flags, solidBlocks == 4096 && sumVertices == 0);
+
+		int solidDrawMask = 0;
 
 		if (sumVertices != 0) {
 			if (this.region == null) {
+				this.flags = SectionFlags.setRegion(this.flags, true);
 			 	this.region = sectionManager.getRegion(this.blockX >> 4, this.blockY >> 4, this.blockZ >> 4);
 			}
 
 			for (int dir = 0; dir <= Direction.COUNT; dir++) {
 				if (VertexWriterManager.SOLID[dir].getVertices() != 0) {
 					this.region.addSolidMesh(this, VertexWriterManager.SOLID[dir], dir);
-					this.solidDrawMask |= 1 << dir;
+					solidDrawMask |= 1 << dir;
 				}
 			}
-
 		}
+
+		this.flags = SectionFlags.setDrawableFaces(this.flags, solidDrawMask);
 
 		if (translucentWriter.getVertices() != 0) {
 			if (this.region == null) {
+				this.flags = SectionFlags.setRegion(this.flags, true);
 				this.region = sectionManager.getRegion(this.blockX >> 4, this.blockY >> 4, this.blockZ >> 4);
 			}
 
 			this.region.addTranslucentMesh(this, translucentWriter);
 		}
 
+		int nonEmptyTranslucent = translucentWriter.getVertices() != 0 ? 0b10 : 0;
+		int nonEmptySolid = solidDrawMask != 0 ? 0b01 : 0;
+
+		this.flags = SectionFlags.setPassesNonEmpty(this.flags, nonEmptyTranslucent | nonEmptySolid);
 		translucentWriter.stopDrawing();
 
-		for (int dir = 0; dir < Direction.COUNT + 1; dir++) {
+		for (int dir = 0; dir <= Direction.COUNT; dir++) {
 			VertexWriterManager.SOLID[dir].stopDrawing();
 		}
 
-		this.dirty = false;
+		this.flags = SectionFlags.setDirty(this.flags, false);
 	}
 
 	private void prepareWriterForTerrain(VertexWriterManager writerManager) {
@@ -198,16 +208,44 @@ public class SectionRender {
 	}
 
 	public void setAdjacentNeighbor(SectionRender render, int direction) {
+		int adjacentMask = SectionFlags.getAdjacentMask(this.flags);
+
 		if (render == null) {
-			this.adjacentMask &= ~(1 << direction);
+			adjacentMask &= ~(1 << direction);
 		} else {
-			this.adjacentMask |= (1 << direction);
+			adjacentMask |= (1 << direction);
 		}
 
-		this.adjacentSections[direction] = render;
+		this.flags = SectionFlags.setAdjacentMask(this.flags, adjacentMask);
+
+		if (direction == Direction.DOWN) {
+			this.adjacentDown = render;
+		} else if (direction == Direction.UP) {
+			this.adjacentUp = render;
+		} else if (direction == Direction.WEST) {
+			this.adjacentWest = render;
+		} else if (direction == Direction.EAST) {
+			this.adjacentEast = render;
+		} else if (direction == Direction.NORTH) {
+			this.adjacentNorth = render;
+		} else {
+			this.adjacentSouth = render;
+		}
 	}
 
 	public SectionRender getAdjacent(int direction) {
-		return this.adjacentSections[direction];
+		if (direction == Direction.DOWN) {
+			return this.adjacentDown;
+		} else if (direction == Direction.UP) {
+			return this.adjacentUp;
+		} else if (direction == Direction.WEST) {
+			return this.adjacentWest;
+		} else if (direction == Direction.EAST) {
+			return this.adjacentEast;
+		} else if (direction == Direction.NORTH) {
+			return this.adjacentNorth;
+		} else {
+			return this.adjacentSouth;
+		}
 	}
 }

@@ -10,6 +10,7 @@
     "injects.AABBMixin",
     "injects.BlockLogicMixin",
     "injects.BlocksMixin",
+    "injects.FogManagerMixin",
     "injects.FrustumMixin",
     "injects.TesselatorStandardMixin",
     "opts.OpenGlHelperMixin",

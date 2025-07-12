@@ -51,4 +51,8 @@ public class BFSQueue {
 
 		this.sectionRenders[this.position++] = render;
 	}
+
+	public int size() {
+		return this.position;
+	}
 }
