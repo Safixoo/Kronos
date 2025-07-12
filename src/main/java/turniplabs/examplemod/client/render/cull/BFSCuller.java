@@ -220,36 +220,36 @@ public class BFSCuller {
 		return planes;
 	}
 
-	private static final int MAX_PRECISION = 1 << 14;
+	private static final int MAX_PRECISION = 17;
 
 	private static boolean visibleByRayCast(int x1, int y1, int z1, int x2, int y2, int z2) {
 		int dx = x2 - x1;
 		int dy = y2 - y1;
 		int dz = z2 - z1;
 
-		int stepX = sign(dx);
-		int stepY = sign(dy);
-		int stepZ = sign(dz);
-
 		int voxelX = x1 >> 4;
 		int voxelY = y1 >> 4;
 		int voxelZ = z1 >> 4;
 
-		float invDx = 1.0f / Math.abs(dx);
-		float invDy = 1.0f / Math.abs(dy);
-		float invDz = 1.0f / Math.abs(dz);
+		int stepX = sign(dx);
+		int stepY = sign(dy);
+		int stepZ = sign(dz);
 
-		float tDeltaX = 16 * invDx;
-		float tDeltaY = 16 * invDy;
-		float tDeltaZ = 16 * invDz;
+		int invDx = (1 << MAX_PRECISION) / (Math.abs(dx) + 1);
+		int invDy = (1 << MAX_PRECISION) / (Math.abs(dy) + 1);
+		int invDz = (1 << MAX_PRECISION) / (Math.abs(dz) + 1);
+
+		int tDeltaX = invDx << 4;
+		int tDeltaY = invDy << 4;
+		int tDeltaZ = invDz << 4;
 
 		int originOffsetX = (x1 & 15);
 		int originOffsetY = (y1 & 15);
 		int originOffsetZ = (z1 & 15);
 
-		float tMaxX = (stepX > 0 ? (16 - originOffsetX) : originOffsetX + 1) * invDx;
-		float tMaxY = (stepY > 0 ? (16 - originOffsetY) : originOffsetY + 1) * invDy;
-		float tMaxZ = (stepZ > 0 ? (16 - originOffsetZ) : originOffsetZ + 1) * invDz;
+		int tMaxX = (stepX > 0 ? (16 - originOffsetX) : originOffsetX + 1) * invDx;
+		int tMaxY = (stepY > 0 ? (16 - originOffsetY) : originOffsetY + 1) * invDy;
+		int tMaxZ = (stepZ > 0 ? (16 - originOffsetZ) : originOffsetZ + 1) * invDz;
 
 		int invalid = 0;
 
@@ -277,7 +277,7 @@ public class BFSCuller {
 			}
 		}
 
-		return invalid > 1;
+		return invalid <= 1;
 	}
 
 	private static int sign(int num) {

@@ -1,12 +1,11 @@
 package turniplabs.examplemod.client.render.region;
 
-import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL14C;
 import org.lwjgl.opengl.GL15;
-import org.lwjgl.opengl.GL45;
 import org.lwjgl.system.MemoryUtil;
 import turniplabs.examplemod.client.render.SectionManager;
 import turniplabs.examplemod.client.render.SectionRender;
+import turniplabs.examplemod.client.util.Direction;
 import turniplabs.examplemod.client.vertex.VertexWriterManager;
 import turniplabs.examplemod.client.vertex.writer.TerrainVertexWriter;
 
@@ -16,14 +15,12 @@ public class RegionRender {
 	private RegionAllocation translucentBuffer;
 	private RegionAllocation solidBuffer;
 
-	public static final long emptyIndices = MemoryUtil.nmemCalloc(0, 8192 * 12);
-
 	public final long solidFirst;
 	public final long solidCount;
 	public int solidEmptyDraw = 0;
 
-	public final long translucentFirst = MemoryUtil.nmemAlloc(256 * 4);
-	public final long translucentCount = MemoryUtil.nmemAlloc(256 * 4);
+	public final long translucentFirst;
+	public final long translucentCount;
 	public int translucentEmptyDraw = 0;
 
 	public int currentFrame;
@@ -33,10 +30,15 @@ public class RegionRender {
 		this.regionY = sectionY >> 2;
 		this.regionZ = sectionZ >> 3;
 
-		long ptrSolidData = MemoryUtil.nmemAlloc(256 * 4 * 14);
+		long ptrSolidData = MemoryUtil.nmemAlloc((256 * 4 * 7) * 2);
 
 		this.solidFirst = ptrSolidData;
 		this.solidCount = ptrSolidData + (256 * 4 * 7);
+
+		long ptrTranslucentData = MemoryUtil.nmemAlloc((256 * 4) * 2);
+
+		this.translucentFirst = ptrTranslucentData;
+		this.translucentCount = ptrTranslucentData + (256 * 4);
 	}
 
 	public void clear() {
@@ -51,9 +53,7 @@ public class RegionRender {
 		}
 
 		MemoryUtil.nmemFree(this.solidFirst);
-
 		MemoryUtil.nmemFree(this.translucentFirst);
-		MemoryUtil.nmemFree(this.translucentCount);
 	}
 
 	public void addSolidMesh(SectionRender render, VertexWriterManager manager, int side) {
@@ -77,7 +77,7 @@ public class RegionRender {
 	}
 
 	public void addTranslucentDraw(long drawData) {
-		this.addToBatch(this.translucentFirst, this.translucentCount, drawData, this.translucentEmptyDraw++);
+		this.addToBatch(this.translucentFirst, this.translucentFirst + (256 * 4), drawData, this.translucentEmptyDraw++);
 	}
 
 	public void bindSolid() {
