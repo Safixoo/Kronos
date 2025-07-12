@@ -3,6 +3,7 @@ package turniplabs.examplemod.client.render.region;
 import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
 import it.unimi.dsi.fastutil.objects.*;
 import org.lwjgl.opengl.GL30;
+import org.lwjgl.system.MemoryUtil;
 import turniplabs.examplemod.client.render.SectionManager;
 
 public class RegionManager {
@@ -67,6 +68,7 @@ public class RegionManager {
 			for (RegionRender region : this.regionRenders) {
 				if (region.translucentEmptyDraw != 0) {
 					region.bindTranslucent();
+
 					region.draw(region.translucentFirst, region.translucentCount, region.translucentEmptyDraw);
 				}
 			}

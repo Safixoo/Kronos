@@ -1,6 +1,9 @@
 package turniplabs.examplemod.client.render.region;
 
+import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL14C;
 import org.lwjgl.opengl.GL15;
+import org.lwjgl.opengl.GL45;
 import org.lwjgl.system.MemoryUtil;
 import turniplabs.examplemod.client.render.SectionManager;
 import turniplabs.examplemod.client.render.SectionRender;
@@ -12,6 +15,8 @@ public class RegionRender {
 
 	private RegionAllocation translucentBuffer;
 	private RegionAllocation solidBuffer;
+
+	public static final long emptyIndices = MemoryUtil.nmemCalloc(0, 8192 * 12);
 
 	public final long solidFirst;
 	public final long solidCount;
@@ -89,7 +94,7 @@ public class RegionRender {
 	}
 
 	public void draw(long first, long count, int drawCount) {
-		GL15.nglMultiDrawArrays(GL15.GL_QUADS, first, count, drawCount);
+		GL14C.nglMultiDrawArrays(GL15.GL_QUADS, first, count, drawCount);
 	}
 
 	public static int regionIndex(int x, int y, int z) {

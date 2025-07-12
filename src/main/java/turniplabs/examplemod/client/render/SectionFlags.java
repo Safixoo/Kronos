@@ -13,6 +13,14 @@ public class SectionFlags {
 		return (flags >>> 0 & PASSES_NON_EMPTY);
 	}
 
+	public static boolean hasSolidPass(int flags) {
+		return (flags >>> 0 & 1) != 0;
+	}
+
+	public static boolean hasTranslucentPass(int flags) {
+		return (flags >>> 0 & 2) != 0;
+	}
+
 	public static int setPassesNonEmpty(int flags, int nonEmpty) {
 		return (flags & ~PASSES_NON_EMPTY) | nonEmpty << 0;
 	}
@@ -57,12 +65,20 @@ public class SectionFlags {
 		return (flags & DRAWABLE_FACES) >>> 15;
 	}
 
+	public static boolean hasDrawableFaces(int flags) {
+		return (flags & DRAWABLE_FACES) != 0;
+	}
+
 	public static int setDrawableFaces(int flags, int faces) {
 		return (flags & ~DRAWABLE_FACES) | (faces << 15);
 	}
 
 	public static boolean isDirty(int flags) {
 		return (flags & DIRTY) != 0;
+	}
+
+	public static int dirtyMask(int flags) {
+		return (flags >>> 22) & 1;
 	}
 
 	public static int setDirty(int flags, boolean dirty) {

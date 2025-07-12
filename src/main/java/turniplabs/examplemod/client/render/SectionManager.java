@@ -11,6 +11,7 @@ import net.minecraft.core.item.ItemEgg;
 import net.minecraft.core.player.inventory.container.ContainerInventory;
 import net.minecraft.core.world.World;
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL30;
 import turniplabs.examplemod.client.GlobalFlags;
 import turniplabs.examplemod.client.render.cull.BFSCuller;
 import turniplabs.examplemod.client.render.cull.BFSQueue;
@@ -52,7 +53,7 @@ public class SectionManager {
 	private long vramUsed;
 	private long vramAllocated;
 
-	private static final int MAX_UPDATE_QUEUES = 6;
+	private static final int MAX_UPDATE_QUEUES = 10;
 
 	private final long[] lastFrameSamples = new long[32];
 

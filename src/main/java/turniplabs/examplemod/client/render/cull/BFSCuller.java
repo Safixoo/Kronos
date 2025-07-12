@@ -13,7 +13,7 @@ import turniplabs.examplemod.client.util.Mth;
 import static org.joml.Math.fma;
 
 public class BFSCuller {
-	private final BFSQueue bfsQueue = new BFSQueue();
+	public final BFSQueue bfsQueue = new BFSQueue();
 	private RegionManager regionManager;
 
 	private float fogEnd;
@@ -61,10 +61,9 @@ public class BFSCuller {
 
 			int flags = node.flags;
 
-			if (distance >= Mth.square(128) && SectionFlags.getDrawableFaces(flags) != 0) {
-				if (!visibleByRayCast(node.blockX + 8, node.blockY + 8, node.blockZ + 8, playerChunkX, playerChunkY, playerChunkZ)) {
-					continue;
-				}
+			if (distance >= Mth.square(120) && SectionFlags.hasDrawableFaces(flags) &&
+				!visibleByRayCast(node.blockX + 8, node.blockY + 8, node.blockZ + 8, playerChunkX, playerChunkY, playerChunkZ)) {
+				continue;
 			}
 
 			int outwardDirections = getOutwardDirections(playerChunkX, playerChunkY, playerChunkZ, node);
@@ -120,18 +119,34 @@ public class BFSCuller {
 			}
 		}
 
-		if ((SectionFlags.getPassesNonEmpty(flags) & 0b01) != 0) {
+		if (SectionFlags.hasSolidPass(flags)) {
 			int visibleFaces = getVisibleFaces(playerX, playerY, playerZ, section.blockX, section.blockY, section.blockZ) & SectionFlags.getDrawableFaces(flags);
 			SectionManager.getCurrentInstance().drawnSolidRenderers++;
 
-			for (int dir = 0; dir <= Direction.COUNT; dir++) {
-				if ((visibleFaces & (1 << dir)) != 0) {
-					region.addSolidDraw(section.solidDrawFaces[dir]);
-				}
+			if ((visibleFaces & (1 << 0)) != 0) {
+				region.addSolidDraw(section.solidDrawFaces[0]);
+			}
+			if ((visibleFaces & (1 << 1)) != 0) {
+				region.addSolidDraw(section.solidDrawFaces[1]);
+			}
+			if ((visibleFaces & (1 << 2)) != 0) {
+				region.addSolidDraw(section.solidDrawFaces[2]);
+			}
+			if ((visibleFaces & (1 << 3)) != 0) {
+				region.addSolidDraw(section.solidDrawFaces[3]);
+			}
+			if ((visibleFaces & (1 << 4)) != 0) {
+				region.addSolidDraw(section.solidDrawFaces[4]);
+			}
+			if ((visibleFaces & (1 << 5)) != 0) {
+				region.addSolidDraw(section.solidDrawFaces[5]);
+			}
+			if ((visibleFaces & (1 << 6)) != 0) {
+				region.addSolidDraw(section.solidDrawFaces[6]);
 			}
 		}
 
-		if ((SectionFlags.getPassesNonEmpty(flags) & 0b10) != 0) {
+		if (SectionFlags.hasTranslucentPass(flags)) {
 			region.addTranslucentDraw(section.transDrawData);
 		}
 	}
@@ -205,109 +220,64 @@ public class BFSCuller {
 		return planes;
 	}
 
+	private static final int MAX_PRECISION = 1 << 14;
+
 	private static boolean visibleByRayCast(int x1, int y1, int z1, int x2, int y2, int z2) {
-		int dX = x2 - x1;
-		int dY = y2 - y1;
-		int dZ = z2 - z1;
+		int dx = x2 - x1;
+		int dy = y2 - y1;
+		int dz = z2 - z1;
 
-		int incX = sign(dX);
-		int incY = sign(dY);
-		int incZ = sign(dZ);
+		int stepX = sign(dx);
+		int stepY = sign(dy);
+		int stepZ = sign(dz);
 
-		int lenX = Math.abs(dX);
-		int lenY = Math.abs(dY);
-		int lenZ = Math.abs(dZ);
+		int voxelX = x1 >> 4;
+		int voxelY = y1 >> 4;
+		int voxelZ = z1 >> 4;
 
-		int sumX = lenX << 4;
-		int sumY = lenY << 4;
-		int sumZ = lenZ << 4;
+		float invDx = 1.0f / Math.abs(dx);
+		float invDy = 1.0f / Math.abs(dy);
+		float invDz = 1.0f / Math.abs(dz);
 
-		int valid = 0;
+		float tDeltaX = 16 * invDx;
+		float tDeltaY = 16 * invDy;
+		float tDeltaZ = 16 * invDz;
 
-		if (lenX >= lenY && lenX >= lenZ) {
-			int errY = sumY - lenX;
-			int errZ = sumZ - lenX;
+		int originOffsetX = (x1 & 15);
+		int originOffsetY = (y1 & 15);
+		int originOffsetZ = (z1 & 15);
 
-			for (int i = 0; i < lenX; i++) {
-				x1 += incX;
+		float tMaxX = (stepX > 0 ? (16 - originOffsetX) : originOffsetX + 1) * invDx;
+		float tMaxY = (stepY > 0 ? (16 - originOffsetY) : originOffsetY + 1) * invDy;
+		float tMaxZ = (stepZ > 0 ? (16 - originOffsetZ) : originOffsetZ + 1) * invDz;
 
-				if (errY > 0) {
-					y1 += incY;
-					errY -= sumX;
-				}
-				if (errZ > 0) {
-					z1 += incZ;
-					errZ -= sumX;
-				}
+		int invalid = 0;
 
-				errY += sumY;
-				errZ += sumZ;
-
-				if (!BFSVisArray.getVisible(x1 >> 4, y1 >> 4, z1 >> 4)) {
-					return false;
+		for (int i = 0; i < 5; i++) {
+			if (tMaxX < tMaxY) {
+				if (tMaxX < tMaxZ) {
+					voxelX += stepX;
+					tMaxX += tDeltaX;
 				} else {
-					if (++valid > 8) {
-						break;
-					}
+					voxelZ += stepZ;
+					tMaxZ += tDeltaZ;
+				}
+			} else {
+				if (tMaxY < tMaxZ) {
+					voxelY += stepY;
+					tMaxY += tDeltaY;
+				} else {
+					voxelZ += stepZ;
+					tMaxZ += tDeltaZ;
 				}
 			}
-		} else if (lenY >= lenX && lenY >= lenZ) {
-			int errX = sumX - lenY;
-			int errZ = sumZ - lenY;
 
-			for (int i = 0; i < lenY; i++) {
-				y1 += incY;
-
-				if (errX > 0) {
-					x1 += incX;
-					errX -= sumY;
-				}
-				if (errZ > 0) {
-					z1 += incZ;
-					errZ -= sumY;
-				}
-
-				errX += sumX;
-				errZ += sumZ;
-
-				if (!BFSVisArray.getVisible(x1 >> 4, y1 >> 4, z1 >> 4)) {
-					return false;
-				} else {
-					if (++valid > 8) {
-						break;
-					}
-				}
-			}
-		} else {
-			int errY = sumY - lenZ;
-			int errX = sumX - lenZ;
-
-			for (int i = 0; i < lenZ; i++) {
-				z1 += incZ;
-
-				if (errY > 0) {
-					y1 += incY;
-					errY -= sumZ;
-				}
-				if (errX > 0) {
-					x1 += incX;
-					errX -= sumZ;
-				}
-
-				errY += sumY;
-				errX += sumX;
-
-				if (!BFSVisArray.getVisible(x1 >> 4, y1 >> 4, z1 >> 4)) {
-					return false;
-				} else {
-					if (++valid > 8) {
-						break;
-					}
-				}
+			if (!BFSVisArray.getVisible(voxelX, voxelY, voxelZ)) {
+				if (invalid++ > 1) break;
 			}
 		}
 
-		return true;
+		return invalid > 1;
 	}
 
 	private static int sign(int num) {
