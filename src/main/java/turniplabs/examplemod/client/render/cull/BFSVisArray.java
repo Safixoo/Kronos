@@ -3,13 +3,13 @@ package turniplabs.examplemod.client.render.cull;
 import turniplabs.examplemod.client.util.BitArray;
 
 public class BFSVisArray {
+	private static int lastDistance;
 	private static BitArray visArray;
 
 	private static int offsetX;
 	private static int offsetZ;
 
 	private static int sizeX;
-	private static int sizeZ;
 
 	public static void start(int cameraX, int cameraZ, int renderDistance) {
 		int powRenderDistance = nextPowerOfTwo(renderDistance);
@@ -19,19 +19,21 @@ public class BFSVisArray {
 
 		int totalVolume = (xzWide * xzWide) * yLength;
 
-		offsetX = cameraX - renderDistance;
-		offsetZ = cameraZ - renderDistance;
+		offsetX = cameraX - powRenderDistance;
+		offsetZ = cameraZ - powRenderDistance;
 
-		int bits = Integer.bitCount(powRenderDistance - 1);
+		sizeX = Integer.bitCount(powRenderDistance - 1);
 
-		sizeZ = bits + bits;
-		sizeX = bits;
+		if (lastDistance == powRenderDistance) {
+			visArray.clear();
+		} else {
+			visArray = new BitArray(totalVolume);
+		}
 
-		visArray = new BitArray(totalVolume);
+		lastDistance = powRenderDistance;
 	}
 
 	private static int nextPowerOfTwo(int num) {
-		if (num <= 0) return 1;
 		num--;
 		num |= num >> 1;
 		num |= num >> 2;
@@ -41,10 +43,10 @@ public class BFSVisArray {
 		return num + 1;
 	}
 
-	public static boolean getVisible(int sectionX, int sectionY, int sectionZ) {
+	public static boolean notVisible(int sectionX, int sectionY, int sectionZ) {
 		int index = getInd(sectionX, sectionY, sectionZ);
 
-		return visArray.get(index);
+		return visArray.getFalse(index);
 	}
 
 	public static void setVisible(int sectionX, int sectionY, int sectionZ) {
@@ -57,6 +59,10 @@ public class BFSVisArray {
 		int relX = sectionX - offsetX;
 		int relZ = sectionZ - offsetZ;
 
-		return (relX << sizeX) | (relZ << sizeZ) | sectionY;
+		if (relX < 0 || relZ < 0) {
+			return 0;
+		}
+
+		return ((relX << sizeX) | relZ) << sizeX | sectionY;
 	}
 }

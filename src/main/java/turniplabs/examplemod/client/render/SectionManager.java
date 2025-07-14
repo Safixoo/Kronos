@@ -11,11 +11,11 @@ import net.minecraft.core.item.ItemEgg;
 import net.minecraft.core.player.inventory.container.ContainerInventory;
 import net.minecraft.core.world.World;
 import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL30;
 import turniplabs.examplemod.client.GlobalFlags;
 import turniplabs.examplemod.client.render.cull.BFSCuller;
-import turniplabs.examplemod.client.render.cull.BFSQueue;
+import turniplabs.examplemod.client.render.cull.FrustumCuller;
 import turniplabs.examplemod.client.render.cull.UpdateQueue;
+import turniplabs.examplemod.client.render.data.CameraData;
 import turniplabs.examplemod.client.render.data.FogData;
 import turniplabs.examplemod.client.render.meshing.BlockRenderer;
 import turniplabs.examplemod.client.render.region.RegionManager;
@@ -23,43 +23,34 @@ import turniplabs.examplemod.client.render.region.RegionRender;
 import turniplabs.examplemod.client.util.Direction;
 import turniplabs.examplemod.client.util.Mth;
 
-import java.util.Arrays;
-
 public class SectionManager {
-	// Could be replaced in a future with a smart indexed array, but without reusing objects as vanilla.
-	// (as that becomes a real pain mostly with bfs culling).
-	private final Long2ReferenceOpenHashMap<SectionRender> sectionMap = new Long2ReferenceOpenHashMap<>();
+	private static final int MAX_UPDATE_QUEUES = 10;
 
+	private final Long2ReferenceOpenHashMap<SectionRender> sectionMap = new Long2ReferenceOpenHashMap<>();
 	private final BFSCuller bfsCuller = new BFSCuller();
+	private final RegionManager regionManager = new RegionManager();
+	private final BlockRenderer blockRenderer = new BlockRenderer();
 	private static SectionManager INSTANCE;
 
-	private final RegionManager regionManager = new RegionManager();
-
-	private final BlockRenderer blockRenderer = new BlockRenderer();
 	private World worldObj;
 
-	private int renderDistance = -1;
-
-	private double cameraX, cameraY, cameraZ;
+	private CameraData cameraData;
 	private double lastUpdateX, lastUpdateZ;
-
-	public int drawnSolidRenderers = 0;
-
-	private ShaderSectionTerrain terrainShader;
+	private int renderDistance;
 
 	private long lastPositionCache = -1;
-	private SectionRender lastSectionCache;
+	private SectionRender lastSectionCache = null;
 
 	private long vramUsed;
 	private long vramAllocated;
-
-	private static final int MAX_UPDATE_QUEUES = 10;
+	public int drawnSolidRenderers;
 
 	private final long[] lastFrameSamples = new long[32];
-
 	private int frameSampleInd;
 	private long lastFrameTime;
 	private long lastFrameBudget;
+
+	private ShaderSectionTerrain terrainShader;
 
 	public SectionManager(World world) {
 		INSTANCE = this;
@@ -172,11 +163,10 @@ public class SectionManager {
 	}
 
 	public void update(int renderDistance, double cameraX, double cameraY, double cameraZ, boolean worldChanged, float partialTick) {
-		this.cameraX = cameraX;
-		this.cameraY = cameraY;
-		this.cameraZ = cameraZ;
-
+		this.cameraData = extractCameraData(cameraX, cameraY, cameraZ, renderDistance);
 		this.regionManager.update(worldChanged);
+
+		FrustumCuller.addFractCamera(this.cameraData.fractX, this.cameraData.fractY, this.cameraData.fractZ);
 
 		if (this.renderDistance != renderDistance || worldChanged) {
 			this.renderDistance = renderDistance;
@@ -198,11 +188,23 @@ public class SectionManager {
 		ContainerInventory inventory = playerLocal.inventory;
 
 		if (inventory == null || inventory.getCurrentItem() == null || !(inventory.getCurrentItem().getItem() instanceof ItemEgg)) {
-			this.bfsCuller.init((int) cameraX, (int) cameraZ, Mth.square(FogData.fogEnd), renderDistance);
-			this.bfsCuller.updateRenderList(this.sectionMap, (float) cameraX, (float) cameraY, (float) cameraZ);
+			this.bfsCuller.init(this.cameraData.cameraX, this.cameraData.cameraZ, Mth.square(FogData.fogEnd), renderDistance);
+			this.bfsCuller.updateRenderList(this.sectionMap, this.cameraData);
 		}
 
 		this.queueRebuilds(partialTick);
+	}
+
+	private static CameraData extractCameraData(double cameraX, double cameraY, double cameraZ, int renderDistance) {
+		int playerX = (int) cameraX;
+		int playerY = (int) cameraY;
+		int playerZ = (int) cameraZ;
+
+		float fractX = (float) (cameraX - playerX);
+		float fractY = (float) (cameraY - playerY);
+		float fractZ = (float) (cameraZ - playerZ);
+
+		return new CameraData(fractX, fractY, fractZ, playerX, playerY, playerZ, renderDistance);
 	}
 
 	// TODO:
@@ -261,8 +263,8 @@ public class SectionManager {
 		int lastChunkCameraX = Math.floorDiv((int) this.lastUpdateX, 16);
 		int lastChunkCameraZ = Math.floorDiv((int) this.lastUpdateZ, 16);
 
-		int currentCameraX = Math.floorDiv((int) this.cameraX, 16);
-		int currentCameraZ = Math.floorDiv((int) this.cameraZ, 16);
+		int currentCameraX = Math.floorDiv(this.cameraData.cameraX, 16);
+		int currentCameraZ = Math.floorDiv(this.cameraData.cameraZ, 16);
 
 		// Doing currentCamera - lastChunkCamera is like generating a vector
 		// from the last camera check pos to the current.
@@ -284,14 +286,14 @@ public class SectionManager {
 
 				// Add new sections in distance.
 				if (newX <= -this.renderDistance || newX >= this.renderDistance) {
-					this.lastUpdateX = this.cameraX;
+					this.lastUpdateX = this.cameraData.cameraX;
 
 					for (int y = 0; y < 16; y++) {
 						this.addRender(currentCameraX + x, y, currentCameraZ + z, false);
 					}
 				}
 				if (newZ <= -this.renderDistance || newZ >= this.renderDistance) {
-					this.lastUpdateZ = this.cameraZ;
+					this.lastUpdateZ = this.cameraData.cameraZ;
 
 					for (int y = 0; y < 16; y++) {
 						this.addRender(currentCameraX + x, y, currentCameraZ + z, false);
@@ -368,7 +370,7 @@ public class SectionManager {
 		}
 
 		this.terrainShader.bindProgram();
-		this.terrainShader.setupUniforms((float) this.cameraX, (float) this.cameraY, (float) this.cameraZ, noFog);
+		this.terrainShader.setupUniforms(this.cameraData.cameraX(), this.cameraData.cameraY(), this.cameraData.cameraZ(), noFog);
 
 		this.regionManager.drawAllRegions(renderPass);
 		this.terrainShader.unbindProgram();

@@ -2,9 +2,7 @@ package turniplabs.examplemod.client.render.meshing;
 
 import net.minecraft.client.render.LightmapHelper;
 import net.minecraft.client.render.block.color.BlockColor;
-import net.minecraft.client.render.block.model.BlockModel;
-import net.minecraft.client.render.block.model.BlockModelGrass;
-import net.minecraft.client.render.block.model.BlockModelLeaves;
+import net.minecraft.client.render.block.model.*;
 import net.minecraft.client.render.texture.stitcher.IconCoordinate;
 import net.minecraft.core.block.Block;
 import net.minecraft.core.util.helper.Side;
@@ -21,8 +19,6 @@ import turniplabs.examplemod.client.vertex.writer.TerrainVertexWriter;
 public class BlockRenderer {
 	public BlockLightCache cache = new BlockLightCache();
 	private SectionCache chunkCache;
-
-	private boolean[] facesBlock;
 	private boolean useColor;
 
 	public int colorTopLeft;
@@ -50,19 +46,26 @@ public class BlockRenderer {
 		int color = blockColor.getWorldColor(this.chunkCache, x, y, z);
 
 		this.cache.setupCache(this.chunkCache, x, y, z);
-		this.facesBlock = ((IBlockAABB) aabb).blockBoundsCheck();
 		this.setModelBounds(x, y, z, aabb);
+		boolean[] sideChecks = ((IBlockAABB) aabb).blockBoundsCheck();
 
+		boolean isStandard = blockModel.getClass() == BlockModelStandard.class;
 		boolean isGrass = blockModel instanceof BlockModelGrass;
 		boolean isLeaves = this.isLeaves = blockModel instanceof BlockModelLeaves;
 
 		for (int side = 0; side < Direction.COUNT; side++) {
-			if (isGrass || isLeaves) {
-				int meta = this.chunkCache.getBlockMetadata(x, y, z);
-				this.useColor = blockModel.shouldSideBeColored(this.chunkCache, x, y, z, side, meta);
-			}
+			int dirX = Direction.x(side);
+			int dirY = Direction.y(side);
+			int dirZ = Direction.z(side);
 
-			this.renderSideFaceAll(block, blockModel, aabb, this.modelData, x, y, z, side, ColorBGRManager.rgbToBgr(color));
+			if (shouldDrawSide(x + dirX, y + dirY, z + dirZ, side, blockModel, aabb, sideChecks, isStandard)) {
+				if (isGrass || isLeaves) {
+					int meta = this.chunkCache.getBlockMetadata(x, y, z);
+					this.useColor = blockModel.shouldSideBeColored(this.chunkCache, x, y, z, side, meta);
+				}
+
+				this.renderSide(block, blockModel, this.modelData, x, y, z, side, ColorBGRManager.rgbToBgr(color));
+			}
 		}
 
 //		if (isGrass) {
@@ -76,30 +79,28 @@ public class BlockRenderer {
 		this.chunkCache = chunkCache;
 	}
 
-	private boolean shouldDrawSide(int x, int y, int z, int side, BlockModel<?> block, AABB aabb) {
-		return block.shouldSideBeRendered(this.chunkCache, aabb, x, y, z, side);
+	private boolean shouldDrawSide(int x, int y, int z, int side, BlockModel<?> block, AABB aabb, boolean[] sideChecks, boolean isStandard) {
+		if (isStandard) {
+			return sideChecks[side] || !this.chunkCache.isBlockOpaqueCube(x, y, z);
+		} else {
+			return block.shouldSideBeRendered(this.chunkCache, aabb, x, y, z, side);
+		}
 	}
 
-	private void renderSideFaceAll(Block<?> block, BlockModel<?> blockModel, AABB aabb, ModelBoundsData bounds, int x, int y, int z, int side, int color) {
-		int dirX = Direction.x(side);
-		int dirY = Direction.y(side);
-		int dirZ = Direction.z(side);
+	private void renderSide(Block<?> block, BlockModel<?> blockModel, ModelBoundsData bounds, int x, int y, int z, int side, int color) {
+		VertexWriterManager.setCurrentInstance(VertexWriterManager.SOLID[side]);
 
-		if (this.shouldDrawSide(x + dirX, y + dirY, z + dirZ, side, blockModel, aabb)) {
-			VertexWriterManager.setCurrentInstance(VertexWriterManager.SOLID[side]);
+		IconCoordinate tex = blockModel.getBlockTexture(this.chunkCache, x, y, z, Side.sides[side]);
+		VertexWriterManager.getCurrentInstance().ensureCapacity(TerrainVertexWriter.STRIDE * 4);
+		FaceWriterWrapper quadWriter = FaceDataWriters.getWriterBySide(side);
 
-			IconCoordinate tex = blockModel.getBlockTexture(this.chunkCache, x, y, z, Side.sides[side]);
-			VertexWriterManager.getCurrentInstance().ensureCapacity(TerrainVertexWriter.STRIDE * 4);
-			FaceWriterWrapper quadWriter = FaceDataWriters.getWriterBySide(side);
+		float minU = (float) tex.getIconUMin();
+		float maxU = (float) tex.getIconUMax();
+		float minV = (float) tex.getIconVMin();
+		float maxV = (float) tex.getIconVMax();
 
-			float minU = (float) tex.getIconUMin();
-			float maxU = (float) tex.getIconUMax();
-			float minV = (float) tex.getIconVMin();
-			float maxV = (float) tex.getIconVMax();
-
-			quadWriter.setUV(maxU, minV, minU, maxV);
-			quadWriter.colorizeAndBufferQuad(this, bounds, block, x, y, z, color);
-		}
+		quadWriter.setUV(maxU, minV, minU, maxV);
+		quadWriter.colorizeAndBufferQuad(this, bounds, block, x, y, z, color);
 	}
 
 	public void colorizeQuad(Block<?> block, int x, int y, int z, int side, int dirX, int dirY, int dirZ, float depth, int topX, int topY, int topZ, float topP, float botP, int lefX, int lefY, int lefZ, float lefP, float rigP, int color) {

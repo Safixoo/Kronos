@@ -19,7 +19,7 @@ public class FrustumCuller {
 		if (nxY >= 0) nxW += 16.0;
 		if (nxZ >= 0) nxW += 16.0;
 
-		FrustumCuller.nxW += nxW;
+		FrustumCuller.nxW = (float) -(FrustumCuller.nxW + nxW);
 //		invW = 1.0f / nxW;
 //
 //		nxX *= invW;
@@ -33,7 +33,7 @@ public class FrustumCuller {
 		if (pxY >= 0) pxW += 16.0;
 		if (pxZ >= 0) pxW += 16.0;
 
-		FrustumCuller.pxW += pxW;
+		FrustumCuller.pxW = (float) -(FrustumCuller.pxW + pxW);
 //		invW = 1.0f / pxW;
 //
 //		pxX *= invW;
@@ -47,7 +47,7 @@ public class FrustumCuller {
 		if (nyY >= 0) nyW += 16.0;
 		if (nyZ >= 0) nyW += 16.0;
 
-		FrustumCuller.nyW += nyW;
+		FrustumCuller.nyW = (float) -(FrustumCuller.nyW + nyW);
 //		invW = 1.0f / nyW;
 //
 //		nyX *= invW;
@@ -61,7 +61,7 @@ public class FrustumCuller {
 		if (pyY >= 0) pyW += 16.0;
 		if (pyZ >= 0) pyW += 16.0;
 
-		FrustumCuller.pyW += pyW;
+		FrustumCuller.pyW = (float) -(FrustumCuller.pyW + pyW);
 //		invW = 1.0f / pyW;
 //
 //		pyX *= invW;
@@ -91,10 +91,32 @@ public class FrustumCuller {
 //		pzZ *= invW;
 	}
 
+	public static void addFractCamera(float fractX, float fractY, float fractZ) {
+		{
+			nxW -= nxX * fractX;
+			nxW -= nxY * fractY;
+			nxW -= nxZ * fractZ;
+
+			pxW -= pxX * fractX;
+			pxW -= pxY * fractY;
+			pxW -= pxZ * fractZ;
+		}
+
+		{
+			nyW -= nyX * fractX;
+			nyW -= nyY * fractY;
+			nyW -= nyZ * fractZ;
+
+			pyW -= pyX * fractX;
+			pyW -= pyY * fractY;
+			pyW -= pyZ * fractZ;
+		}
+	}
+
 	public static boolean testAab(float minX, float minY, float minZ) {
-		return  nxX * minX + nxY * minY + nxZ * minZ >= -nxW &&
-				pxX * minX + pxY * minY + pxZ * minZ >= -pxW &&
-				nyX * minX + nyY * minY + nyZ * minZ >= -nyW &&
-				pyX * minX + pyY * minY + pyZ * minZ >= -pyW;
+		return  nxX * minX + nxY * minY + nxZ * minZ >= nxW &&
+				pxX * minX + pxY * minY + pxZ * minZ >= pxW &&
+				nyX * minX + nyY * minY + nyZ * minZ >= nyW &&
+				pyX * minX + pyY * minY + pyZ * minZ >= pyW;
 	}
 }

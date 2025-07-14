@@ -6,14 +6,13 @@ import turniplabs.examplemod.client.util.BlocksFlags;
 public class BlockLightCache {
 	private int opacityMask;
 	private int lightMapMask;
-
-	private final int[] lightmapCoordValue = new int[27];
 	private int opacityValue;
 
-	private int offsetX = Integer.MAX_VALUE;
-	private int offsetY = Integer.MAX_VALUE;
-	private int offsetZ = Integer.MAX_VALUE;
+	private int offsetX;
+	private int offsetY;
+	private int offsetZ;
 
+	private final short[] lightmapCoordValue = new short[27];
 	private WorldSource access;
 
 	public void setupCache(WorldSource access, int x, int y, int z) {
@@ -52,9 +51,13 @@ public class BlockLightCache {
 
 		if ((this.lightMapMask & (1L << index)) == 0) {
 			this.lightMapMask |= 1 << index;
-			return this.lightmapCoordValue[index] = this.access.getLightmapCoord(relX + this.offsetX, relY + this.offsetY, relZ + this.offsetZ, 0);
+
+			int lightmap = this.access.getLightmapCoord(relX + this.offsetX, relY + this.offsetY, relZ + this.offsetZ, 0);
+			this.lightmapCoordValue[index] = (short) (lightmap >> 4);
+
+			return lightmap;
 		}
 
-		return this.lightmapCoordValue[index];
+		return (this.lightmapCoordValue[index] & 0xFFFF) << 4;
 	}
 }

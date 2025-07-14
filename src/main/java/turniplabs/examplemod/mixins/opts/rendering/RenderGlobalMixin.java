@@ -44,10 +44,6 @@ public abstract class RenderGlobalMixin {
 	private int renderersBeingRendered;
 	@Shadow
 	private int renderersLoaded;
-
-	@Shadow
-	public abstract void markRenderersForNewPosition(int x, int y, int z);
-
 	private SectionManager manager;
 	private boolean shouldReload;
 
