@@ -33,10 +33,6 @@ public class BFSQueue {
 	}
 
 	public SectionRender get(int position) {
-		if (position >= this.position) {
-			return null;
-		}
-
 		return this.sectionRenders[position];
 	}
 

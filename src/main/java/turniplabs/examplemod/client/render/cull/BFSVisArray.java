@@ -59,10 +59,6 @@ public class BFSVisArray {
 		int relX = sectionX - offsetX;
 		int relZ = sectionZ - offsetZ;
 
-		if (relX < 0 || relZ < 0) {
-			return 0;
-		}
-
 		return ((relX << sizeX) | relZ) << sizeX | sectionY;
 	}
 }

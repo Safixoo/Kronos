@@ -3,10 +3,12 @@ package turniplabs.examplemod.client.render.cull;
 import org.joml.Matrix4f;
 
 public class FrustumCuller {
-	private static double nxX, nxY, nxZ, nxW;
-	private static double pxX, pxY, pxZ, pxW;
-	private static double nyX, nyY, nyZ, nyW;
-	private static double pyX, pyY, pyZ, pyW;
+//	public static Matrix4f projectionModelViewMatrix = new Matrix4f();
+
+	private static float nxX, nxY, nxZ, nxW;
+	private static float pxX, pxY, pxZ, pxW;
+	private static float nyX, nyY, nyZ, nyW;
+	private static float pyX, pyY, pyZ, pyW;
 //	private static float nzX, nzY, nzZ, nzW;
 //	private static float pzX, pzY, pzZ, pzW;
 

@@ -1,9 +1,9 @@
 package turniplabs.examplemod.client.render.data;
 
 public class CameraData {
-	public int cameraX;
-	public int cameraY;
-	public int cameraZ;
+	public int intX;
+	public int intY;
+	public int intZ;
 
 	public float fractX;
 	public float fractY;
@@ -16,22 +16,22 @@ public class CameraData {
 		this.fractY = fractY;
 		this.fractZ = fractZ;
 
-		this.cameraX = cameraX;
-		this.cameraY = cameraY;
-		this.cameraZ = cameraZ;
+		this.intX = cameraX;
+		this.intY = cameraY;
+		this.intZ = cameraZ;
 
 		this.renderDistance = renderDistance;
 	}
 
 	public float cameraX() {
-		return this.cameraX + this.fractX;
+		return this.intX + this.fractX;
 	}
 
 	public float cameraY() {
-		return this.cameraY + this.fractY;
+		return this.intY + this.fractY;
 	}
 
 	public float cameraZ() {
-		return this.cameraZ + this.fractZ;
+		return this.intZ + this.fractZ;
 	}
 }

@@ -19,25 +19,32 @@ import turniplabs.examplemod.client.util.BlocksFlags;
 import turniplabs.examplemod.client.util.Direction;
 import turniplabs.examplemod.client.vertex.format.DefaultVertexFormats;
 
+// Saves basic info for each section from the world, is used mostly for culling and
+// meshing, rendering is almost only managed in the RegionRender in an objectless fashion.
 public class SectionRender {
+	// Most of the section data, flags is a bit-mask from SectionFlag encoding.
+	public int currentFrame, flags;
+
+	// Section position relative to blocks.
 	public int blockX, blockY, blockZ;
-	public int flags;
 
-	public int currentFrame;
+	public /* ubyte */ int regionIndex;
 
-	public long transDrawData;
-	public long[] solidDrawFaces = new long[Direction.COUNT + 1];
-
+	// Adjacent nodes that searched during BFS culling, done like this
+	// to avoid array dereferences and checks, inspired from Sodium.
 	public SectionRender adjacentDown, adjacentUp, adjacentNorth,
                         adjacentSouth, adjacentWest, adjacentEast;
 
+	// Section main data structures.
 	private SectionCache sectionCache;
-	public RegionRender region;
+	public RegionRender region = RegionRender.NULL;
 
 	public SectionRender(int blockX, int blockY, int blockZ) {
 		this.blockX = blockX;
 		this.blockY = blockY;
 		this.blockZ = blockZ;
+
+		this.regionIndex = RegionRender.regionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
 	}
 
 	public void rebuild(SectionManager sectionManager, BlockRenderer blockRenderer, World world) {
@@ -131,62 +138,96 @@ public class SectionRender {
 			}
 		}
 
+		this.processCullFaces(solidFaces);
+
+		int sumVertices = this.sumAllSolidVertices();
+		int solidDrawMask = this.nonEmptyFacesMask();
+		int translucentDrawMask = translucentWriter.getVertices() != 0 ? 1 : 0;
+
+		this.uploadMeshesToRegion(sectionManager, translucentWriter, sumVertices);
+
+		byte drawMask = (byte) (solidDrawMask << 1 & 0b1_111_111_0 | translucentDrawMask);
+		this.region.drawDataMask[this.regionIndex] = drawMask;
+
+		int nonEmptyTranslucent = translucentDrawMask << 1;
+		int nonEmptySolid = solidDrawMask != 0 ? 0b01 : 0;
+
+		boolean emptySolid = solidBlocks == 4096 && sumVertices == 0;
+
+		this.flags = SectionFlags.setDirty(this.flags, false);
+		this.flags = SectionFlags.setRegion(this.flags, this.region != RegionRender.NULL);
+		this.flags = SectionFlags.setEmptySolid(this.flags, emptySolid);
+		this.flags = SectionFlags.setPassesNonEmpty(this.flags, nonEmptyTranslucent | nonEmptySolid);
+		this.flags = SectionFlags.setDrawableFaces(this.flags, solidDrawMask);
+
+		if (emptySolid) {
+			this.currentFrame = Integer.MAX_VALUE;
+		} else {
+			this.currentFrame = Integer.MIN_VALUE;
+		}
+
+		for (int dir = 0; dir <= Direction.COUNT; dir++) {
+			VertexWriterManager.SOLID[dir].stopDrawing();
+		}
+
+		translucentWriter.stopDrawing();
+	}
+
+	private void uploadMeshesToRegion(SectionManager sectionManager, VertexWriterManager translucentWriter, int sumVertices) {
+		if (sumVertices > 0) {
+			if (this.region == RegionRender.NULL) {
+				this.region = sectionManager.getRegion(this.blockX >> 4, this.blockY >> 4, this.blockZ >> 4);
+			}
+
+			for (int dir = 0; dir <= Direction.COUNT; dir++) {
+				if (VertexWriterManager.SOLID[dir].getVertices() != 0) {
+					this.region.addSolidMesh(this, VertexWriterManager.SOLID[dir], dir);
+				}
+			}
+		}
+
+		if (translucentWriter.getVertices() != 0) {
+			if (this.region == RegionRender.NULL) {
+				this.region = sectionManager.getRegion(this.blockX >> 4, this.blockY >> 4, this.blockZ >> 4);
+			}
+
+			this.region.addTranslucentMesh(this, translucentWriter);
+		}
+	}
+
+	private void processCullFaces(int[] cullFaces) {
 		int solidFacesMask = 0;
 
 		for (int dir = 0; dir < Direction.COUNT; dir++) {
-			if (solidFaces[dir] == 256) {
+			if (cullFaces[dir] == 256) {
 				solidFacesMask |= 1 << dir;
 			}
 		}
 
-		this.flags = SectionFlags.setSolidFaces(this.flags, solidFacesMask);
+		this.flags = SectionFlags.setAdjacentMask(this.flags, ~solidFacesMask & SectionFlags.getAdjacentMask(this.flags));
+		this.flags = SectionFlags.setCullFaces(this.flags, solidFacesMask);
+	}
 
+	private int sumAllSolidVertices() {
 		int sumVertices = 0;
 
 		for (int dir = 0; dir <= Direction.COUNT; dir++) {
 			sumVertices += VertexWriterManager.SOLID[dir].getVertices();
 		}
 
-		this.flags = SectionFlags.setEmptySolid(this.flags, solidBlocks == 4096 && sumVertices == 0);
+		return sumVertices;
+	}
 
-		int solidDrawMask = 0;
-
-		if (sumVertices != 0) {
-			if (this.region == null) {
-				this.flags = SectionFlags.setRegion(this.flags, true);
-			 	this.region = sectionManager.getRegion(this.blockX >> 4, this.blockY >> 4, this.blockZ >> 4);
-			}
-
-			for (int dir = 0; dir <= Direction.COUNT; dir++) {
-				if (VertexWriterManager.SOLID[dir].getVertices() != 0) {
-					this.region.addSolidMesh(this, VertexWriterManager.SOLID[dir], dir);
-					solidDrawMask |= 1 << dir;
-				}
-			}
-		}
-
-		this.flags = SectionFlags.setDrawableFaces(this.flags, solidDrawMask);
-
-		if (translucentWriter.getVertices() != 0) {
-			if (this.region == null) {
-				this.flags = SectionFlags.setRegion(this.flags, true);
-				this.region = sectionManager.getRegion(this.blockX >> 4, this.blockY >> 4, this.blockZ >> 4);
-			}
-
-			this.region.addTranslucentMesh(this, translucentWriter);
-		}
-
-		int nonEmptyTranslucent = translucentWriter.getVertices() != 0 ? 0b10 : 0;
-		int nonEmptySolid = solidDrawMask != 0 ? 0b01 : 0;
-
-		this.flags = SectionFlags.setPassesNonEmpty(this.flags, nonEmptyTranslucent | nonEmptySolid);
-		translucentWriter.stopDrawing();
+	private int nonEmptyFacesMask() {
+		int mask = 0;
 
 		for (int dir = 0; dir <= Direction.COUNT; dir++) {
-			VertexWriterManager.SOLID[dir].stopDrawing();
+			if (VertexWriterManager.SOLID[dir].getVertices() != 0) {
+				mask |= 1 << dir;
+			}
 		}
 
-		this.flags = SectionFlags.setDirty(this.flags, false);
+		return mask;
 	}
 
 	private void prepareWriterForTerrain(VertexWriterManager writerManager) {

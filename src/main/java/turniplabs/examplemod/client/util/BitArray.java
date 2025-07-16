@@ -1,7 +1,5 @@
 package turniplabs.examplemod.client.util;
 
-import org.lwjgl.system.MemoryUtil;
-
 import java.util.Arrays;
 
 // Class borrowed from Sodium

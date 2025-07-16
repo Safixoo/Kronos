@@ -14,33 +14,25 @@ import turniplabs.examplemod.client.util.Mth;
 
 public class BFSCuller {
 	public final BFSQueue bfsQueue = new BFSQueue();
-	private RegionManager regionManager;
 	private int activeFrame;
 
-	public void setRenderingLists(RegionManager regionManager) {
-		this.regionManager = regionManager;
-	}
-
-	public void init(int cameraX, int cameraZ, float fogEnd, int renderDistance) {
+	public void init(RegionManager regionManager, int cameraX, int cameraZ, int renderDistance) {
 		UpdateQueue.clear();
 		BFSVisArray.start(cameraX >> 4, cameraZ >> 4, renderDistance);
 
-		for (RegionRender render : this.regionManager.regionRenders) {
-			render.translucentEmptyDraw = 0;
-			render.solidEmptyDraw = 0;
+		for (RegionRender render : regionManager.regionMap.values()) {
+			render.sectionsToRender = 0;
 		}
-
-		this.regionManager.regionRenders.clear();
 
 		this.bfsQueue.clear();
 		this.activeFrame++;
 	}
 
-	private static void bfsSearch(BFSQueue bfsQueue, RegionManager regionManager, int playerX, int playerY, int playerZ,
+	private static void bfsSearch(BFSQueue bfsQueue, int playerX, int playerY, int playerZ,
 								  int renderDistance, int activeFrame) {
 		int bfsIndex = 0;
-
 		SectionRender node;
+
 		while ((node = bfsQueue.get(bfsIndex++)) != null) {
 			int flags = node.flags;
 
@@ -48,11 +40,10 @@ public class BFSCuller {
 				continue;
 			}
 
-			queueRegionNode(node, regionManager, flags, activeFrame, playerX, playerY, playerZ);
+			queueRegionNode(node, flags);
 
 			int outwardDirections = getOutwardDirections(playerX, playerY, playerZ, node);
 			outwardDirections &= SectionFlags.getAdjacentMask(flags);
-			outwardDirections &= ~SectionFlags.getSolidFaces(flags);
 
 			exploreNodes(bfsQueue, node, outwardDirections, activeFrame);
 		}
@@ -65,9 +56,9 @@ public class BFSCuller {
 
 		BFSVisArray.setVisible(node.blockX >> 4, node.blockY >> 4, node.blockZ >> 4);
 
-		float distance = withinRenderDistance(distX, distY, distZ);
+		int distance = withinRenderDistance(distX, distY, distZ);
 
-		if (distance >= fogEnd || (distance >= Mth.square(16) && !FrustumCuller.testAab(distX, distY, distZ))) {
+		if (distance >= fogEnd || !FrustumCuller.testAab(distX, distY, distZ)) {
 			return true;
 		}
 
@@ -79,94 +70,37 @@ public class BFSCuller {
 	}
 
 	public void updateRenderList(Long2ReferenceOpenHashMap<SectionRender> sectionMap, CameraData camera) {
-		int chunkX = MathHelper.floor(camera.cameraX);
-		int chunkY = MathHelper.clamp(MathHelper.floor(camera.cameraY), 0, 255);
-		int chunkZ = MathHelper.floor(camera.cameraZ);
+		int chunkX = MathHelper.floor(camera.intX);
+		int chunkY = MathHelper.clamp(MathHelper.floor(camera.intY), 0, 255);
+		int chunkZ = MathHelper.floor(camera.intZ);
 
 		SectionRender spawn = sectionMap.get(SectionManager.asLong(chunkX >> 4, chunkY >> 4, chunkZ >> 4));
 
 		if (spawn != null) {
 			int flags = spawn.flags;
 
+			BFSVisArray.setVisible(spawn.blockX >> 4, spawn.blockY >> 4, spawn.blockZ >> 4);
 			exploreNodes(this.bfsQueue, spawn, SectionFlags.getAdjacentMask(flags), this.activeFrame);
 
 			if (SectionFlags.isDirty(flags)) {
 				UpdateQueue.addToQueueUnsafe(spawn);
 			}
 
-			queueRegionNode(spawn, this.regionManager, flags, this.activeFrame, camera.cameraX, camera.cameraY, camera.cameraZ);
+			queueRegionNode(spawn, flags);
 		}
 
-		bfsSearch(this.bfsQueue, this.regionManager, camera.cameraX, camera.cameraY, camera.cameraZ, (int) Mth.square(FogData.fogEnd), this.activeFrame);
+		bfsSearch(this.bfsQueue, camera.intX, camera.intY, camera.intZ, (int) Mth.square(FogData.fogEnd), this.activeFrame);
 	}
 
-	private static void queueRegionNode(SectionRender section, RegionManager regionManager, int flags, int activeFrame, int playerX, int playerY, int playerZ) {
+	private static void queueRegionNode(SectionRender section, int flags) {
 		if (!SectionFlags.hasRegion(flags)) {
 			return;
 		}
 
 		RegionRender region = section.region;
 
-		if (region.currentFrame != activeFrame) {
-			region.currentFrame = activeFrame;
-
-			if (SectionFlags.hasPassesNonEmpty(flags)) {
-				regionManager.addToDrawQueue(region);
-			}
-		}
-
-		if (SectionFlags.hasSolidPass(flags)) {
-			int visibleFaces = getVisibleFaces(playerX, playerY, playerZ, section.blockX, section.blockY, section.blockZ) & SectionFlags.getDrawableFaces(flags);
-			SectionManager.getCurrentInstance().drawnSolidRenderers++;
-
-			if ((visibleFaces & (1 << 0)) != 0) {
-				region.addSolidDraw(section.solidDrawFaces[0]);
-			}
-			if ((visibleFaces & (1 << 1)) != 0) {
-				region.addSolidDraw(section.solidDrawFaces[1]);
-			}
-			if ((visibleFaces & (1 << 2)) != 0) {
-				region.addSolidDraw(section.solidDrawFaces[2]);
-			}
-			if ((visibleFaces & (1 << 3)) != 0) {
-				region.addSolidDraw(section.solidDrawFaces[3]);
-			}
-			if ((visibleFaces & (1 << 4)) != 0) {
-				region.addSolidDraw(section.solidDrawFaces[4]);
-			}
-			if ((visibleFaces & (1 << 5)) != 0) {
-				region.addSolidDraw(section.solidDrawFaces[5]);
-			}
-			if ((visibleFaces & (1 << 6)) != 0) {
-				region.addSolidDraw(section.solidDrawFaces[6]);
-			}
-		}
-
-		if (SectionFlags.hasTranslucentPass(flags)) {
-			region.addTranslucentDraw(section.transDrawData);
-		}
-	}
-
-	public static int getVisibleFaces(int originX, int originY, int originZ, int chunkX, int chunkY, int chunkZ) {
-		int planes = (1 << Direction.COUNT);
-
-		planes |= greaterThan(originX, (chunkX - 3)) << Direction.EAST;
-		planes |= greaterThan(originY, (chunkY - 3)) << Direction.UP;
-		planes |= greaterThan(originZ, (chunkZ - 3)) << Direction.SOUTH;
-
-		planes |= lessThan(originX, (chunkX + 19)) << Direction.WEST;
-		planes |= lessThan(originY, (chunkY + 19)) << Direction.DOWN;
-		planes |= lessThan(originZ, (chunkZ + 19)) << Direction.NORTH;
-
-		return planes;
-	}
-
-	public static int lessThan(int a, int b) {
-		return (a - b) >>> 31;
-	}
-
-	public static int greaterThan(int a, int b) {
-		return (b - a) >>> 31;
+		region.renderIndices[region.sectionsToRender & 0xFF] = (byte) section.regionIndex;
+		region.sectionsToRender += SectionFlags.hasPassesNonEmptyBit(flags);
 	}
 
 	private static void exploreNodes(BFSQueue queue, SectionRender fatherNode, int directions, int activeFrame) {
@@ -174,7 +108,7 @@ public class BFSCuller {
 			return;
 		}
 
-		queue.verifyCapacity(Direction.COUNT);
+		queue.verifyCapacity(Direction.COUNT + 1);
 
 		if (Direction.hasSet(directions, Direction.DOWN)) {
 			visitNode(queue, fatherNode.adjacentDown, activeFrame);
@@ -204,23 +138,20 @@ public class BFSCuller {
 	private static int getOutwardDirections(int playerX, int playerY, int playerZ, SectionRender render) {
 		int planes = 0;
 
-		int chunkX = (render.blockX >> 4);
-		int playerChunkX = playerX >> 4;
+		int diffChunkX = (render.blockX >> 4) - (playerX >> 4);
 
-		planes |= ((chunkX - playerChunkX - 1) >> 31) & Direction.set(Direction.WEST);
-		planes |= ((playerChunkX - chunkX - 1) >> 31) & Direction.set(Direction.EAST);
+		planes |= (~ diffChunkX >> 31) & Direction.set(Direction.EAST);
+		planes |= (~-diffChunkX >> 31) & Direction.set(Direction.WEST);
 
-		int chunkY = (render.blockY >> 4);
-		int playerChunkY = playerY >> 4;
+		int diffChunkY = (render.blockY >> 4) - (playerY >> 4);
 
-		planes |= ((chunkY - playerChunkY - 1) >> 31) & Direction.set(Direction.DOWN);
-		planes |= ((playerChunkY - chunkY - 1) >> 31) & Direction.set(Direction.UP);
+		planes |= (~ diffChunkY >> 31) & Direction.set(Direction.UP);
+		planes |= (~-diffChunkY >> 31) & Direction.set(Direction.DOWN);
 
-		int chunkZ = (render.blockZ >> 4);
-		int playerChunkZ = playerZ >> 4;
+		int diffChunkZ = (render.blockZ >> 4) - (playerZ >> 4);
 
-		planes |= ((chunkZ - playerChunkZ - 1) >> 31) & Direction.set(Direction.NORTH);
-		planes |= ((playerChunkZ - chunkZ - 1) >> 31) & Direction.set(Direction.SOUTH);
+		planes |= (~ diffChunkZ >> 31) & Direction.set(Direction.SOUTH);
+		planes |= (~-diffChunkZ >> 31) & Direction.set(Direction.NORTH);
 
 		return planes;
 	}
@@ -289,7 +220,7 @@ public class BFSCuller {
 		return (num >> 31) | 1;
 	}
 
-	private static float withinRenderDistance(int x, int y, int z) {
+	private static int withinRenderDistance(int x, int y, int z) {
 		x += 8;
 		y += 8;
 		z += 8;
@@ -298,12 +229,10 @@ public class BFSCuller {
 	}
 
 	private static void visitNode(BFSQueue queue, SectionRender adj, int activeFrame) {
-		int flags;
-
-		if (adj.currentFrame != activeFrame && !SectionFlags.isEmptySolid(flags = adj.flags)) {
+		if (adj.currentFrame < activeFrame) {
 			adj.currentFrame = activeFrame;
 
-			if (UpdateQueue.hasSpace() && SectionFlags.isDirty(flags)) {
+			if (UpdateQueue.hasSpace() && SectionFlags.isDirty(adj.flags)) {
 				UpdateQueue.addToQueueUnsafe(adj);
 			}
 

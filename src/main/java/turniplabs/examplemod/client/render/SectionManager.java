@@ -1,10 +1,7 @@
 package turniplabs.examplemod.client.render;
 
 import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
-import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongArrays;
-import it.unimi.dsi.fastutil.objects.ReferenceArrayList;
-import it.unimi.dsi.fastutil.objects.ReferenceList;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.player.PlayerLocal;
 import net.minecraft.core.item.ItemEgg;
@@ -34,7 +31,7 @@ public class SectionManager {
 
 	private World worldObj;
 
-	private CameraData cameraData;
+	private CameraData camera;
 	private double lastUpdateX, lastUpdateZ;
 	private int renderDistance;
 
@@ -55,7 +52,6 @@ public class SectionManager {
 	public SectionManager(World world) {
 		INSTANCE = this;
 
-		this.bfsCuller.setRenderingLists(this.regionManager);
 		this.worldObj = world;
 	}
 
@@ -163,10 +159,10 @@ public class SectionManager {
 	}
 
 	public void update(int renderDistance, double cameraX, double cameraY, double cameraZ, boolean worldChanged, float partialTick) {
-		this.cameraData = extractCameraData(cameraX, cameraY, cameraZ, renderDistance);
-		this.regionManager.update(worldChanged);
+		this.camera = extractCameraData(cameraX, cameraY, cameraZ, renderDistance);
+		this.regionManager.update(this.camera, renderDistance, worldChanged);
 
-		FrustumCuller.addFractCamera(this.cameraData.fractX, this.cameraData.fractY, this.cameraData.fractZ);
+		FrustumCuller.addFractCamera(this.camera.fractX, this.camera.fractY, this.camera.fractZ);
 
 		if (this.renderDistance != renderDistance || worldChanged) {
 			this.renderDistance = renderDistance;
@@ -188,8 +184,8 @@ public class SectionManager {
 		ContainerInventory inventory = playerLocal.inventory;
 
 		if (inventory == null || inventory.getCurrentItem() == null || !(inventory.getCurrentItem().getItem() instanceof ItemEgg)) {
-			this.bfsCuller.init(this.cameraData.cameraX, this.cameraData.cameraZ, Mth.square(FogData.fogEnd), renderDistance);
-			this.bfsCuller.updateRenderList(this.sectionMap, this.cameraData);
+			this.bfsCuller.init(this.regionManager, this.camera.intX, this.camera.intZ, renderDistance);
+			this.bfsCuller.updateRenderList(this.sectionMap, this.camera);
 		}
 
 		this.queueRebuilds(partialTick);
@@ -263,8 +259,8 @@ public class SectionManager {
 		int lastChunkCameraX = Math.floorDiv((int) this.lastUpdateX, 16);
 		int lastChunkCameraZ = Math.floorDiv((int) this.lastUpdateZ, 16);
 
-		int currentCameraX = Math.floorDiv(this.cameraData.cameraX, 16);
-		int currentCameraZ = Math.floorDiv(this.cameraData.cameraZ, 16);
+		int currentCameraX = Math.floorDiv(this.camera.intX, 16);
+		int currentCameraZ = Math.floorDiv(this.camera.intZ, 16);
 
 		// Doing currentCamera - lastChunkCamera is like generating a vector
 		// from the last camera check pos to the current.
@@ -286,14 +282,14 @@ public class SectionManager {
 
 				// Add new sections in distance.
 				if (newX <= -this.renderDistance || newX >= this.renderDistance) {
-					this.lastUpdateX = this.cameraData.cameraX;
+					this.lastUpdateX = this.camera.intX;
 
 					for (int y = 0; y < 16; y++) {
 						this.addRender(currentCameraX + x, y, currentCameraZ + z, false);
 					}
 				}
 				if (newZ <= -this.renderDistance || newZ >= this.renderDistance) {
-					this.lastUpdateZ = this.cameraData.cameraZ;
+					this.lastUpdateZ = this.camera.intZ;
 
 					for (int y = 0; y < 16; y++) {
 						this.addRender(currentCameraX + x, y, currentCameraZ + z, false);
@@ -370,9 +366,9 @@ public class SectionManager {
 		}
 
 		this.terrainShader.bindProgram();
-		this.terrainShader.setupUniforms(this.cameraData.cameraX(), this.cameraData.cameraY(), this.cameraData.cameraZ(), noFog);
+		this.terrainShader.setupUniforms(this.camera.cameraX(), this.camera.cameraY(), this.camera.cameraZ(), noFog);
 
-		this.regionManager.drawAllRegions(renderPass);
+		this.regionManager.drawAllRegions(this.camera, renderPass);
 		this.terrainShader.unbindProgram();
 	}
 
