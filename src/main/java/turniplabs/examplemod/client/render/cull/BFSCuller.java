@@ -16,6 +16,66 @@ public class BFSCuller {
 	public final BFSQueue bfsQueue = new BFSQueue();
 	private int activeFrame;
 
+	// Each portal from each direction and its corner vertices positions.
+	private static final int[][] PORTAL_DATA = new int[Direction.COUNT][2 * 3];
+
+	static {
+		{
+			PORTAL_DATA[Direction.DOWN][0] = 0;
+			PORTAL_DATA[Direction.DOWN][1] = 0;
+			PORTAL_DATA[Direction.DOWN][2] = 0;
+			//
+			PORTAL_DATA[Direction.DOWN][3] = 15;
+			PORTAL_DATA[Direction.DOWN][4] = 0;
+			PORTAL_DATA[Direction.DOWN][5] = 15;
+
+			PORTAL_DATA[Direction.UP][0] = 0;
+			PORTAL_DATA[Direction.UP][1] = 15;
+			PORTAL_DATA[Direction.UP][2] = 0;
+			//
+			PORTAL_DATA[Direction.UP][3] = 15;
+			PORTAL_DATA[Direction.UP][4] = 15;
+			PORTAL_DATA[Direction.UP][5] = 15;
+		}
+
+		{
+			PORTAL_DATA[Direction.EAST][0] = 15;
+			PORTAL_DATA[Direction.EAST][1] = 0;
+			PORTAL_DATA[Direction.EAST][2] = 0;
+			//
+			PORTAL_DATA[Direction.EAST][3] = 15;
+			PORTAL_DATA[Direction.EAST][4] = 15;
+			PORTAL_DATA[Direction.EAST][5] = 15;
+
+			PORTAL_DATA[Direction.WEST][0] = 0;
+			PORTAL_DATA[Direction.WEST][1] = 0;
+			PORTAL_DATA[Direction.WEST][2] = 0;
+			//
+			PORTAL_DATA[Direction.WEST][3] = 0;
+			PORTAL_DATA[Direction.WEST][4] = 15;
+			PORTAL_DATA[Direction.WEST][5] = 15;
+		}
+
+		{
+			PORTAL_DATA[Direction.SOUTH][0] = 0;
+			PORTAL_DATA[Direction.SOUTH][1] = 0;
+			PORTAL_DATA[Direction.SOUTH][2] = 15;
+			//
+			PORTAL_DATA[Direction.SOUTH][3] = 15;
+			PORTAL_DATA[Direction.SOUTH][4] = 15;
+			PORTAL_DATA[Direction.SOUTH][5] = 15;
+
+			PORTAL_DATA[Direction.NORTH][0] = 0;
+			PORTAL_DATA[Direction.NORTH][1] = 0;
+			PORTAL_DATA[Direction.NORTH][2] = 0;
+			//
+			PORTAL_DATA[Direction.NORTH][3] = 15;
+			PORTAL_DATA[Direction.NORTH][4] = 15;
+			PORTAL_DATA[Direction.NORTH][5] = 0;
+		}
+
+	}
+
 	public void init(RegionManager regionManager, int cameraX, int cameraZ, int renderDistance) {
 		UpdateQueue.clear();
 		BFSVisArray.start(cameraX >> 4, cameraZ >> 4, renderDistance);
@@ -218,6 +278,51 @@ public class BFSCuller {
 
 	private static int sign(int num) {
 		return (num >> 31) | 1;
+	}
+
+	private static boolean genPortalAndOcclude(SectionRender render, int from, int to, int pX, int pY, int pZ) {
+		int[] cornersFrom = PORTAL_DATA[from];
+
+		int cornerX0 = cornersFrom[0];
+		int cornerY0 = cornersFrom[1];
+		int cornerZ0 = cornersFrom[0];
+
+		int cornerX1 = cornersFrom[3];
+		int cornerY1 = cornersFrom[4];
+		int cornerZ1 = cornersFrom[5];
+
+		// i  j  k
+		// x0 y0 z0
+		// x1 y1 z1
+		int crossX0 = (pY * cornerZ0) - (pZ * cornerY0);
+		int crossY0 = (pZ * cornerX0) - (pX * cornerZ0);
+		int crossZ0 = (pX * cornerY0) - (pY * cornerZ0);
+
+		int crossX1 = (pY * cornerZ1) - (pZ * cornerY1);
+		int crossY1 = (pZ * cornerX1) - (pX * cornerZ1);
+		int crossZ1 = (pX * cornerY1) - (pY * cornerZ1);
+
+		if ((crossX0 * cornerX1) + (crossY0 * cornerY1) + (crossZ0 * cornerZ1) < 0) {
+			cornerX0 = -cornerX0;
+			cornerY0 = -cornerY0;
+			cornerZ0 = -cornerZ0;
+		}
+
+		if ((crossX1 * cornerX0) + (crossY1 * cornerY0) + (crossZ1 * cornerZ0) < 0) {
+			cornerX1 = -cornerX1;
+			cornerY1 = -cornerY1;
+			cornerZ1 = -cornerZ1;
+		}
+
+		cornersFrom = PORTAL_DATA[from];
+
+		int toX0 = cornersFrom[0];
+		int toY0 = cornersFrom[1];
+		int toZ0 = cornersFrom[0];
+
+		int toX1 = cornersFrom[3];
+		int toY1 = cornersFrom[4];
+		int toZ1 = cornersFrom[5];
 	}
 
 	private static int withinRenderDistance(int x, int y, int z) {
