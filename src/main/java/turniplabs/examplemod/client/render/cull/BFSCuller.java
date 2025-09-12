@@ -30,7 +30,7 @@ public class BFSCuller {
 
 	private static void bfsSearch(BFSQueue bfsQueue, int playerX, int playerY, int playerZ,
 								  int renderDistance, int activeFrame) {
-		int bfsIndex = 0;
+		int bfsIndex = 1;
 		SectionRender node;
 
 		while ((node = bfsQueue.get(bfsIndex++)) != null) {
@@ -38,6 +38,10 @@ public class BFSCuller {
 
 			if (isSectionInvisible(node, flags, playerX, playerY, playerZ, renderDistance)) {
 				continue;
+			}
+
+			if (UpdateQueue.hasSpace() && SectionFlags.isDirty(flags)) {
+				UpdateQueue.addToQueueUnsafe(node);
 			}
 
 			queueRegionNode(node, flags);
@@ -58,7 +62,7 @@ public class BFSCuller {
 
 		int distance = withinRenderDistance(distX, distY, distZ);
 
-		if (distance >= fogEnd || !FrustumCuller.testAab(distX, distY, distZ)) {
+		if (distance > fogEnd || !FrustumCuller.testAab(distX, distY, distZ)) {
 			return true;
 		}
 
@@ -110,28 +114,34 @@ public class BFSCuller {
 
 		queue.verifyCapacity(Direction.COUNT + 1);
 
-		if (Direction.hasSet(directions, Direction.DOWN)) {
-			visitNode(queue, fatherNode.adjacentDown, activeFrame);
+		if (Direction.hasSet(directions, Direction.DOWN) && fatherNode.adjacentDown.currentFrame < activeFrame) {
+			queue.addToQueueUnsafe(fatherNode.adjacentDown);
+			fatherNode.adjacentDown.currentFrame = activeFrame;
 		}
 
-		if (Direction.hasSet(directions, Direction.UP)) {
-			visitNode(queue, fatherNode.adjacentUp, activeFrame);
+		if (Direction.hasSet(directions, Direction.UP) && fatherNode.adjacentUp.currentFrame < activeFrame) {
+			queue.addToQueueUnsafe(fatherNode.adjacentUp);
+			fatherNode.adjacentUp.currentFrame = activeFrame;
 		}
 
-		if (Direction.hasSet(directions, Direction.NORTH)) {
-			visitNode(queue, fatherNode.adjacentNorth, activeFrame);
+		if (Direction.hasSet(directions, Direction.NORTH) && fatherNode.adjacentNorth.currentFrame < activeFrame) {
+			queue.addToQueueUnsafe(fatherNode.adjacentNorth);
+			fatherNode.adjacentNorth.currentFrame = activeFrame;
 		}
 
-		if (Direction.hasSet(directions, Direction.SOUTH)) {
-			visitNode(queue, fatherNode.adjacentSouth, activeFrame);
+		if (Direction.hasSet(directions, Direction.SOUTH) && fatherNode.adjacentSouth.currentFrame < activeFrame) {
+			queue.addToQueueUnsafe(fatherNode.adjacentSouth);
+			fatherNode.adjacentSouth.currentFrame = activeFrame;
 		}
 
-		if (Direction.hasSet(directions, Direction.WEST)) {
-			visitNode(queue, fatherNode.adjacentWest, activeFrame);
+		if (Direction.hasSet(directions, Direction.WEST) && fatherNode.adjacentWest.currentFrame < activeFrame) {
+			queue.addToQueueUnsafe(fatherNode.adjacentWest);
+			fatherNode.adjacentWest.currentFrame = activeFrame;
 		}
 
-		if (Direction.hasSet(directions, Direction.EAST)) {
-			visitNode(queue, fatherNode.adjacentEast, activeFrame);
+		if (Direction.hasSet(directions, Direction.EAST) && fatherNode.adjacentEast.currentFrame < activeFrame) {
+			queue.addToQueueUnsafe(fatherNode.adjacentEast);
+			fatherNode.adjacentEast.currentFrame = activeFrame;
 		}
 	}
 
@@ -226,17 +236,5 @@ public class BFSCuller {
 		z += 8;
 
 		return (x * x) + (y * y) + (z * z);
-	}
-
-	private static void visitNode(BFSQueue queue, SectionRender adj, int activeFrame) {
-		if (adj.currentFrame < activeFrame) {
-			adj.currentFrame = activeFrame;
-
-			if (UpdateQueue.hasSpace() && SectionFlags.isDirty(adj.flags)) {
-				UpdateQueue.addToQueueUnsafe(adj);
-			}
-
-			queue.addToQueueUnsafe(adj);
-		}
 	}
 }

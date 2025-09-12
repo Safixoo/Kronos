@@ -3,9 +3,9 @@ package turniplabs.examplemod.client.render.cull;
 import turniplabs.examplemod.client.render.SectionRender;
 
 public class BFSQueue {
-	private SectionRender[] sectionRenders;
-	private int capacity;
-	private int position;
+	public SectionRender[] sectionRenders;
+	public int capacity;
+	public int position;
 
 	public BFSQueue(int size) {
 		this.sectionRenders = new SectionRender[size];
@@ -29,7 +29,7 @@ public class BFSQueue {
 	}
 
 	public void clear() {
-		this.position = 0;
+		this.position = 1;
 	}
 
 	public SectionRender get(int position) {

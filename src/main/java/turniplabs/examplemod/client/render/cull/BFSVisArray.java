@@ -8,6 +8,7 @@ public class BFSVisArray {
 
 	private static int offsetX;
 	private static int offsetZ;
+	private static int volumeInd;
 
 	private static int sizeX;
 
@@ -27,7 +28,7 @@ public class BFSVisArray {
 		if (lastDistance == powRenderDistance) {
 			visArray.clear();
 		} else {
-			visArray = new BitArray(totalVolume);
+			visArray = new BitArray(volumeInd = totalVolume);
 		}
 
 		lastDistance = powRenderDistance;
@@ -46,11 +47,19 @@ public class BFSVisArray {
 	public static boolean notVisible(int sectionX, int sectionY, int sectionZ) {
 		int index = getInd(sectionX, sectionY, sectionZ);
 
+		if (index < 0 || index >= volumeInd) {
+			return true;
+		}
+
 		return visArray.getFalse(index);
 	}
 
 	public static void setVisible(int sectionX, int sectionY, int sectionZ) {
 		int index = getInd(sectionX, sectionY, sectionZ);
+
+		if (index < 0 || index >= volumeInd) {
+			return;
+		}
 
 		visArray.set(index);
 	}

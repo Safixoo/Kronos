@@ -13,13 +13,11 @@ import turniplabs.examplemod.client.render.data.ModelBoundsData;
 import turniplabs.examplemod.client.render.data.SectionCache;
 import turniplabs.examplemod.client.util.ColorBGRManager;
 import turniplabs.examplemod.client.util.Direction;
-import turniplabs.examplemod.client.util.interfaces.mixin.IBlockAABB;
 import turniplabs.examplemod.client.vertex.writer.TerrainVertexWriter;
 
 public class BlockRenderer {
 	public BlockLightCache cache = new BlockLightCache();
 	private SectionCache chunkCache;
-	private boolean useColor;
 
 	public int colorTopLeft;
 	public int colorTopRight;
@@ -31,8 +29,6 @@ public class BlockRenderer {
 	public int lightMapCoordBottomRight;
 	public int lightMapCoordTopRight;
 
-	private boolean isLeaves;
-
 	private final ModelBoundsData modelData = new ModelBoundsData();
 	private static final float[] SIDE_LIGHT_MULTIPLIER = new float[] {0.5F, 1.0F, 0.8F, 0.8F, 0.6F, 0.8F};
 
@@ -42,29 +38,31 @@ public class BlockRenderer {
 		this.modelData.setRender(this);
 	}
 
-	public void renderStandardBlock(Block<?> block, BlockColor blockColor, BlockModel<?> blockModel, AABB aabb, int x, int y, int z) {
-		int color = blockColor.getWorldColor(this.chunkCache, x, y, z);
-
+	public void renderStandardBlock(Block<?> block, BlockColor blockColor, BlockModel<?> blockModel, AABB aabb, int x, int y, int z, int drawMask) {
 		this.cache.setupCache(this.chunkCache, x, y, z);
 		this.setModelBounds(x, y, z, aabb);
-		boolean[] sideChecks = ((IBlockAABB) aabb).blockBoundsCheck();
 
-		boolean isStandard = blockModel.getClass() == BlockModelStandard.class;
-		boolean isGrass = blockModel instanceof BlockModelGrass;
-		boolean isLeaves = this.isLeaves = blockModel instanceof BlockModelLeaves;
+		boolean useColor = blockModel instanceof BlockModelGrass || blockModel instanceof BlockModelLeaves;
+
+		int color = 0xFFFFFFFF;
+		int meta = 0;
+
+		if (useColor) {
+			color = ColorBGRManager.rgbToBgr(blockColor.getWorldColor(this.chunkCache, x, y, z));
+			meta = this.chunkCache.getBlockMetadata(x, y, z);
+		}
+
+		int colorUsed;
 
 		for (int side = 0; side < Direction.COUNT; side++) {
-			int dirX = Direction.x(side);
-			int dirY = Direction.y(side);
-			int dirZ = Direction.z(side);
-
-			if (shouldDrawSide(x + dirX, y + dirY, z + dirZ, side, blockModel, aabb, sideChecks, isStandard)) {
-				if (isGrass || isLeaves) {
-					int meta = this.chunkCache.getBlockMetadata(x, y, z);
-					this.useColor = blockModel.shouldSideBeColored(this.chunkCache, x, y, z, side, meta);
+			if ((drawMask & (1 << side)) != 0) {
+				if (useColor && blockModel.shouldSideBeColored(this.chunkCache, x, y, z, side, meta)) {
+					colorUsed = color;
+				} else {
+					colorUsed = 0xFFFFFFFF;
 				}
 
-				this.renderSide(block, blockModel, this.modelData, x, y, z, side, ColorBGRManager.rgbToBgr(color));
+				this.renderSide(block, blockModel, this.modelData, x, y, z, side, colorUsed);
 			}
 		}
 
@@ -79,12 +77,12 @@ public class BlockRenderer {
 		this.chunkCache = chunkCache;
 	}
 
-	private boolean shouldDrawSide(int x, int y, int z, int side, BlockModel<?> block, AABB aabb, boolean[] sideChecks, boolean isStandard) {
-		if (isStandard) {
-			return sideChecks[side] || !this.chunkCache.isBlockOpaqueCube(x, y, z);
-		} else {
-			return block.shouldSideBeRendered(this.chunkCache, aabb, x, y, z, side);
-		}
+	public boolean shouldDrawSide(int x, int y, int z) {
+		return !this.chunkCache.isBlockOpaqueCube(x, y, z);
+	}
+
+	public boolean shouldDrawSideCenter(int x, int y, int z) {
+		return !this.chunkCache.isBlockOpaqueCubeCenter(x, y, z);
 	}
 
 	private void renderSide(Block<?> block, BlockModel<?> blockModel, ModelBoundsData bounds, int x, int y, int z, int side, int color) {
@@ -104,10 +102,6 @@ public class BlockRenderer {
 	}
 
 	public void colorizeQuad(Block<?> block, int x, int y, int z, int side, int dirX, int dirY, int dirZ, float depth, int topX, int topY, int topZ, float topP, float botP, int lefX, int lefY, int lefZ, float lefP, float rigP, int color) {
-		if (!this.useColor) {
-			color = 0xFFFFFFFF;
-		}
-
 		if (LightmapHelper.isLightmapEnabled()) {
 			this.prepareLightMap(block, block.emission == 0, x, y, z, dirX, dirY, dirZ, lefX, lefY, lefZ, topX, topY, topZ);
 		}
@@ -117,7 +111,7 @@ public class BlockRenderer {
 		float lightBL = 1.0f;
 		float lightTL = 1.0f;
 
-		if (!this.isLeaves && block.emission == 0) {
+		if (block.emission == 0) {
 			float dirB = this.cache.getBrightness(dirX, dirY, dirZ);
 			boolean lefT = this.cache.getOpacity(dirX + lefX, dirY + lefY, dirZ + lefZ);
 			boolean botT = this.cache.getOpacity(dirX - topX, dirY - topY, dirZ - topZ);
@@ -157,7 +151,7 @@ public class BlockRenderer {
 				lightBL = (lB + blB + dirB + bB) * 0.25F * lerp(depth, lightBL);
 
 			}
-		} else if (!this.isLeaves) {
+		} else {
 			float brightness;
 
 			if (!block.isSolidRender()) {
