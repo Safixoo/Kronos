@@ -16,21 +16,21 @@ import org.jetbrains.annotations.Nullable;
 import turniplabs.examplemod.client.util.BlocksFlags;
 
 public class SectionCache implements WorldSource {
-	private Chunk[] chunks = new Chunk[3 * 3];
-
-	private final World worldObj;
-	private final int sectionX, sectionY, sectionZ;
-
-	private final short[][] sectionBlocks = new short[3 * 3 * 3][];
-	private short[] centerSectBlocks;
-
-	private final byte[][] sectionData = new byte[3 * 3 * 3][];
-	private final byte[][] skyLightmap = new byte[3 * 3 * 3][];
-	private final byte[][] blockLightmap = new byte[3 * 3 * 3][];
-
 	private static final short[] DEFAULT_SHORT_ARRAY = new short[16 * 16 * 16];
 	private static final byte[] DEFAULT_BYTE_ARRAY = new byte[16 * 16 * 16];
 
+	private final Chunk[] chunks = new Chunk[3 * 3];
+	private final World worldObj;
+
+	private final int sectionX, sectionY, sectionZ;
+
+	private final short[][] sectionBlocks = new short[3 * 3 * 3][];
+	private final byte[][] sectionData = new byte[3 * 3 * 3][];
+
+	private final byte[][] lightSky = new byte[3 * 3 * 3][];
+	private final byte[][] lightBlock = new byte[3 * 3 * 3][];
+
+	private short[] centerSectBlocks;
 	private boolean centerSectEmpty;
 
 	public SectionCache(World world, int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
@@ -79,12 +79,12 @@ public class SectionCache implements WorldSource {
 							this.sectionData[sectionIndex] = DEFAULT_BYTE_ARRAY;
 						}
 
-						this.skyLightmap[sectionIndex] = section.skylightMap != null ? section.skylightMap.data : DEFAULT_BYTE_ARRAY;
-						this.blockLightmap[sectionIndex] = section.blocklightMap != null ? section.blocklightMap.data : DEFAULT_BYTE_ARRAY;;
+						this.lightSky[sectionIndex] = section.skylightMap != null ? section.skylightMap.data : DEFAULT_BYTE_ARRAY;
+						this.lightBlock[sectionIndex] = section.blocklightMap != null ? section.blocklightMap.data : DEFAULT_BYTE_ARRAY;;
 					} else {
 						this.sectionBlocks[sectionIndex] = DEFAULT_SHORT_ARRAY;
-						this.skyLightmap[sectionIndex] = DEFAULT_BYTE_ARRAY;
-						this.blockLightmap[sectionIndex] = DEFAULT_BYTE_ARRAY;
+						this.lightSky[sectionIndex] = DEFAULT_BYTE_ARRAY;
+						this.lightBlock[sectionIndex] = DEFAULT_BYTE_ARRAY;
 					}
 					this.centerSectBlocks = this.sectionBlocks[sectionIndex(1, 1, 1)];
 				}
@@ -192,8 +192,8 @@ public class SectionCache implements WorldSource {
 		int sectionIndex = sectionIndex(sectionX, sectionY, sectionZ);
 		int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
 
-		int skyLight = getNibble(this.skyLightmap[sectionIndex], blockIndex);
-		int blockLight = getNibble(this.blockLightmap[sectionIndex], blockIndex);
+		int skyLight = getNibble(this.lightSky[sectionIndex], blockIndex);
+		int blockLight = getNibble(this.lightBlock[sectionIndex], blockIndex);
 
 		return LightmapHelper.getLightmapCoord(skyLight, blockLight);
 	}
