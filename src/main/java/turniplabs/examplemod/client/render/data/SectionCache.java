@@ -31,6 +31,7 @@ public class SectionCache implements WorldSource {
 	private final byte[][] lightBlock = new byte[3 * 3 * 3][];
 
 	private short[] centerSectBlocks;
+	private byte[] centerSectData;
 	private boolean centerSectEmpty;
 
 	public SectionCache(World world, int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
@@ -80,13 +81,15 @@ public class SectionCache implements WorldSource {
 						}
 
 						this.lightSky[sectionIndex] = section.skylightMap != null ? section.skylightMap.data : DEFAULT_BYTE_ARRAY;
-						this.lightBlock[sectionIndex] = section.blocklightMap != null ? section.blocklightMap.data : DEFAULT_BYTE_ARRAY;;
+						this.lightBlock[sectionIndex] = section.blocklightMap != null ? section.blocklightMap.data : DEFAULT_BYTE_ARRAY;
+						;
 					} else {
 						this.sectionBlocks[sectionIndex] = DEFAULT_SHORT_ARRAY;
 						this.lightSky[sectionIndex] = DEFAULT_BYTE_ARRAY;
 						this.lightBlock[sectionIndex] = DEFAULT_BYTE_ARRAY;
 					}
 					this.centerSectBlocks = this.sectionBlocks[sectionIndex(1, 1, 1)];
+					this.centerSectData = this.sectionData[sectionIndex(1, 1, 1)];
 				}
 			}
 		}
@@ -114,7 +117,7 @@ public class SectionCache implements WorldSource {
 		return nibbleArray[nibbleIndex] >>> (nibblePart << 2) & 15;
 	}
 
-	private static int makeBlockIndex(int x, int y, int z) {
+	public static int makeBlockIndex(int x, int y, int z) {
 		return y << 8 | z << 4 | x;
 	}
 
@@ -229,6 +232,10 @@ public class SectionCache implements WorldSource {
 		return this.sectionData[sectionIndex][makeBlockIndex(x & 15, y & 15, z & 15)];
 	}
 
+	public int getBlockMetadataCenter(int x, int y, int z) {
+		return this.centerSectData[makeBlockIndex(x & 15, y & 15, z & 15)];
+	}
+
 	@Override
 	public Material getBlockMaterial(int x, int y, int z) {
 		return BlocksFlags.MATERIAL[this.getBlockId(x, y, z)];
@@ -243,12 +250,16 @@ public class SectionCache implements WorldSource {
 		int sectionIndex = sectionIndex(sectionX, sectionY, sectionZ);
 		int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
 
-		return BlocksFlags.SOLID[this.sectionBlocks[sectionIndex][blockIndex]];
+		return BlocksFlags.isBlockSolidBool(this.sectionBlocks[sectionIndex][blockIndex]);
 	}
 
 	public boolean isBlockOpaqueCubeCenter(int x, int y, int z) {
 		int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
-		return BlocksFlags.SOLID[this.centerSectBlocks[blockIndex]];
+		return BlocksFlags.isBlockSolidBool(this.centerSectBlocks[blockIndex]);
+	}
+
+	public int isBlockOpaqueCubeCenterInt(int blockInd) {
+		return BlocksFlags.isBlockSolid(this.centerSectBlocks[blockInd]);
 	}
 
 	@Override

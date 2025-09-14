@@ -49,7 +49,7 @@ public class BlockRenderer {
 
 		if (useColor) {
 			color = ColorBGRManager.rgbToBgr(blockColor.getWorldColor(this.chunkCache, x, y, z));
-			meta = this.chunkCache.getBlockMetadata(x, y, z);
+			meta = this.chunkCache.getBlockMetadataCenter(x, y, z);
 		}
 
 		int colorUsed;
@@ -75,14 +75,6 @@ public class BlockRenderer {
 
 	public void setChunkCache(SectionCache chunkCache) {
 		this.chunkCache = chunkCache;
-	}
-
-	public boolean shouldDrawSide(int x, int y, int z) {
-		return !this.chunkCache.isBlockOpaqueCube(x, y, z);
-	}
-
-	public boolean shouldDrawSideCenter(int x, int y, int z) {
-		return !this.chunkCache.isBlockOpaqueCubeCenter(x, y, z);
 	}
 
 	private void renderSide(Block<?> block, BlockModel<?> blockModel, ModelBoundsData bounds, int x, int y, int z, int side, int color) {

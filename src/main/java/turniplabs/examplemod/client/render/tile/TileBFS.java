@@ -36,9 +36,9 @@ public class TileBFS {
 	private int outwardTileDirections(TileRender tile, int playerX, int playerY, int playerZ) {
 		int outwardDirections = 0;
 
-		int playerTileX = (playerX >> 4) >> 2;
-		int playerTileY = (playerY >> 4) >> 2;
-		int playerTileZ = (playerZ >> 4) >> 2;
+		int playerTileX = (playerX >> 6);
+		int playerTileY = (playerY >> 6);
+		int playerTileZ = (playerZ >> 6);
 
 		outwardDirections |= playerTileX >= tile.tileX ? 1 << Dir.XN : 0;
 		outwardDirections |= playerTileX <= tile.tileX ? 1 << Dir.XP : 0;

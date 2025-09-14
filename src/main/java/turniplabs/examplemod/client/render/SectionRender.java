@@ -48,6 +48,15 @@ public class SectionRender {
 		this.regionIndex = RegionRender.regionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
 	}
 
+	public static final int POS_X =  SectionCache.makeBlockIndex(1, 0, 0);
+	public static final int NEG_X = -SectionCache.makeBlockIndex(1, 0, 0);
+
+	public static final int POS_Y =  SectionCache.makeBlockIndex(0, 1, 0);
+	public static final int NEG_Y = -SectionCache.makeBlockIndex(0, 1, 0);
+
+	public static final int POS_Z =  SectionCache.makeBlockIndex(0, 0, 1);
+	public static final int NEG_Z = -SectionCache.makeBlockIndex(0, 0, 1);
+
 	public void rebuild(SectionManager sectionManager, BlockRenderer blockRenderer, World world) {
 		ChunkRenderer.updates++;
 
@@ -79,7 +88,7 @@ public class SectionRender {
 		this.prepareWriterForTerrain(translucentWriter);
 
 		int solidBlocks = 0;
-		int[] solidFaces = new int[Direction.COUNT];
+		short[] solidFaces = new short[Direction.COUNT];
 
 //		int lastBlockId = -1;
 //		BlockColor lastBlockColor = null;
@@ -186,14 +195,10 @@ public class SectionRender {
 	}
 
 	private int queueBlock(int x, int y, int z, BlockRenderer blockRenderer, RenderBlocks renderBlocks,
-							BlockInfo blockInfo, int[] solidFaces, int solidBlocks, boolean center) {
-		int minX = x & ~15;
-		int minY = y & ~15;
-		int minZ = z & ~15;
-
-		int maxX = minX | 15;
-		int maxY = minY | 15;
-		int maxZ = minZ | 15;
+							BlockInfo blockInfo, short[] solidFaces, int solidBlocks, boolean center) {
+		int relX = x & 15;
+		int relY = y & 15;
+		int relZ = z & 15;
 
 		int blockId = this.sectionCache.getBlockIdCenter(x, y, z);
 
@@ -203,26 +208,29 @@ public class SectionRender {
 
 		if (BlocksFlags.SOLID[blockId]) {
 			solidBlocks++;
-			if (y == maxY) solidFaces[Direction.UP]++;
-			if (y == minY) solidFaces[Direction.DOWN]++;
+			if (relY == 15) solidFaces[Direction.UP]++;
+			if (relY == 0) solidFaces[Direction.DOWN]++;
 
-			if (x == maxX) solidFaces[Direction.EAST]++;
-			if (x == minX) solidFaces[Direction.WEST]++;
+			if (relX == 15) solidFaces[Direction.EAST]++;
+			if (relX == 0) solidFaces[Direction.WEST]++;
 
-			if (z == maxZ) solidFaces[Direction.SOUTH]++;
-			if (z == minZ) solidFaces[Direction.NORTH]++;
+			if (relZ == 15) solidFaces[Direction.SOUTH]++;
+			if (relX == 0) solidFaces[Direction.NORTH]++;
 		}
 
 		BlockColor blockColor;
 		BlockModel<?> blockModel;
 		Block<?> block = Blocks.getBlock(blockId);
+		AABB aabb;
 
 		if (blockInfo.lastBlockId == blockId) {
 			blockModel = blockInfo.lastModel;
 			blockColor = blockInfo.lastBlockColor;
+			aabb = blockInfo.aabb;
 		} else {
 			blockModel = blockInfo.lastModel = BlockModelDispatcher.getInstance().getDispatch(block);
-			blockColor = blockInfo.lastBlockColor = BlockColorDispatcher.getInstance().getDispatch(blockModel.block);
+			blockColor = blockInfo.lastBlockColor = BlockColorDispatcher.getInstance().getDispatch(block);
+			aabb = blockInfo.aabb = block.getBoundsRaw();
 			blockInfo.lastBlockId = blockId;
 		}
 
@@ -233,24 +241,27 @@ public class SectionRender {
 			VertexWriterManager.setCurrentInstance(VertexWriterManager.TRANSLUCENT);
 		}
 
-		if (BlocksFlags.SOLID[blockId] || model instanceof BlockModelLeaves) {
-			AABB aabb = model.block.getBoundsRaw();
+		if (BlocksFlags.isBlockSolidBool(blockId) || model instanceof BlockModelLeaves) {
+			SectionCache cache = this.sectionCache;
+
 			int drawMask = 0;
 
 			if (center) {
-				drawMask |= blockRenderer.shouldDrawSideCenter(x, y - 1, z) ? 1 << 0 : 0;
-				drawMask |= blockRenderer.shouldDrawSideCenter(x, y + 1, z) ? 1 << 1 : 0;
-				drawMask |= blockRenderer.shouldDrawSideCenter(x, y, z - 1) ? 1 << 2 : 0;
-				drawMask |= blockRenderer.shouldDrawSideCenter(x, y, z + 1) ? 1 << 3 : 0;
-				drawMask |= blockRenderer.shouldDrawSideCenter(x - 1, y, z) ? 1 << 4 : 0;
-				drawMask |= blockRenderer.shouldDrawSideCenter(x + 1, y, z) ? 1 << 5 : 0;
+				int blockInd = SectionCache.makeBlockIndex(x, y, z);
+				drawMask |= cache.isBlockOpaqueCubeCenterInt(blockInd + NEG_Y) << Direction.DOWN;
+				drawMask |= cache.isBlockOpaqueCubeCenterInt(blockInd + POS_Y) << Direction.UP;
+				drawMask |= cache.isBlockOpaqueCubeCenterInt(blockInd + NEG_Z) << Direction.NORTH;
+				drawMask |= cache.isBlockOpaqueCubeCenterInt(blockInd + POS_Z) << Direction.SOUTH;
+				drawMask |= cache.isBlockOpaqueCubeCenterInt(blockInd + NEG_X) << Direction.WEST;
+				drawMask |= cache.isBlockOpaqueCubeCenterInt(blockInd + POS_X) << Direction.EAST;
+				drawMask = ~drawMask;
 			} else {
-				drawMask |= blockRenderer.shouldDrawSide(x, y - 1, z) ? 1 << 0 : 0;
-				drawMask |= blockRenderer.shouldDrawSide(x, y + 1, z) ? 1 << 1 : 0;
-				drawMask |= blockRenderer.shouldDrawSide(x, y, z - 1) ? 1 << 2 : 0;
-				drawMask |= blockRenderer.shouldDrawSide(x, y, z + 1) ? 1 << 3 : 0;
-				drawMask |= blockRenderer.shouldDrawSide(x - 1, y, z) ? 1 << 4 : 0;
-				drawMask |= blockRenderer.shouldDrawSide(x + 1, y, z) ? 1 << 5 : 0;
+				drawMask |= cache.isBlockOpaqueCube(x, y - 1, z) ? 1 << 0 : 0;
+				drawMask |= cache.isBlockOpaqueCube(x, y + 1, z) ? 1 << 1 : 0;
+				drawMask |= cache.isBlockOpaqueCube(x, y, z - 1) ? 1 << 2 : 0;
+				drawMask |= cache.isBlockOpaqueCube(x, y, z + 1) ? 1 << 3 : 0;
+				drawMask |= cache.isBlockOpaqueCube(x - 1, y, z) ? 1 << 4 : 0;
+				drawMask |= cache.isBlockOpaqueCube(x + 1, y, z) ? 1 << 5 : 0;
 			}
 
 			blockRenderer.renderStandardBlock(block, blockColor, model, aabb, x, y, z, drawMask);
@@ -287,7 +298,7 @@ public class SectionRender {
 		}
 	}
 
-	private void processCullFaces(int[] cullFaces) {
+	private void processCullFaces(short[] cullFaces) {
 		int solidFacesMask = 0;
 
 		for (int dir = 0; dir < Direction.COUNT; dir++) {
@@ -385,6 +396,7 @@ public class SectionRender {
 	public static class BlockInfo {
 		public BlockModel<?> lastModel;
 		public BlockColor lastBlockColor;
+		public AABB aabb;
 		public int lastBlockId = -1;
 	}
 }

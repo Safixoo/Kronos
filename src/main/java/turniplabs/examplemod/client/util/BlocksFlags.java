@@ -8,7 +8,7 @@ public class BlocksFlags {
 	public static final Block<?>[] BLOCKS_LIST = new Block[2048];
 	public static final Material[] MATERIAL = new Material[2048];
 	public static final boolean[] SOLID = new boolean[2048];
-	public static final byte[] SOLID_MASK = new byte[2048];
+	public static final byte[] SOLID_MASK = new byte[2048 >> 3];
 	public static final boolean[] LEAVES = new boolean[2048];
 	public static final boolean[] LIT_INTERIOR = new boolean[2048];
 
@@ -16,12 +16,29 @@ public class BlocksFlags {
 		for (int i = 0; i < 1054; i++) {
 			Block<?> block = Blocks.getBlock(i);
 
+			int arrInd = i >> 3;
+			int bitInd = i & 7;
+
 			SOLID[i] = Blocks.solid[i];
 			MATERIAL[i] = (block == null || i == 0) ? Material.air : block.getMaterial();
 			SOLID[i] = Blocks.solid[i] || MATERIAL[i] == Material.leaves;
-			SOLID_MASK[i] = (byte) (SOLID[i] ? 1 : 0);
+			SOLID_MASK[arrInd] |= (byte) ((SOLID[i] ? 1 : 0) << bitInd);
 			LIT_INTERIOR[i] = i != 0 && BLOCKS_LIST[i] != null && BLOCKS_LIST[i].isLitInteriorSurface;
 		}
+	}
+
+	public static int isBlockSolid(int id) {
+		int arrInd = id >> 3;
+		int bitInd = id & 7;
+
+		return (SOLID_MASK[arrInd] >> bitInd) & 1;
+	}
+
+	public static boolean isBlockSolidBool(int id) {
+		int arrInd = id >> 3;
+		int bitInd = id & 7;
+
+		return (SOLID_MASK[arrInd] & (1 << bitInd)) != 0;
 	}
 
 	public static void addBlockToList(Block<?> block) {
