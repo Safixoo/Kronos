@@ -115,7 +115,7 @@ public class RegionAllocation {
 		Allocation alloc = this.findRenderAlloc(render, side);
 		long drawData;
 
-		if (alloc != null && alloc.side == side && alloc.render == render && alloc.size >= size) {
+		if (alloc != null && alloc.size >= size) {
 			this.uploadAllocation(alloc, data, size);
 			drawData = packDrawData(size, (int) alloc.offset);
 		} else {
@@ -137,6 +137,7 @@ public class RegionAllocation {
 
 		if (alloc.size >= spaceNeeded) {
 			this.freeAllocations = this.freeAllocations.next;
+			alloc.next = null;
 			return alloc;
 		}
 
@@ -157,11 +158,15 @@ public class RegionAllocation {
 	public @Nullable Allocation findRenderAlloc(SectionRender render, int side) {
 		Allocation alloc = this.firstEntry;
 
-		while (alloc != null && alloc.render != render && alloc.side != side) {
+		while (alloc != null) {
+			if (alloc.render == render && alloc.side == side) {
+				return alloc;
+			}
+
 			alloc = alloc.next;
 		}
 
-		return alloc;
+		return null;
 	}
 
 	public static long packDrawData(int count, int first) {
