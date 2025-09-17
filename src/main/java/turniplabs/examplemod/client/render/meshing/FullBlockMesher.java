@@ -1,5 +1,6 @@
 package turniplabs.examplemod.client.render.meshing;
 
+import net.minecraft.client.render.block.color.BlockColor;
 import net.minecraft.client.render.block.model.BlockModel;
 import net.minecraft.client.render.texture.stitcher.IconCoordinate;
 import net.minecraft.core.util.helper.Side;
@@ -16,40 +17,55 @@ import turniplabs.examplemod.client.vertex.writer.TerrainVertexWriter;
 
 public class FullBlockMesher {
 	private static final int[] SHADE_FULL_COLOR = new int[Direction.COUNT];
-	private static final int[] VERT_COLOR = new int[4];
+	private static final int[] SHADE_FULL_FACTOR = new int[Direction.COUNT];
 	private static final float[] VERT_UVS = new float[4];
 
 	private static final Vector2i[] MAP_ID_TO_UV = new Vector2i[4];
 
-	public static void renderFaces(BlockModel<?> model, SectionCache cache, int x, int y, int z, int bitMask) {
+	public static void renderFaces(BlockModel<?> model, BlockColor blockColor, SectionCache cache, int x, int y, int z) {
+		int meta = cache.getBlockMetadataCenter(x, y, z);
+		int color = 0xffffffff;
+
 		for (int dir = 0; dir < Direction.COUNT; dir++) {
+			int dirX = x + Direction.x(dir);
+			int dirY = y + Direction.y(dir);
+			int dirZ = z + Direction.z(dir);
+
+			if (cache.isBlockOpaqueCube(dirX, dirY, dirZ)) {
+				continue;
+			}
+
 			IconCoordinate tex = model.getBlockTexture(cache, x, y, z, Side.sides[dir]);
-
-			int dirX = Direction.x(dir);
-			int dirY = Direction.y(dir);
-			int dirZ = Direction.z(dir);
-
 			VertexWriterManager.setCurrentInstance(VertexWriterManager.SOLID[dir]);
 
-			if ((bitMask & (1 << dir)) != 0) {
-				renderFace(FACE_RENDER[dir], tex, dir, cache, x + dirX, y + dirY, z + dirZ, x, y, z);
+			boolean colorized = model.shouldSideBeColored(cache, x, y, z, dir, meta);
+			FacingRender render = FACE_RENDER[dir];
+
+			if (colorized) {
+				if (color == 0xffffffff) {
+					color = ColorBGRManager.rgbToBgr(blockColor.getWorldColor(cache, x, y, z));
+				}
+
+				renderFace(render, tex, dir, cache, x, y, z, ColorBGRManager.multiplyColor(color, SHADE_FULL_FACTOR[dir]));
+			} else {
+				renderFace(render, tex, dir, cache, x, y, z, SHADE_FULL_COLOR[dir]);
 			}
 		}
 	}
 
-	public static void renderFace(FacingRender facing, IconCoordinate tex, int dir, SectionCache cache, int dirX, int dirY, int dirZ, int x, int y, int z) {
-		int shade = SHADE_FULL_COLOR[dir];
 
-		int offP1 = facing.aoCorners[0];
-		int offP2 = facing.aoCorners[1];
+	public static void renderFace(FacingRender facing, IconCoordinate tex, int dir, SectionCache cache, int x, int y, int z, int color) {
+		int p1X = facing.aoCornerX0;
+		int p1Y = facing.aoCornerY0;
+		int p1Z = facing.aoCornerZ0;
 
-		int p1X = Direction.x(offP1);
-		int p1Y = Direction.y(offP1);
-		int p1Z = Direction.z(offP1);
+		int p2X = facing.aoCornerX1;
+		int p2Y = facing.aoCornerY1;
+		int p2Z = facing.aoCornerZ1;
 
-		int p2X = Direction.x(offP2);
-		int p2Y = Direction.y(offP2);
-		int p2Z = Direction.z(offP2);
+		int dirX = x + Direction.x(dir);
+		int dirY = y + Direction.y(dir);
+		int dirZ = z + Direction.z(dir);
 
 		int posZ = cache.getBlockId(dirX + p2X, dirY + p2Y, dirZ + p2Z);
 		int negZ = cache.getBlockId(dirX - p2X, dirY - p2Y, dirZ - p2Z);
@@ -70,15 +86,13 @@ public class FullBlockMesher {
 		int cornerNP = cache.getBlockId(dirX - pd12X, dirY - pd12Y, dirZ - pd12Z);
 		int cornerNN = cache.getBlockId(dirX - p12X, dirY - p12Y, dirZ - p12Z);
 
-		final int[] rgb = VERT_COLOR;
 		final float[] uvs = VERT_UVS;
 
-		rgb[0] = ColorBGRManager.multiplyColor(shade, ao(posZ, posX, cornerPP));
-		rgb[1] = ColorBGRManager.multiplyColor(shade, ao(negZ, posX, cornerPN));
-		rgb[2] = ColorBGRManager.multiplyColor(shade, ao(negZ, negX, cornerNN));
-		rgb[3] = ColorBGRManager.multiplyColor(shade, ao(posZ, negX, cornerNP));
+		int color0 = ColorBGRManager.multiplyColor(color, ao(posZ, posX, cornerPP));
+		int color1 = ColorBGRManager.multiplyColor(color, ao(negZ, posX, cornerPN));
+		int color2 = ColorBGRManager.multiplyColor(color, ao(negZ, negX, cornerNN));
+		int color3 = ColorBGRManager.multiplyColor(color, ao(posZ, negX, cornerNP));
 
-		int extraOff = (rgb[0] > rgb[3] || rgb[2] > rgb[1]) ? 0 : 1;
 		VertexWriterManager.getCurrentInstance().ensureCapacity(TerrainVertexWriter.STRIDE * 4);
 
 		float inverseW = (float) tex.parentAtlas.getInverseWidth();
@@ -89,10 +103,21 @@ public class FullBlockMesher {
 		uvs[2] = (tex.iconX + tex.width) * inverseW;
 		uvs[3] = (tex.iconY + tex.height) * inverseH;
 
-		for (int vertInd = 0; vertInd < 4; vertInd++) {
-			int realInd = (vertInd + extraOff) & 3;
-			Vector2i texId = MAP_ID_TO_UV[facing.uvData[realInd]];
-			addVertex(facing, realInd, x, y, z, uvs[texId.x], uvs[texId.y], rgb[realInd]);
+		Vector2i uv0 = MAP_ID_TO_UV[facing.uvData[0]];
+		Vector2i uv1 = MAP_ID_TO_UV[facing.uvData[1]];
+		Vector2i uv2 = MAP_ID_TO_UV[facing.uvData[2]];
+		Vector2i uv3 = MAP_ID_TO_UV[facing.uvData[3]];
+
+		if (color0 > color3 || color2 > color1) {
+			addVertex(facing, 0, x, y, z, uvs[uv0.x], uvs[uv0.y], color0);
+			addVertex(facing, 1, x, y, z, uvs[uv1.x], uvs[uv1.y], color1);
+			addVertex(facing, 2, x, y, z, uvs[uv2.x], uvs[uv2.y], color2);
+			addVertex(facing, 3, x, y, z, uvs[uv3.x], uvs[uv3.y], color3);
+		} else {
+			addVertex(facing, 3, x, y, z, uvs[uv3.x], uvs[uv3.y], color3);
+			addVertex(facing, 0, x, y, z, uvs[uv0.x], uvs[uv0.y], color0);
+			addVertex(facing, 1, x, y, z, uvs[uv1.x], uvs[uv1.y], color1);
+			addVertex(facing, 2, x, y, z, uvs[uv2.x], uvs[uv2.y], color2);
 		}
 	}
 
@@ -116,23 +141,27 @@ public class FullBlockMesher {
 		manager.addVertex();
 	}
 
+	// Leaves reduce lighting much more than opaque blocks.
+	private static final int[] REDUCE = new int[2];
+
 	public static int br(boolean full) {
-		return full ? (int) (0.22f * 256.0f) : 0;
+		return full ? (int) (0.30f * 256.0f) : 0;
 	}
 
-	public static boolean full(int blockId) {
-		return BlocksFlags.SOLID[blockId];
+	public static int full(int blockId) {
+		return BlocksFlags.SOLID_LIGHT_MASK[blockId];
 	}
 
 	public static int ao(int pos1, int pos2, int corner) {
-		boolean fullP1 = full(pos1);
-		boolean fullP2 = full(pos2);
-		boolean fullC = full(corner);
+		int fullP1 = full(pos1);
+		int fullP2 = full(pos2);
+		int fullC = full(corner);
 
-		int factor = fullC && ((!fullP1 && !fullP2) || (fullP1 && fullP2)) ? (int) (0.78f * 256.0f) : 256;
+		int fullP = fullP1 ^ fullP2;
+		int factor = fullC == 1 && fullP == 0 ? (int) ((1.0f - 0.30f) * 256.0f) : 256;
 
-		factor -= br(fullP1);
-		factor -= br(fullP2);
+		factor -= br(fullP1 == 1);
+		factor -= br(fullP2 == 1);
 
 		return Math.max(factor, 129);
 	}
@@ -176,62 +205,71 @@ public class FullBlockMesher {
 
 	// minU - 0, minV - 1, maxU - 2, maxV - 3.
     static {
-		NEG_Y.aoCorners[0] = NEG_X_DIR;
-		NEG_Y.aoCorners[1] = POS_Z_DIR;
+		NEG_Y.aoCorner0 = NEG_X_DIR;
+		NEG_Y.aoCorner1 = POS_Z_DIR;
 		NEG_Y.quadVerts[0] = createVec3i(0, 0, 1);
 		NEG_Y.quadVerts[1] = createVec3i(0, 0, 0);
 		NEG_Y.quadVerts[2] = createVec3i(1, 0, 0);
 		NEG_Y.quadVerts[3] = createVec3i(1, 0, 1);
 		NEG_Y.setTexInd(2, 3, 0, 1);
 
-		POS_Y.aoCorners[0] = POS_X_DIR;
-		POS_Y.aoCorners[1] = POS_Z_DIR;
+		POS_Y.aoCorner0 = POS_X_DIR;
+		POS_Y.aoCorner1 = POS_Z_DIR;
 		POS_Y.quadVerts[0] = createVec3i(1, 1, 1);
 		POS_Y.quadVerts[1] = createVec3i(1, 1, 0);
 		POS_Y.quadVerts[2] = createVec3i(0, 1, 0);
 		POS_Y.quadVerts[3] = createVec3i(0, 1, 1);
 		POS_Y.setTexInd(3, 0, 1, 2);
 
-		POS_X.aoCorners[0] = NEG_Y_DIR;
-		POS_X.aoCorners[1] = POS_Z_DIR;
+		POS_X.aoCorner0 = NEG_Y_DIR;
+		POS_X.aoCorner1 = POS_Z_DIR;
 		POS_X.quadVerts[0] = createVec3i(1, 0, 1);
 		POS_X.quadVerts[1] = createVec3i(1, 0, 0);
 		POS_X.quadVerts[2] = createVec3i(1, 1, 0);
 		POS_X.quadVerts[3] = createVec3i(1, 1, 1);
 		POS_X.setTexInd(1, 2, 3, 0);
 
-		NEG_X.aoCorners[0] = POS_Y_DIR;
-		NEG_X.aoCorners[1] = POS_Z_DIR;
+		NEG_X.aoCorner0 = POS_Y_DIR;
+		NEG_X.aoCorner1 = POS_Z_DIR;
 		NEG_X.quadVerts[0] = createVec3i(0, 1, 1);
 		NEG_X.quadVerts[1] = createVec3i(0, 1, 0);
 		NEG_X.quadVerts[2] = createVec3i(0, 0, 0);
 		NEG_X.quadVerts[3] = createVec3i(0, 0, 1);
 		NEG_X.setTexInd(3, 0, 1, 2);
 
-		POS_Z.aoCorners[0] = NEG_X_DIR;
-		POS_Z.aoCorners[1] = POS_Y_DIR;
+		POS_Z.aoCorner0 = NEG_X_DIR;
+		POS_Z.aoCorner1 = POS_Y_DIR;
 		POS_Z.quadVerts[0] = createVec3i(0, 1, 1);
 		POS_Z.quadVerts[1] = createVec3i(0, 0, 1);
 		POS_Z.quadVerts[2] = createVec3i(1, 0, 1);
 		POS_Z.quadVerts[3] = createVec3i(1, 1, 1);
 		POS_Z.setTexInd(0, 1, 2, 3);
 
-		NEG_Z.aoCorners[0] = POS_Y_DIR;
-		NEG_Z.aoCorners[1] = NEG_X_DIR;
+		NEG_Z.aoCorner0 = POS_Y_DIR;
+		NEG_Z.aoCorner1 = NEG_X_DIR;
 		NEG_Z.quadVerts[0] = createVec3i(0, 1, 0);
 		NEG_Z.quadVerts[1] = createVec3i(1, 1, 0);
 		NEG_Z.quadVerts[2] = createVec3i(1, 0, 0);
 		NEG_Z.quadVerts[3] = createVec3i(0, 0, 0);
 		NEG_Z.setTexInd(3, 0, 1, 2);
 
-
 		MAP_ID_TO_UV[0] = new Vector2i(0, 1);
 		MAP_ID_TO_UV[1] = new Vector2i(0, 3);
 		MAP_ID_TO_UV[2] = new Vector2i(2, 3);
 		MAP_ID_TO_UV[3] = new Vector2i(2, 1);
 
+		NEG_X.processCornersDir();
+		POS_X.processCornersDir();
+
+		NEG_Z.processCornersDir();
+		POS_Z.processCornersDir();
+
+		NEG_Y.processCornersDir();
+		POS_Y.processCornersDir();
+
 		for (int i = 0; i < Direction.COUNT; i++) {
 			SHADE_FULL_COLOR[i] = ColorBGRManager.multiplyColor(0xFF_FF_FF, BlockRenderer.SIDE_LIGHT_MULTIPLIER[i]);
+			SHADE_FULL_FACTOR[i] = (int) (BlockRenderer.SIDE_LIGHT_MULTIPLIER[i] * 256.0f);
 		}
 	}
 }

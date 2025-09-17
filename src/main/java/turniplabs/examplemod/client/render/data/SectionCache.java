@@ -22,14 +22,16 @@ public class SectionCache implements WorldSource {
 	private final int sectionX, sectionY, sectionZ;
 
 	private final short[][] sectionBlocks = new short[3 * 3 * 3][];
-	private short[] centerSectBlocks;
 
 	private final byte[][] sectionData = new byte[3 * 3 * 3][];
-	private final byte[][] skyLightmap = new byte[3 * 3 * 3][];
-	private final byte[][] blockLightmap = new byte[3 * 3 * 3][];
+	private final byte[][] lightSky = new byte[3 * 3 * 3][];
+	private final byte[][] lightBlock = new byte[3 * 3 * 3][];
 
 	private static final short[] DEFAULT_SHORT_ARRAY = new short[16 * 16 * 16];
 	private static final byte[] DEFAULT_BYTE_ARRAY = new byte[16 * 16 * 16];
+
+	private short[] centerSectBlocks;
+	private byte[] centerSectData;
 
 	private boolean centerSectEmpty;
 
@@ -79,14 +81,15 @@ public class SectionCache implements WorldSource {
 							this.sectionData[sectionIndex] = DEFAULT_BYTE_ARRAY;
 						}
 
-						this.skyLightmap[sectionIndex] = section.skylightMap != null ? section.skylightMap.data : DEFAULT_BYTE_ARRAY;
-						this.blockLightmap[sectionIndex] = section.blocklightMap != null ? section.blocklightMap.data : DEFAULT_BYTE_ARRAY;;
+						this.lightSky[sectionIndex] = section.skylightMap != null ? section.skylightMap.data : DEFAULT_BYTE_ARRAY;
+						this.lightBlock[sectionIndex] = section.blocklightMap != null ? section.blocklightMap.data : DEFAULT_BYTE_ARRAY;;
 					} else {
 						this.sectionBlocks[sectionIndex] = DEFAULT_SHORT_ARRAY;
-						this.skyLightmap[sectionIndex] = DEFAULT_BYTE_ARRAY;
-						this.blockLightmap[sectionIndex] = DEFAULT_BYTE_ARRAY;
+						this.lightSky[sectionIndex] = DEFAULT_BYTE_ARRAY;
+						this.lightBlock[sectionIndex] = DEFAULT_BYTE_ARRAY;
 					}
 					this.centerSectBlocks = this.sectionBlocks[sectionIndex(1, 1, 1)];
+					this.centerSectData = this.sectionData[sectionIndex(1, 1, 1)];
 				}
 			}
 		}
@@ -182,8 +185,8 @@ public class SectionCache implements WorldSource {
 		int sectionIndex = sectionIndex(sectionX, sectionY, sectionZ);
 		int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
 
-		int skyLight = getNibble(this.skyLightmap[sectionIndex], blockIndex);
-		int blockLight = getNibble(this.blockLightmap[sectionIndex], blockIndex);
+		int skyLight = getNibble(this.lightSky[sectionIndex], blockIndex);
+		int blockLight = getNibble(this.lightBlock[sectionIndex], blockIndex);
 
 		return LightmapHelper.getLightmapCoord(skyLight, blockLight);
 	}
@@ -211,12 +214,11 @@ public class SectionCache implements WorldSource {
 
 		int sectionIndex = sectionIndex(offX, offY, offZ);
 
-		// Doesn't solve all issues with section indexing but avoid many ArrayOutOfBounds.
-		if (sectionIndex < 0 || sectionIndex >= 27) {
-			return 0;
-		}
-
 		return this.sectionData[sectionIndex][makeBlockIndex(x & 15, y & 15, z & 15)];
+	}
+
+	public int getBlockMetadataCenter(int x, int y, int z) {
+		return this.centerSectData[makeBlockIndex(x & 15, y & 15, z & 15)];
 	}
 
 	@Override

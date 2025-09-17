@@ -51,6 +51,7 @@ public class SectionRender {
 
 	public void rebuild(SectionManager sectionManager, BlockRenderer blockRenderer, World world) {
 		ChunkRenderer.updates++;
+		BlocksFlags.processLeavesSolid();
 
 		int minX = this.blockX;
 		int minY = this.blockY;
@@ -82,65 +83,79 @@ public class SectionRender {
 		int solidBlocks = 0;
 		int[] solidFaces = new int[Direction.COUNT];
 
-//		int lastBlockId = -1;
-//		BlockColor lastBlockColor = null;
-//		BlockModel<?> lastModel = null;
+		int lastBlockId = -1;
+		BlockColor lastBlockColor = null;
+		BlockModel<?> lastModel = null;
 
-		BlockInfo blockInfo = new BlockInfo();
+		long start = System.nanoTime();
 
 		if (!sectionCache.isSectionEmpty()) {
-			// 15x15x15 center blocks.
-			for (int y = minY + 1; y < maxY - 1; y++) {
-				for (int z = minZ + 1; z < maxZ - 1; z++) {
-					for (int x = minX + 1; x < maxX - 1; x++) {
-						solidBlocks = queueBlock(x, y, z, blockRenderer, renderBlocks, blockInfo, solidFaces, solidBlocks, true);
+			for (int y = minY; y < maxY; y++) {
+				for (int z = minZ; z < maxZ; z++) {
+					for (int x = minX; x < maxX; x++) {
+						int blockId = this.sectionCache.getBlockIdCenter(x, y, z);
+
+						if (blockId == 0) {
+							continue;
+						}
+
+						if (BlocksFlags.SOLID[blockId]) {
+							solidBlocks++;
+							if (y == maxY - 1) solidFaces[Direction.UP]++;
+							if (y == minY) solidFaces[Direction.DOWN]++;
+
+							if (x == maxX - 1) solidFaces[Direction.EAST]++;
+							if (x == minX) solidFaces[Direction.WEST]++;
+
+							if (z == maxZ - 1) solidFaces[Direction.SOUTH]++;
+							if (z == minZ) solidFaces[Direction.NORTH]++;
+						}
+
+						BlockColor blockColor;
+						BlockModel<?> blockModel;
+						Block<?> block = Blocks.getBlock(blockId);
+
+						if (lastBlockId == blockId) {
+							blockModel = lastModel;
+							blockColor = lastBlockColor;
+						} else {
+							blockModel = lastModel = BlockModelDispatcher.getInstance().getDispatch(block);
+							blockColor = lastBlockColor = BlockColorDispatcher.getInstance().getDispatch(blockModel.block);
+							lastBlockId = blockId;
+						}
+
+						BlockModel<?> model = blockModel;
+						int blockRenderPass = model.renderLayer();
+
+						if (blockRenderPass != 0) {
+							VertexWriterManager.setCurrentInstance(VertexWriterManager.TRANSLUCENT);
+						}
+
+						if (BlocksFlags.SOLID[blockId] || model instanceof BlockModelLeaves) {
+							FullBlockMesher.renderFaces(model, blockColor, this.sectionCache, x, y, z);
+						} else {
+							if (blockRenderPass == 0) {
+								VertexWriterManager.setCurrentInstance(VertexWriterManager.SOLID[Direction.COUNT]);
+							}
+
+							this.renderBlock(Tessellator.instance, renderBlocks, model, x, y, z);
+						}
 					}
-				}
-			}
-
-			// -X face
-			for (int y = minY; y < maxY; y++) {
-				for (int z = minZ; z < maxZ; z++) {
-					solidBlocks = queueBlock(minX, y, z, blockRenderer, renderBlocks, blockInfo, solidFaces, solidBlocks, false);
-				}
-			}
-
-			// +X face
-			for (int y = minY; y < maxY; y++) {
-				for (int z = minZ; z < maxZ; z++) {
-					solidBlocks = queueBlock(maxX - 1, y, z, blockRenderer, renderBlocks, blockInfo, solidFaces, solidBlocks, false);
-				}
-			}
-
-			// +Y face
-			for (int z = minZ; z < maxZ; z++) {
-				for (int x = minX + 1; x < maxX - 1; x++) {
-					solidBlocks = queueBlock(x, maxY - 1, z, blockRenderer, renderBlocks, blockInfo, solidFaces, solidBlocks, false);
-				}
-			}
-
-			// -Y face
-			for (int z = minZ; z < maxZ; z++) {
-				for (int x = minX + 1; x < maxX - 1; x++) {
-					solidBlocks = queueBlock(x, minY, z, blockRenderer, renderBlocks, blockInfo, solidFaces, solidBlocks, false);
-				}
-			}
-
-			// -Z face
-			for (int x = minX + 1; x < maxX - 1; x++) {
-				for (int y = minY + 1; y < maxY - 1; y++) {
-					solidBlocks = queueBlock(x, y, minZ, blockRenderer, renderBlocks, blockInfo, solidFaces, solidBlocks, false);
-				}
-			}
-
-			// +Z face
-			for (int x = minX + 1; x < maxX - 1; x++) {
-				for (int y = minY + 1; y < maxY - 1; y++) {
-					solidBlocks = queueBlock(x, y, maxZ - 1, blockRenderer, renderBlocks, blockInfo, solidFaces, solidBlocks, false);
 				}
 			}
 		} else {
 			this.sectionCache = null;
+		}
+
+		long end = System.nanoTime();
+
+		samples++;
+		timePassed += end - start;
+
+		if (samples == 1600) {
+			System.out.println("Time passed prom: " + ((timePassed / 1600f) / 1_000_000f) + "ms");
+			samples = 0;
+			timePassed = 0;
 		}
 
 //		for (int y = minY; y < maxY; y++) {
@@ -186,82 +201,12 @@ public class SectionRender {
 		translucentWriter.stopDrawing();
 	}
 
-	private int queueBlock(int x, int y, int z, BlockRenderer blockRenderer, RenderBlocks renderBlocks,
-							BlockInfo blockInfo, int[] solidFaces, int solidBlocks, boolean center) {
-		int minX = x & ~15;
-		int minY = y & ~15;
-		int minZ = z & ~15;
+	static long samples = 0;
+	static long timePassed = 0;
 
-		int maxX = minX | 15;
-		int maxY = minY | 15;
-		int maxZ = minZ | 15;
+	private int queueBlock(int x, int y, int z, RenderBlocks renderBlocks,
+							BlockInfo blockInfo, int[] solidFaces, int solidBlocks) {
 
-		int blockId = this.sectionCache.getBlockIdCenter(x, y, z);
-
-		if (blockId == 0) {
-			return solidBlocks;
-		}
-
-		if (BlocksFlags.SOLID[blockId]) {
-			solidBlocks++;
-			if (y == maxY) solidFaces[Direction.UP]++;
-			if (y == minY) solidFaces[Direction.DOWN]++;
-
-			if (x == maxX) solidFaces[Direction.EAST]++;
-			if (x == minX) solidFaces[Direction.WEST]++;
-
-			if (z == maxZ) solidFaces[Direction.SOUTH]++;
-			if (z == minZ) solidFaces[Direction.NORTH]++;
-		}
-
-		BlockColor blockColor;
-		BlockModel<?> blockModel;
-		Block<?> block = Blocks.getBlock(blockId);
-
-		if (blockInfo.lastBlockId == blockId) {
-			blockModel = blockInfo.lastModel;
-			blockColor = blockInfo.lastBlockColor;
-		} else {
-			blockModel = blockInfo.lastModel = BlockModelDispatcher.getInstance().getDispatch(block);
-			blockColor = blockInfo.lastBlockColor = BlockColorDispatcher.getInstance().getDispatch(blockModel.block);
-			blockInfo.lastBlockId = blockId;
-		}
-
-		BlockModel<?> model = blockModel;
-		int blockRenderPass = model.renderLayer();
-
-		if (blockRenderPass != 0) {
-			VertexWriterManager.setCurrentInstance(VertexWriterManager.TRANSLUCENT);
-		}
-
-		if (BlocksFlags.SOLID[blockId] || model instanceof BlockModelLeaves) {
-			int drawMask = 0;
-
-			if (center) {
-				drawMask |= blockRenderer.shouldDrawSideCenter(x, y - 1, z) ? 1 << 0 : 0;
-				drawMask |= blockRenderer.shouldDrawSideCenter(x, y + 1, z) ? 1 << 1 : 0;
-				drawMask |= blockRenderer.shouldDrawSideCenter(x, y, z - 1) ? 1 << 2 : 0;
-				drawMask |= blockRenderer.shouldDrawSideCenter(x, y, z + 1) ? 1 << 3 : 0;
-				drawMask |= blockRenderer.shouldDrawSideCenter(x - 1, y, z) ? 1 << 4 : 0;
-				drawMask |= blockRenderer.shouldDrawSideCenter(x + 1, y, z) ? 1 << 5 : 0;
-			} else {
-				drawMask |= blockRenderer.shouldDrawSide(x, y - 1, z) ? 1 << 0 : 0;
-				drawMask |= blockRenderer.shouldDrawSide(x, y + 1, z) ? 1 << 1 : 0;
-				drawMask |= blockRenderer.shouldDrawSide(x, y, z - 1) ? 1 << 2 : 0;
-				drawMask |= blockRenderer.shouldDrawSide(x, y, z + 1) ? 1 << 3 : 0;
-				drawMask |= blockRenderer.shouldDrawSide(x - 1, y, z) ? 1 << 4 : 0;
-				drawMask |= blockRenderer.shouldDrawSide(x + 1, y, z) ? 1 << 5 : 0;
-			}
-
-//			blockRenderer.renderStandardBlock(block, blockColor, model, aabb, x, y, z, drawMask);
-			FullBlockMesher.renderFaces(model, this.sectionCache, x, y, z, drawMask);
-		} else {
-			if (blockRenderPass == 0) {
-				VertexWriterManager.setCurrentInstance(VertexWriterManager.SOLID[Direction.COUNT]);
-			}
-
-			this.renderBlock(Tessellator.instance, renderBlocks, model, x, y, z);
-		}
 
 		return solidBlocks;
 	}

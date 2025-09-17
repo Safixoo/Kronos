@@ -49,15 +49,15 @@ public class Direction {
 		return (num & (1 << dir)) != 0;
 	}
 
-	public static int x(int direction) {
+	public static byte x(int direction) {
 		return X[direction];
 	}
 
-	public static int y(int direction) {
+	public static byte y(int direction) {
 		return Y[direction];
 	}
 
-	public static int z(int direction) {
+	public static byte z(int direction) {
 		return Z[direction];
 	}
 

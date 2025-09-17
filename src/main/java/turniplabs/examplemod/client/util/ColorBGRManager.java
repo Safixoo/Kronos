@@ -19,6 +19,14 @@ public class ColorBGRManager {
 		return multiplyColor(color, (int) (factor * 256));
 	}
 
+	public static int multiplyColorByColor(int color1, int color2) {
+		int r = ((color1 & 0xFF_00_00) * (color2 & 0xFF_00_00)) & 0xFF_00_00_00;
+		int g = ((color1 & 0x00_FF_00) * (color2 & 0x00_FF_00)) & 0x00_FF_00_00;
+		int b = ((color1 & 0x00_00_FF) * (color2 & 0x00_00_FF)) & 0x00_00_FF_00;
+
+		return (r | g | b) >>> 8;
+	}
+
 	public static int multiplyColor(int color, int factor) {
 		int gr = ((color & 0x00FF00) * factor);
 		int rb = ((color & 0xFF00FF) * factor);
