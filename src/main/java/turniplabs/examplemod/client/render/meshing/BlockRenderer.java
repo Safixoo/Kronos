@@ -3,6 +3,7 @@ package turniplabs.examplemod.client.render.meshing;
 import net.minecraft.client.render.LightmapHelper;
 import net.minecraft.client.render.block.color.BlockColor;
 import net.minecraft.client.render.block.model.*;
+import net.minecraft.client.render.tessellator.Tessellator;
 import net.minecraft.client.render.texture.stitcher.IconCoordinate;
 import net.minecraft.core.block.Block;
 import net.minecraft.core.util.helper.Side;
@@ -30,7 +31,7 @@ public class BlockRenderer {
 	public int lightMapCoordTopRight;
 
 	private final ModelBoundsData modelData = new ModelBoundsData();
-	public static final float[] SIDE_LIGHT_MULTIPLIER = new float[] {0.5F, 0.95F, 0.8F, 0.8F, 0.6F, 0.8F};
+	public static final float[] SIDE_LIGHT_MULTIPLIER = new float[] { 0.5F, 1.0F, 0.8F, 0.8F, 0.6F, 0.6F };
 
 	private void setModelBounds(int x, int y, int z, AABB bounds) {
 		this.modelData.setBoundsData(bounds.minX + x, bounds.minY + y, bounds.minZ + z, bounds.maxX + x, bounds.maxY + y, bounds.maxZ + z);
@@ -66,11 +67,7 @@ public class BlockRenderer {
 			}
 		}
 
-//		if (isGrass) {
-//			BlockModelGrass.useOverlay = true;
-//			blockModel.renderStandardBlock(Tessellator.instance, blockModel.block.getBoundsRaw(), x, y, z);
-//			BlockModelGrass.useOverlay = false;
-//		}
+
 	}
 
 	public void setChunkCache(SectionCache chunkCache) {

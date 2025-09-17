@@ -5,6 +5,7 @@ import net.minecraft.client.render.block.color.BlockColor;
 import net.minecraft.client.render.block.color.BlockColorDispatcher;
 import net.minecraft.client.render.block.model.BlockModel;
 import net.minecraft.client.render.block.model.BlockModelDispatcher;
+import net.minecraft.client.render.block.model.BlockModelGrass;
 import net.minecraft.client.render.block.model.BlockModelLeaves;
 import net.minecraft.client.render.terrain.ChunkRenderer;
 import net.minecraft.client.render.tessellator.Tessellator;
@@ -20,6 +21,7 @@ import turniplabs.examplemod.client.render.meshing.BlockRenderer;
 import turniplabs.examplemod.client.util.BlocksFlags;
 import turniplabs.examplemod.client.util.Direction;
 import turniplabs.examplemod.client.vertex.format.DefaultVertexFormats;
+import turniplabs.examplemod.mixins.injects.AABBMixin;
 
 // Saves basic info for each section from the world, is used mostly for culling and
 // meshing, rendering is almost only managed in the RegionRender in an objectless fashion.
@@ -48,6 +50,9 @@ public class SectionRender {
 
 		this.regionIndex = RegionRender.regionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
 	}
+
+	private static final float EPSILON = 4E-3f;
+	private static final AABB GRASS = AABB.getPermanentBB(-EPSILON, 0, -EPSILON, 1 + EPSILON, 1, 1 + EPSILON);
 
 	public void rebuild(SectionManager sectionManager, BlockRenderer blockRenderer, World world) {
 		ChunkRenderer.updates++;
@@ -133,6 +138,12 @@ public class SectionRender {
 
 						if (BlocksFlags.SOLID[blockId] || model instanceof BlockModelLeaves) {
 							FullBlockMesher.renderFaces(model, blockColor, this.sectionCache, x, y, z);
+
+							if (model instanceof BlockModelGrass) {
+								BlockModelGrass.useOverlay = true;
+								blockModel.renderStandardBlock(Tessellator.instance, GRASS, x, y, z);
+								BlockModelGrass.useOverlay = false;
+							}
 						} else {
 							if (blockRenderPass == 0) {
 								VertexWriterManager.setCurrentInstance(VertexWriterManager.SOLID[Direction.COUNT]);

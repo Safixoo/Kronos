@@ -1,5 +1,6 @@
 package turniplabs.examplemod.client.render.meshing;
 
+import org.joml.Vector3f;
 import org.joml.Vector3i;
 import turniplabs.examplemod.client.util.Direction;
 
@@ -7,7 +8,7 @@ public class FacingRender {
 	public byte aoCornerX0, aoCornerY0, aoCornerZ0;
 	public byte aoCornerX1, aoCornerY1, aoCornerZ1;
 
-	public final Vector3i[] quadVerts = new Vector3i[Direction.COUNT];
+	public final Vector3f[] quadVerts = new Vector3f[Direction.COUNT];
 	public final int[] uvData = new int[4];
 
 	public int aoCorner0;

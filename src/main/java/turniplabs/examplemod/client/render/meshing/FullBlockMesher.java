@@ -4,10 +4,9 @@ import net.minecraft.client.render.block.color.BlockColor;
 import net.minecraft.client.render.block.model.BlockModel;
 import net.minecraft.client.render.texture.stitcher.IconCoordinate;
 import net.minecraft.core.util.helper.Side;
-import org.joml.Vector2f;
 import org.joml.Vector2i;
+import org.joml.Vector3f;
 import org.joml.Vector3i;
-import org.joml.Vector4i;
 import turniplabs.examplemod.client.render.data.SectionCache;
 import turniplabs.examplemod.client.util.BlocksFlags;
 import turniplabs.examplemod.client.util.ColorBGRManager;
@@ -126,7 +125,7 @@ public class FullBlockMesher {
 	}
 
 	private static void addVertex(FacingRender facing, int vertInd, int x, int y, int z, float u, float v, int color) {
-		Vector3i vertOff = facing.quadVerts[vertInd];
+		Vector3f vertOff = facing.quadVerts[vertInd];
 
 		float relX = x + vertOff.x;
 		float relY = y + vertOff.y;
@@ -136,7 +135,7 @@ public class FullBlockMesher {
 
 		manager.setPos(relX, relY, relZ);
 		manager.setUv(u, v);
-		manager.setColor(color);
+		manager.setColor(color | 0xFF_000000);
 
 		manager.addVertex();
 	}
@@ -145,33 +144,41 @@ public class FullBlockMesher {
 	private static final int[] REDUCE = new int[2];
 
 	public static int br(boolean full) {
-		return full ? (int) (0.30f * 256.0f) : 0;
+		return full ? LIGHT_REDUCE : 0;
 	}
 
 	public static int full(int blockId) {
 		return BlocksFlags.SOLID_LIGHT_MASK[blockId];
 	}
 
+	public static final int LIGHT_REDUCE = 95;
+	public static final int CORNER_LIGHT = 256 - ((LIGHT_REDUCE * 3) >> 2);
+
 	public static int ao(int pos1, int pos2, int corner) {
 		int fullP1 = full(pos1);
 		int fullP2 = full(pos2);
 		int fullC = full(corner);
 
-		int fullP = fullP1 ^ fullP2;
-		int factor = fullC == 1 && fullP == 0 ? (int) ((1.0f - 0.30f) * 256.0f) : 256;
+		int fullXorP = fullP1 ^ fullP2;
+
+		int factor = fullC == 1 && fullXorP == 0 ? CORNER_LIGHT - ((fullP1 | fullP2) << 8) : 256;
+
+		if (fullC == 0) {
+			factor += 20;
+		}
 
 		factor -= br(fullP1 == 1);
 		factor -= br(fullP2 == 1);
 
-		return Math.max(factor, 129);
+		return Math.min(Math.max(factor, 65), 255);
 	}
 
 	private static Vector2i createVec2i(int x, int y) {
 		return new Vector2i(x, y);
 	}
 
-	private static Vector3i createVec3i(int x, int y, int z) {
-		return new Vector3i(x, y, z);
+	private static Vector3f createVec3f(float x, float y, float z) {
+		return new Vector3f(x, y, z);
 	}
 
 	public static final FacingRender NEG_Y = new FacingRender();
@@ -205,52 +212,54 @@ public class FullBlockMesher {
 
 	// minU - 0, minV - 1, maxU - 2, maxV - 3.
     static {
+		final float EPSILON = 8E-4f;
+
 		NEG_Y.aoCorner0 = NEG_X_DIR;
 		NEG_Y.aoCorner1 = POS_Z_DIR;
-		NEG_Y.quadVerts[0] = createVec3i(0, 0, 1);
-		NEG_Y.quadVerts[1] = createVec3i(0, 0, 0);
-		NEG_Y.quadVerts[2] = createVec3i(1, 0, 0);
-		NEG_Y.quadVerts[3] = createVec3i(1, 0, 1);
+		NEG_Y.quadVerts[0] = createVec3f(0, 0, 1);
+		NEG_Y.quadVerts[1] = createVec3f(0, 0, 0);
+		NEG_Y.quadVerts[2] = createVec3f(1, 0, 0);
+		NEG_Y.quadVerts[3] = createVec3f(1, 0, 1);
 		NEG_Y.setTexInd(2, 3, 0, 1);
 
 		POS_Y.aoCorner0 = POS_X_DIR;
 		POS_Y.aoCorner1 = POS_Z_DIR;
-		POS_Y.quadVerts[0] = createVec3i(1, 1, 1);
-		POS_Y.quadVerts[1] = createVec3i(1, 1, 0);
-		POS_Y.quadVerts[2] = createVec3i(0, 1, 0);
-		POS_Y.quadVerts[3] = createVec3i(0, 1, 1);
-		POS_Y.setTexInd(3, 0, 1, 2);
+		POS_Y.quadVerts[0] = createVec3f(1, 1, 1);
+		POS_Y.quadVerts[1] = createVec3f(1, 1, 0);
+		POS_Y.quadVerts[2] = createVec3f(0, 1, 0);
+		POS_Y.quadVerts[3] = createVec3f(0, 1, 1);
+		POS_Y.setTexInd(2, 3, 0, 1);
 
 		POS_X.aoCorner0 = NEG_Y_DIR;
 		POS_X.aoCorner1 = POS_Z_DIR;
-		POS_X.quadVerts[0] = createVec3i(1, 0, 1);
-		POS_X.quadVerts[1] = createVec3i(1, 0, 0);
-		POS_X.quadVerts[2] = createVec3i(1, 1, 0);
-		POS_X.quadVerts[3] = createVec3i(1, 1, 1);
+		POS_X.quadVerts[0] = createVec3f(1 - EPSILON, 0, 1);
+		POS_X.quadVerts[1] = createVec3f(1 - EPSILON, 0, 0);
+		POS_X.quadVerts[2] = createVec3f(1 - EPSILON, 1, 0);
+		POS_X.quadVerts[3] = createVec3f(1 - EPSILON, 1, 1);
 		POS_X.setTexInd(1, 2, 3, 0);
 
 		NEG_X.aoCorner0 = POS_Y_DIR;
 		NEG_X.aoCorner1 = POS_Z_DIR;
-		NEG_X.quadVerts[0] = createVec3i(0, 1, 1);
-		NEG_X.quadVerts[1] = createVec3i(0, 1, 0);
-		NEG_X.quadVerts[2] = createVec3i(0, 0, 0);
-		NEG_X.quadVerts[3] = createVec3i(0, 0, 1);
+		NEG_X.quadVerts[0] = createVec3f(0 + EPSILON, 1, 1);
+		NEG_X.quadVerts[1] = createVec3f(0 + EPSILON, 1, 0);
+		NEG_X.quadVerts[2] = createVec3f(0 + EPSILON, 0, 0);
+		NEG_X.quadVerts[3] = createVec3f(0 + EPSILON, 0, 1);
 		NEG_X.setTexInd(3, 0, 1, 2);
 
 		POS_Z.aoCorner0 = NEG_X_DIR;
 		POS_Z.aoCorner1 = POS_Y_DIR;
-		POS_Z.quadVerts[0] = createVec3i(0, 1, 1);
-		POS_Z.quadVerts[1] = createVec3i(0, 0, 1);
-		POS_Z.quadVerts[2] = createVec3i(1, 0, 1);
-		POS_Z.quadVerts[3] = createVec3i(1, 1, 1);
+		POS_Z.quadVerts[0] = createVec3f(0, 1, 1 - EPSILON);
+		POS_Z.quadVerts[1] = createVec3f(0, 0, 1 - EPSILON);
+		POS_Z.quadVerts[2] = createVec3f(1, 0, 1 - EPSILON);
+		POS_Z.quadVerts[3] = createVec3f(1, 1, 1 - EPSILON);
 		POS_Z.setTexInd(0, 1, 2, 3);
 
 		NEG_Z.aoCorner0 = POS_Y_DIR;
 		NEG_Z.aoCorner1 = NEG_X_DIR;
-		NEG_Z.quadVerts[0] = createVec3i(0, 1, 0);
-		NEG_Z.quadVerts[1] = createVec3i(1, 1, 0);
-		NEG_Z.quadVerts[2] = createVec3i(1, 0, 0);
-		NEG_Z.quadVerts[3] = createVec3i(0, 0, 0);
+		NEG_Z.quadVerts[0] = createVec3f(0, 1, 0 + EPSILON);
+		NEG_Z.quadVerts[1] = createVec3f(1, 1, 0 + EPSILON);
+		NEG_Z.quadVerts[2] = createVec3f(1, 0, 0 + EPSILON);
+		NEG_Z.quadVerts[3] = createVec3f(0, 0, 0 + EPSILON);
 		NEG_Z.setTexInd(3, 0, 1, 2);
 
 		MAP_ID_TO_UV[0] = new Vector2i(0, 1);
