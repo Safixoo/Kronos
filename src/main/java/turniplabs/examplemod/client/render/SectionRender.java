@@ -12,6 +12,7 @@ import net.minecraft.core.block.Block;
 import net.minecraft.core.block.Blocks;
 import net.minecraft.core.util.phys.AABB;
 import net.minecraft.core.world.World;
+import turniplabs.examplemod.client.render.meshing.FullBlockMesher;
 import turniplabs.examplemod.client.render.region.RegionRender;
 import turniplabs.examplemod.client.vertex.VertexWriterManager;
 import turniplabs.examplemod.client.render.data.SectionCache;
@@ -234,7 +235,6 @@ public class SectionRender {
 		}
 
 		if (BlocksFlags.SOLID[blockId] || model instanceof BlockModelLeaves) {
-			AABB aabb = model.block.getBoundsRaw();
 			int drawMask = 0;
 
 			if (center) {
@@ -253,7 +253,8 @@ public class SectionRender {
 				drawMask |= blockRenderer.shouldDrawSide(x + 1, y, z) ? 1 << 5 : 0;
 			}
 
-			blockRenderer.renderStandardBlock(block, blockColor, model, aabb, x, y, z, drawMask);
+//			blockRenderer.renderStandardBlock(block, blockColor, model, aabb, x, y, z, drawMask);
+			FullBlockMesher.renderFaces(model, this.sectionCache, x, y, z, drawMask);
 		} else {
 			if (blockRenderPass == 0) {
 				VertexWriterManager.setCurrentInstance(VertexWriterManager.SOLID[Direction.COUNT]);

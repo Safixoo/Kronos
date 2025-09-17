@@ -120,21 +120,11 @@ public class SectionCache implements WorldSource {
 
 	@Override
 	public int getBlockId(int x, int y, int z) {
-		if (y < 0 || y >= 256) {
-			return 0;
-		}
-
 		int sectionX = (x >> 4) - this.sectionX;
 		int sectionY = (y >> 4) - this.sectionY;
 		int sectionZ = (z >> 4) - this.sectionZ;
 
-		int sectionIndex = sectionIndex(sectionX, sectionY, sectionZ);
-
-		if (sectionIndex >= 0 && sectionIndex < 27) {
-			return this.sectionBlocks[sectionIndex(sectionX, sectionY, sectionZ)][makeBlockIndex(x & 15, y & 15, z & 15)];
-		}
-
-		return 0;
+		return this.sectionBlocks[sectionIndex(sectionX, sectionY, sectionZ)][makeBlockIndex(x & 15, y & 15, z & 15)];
 	}
 
 	public int getBlockIdCenter(int x, int y, int z) {

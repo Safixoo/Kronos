@@ -16,14 +16,14 @@ public class ColorBGRManager {
 	}
 
 	public static int multiplyColor(int color, float factor) {
-		return multiplyColor(color, MathHelper.clamp((int) (factor * 256), 0, 256));
+		return multiplyColor(color, (int) (factor * 256));
 	}
 
 	public static int multiplyColor(int color, int factor) {
-		int green =      ((color & 0x00FF00) * factor) >>> 8;
-		int redAndBlue = ((color & 0xFF00FF) * factor) >>> 8;
+		int gr = ((color & 0x00FF00) * factor);
+		int rb = ((color & 0xFF00FF) * factor);
 
-		return (green & 0x00FF00 | redAndBlue & 0xFF00FF);
+		return (gr & 0x00FF00_00 | rb & 0xFF00FF_00) >>> 8;
 	}
 
 	public static long multiplyTwoColorsParallel(int colorOne, int colorTwo, int r, int g, int b) {

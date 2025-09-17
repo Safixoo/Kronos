@@ -30,7 +30,7 @@ public class BlockRenderer {
 	public int lightMapCoordTopRight;
 
 	private final ModelBoundsData modelData = new ModelBoundsData();
-	private static final float[] SIDE_LIGHT_MULTIPLIER = new float[] {0.5F, 1.0F, 0.8F, 0.8F, 0.6F, 0.8F};
+	public static final float[] SIDE_LIGHT_MULTIPLIER = new float[] {0.5F, 0.95F, 0.8F, 0.8F, 0.6F, 0.8F};
 
 	private void setModelBounds(int x, int y, int z, AABB bounds) {
 		this.modelData.setBoundsData(bounds.minX + x, bounds.minY + y, bounds.minZ + z, bounds.maxX + x, bounds.maxY + y, bounds.maxZ + z);
