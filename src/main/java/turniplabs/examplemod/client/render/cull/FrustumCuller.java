@@ -5,10 +5,10 @@ import org.joml.Matrix4f;
 public class FrustumCuller {
 //	public static Matrix4f projectionModelViewMatrix = new Matrix4f();
 
-	private static float nxX, nxY, nxZ, nxW;
-	private static float pxX, pxY, pxZ, pxW;
-	private static float nyX, nyY, nyZ, nyW;
-	private static float pyX, pyY, pyZ, pyW;
+	private static double nxX, nxY, nxZ, nxW;
+	private static double pxX, pxY, pxZ, pxW;
+	private static double nyX, nyY, nyZ, nyW;
+	private static double pyX, pyY, pyZ, pyW;
 //	private static float nzX, nzY, nzZ, nzW;
 //	private static float pzX, pzY, pzZ, pzW;
 
@@ -21,7 +21,7 @@ public class FrustumCuller {
 		if (nxY >= 0) nxW += 16.0;
 		if (nxZ >= 0) nxW += 16.0;
 
-		FrustumCuller.nxW = (float) -(FrustumCuller.nxW + nxW);
+		FrustumCuller.nxW = -(FrustumCuller.nxW + nxW);
 //		invW = 1.0f / nxW;
 //
 //		nxX *= invW;
@@ -35,7 +35,7 @@ public class FrustumCuller {
 		if (pxY >= 0) pxW += 16.0;
 		if (pxZ >= 0) pxW += 16.0;
 
-		FrustumCuller.pxW = (float) -(FrustumCuller.pxW + pxW);
+		FrustumCuller.pxW = -(FrustumCuller.pxW + pxW);
 //		invW = 1.0f / pxW;
 //
 //		pxX *= invW;
@@ -49,7 +49,7 @@ public class FrustumCuller {
 		if (nyY >= 0) nyW += 16.0;
 		if (nyZ >= 0) nyW += 16.0;
 
-		FrustumCuller.nyW = (float) -(FrustumCuller.nyW + nyW);
+		FrustumCuller.nyW = -(FrustumCuller.nyW + nyW);
 //		invW = 1.0f / nyW;
 //
 //		nyX *= invW;
@@ -63,7 +63,7 @@ public class FrustumCuller {
 		if (pyY >= 0) pyW += 16.0;
 		if (pyZ >= 0) pyW += 16.0;
 
-		FrustumCuller.pyW = (float) -(FrustumCuller.pyW + pyW);
+		FrustumCuller.pyW = -(FrustumCuller.pyW + pyW);
 //		invW = 1.0f / pyW;
 //
 //		pyX *= invW;
