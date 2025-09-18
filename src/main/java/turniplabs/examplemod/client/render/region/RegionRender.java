@@ -98,6 +98,12 @@ public class RegionRender {
 		}
 
 		int index = (render.regionIndex * TOTAL_DRAWS) + side;
+
+		if (this.regionDrawData[index] != 0) {
+			this.regionDrawData[index] = this.solidBuffer.allocate(render, manager.getVertexData(), manager.getVertices(), side);
+			return;
+		}
+
 		this.regionDrawData[index] = this.solidBuffer.renewAllocation(render, manager.getVertexData(), manager.getVertices(), side);
 	}
 
@@ -111,6 +117,12 @@ public class RegionRender {
 		}
 
 		int index = (render.regionIndex * TOTAL_DRAWS) + SOLID_DRAWS;
+
+		if (this.regionDrawData[index] != 0) {
+			this.regionDrawData[index] = this.translucentBuffer.allocate(render, manager.getVertexData(), manager.getVertices(), 0);
+			return;
+		}
+
 		this.regionDrawData[index] = this.translucentBuffer.renewAllocation(render, manager.getVertexData(), manager.getVertices(), 0);
 	}
 

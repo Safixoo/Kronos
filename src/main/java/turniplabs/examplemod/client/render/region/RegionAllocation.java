@@ -1,7 +1,6 @@
 package turniplabs.examplemod.client.render.region;
 
 import org.lwjgl.opengl.GL45;
-import org.lwjgl.system.MemoryUtil;
 import turniplabs.examplemod.client.render.SectionFlags;
 import turniplabs.examplemod.client.render.SectionManager;
 import turniplabs.examplemod.client.render.SectionRender;
@@ -80,7 +79,7 @@ public class RegionAllocation {
 	public long allocate(SectionRender render, ByteBuffer vertexData, int size, int side) {
 		Allocation alloc = this.fitInFree(size);
 
-		if (alloc == null || alloc.size < size) {
+		if (alloc == null) {
 			alloc = this.allocateNew(render, size, side);
 		}
 
@@ -102,17 +101,23 @@ public class RegionAllocation {
 		}
 
 		Allocation newAlloc = new Allocation(render, maxOffset, size, side);
+		Allocation first = this.firstEntry;
 		this.offset += sizeInBytes;
 
-		if (this.firstEntry == null) {
-			return this.lastEntry = this.firstEntry = newAlloc;
+		if (first == null) {
+			return this.firstEntry = newAlloc;
 		}
 
-		return this.lastEntry = this.lastEntry.next = newAlloc;
+		while (first.next != null) {
+			first = first.next;
+		}
+
+		first.next = newAlloc;
+		return newAlloc;
 	}
 
 	public long renewAllocation(SectionRender render, ByteBuffer data, int size, int side) {
-		Allocation alloc = this.findRenderAlloc(render, side);
+		Allocation alloc = this.findPrevAlloc(render, side);
 		long drawData;
 
 		if (alloc != null && alloc.size >= size) {
@@ -128,16 +133,20 @@ public class RegionAllocation {
 		return drawData;
 	}
 
+	// Searches for a space in allocations already freed.
 	private @Nullable Allocation fitInFree(int spaceNeeded) {
 		Allocation alloc = this.freeAllocations;
 
+		// Base case: isn't any free space.
 		if (alloc == null) {
 			return null;
 		}
 
+		// Base case: first meets the criteria.
 		if (alloc.size >= spaceNeeded) {
 			this.freeAllocations = this.freeAllocations.next;
 			alloc.next = null;
+
 			return alloc;
 		}
 
@@ -145,17 +154,22 @@ public class RegionAllocation {
 			alloc = alloc.next;
 		}
 
-		Allocation returnAlloc = null;
-
-		if (alloc.next != null) {
-			returnAlloc = alloc.next;
-			alloc.next = alloc.next.next;
+		// Didn't find any free allocation that meet the space needs.
+		if (alloc.next == null) {
+			return null;
 		}
+
+		Allocation returnAlloc = alloc.next;
+
+		// If next isn't null, we find the alloc we wanted.
+		alloc.next = alloc.next.next;
+		returnAlloc.next = null;
 
 		return returnAlloc;
 	}
 
-	public @Nullable Allocation findRenderAlloc(SectionRender render, int side) {
+	// Searches for a previous allocation.
+	public @Nullable Allocation findPrevAlloc(SectionRender render, int side) {
 		Allocation alloc = this.firstEntry;
 
 		while (alloc != null) {
@@ -181,49 +195,44 @@ public class RegionAllocation {
 		return (int) (drawData & 0xFFFFFFFFL);
 	}
 
+	// Removes allocation from the main pool, and saves in the free pool.
 	public void remove(SectionRender render) {
 		Allocation alloc = this.firstEntry;
 
+		// alloc isn't null as we are already removing an existent.
 		if (alloc.render == render) {
 			alloc.render = null;
 			alloc.side = -1;
-			this.firstEntry = alloc.next;
-			return;
+			alloc.next = null;
+
+			this.firstEntry = this.firstEntry.next;
 		}
 
-		while (alloc.next != null && alloc.next.render != render) {
+		// Next shouldn't be null as first doesn't fit the base case.
+		//noinspection DataFlowIssue
+		while (alloc.next.render != render) {
 			alloc = alloc.next;
 		}
 
-		if (alloc.next == null) {
-			return;
-		}
+		Allocation free = this.freeAllocations;
 
-		Allocation renderAlloc = alloc.next;
-		renderAlloc.render = null;
-		renderAlloc.side = -1;
-		renderAlloc.next = null;
-
-		if (this.freeAllocations == null) {
-			this.freeAllocations = renderAlloc;
-		} else {
-			Allocation lastAlloc = this.freeAllocations;
-
-			while (lastAlloc.next != null) {
-				lastAlloc = lastAlloc.next;
+		// Save removed alloc in free pool.
+		if (free != null) {
+			while (free.next != null) {
+				free = free.next;
 			}
 
-			lastAlloc.next = renderAlloc;
+			free.next = alloc;
+		} else {
+			this.freeAllocations = alloc;
 		}
-
-		alloc.next = renderAlloc.next;
 	}
 
 	public void uploadAllocation(Allocation alloc, ByteBuffer data, int size) {
 		this.vertexBuffer.upload(data, alloc.offset * STRIDE, size * STRIDE);
 	}
 
-	public class Allocation {
+	public static class Allocation {
 		public Allocation next;
 		public SectionRender render;
 
