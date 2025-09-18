@@ -51,7 +51,7 @@ public class SectionRender {
 		this.regionIndex = RegionRender.regionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
 	}
 
-	private static final float EPSILON = 4E-3f;
+	private static final float EPSILON = 6E-4f;
 	private static final AABB GRASS = AABB.getPermanentBB(-EPSILON, 0, -EPSILON, 1 + EPSILON, 1, 1 + EPSILON);
 
 	public void rebuild(SectionManager sectionManager, BlockRenderer blockRenderer, World world) {
@@ -140,6 +140,8 @@ public class SectionRender {
 							FullBlockMesher.renderFaces(model, blockColor, this.sectionCache, x, y, z);
 
 							if (model instanceof BlockModelGrass) {
+								VertexWriterManager.setCurrentInstance(VertexWriterManager.SOLID[Direction.COUNT]);
+
 								BlockModelGrass.useOverlay = true;
 								blockModel.renderStandardBlock(Tessellator.instance, GRASS, x, y, z);
 								BlockModelGrass.useOverlay = false;

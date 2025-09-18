@@ -212,7 +212,7 @@ public class FullBlockMesher {
 
 	// minU - 0, minV - 1, maxU - 2, maxV - 3.
     static {
-		final float EPSILON = 8E-4f;
+		final float EPSILON = 0;
 
 		NEG_Y.aoCorner0 = NEG_X_DIR;
 		NEG_Y.aoCorner1 = POS_Z_DIR;
