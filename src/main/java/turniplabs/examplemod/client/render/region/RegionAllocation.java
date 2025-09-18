@@ -1,6 +1,6 @@
 package turniplabs.examplemod.client.render.region;
 
-import org.lwjgl.opengl.GL45;
+import org.lwjgl.opengl.*;
 import turniplabs.examplemod.client.render.SectionFlags;
 import turniplabs.examplemod.client.render.SectionManager;
 import turniplabs.examplemod.client.render.SectionRender;
@@ -10,8 +10,11 @@ import javax.annotation.Nullable;
 import java.nio.ByteBuffer;
 
 public class RegionAllocation {
+	private static final int SPARE_BUFFER_ALLOC = 1024 * 1024 * 16;
+	private static final int MIN_ALLOC = 1024 * 1024 * 16;
 	private static final int STRIDE = TerrainVertexWriter.STRIDE;
-	private static final int MIN_ALLOC = 16000;
+
+	private static int GL31_SUPPORT = -1;
 
 	public final RegionVertexBuffer vertexBuffer;
 
@@ -22,7 +25,6 @@ public class RegionAllocation {
 	private Allocation lastEntry;
 	private Allocation freeAllocations;
 
-	public static final int SPARE_BUFFER_ALLOC = 1024 * 1024 * 24;
 	public static RegionVertexBuffer SPARE_BUFFER;
 
 	public RegionAllocation() {
@@ -36,8 +38,23 @@ public class RegionAllocation {
 			SPARE_BUFFER = new RegionVertexBuffer(SPARE_BUFFER_ALLOC);
 		}
 
+		if (GL31_SUPPORT == -1) {
+			ContextCapabilities cap = GLContext.getCapabilities();
+			GL31_SUPPORT = (cap.GL_ARB_copy_buffer || cap.OpenGL31) ? 1 : 0;
+		}
+
 		this.vertexBuffer = new RegionVertexBuffer(newCapacity);
 		this.capacity = newCapacity;
+	}
+
+	private static void copyReadToTargetBuffer(int fromBuff, int fromOff, int toBuff, int toOff, long size) {
+		GL15.glBindBuffer(GL31.GL_COPY_READ_BUFFER, fromBuff);
+		GL15.glBindBuffer(GL31.GL_COPY_WRITE_BUFFER, toBuff);
+
+		GL31.glCopyBufferSubData(GL31.GL_COPY_READ_BUFFER, GL31.GL_COPY_WRITE_BUFFER, fromOff, toOff, size);
+
+		GL15.glBindBuffer(GL31.GL_COPY_READ_BUFFER, 0);
+		GL15.glBindBuffer(GL31.GL_COPY_WRITE_BUFFER, 0);
 	}
 
 	public void resize(long size) {
@@ -53,7 +70,7 @@ public class RegionAllocation {
 
 		SectionManager.getCurrentInstance().removeMemory(this.capacity);
 
-		if (newSize > SPARE_BUFFER_ALLOC) {
+		if (newSize > SPARE_BUFFER_ALLOC || GL31_SUPPORT == 0) {
 			this.vertexBuffer.allocateSpace(newSize);
 
 			Allocation alloc = this.firstEntry;
@@ -68,9 +85,12 @@ public class RegionAllocation {
 			return;
 		}
 
-		GL45.glCopyNamedBufferSubData(this.vertexBuffer.vboId, SPARE_BUFFER.vboId, 0, 0, this.offset);
+		int regionBuffer = this.vertexBuffer.vboId;
+		int spareBuffer = SPARE_BUFFER.vboId;
+
+		copyReadToTargetBuffer(regionBuffer, 0, spareBuffer, 0, this.offset);
 		this.vertexBuffer.allocateSpace(newSize);
-		GL45.glCopyNamedBufferSubData(SPARE_BUFFER.vboId, this.vertexBuffer.vboId, 0, 0, this.offset);
+		copyReadToTargetBuffer(spareBuffer, 0, regionBuffer, 0, this.offset);
 
 		this.capacity = newSize;
 	}
