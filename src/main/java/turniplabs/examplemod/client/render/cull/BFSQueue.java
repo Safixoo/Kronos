@@ -1,9 +1,13 @@
 package turniplabs.examplemod.client.render.cull;
 
 import turniplabs.examplemod.client.render.SectionRender;
+import turniplabs.examplemod.client.render.region.RegionRender;
 
 public class BFSQueue {
 	public SectionRender[] sectionRenders;
+	public RegionRender[] regionRenders;
+
+	public int regionPos;
 	public int capacity;
 	public int position;
 
@@ -26,6 +30,14 @@ public class BFSQueue {
 		if (this.position + offset >= this.capacity) {
 			this.resize();
 		}
+	}
+
+	public void prepareRegionArr(int renderDistance) {
+		int region8 = (renderDistance >> 3);
+		int region4 = (renderDistance >> 2);
+
+		this.regionRenders = new RegionRender[region8 * region4 * region8];
+		this.regionPos = 0;
 	}
 
 	public void clear() {

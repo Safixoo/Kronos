@@ -368,7 +368,7 @@ public class SectionManager {
 		this.terrainShader.bindProgram();
 		this.terrainShader.setupUniforms(this.camera.cameraX(), this.camera.cameraY(), this.camera.cameraZ(), noFog);
 
-		this.regionManager.drawAllRegions(this.camera, renderPass);
+		this.regionManager.drawAllRegions(this.bfsCuller.bfsQueue, this.camera, renderPass);
 		this.terrainShader.unbindProgram();
 	}
 

@@ -4,6 +4,7 @@ import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
 import it.unimi.dsi.fastutil.objects.*;
 import org.lwjgl.opengl.GL30;
 import turniplabs.examplemod.client.render.SectionManager;
+import turniplabs.examplemod.client.render.cull.BFSQueue;
 import turniplabs.examplemod.client.render.data.CameraData;
 import turniplabs.examplemod.client.util.Mth;
 
@@ -56,12 +57,14 @@ public class RegionManager {
 
 	}
 
-	public void drawAllRegions(CameraData camera, int pass) {
-		ReferenceCollection<RegionRender> aliveRegions = this.regionMap.values();
+	public void drawAllRegions(BFSQueue queue, CameraData camera, int pass) {
+		RegionRender[] regionRenders = queue.regionRenders;
 
-		for (RegionRender region : aliveRegions) {
-			if (region.sectionsToRender == 0) {
-				continue;
+		for (int i = 0; i < regionRenders.length; i++) {
+			RegionRender region = regionRenders[i];
+
+			if (region == null) {
+				break;
 			}
 
 			region.prepareAndDraw(camera, pass);

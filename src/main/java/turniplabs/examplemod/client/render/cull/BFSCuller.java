@@ -24,6 +24,7 @@ public class BFSCuller {
 			render.sectionsToRender = 0;
 		}
 
+		this.bfsQueue.prepareRegionArr(renderDistance);
 		this.bfsQueue.clear();
 		this.activeFrame++;
 	}
@@ -44,7 +45,7 @@ public class BFSCuller {
 				UpdateQueue.addToQueueUnsafe(node);
 			}
 
-			queueRegionNode(node, flags);
+			queueRegionNode(bfsQueue, node, flags);
 
 			int outwardDirections = getOutwardDirections(playerX, playerY, playerZ, node);
 			outwardDirections &= SectionFlags.getAdjacentMask(flags);
@@ -90,21 +91,26 @@ public class BFSCuller {
 				UpdateQueue.addToQueueUnsafe(spawn);
 			}
 
-			queueRegionNode(spawn, flags);
+			queueRegionNode(this.bfsQueue, spawn, flags);
 		}
 
 		bfsSearch(this.bfsQueue, camera.intX, camera.intY, camera.intZ, (int) Mth.square(FogData.fogEnd), this.activeFrame);
 	}
 
-	private static void queueRegionNode(SectionRender section, int flags) {
+	private static void queueRegionNode(BFSQueue bfsQueue, SectionRender section, int flags) {
 		if (!SectionFlags.hasRegion(flags)) {
 			return;
 		}
 
 		RegionRender region = section.region;
 
-		region.renderIndices[region.sectionsToRender & 0xFF] = (byte) section.regionIndex;
-		region.sectionsToRender += SectionFlags.hasPassesNonEmptyBit(flags);
+		if (SectionFlags.hasPassesNonEmpty(flags)) {
+			if (region.sectionsToRender == 0) {
+				bfsQueue.regionRenders[bfsQueue.regionPos++] = region;
+			}
+
+			region.renderIndices[region.sectionsToRender++ & 0xFF] = (byte) section.regionIndex;
+		}
 	}
 
 	private static void exploreNodes(BFSQueue queue, SectionRender fatherNode, int directions, int activeFrame) {
