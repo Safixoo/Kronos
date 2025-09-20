@@ -21,8 +21,9 @@ public abstract class DebugInfoMixin {
 
 			this.drawDebugScreenLineRight("");
 			this.drawDebugScreenLineRight("Safixo Renderer: v0.0");
-			this.drawDebugScreenLineRight("Active Sections: " + manager.allocatedSections());
-			this.drawDebugScreenLineRight("Device MB Used: " + manager.getMemoryUsed() + "/" + manager.getMemoryTotal() + "MiB");
+			this.drawDebugScreenLineRight("Sections: " + manager.allocatedSections());
+			this.drawDebugScreenLineRight("Regions: " + manager.getRegionCount());
+			this.drawDebugScreenLineRight("VRAM U/A: " + manager.getMemoryUsed() + "/" + manager.getMemoryTotal() + "MiB");
 		}
 	}
 }

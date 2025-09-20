@@ -3,6 +3,7 @@ package turniplabs.examplemod.client.render.region;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL15;
 import org.lwjgl.system.MemoryUtil;
+import turniplabs.examplemod.ExampleMod;
 import turniplabs.examplemod.client.render.SectionManager;
 import turniplabs.examplemod.client.render.SectionRender;
 import turniplabs.examplemod.client.render.data.CameraData;
@@ -17,9 +18,6 @@ public class RegionRender {
 	public static final int TRANSLUCENT_DRAWS = 1;
 	public static final int SOLID_DRAWS = Direction.COUNT + 1;
 	public static final int TOTAL_DRAWS = SOLID_DRAWS + TRANSLUCENT_DRAWS;
-
-	public static final int TRANSLUCENT_BIT  = 0b0000001;
-	public static final int SOLID_BITS 		 = 0b1111111;
 
 	// Region coordinates in region space.
 	public int regionX, regionY, regionZ;
@@ -86,6 +84,12 @@ public class RegionRender {
 
 		MemoryUtil.nmemFree(this.solidFirst);
 		MemoryUtil.nmemFree(this.translucentFirst);
+
+		this.solidFirst = MemoryUtil.NULL;
+		this.solidCount = MemoryUtil.NULL;
+
+		this.translucentFirst = MemoryUtil.NULL;
+		this.translucentCount = MemoryUtil.NULL;
 	}
 
 	public void addSolidMesh(SectionRender render, VertexWriterManager manager, int side) {
@@ -130,6 +134,10 @@ public class RegionRender {
 	// work between draw which doesn't pressure the driver immediately, also as we work in a "small"
 	// and contiguous data-set we don't get penalized too much for pulling SectionRenders from memory.
 	public void prepareAndDraw(CameraData camera, int pass) {
+		if ((pass == 0 && this.solidFirst == MemoryUtil.NULL) || (pass == 1 && this.translucentFirst == MemoryUtil.NULL)) {
+			return;
+		}
+
 		final byte[] renderIndices = this.renderIndices;
 		final byte[] drawDataMask = this.drawDataMask;
 		final int sectionsToRender = this.sectionsToRender & 0xFF;
@@ -153,8 +161,8 @@ public class RegionRender {
 
 		vertexBuffer.bind();
 
-		long first = pass == 0 ? this.solidFirst : this.translucentFirst;
-		long count = pass == 0 ? this.solidCount : this.translucentCount;
+		long first = pass != 0 ? this.translucentFirst : this.solidFirst;
+		long count = pass != 0 ? this.translucentCount : this.solidCount;
 
 		GL15.nglMultiDrawArrays(GL11.GL_QUADS, first, count, drawCount);
 	}

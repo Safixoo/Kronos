@@ -6,7 +6,7 @@ import org.lwjgl.opengl.GL30;
 import turniplabs.examplemod.client.render.SectionManager;
 import turniplabs.examplemod.client.render.cull.BFSQueue;
 import turniplabs.examplemod.client.render.data.CameraData;
-import turniplabs.examplemod.client.util.Mth;
+import turniplabs.examplemod.client.util.MathExt;
 
 public class RegionManager {
 	public final Long2ReferenceOpenHashMap<RegionRender> regionMap = new Long2ReferenceOpenHashMap<>();
@@ -44,8 +44,8 @@ public class RegionManager {
 			this.regionMap.clear();
 		}
 
-		double diffX = Mth.square(camera.cameraX() - this.lastUpdateX);
-		double diffZ = Mth.square(camera.cameraZ() - this.lastUpdateZ);
+		double diffX = MathExt.square(camera.cameraX() - this.lastUpdateX);
+		double diffZ = MathExt.square(camera.cameraZ() - this.lastUpdateZ);
 
 		if (diffX + diffZ >= 128) {
 			this.sanitizeRegions(camera);
@@ -59,6 +59,10 @@ public class RegionManager {
 
 	public void drawAllRegions(BFSQueue queue, CameraData camera, int pass) {
 		RegionRender[] regionRenders = queue.regionRenders;
+
+		if (regionRenders == null) {
+			return;
+		}
 
 		for (int i = 0; i < regionRenders.length; i++) {
 			RegionRender region = regionRenders[i];

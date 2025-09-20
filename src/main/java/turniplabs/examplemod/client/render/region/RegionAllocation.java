@@ -1,5 +1,6 @@
 package turniplabs.examplemod.client.render.region;
 
+import net.minecraft.client.render.terrain.VertexBuffer;
 import org.lwjgl.opengl.*;
 import turniplabs.examplemod.client.render.SectionFlags;
 import turniplabs.examplemod.client.render.SectionManager;
@@ -11,7 +12,7 @@ import java.nio.ByteBuffer;
 
 public class RegionAllocation {
 	private static final int SPARE_BUFFER_ALLOC = 1024 * 1024 * 16;
-	private static final int MIN_ALLOC = 1024 * 1024 * 16;
+	private static final int MIN_ALLOC = 1024 * 256;
 	private static final int STRIDE = TerrainVertexWriter.STRIDE;
 
 	private static int GL31_SUPPORT = -1;
@@ -22,7 +23,6 @@ public class RegionAllocation {
 	public long capacity;
 
 	private Allocation firstEntry;
-	private Allocation lastEntry;
 	private Allocation freeAllocations;
 
 	public static RegionVertexBuffer SPARE_BUFFER;
@@ -57,31 +57,56 @@ public class RegionAllocation {
 		GL15.glBindBuffer(GL31.GL_COPY_WRITE_BUFFER, 0);
 	}
 
+	public long getAmplification(long size) {
+		return (size * 3) >>> 1;
+	}
+
 	public void resize(long size) {
 		if (SPARE_BUFFER == null) {
 			return;
 		}
 
-		long newSize = Math.max((this.capacity * 3) >>> 1, size);
+		long newSize = Math.max(getAmplification(size), size);
 
+		// If there's a possibility of avoiding using a temp-buffer for the geometry
+		// it's preferable.
 		if (newSize > SPARE_BUFFER_ALLOC && size <= SPARE_BUFFER_ALLOC) {
 			newSize = SPARE_BUFFER_ALLOC;
 		}
 
 		SectionManager.getCurrentInstance().removeMemory(this.capacity);
 
+		// If there isn't OpenGL support for using a copy function, or it has been
+		// overpassed the copying buffer limit, do mental gymnastics.
 		if (newSize > SPARE_BUFFER_ALLOC || GL31_SUPPORT == 0) {
-			this.vertexBuffer.allocateSpace(newSize);
 
-			Allocation alloc = this.firstEntry;
+			// If the region is more than 64MB avoid allocating a temporal buffer as is preferred
+			// to not duplicate that much memory.
+			if (this.offset > (64 << 20)) {
+				this.vertexBuffer.allocateSpace(newSize);
 
-			while (alloc != null) {
-				alloc.render.flags = SectionFlags.setDirty(alloc.render.flags, true);
-				alloc = alloc.next;
+				Allocation alloc = this.firstEntry;
+
+				while (alloc != null) {
+					alloc.render.flags = SectionFlags.setDirty(alloc.render.flags, true);
+					alloc = alloc.next;
+				}
+
+			} else {
+				// Allocate a temporal buffer to hold region memory.
+				RegionVertexBuffer tempBuffer = new RegionVertexBuffer(this.offset);
+
+				int regionBuffer = this.vertexBuffer.vboId;
+				int spareBuffer = tempBuffer.vboId;
+
+				copyReadToTargetBuffer(regionBuffer, 0, spareBuffer, 0, this.offset);
+				this.vertexBuffer.allocateSpace(newSize);
+				copyReadToTargetBuffer(spareBuffer, 0, regionBuffer, 0, this.offset);
+
+				tempBuffer.clear();
 			}
 
 			this.capacity = newSize;
-
 			return;
 		}
 

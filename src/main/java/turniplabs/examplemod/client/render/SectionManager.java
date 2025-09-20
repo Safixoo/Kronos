@@ -13,12 +13,11 @@ import turniplabs.examplemod.client.render.cull.BFSCuller;
 import turniplabs.examplemod.client.render.cull.FrustumCuller;
 import turniplabs.examplemod.client.render.cull.UpdateQueue;
 import turniplabs.examplemod.client.render.data.CameraData;
-import turniplabs.examplemod.client.render.data.FogData;
 import turniplabs.examplemod.client.render.meshing.BlockRenderer;
 import turniplabs.examplemod.client.render.region.RegionManager;
 import turniplabs.examplemod.client.render.region.RegionRender;
 import turniplabs.examplemod.client.util.Direction;
-import turniplabs.examplemod.client.util.Mth;
+import turniplabs.examplemod.client.util.MathExt;
 
 public class SectionManager {
 	private static final int MAX_UPDATE_QUEUES = 10;
@@ -69,6 +68,10 @@ public class SectionManager {
 
 	public RegionRender getRegion(int sectionX, int sectionY, int sectionZ) {
 		return this.regionManager.getRegion(sectionX, sectionY, sectionZ);
+	}
+
+	public int getRegionCount() {
+		return this.regionManager.regionMap.size();
 	}
 
 	public int allocatedSections() {
@@ -173,10 +176,10 @@ public class SectionManager {
 			this.generateWholeVolume(cameraX, cameraZ);
 		}
 
-		double diffX = Mth.square(cameraX - this.lastUpdateX);
-		double diffZ = Mth.square(cameraZ - this.lastUpdateZ);
+		double diffX = MathExt.square(cameraX - this.lastUpdateX);
+		double diffZ = MathExt.square(cameraZ - this.lastUpdateZ);
 
-		if (diffX + diffZ >= Mth.square(4.0)) {
+		if (diffX + diffZ >= MathExt.square(4.0)) {
 			this.generateSections();
 		}
 
@@ -192,9 +195,9 @@ public class SectionManager {
 	}
 
 	private static CameraData extractCameraData(double cameraX, double cameraY, double cameraZ, int renderDistance) {
-		int playerX = (int) cameraX;
-		int playerY = (int) cameraY;
-		int playerZ = (int) cameraZ;
+		int playerX = (int) Math.floor(cameraX);
+		int playerY = (int) Math.floor(cameraY);
+		int playerZ = (int) Math.floor(cameraZ);
 
 		float fractX = (float) (cameraX - playerX);
 		float fractY = (float) (cameraY - playerY);
@@ -213,10 +216,9 @@ public class SectionManager {
 		this.addFrameSample(currentDiff);
 
 		long maxBudget = Math.min((this.getFrameMedian() * 3) >>> 3, 250_000_000);
-		long lerpedBudget = Mth.lerp(this.lastFrameBudget, maxBudget, partialTick);
-		long smoothedBudget = (long) (Mth.smoothStep(lerpedBudget / 250_001.0) * 250_000.0);
+		long lerpedBudget = MathExt.lerp(this.lastFrameBudget, maxBudget, partialTick);
 
-		this.lastFrameBudget = smoothedBudget;
+		this.lastFrameBudget = lerpedBudget;
 		this.lastFrameTime = currentTime;
 
 		int maxSize = Math.min(MAX_UPDATE_QUEUES, UpdateQueue.size() - 1);
@@ -228,14 +230,17 @@ public class SectionManager {
 		long timePassed = 0L;
 		long estimatedTime = 0L;
 
-		while (i < maxSize && timePassed < smoothedBudget && estimatedTime < smoothedBudget) {
+		while (i < maxSize && timePassed < lerpedBudget && estimatedTime < lerpedBudget) {
 			currentTime = System.nanoTime();
 
+			SectionRender render = UpdateQueue.get(i++);
 			UpdateQueue.get(i++).rebuild(this, this.blockRenderer, this.worldObj);
 
-			samples++;
-			timePassed += System.nanoTime() - currentTime;
-			estimatedTime = (timePassed / samples) * (MAX_UPDATE_QUEUES - i);
+			if (MathExt.euclideanDistance(render, this.camera) > MathExt.square(24.0f)) {
+				samples++;
+				timePassed += System.nanoTime() - currentTime;
+				estimatedTime = (timePassed / samples) * (MAX_UPDATE_QUEUES - i);
+			}
 		}
 
 		UpdateQueue.clear();

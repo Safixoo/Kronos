@@ -10,7 +10,7 @@ import turniplabs.examplemod.client.render.data.FogData;
 import turniplabs.examplemod.client.render.region.RegionManager;
 import turniplabs.examplemod.client.render.region.RegionRender;
 import turniplabs.examplemod.client.util.Direction;
-import turniplabs.examplemod.client.util.Mth;
+import turniplabs.examplemod.client.util.MathExt;
 
 public class BFSCuller {
 	public final BFSQueue bfsQueue = new BFSQueue();
@@ -49,6 +49,8 @@ public class BFSCuller {
 
 			int outwardDirections = getOutwardDirections(playerX, playerY, playerZ, node);
 			outwardDirections &= SectionFlags.getAdjacentMask(flags);
+			// 2398 con - 2420 sin
+//			outwardDirections &= getAngleVisibilityMask(playerX, playerY, playerZ, node);
 
 			exploreNodes(bfsQueue, node, outwardDirections, activeFrame);
 		}
@@ -67,7 +69,7 @@ public class BFSCuller {
 			return true;
 		}
 
-		if (distance >= Mth.square(128) && SectionFlags.hasDrawableFaces(flags)) {
+		if (distance >= MathExt.square(128) && SectionFlags.hasDrawableFaces(flags)) {
 			return !visibleByRayCast(node.blockX + 8, node.blockY + 8, node.blockZ + 8, -distX, -distY, -distZ);
 		}
 
@@ -84,7 +86,9 @@ public class BFSCuller {
 		if (spawn != null) {
 			int flags = spawn.flags;
 
+			UpdateQueue.addToQueue(spawn);
 			BFSVisArray.setVisible(spawn.blockX >> 4, spawn.blockY >> 4, spawn.blockZ >> 4);
+
 			exploreNodes(this.bfsQueue, spawn, SectionFlags.getAdjacentMask(flags), this.activeFrame);
 
 			if (SectionFlags.isDirty(flags)) {
@@ -94,17 +98,13 @@ public class BFSCuller {
 			queueRegionNode(this.bfsQueue, spawn, flags);
 		}
 
-		bfsSearch(this.bfsQueue, camera.intX, camera.intY, camera.intZ, (int) Mth.square(FogData.fogEnd), this.activeFrame);
+		bfsSearch(this.bfsQueue, camera.intX, camera.intY, camera.intZ, (int) MathExt.square(FogData.fogEnd), this.activeFrame);
 	}
 
 	private static void queueRegionNode(BFSQueue bfsQueue, SectionRender section, int flags) {
-		if (!SectionFlags.hasRegion(flags)) {
-			return;
-		}
-
-		RegionRender region = section.region;
-
 		if (SectionFlags.hasPassesNonEmpty(flags)) {
+			RegionRender region = section.region;
+
 			if (region.sectionsToRender == 0) {
 				bfsQueue.regionRenders[bfsQueue.regionPos++] = region;
 			}
@@ -118,36 +118,38 @@ public class BFSCuller {
 			return;
 		}
 
-		queue.verifyCapacity(Direction.COUNT + 1);
+		queue.verifyCapacity(Direction.COUNT);
 
-		if (Direction.hasSet(directions, Direction.DOWN) && fatherNode.adjacentDown.currentFrame < activeFrame) {
-			queue.addToQueueUnsafe(fatherNode.adjacentDown);
-			fatherNode.adjacentDown.currentFrame = activeFrame;
+		SectionRender render;
+
+		if (Direction.hasSet(directions, Direction.DOWN) && (render = fatherNode.adjacentDown).currentFrame < activeFrame) {
+			queue.addToQueueUnsafe(render);
+			render.currentFrame = activeFrame;
 		}
 
-		if (Direction.hasSet(directions, Direction.UP) && fatherNode.adjacentUp.currentFrame < activeFrame) {
-			queue.addToQueueUnsafe(fatherNode.adjacentUp);
-			fatherNode.adjacentUp.currentFrame = activeFrame;
+		if (Direction.hasSet(directions, Direction.UP) && (render = fatherNode.adjacentUp).currentFrame < activeFrame) {
+			queue.addToQueueUnsafe(render);
+			render.currentFrame = activeFrame;
 		}
 
-		if (Direction.hasSet(directions, Direction.NORTH) && fatherNode.adjacentNorth.currentFrame < activeFrame) {
-			queue.addToQueueUnsafe(fatherNode.adjacentNorth);
-			fatherNode.adjacentNorth.currentFrame = activeFrame;
+		if (Direction.hasSet(directions, Direction.NORTH) && (render = fatherNode.adjacentNorth).currentFrame < activeFrame) {
+			queue.addToQueueUnsafe(render);
+			render.currentFrame = activeFrame;
 		}
 
-		if (Direction.hasSet(directions, Direction.SOUTH) && fatherNode.adjacentSouth.currentFrame < activeFrame) {
-			queue.addToQueueUnsafe(fatherNode.adjacentSouth);
-			fatherNode.adjacentSouth.currentFrame = activeFrame;
+		if (Direction.hasSet(directions, Direction.SOUTH) && (render = fatherNode.adjacentSouth).currentFrame < activeFrame) {
+			queue.addToQueueUnsafe(render);
+			render.currentFrame = activeFrame;
 		}
 
-		if (Direction.hasSet(directions, Direction.WEST) && fatherNode.adjacentWest.currentFrame < activeFrame) {
-			queue.addToQueueUnsafe(fatherNode.adjacentWest);
-			fatherNode.adjacentWest.currentFrame = activeFrame;
+		if (Direction.hasSet(directions, Direction.WEST) && (render = fatherNode.adjacentWest).currentFrame < activeFrame) {
+			queue.addToQueueUnsafe(render);
+			render.currentFrame = activeFrame;
 		}
 
-		if (Direction.hasSet(directions, Direction.EAST) && fatherNode.adjacentEast.currentFrame < activeFrame) {
-			queue.addToQueueUnsafe(fatherNode.adjacentEast);
-			fatherNode.adjacentEast.currentFrame = activeFrame;
+		if (Direction.hasSet(directions, Direction.EAST) && (render = fatherNode.adjacentEast).currentFrame < activeFrame) {
+			queue.addToQueueUnsafe(render);
+			render.currentFrame = activeFrame;
 		}
 	}
 

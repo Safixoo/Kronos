@@ -74,14 +74,6 @@ public class BlockRenderer {
 		this.chunkCache = chunkCache;
 	}
 
-	public boolean shouldDrawSide(int x, int y, int z) {
-		return !this.chunkCache.isBlockOpaqueCube(x, y, z);
-	}
-
-	public boolean shouldDrawSideCenter(int x, int y, int z) {
-		return !this.chunkCache.isBlockOpaqueCubeCenter(x, y, z);
-	}
-
 	private void renderSide(Block<?> block, BlockModel<?> blockModel, ModelBoundsData bounds, int x, int y, int z, int side, int color) {
 		VertexWriterManager.setCurrentInstance(VertexWriterManager.SOLID[side]);
 

@@ -104,18 +104,6 @@ public class SectionRender {
 							continue;
 						}
 
-						if (BlocksFlags.SOLID[blockId]) {
-							solidBlocks++;
-							if (y == maxY - 1) solidFaces[Direction.UP]++;
-							if (y == minY) solidFaces[Direction.DOWN]++;
-
-							if (x == maxX - 1) solidFaces[Direction.EAST]++;
-							if (x == minX) solidFaces[Direction.WEST]++;
-
-							if (z == maxZ - 1) solidFaces[Direction.SOUTH]++;
-							if (z == minZ) solidFaces[Direction.NORTH]++;
-						}
-
 						BlockColor blockColor;
 						BlockModel<?> blockModel;
 						Block<?> block = Blocks.getBlock(blockId);
@@ -137,6 +125,16 @@ public class SectionRender {
 						}
 
 						if (BlocksFlags.SOLID[blockId] || model instanceof BlockModelLeaves) {
+							solidBlocks++;
+							if (y == maxY - 1) solidFaces[Direction.UP]++;
+							if (y == minY) solidFaces[Direction.DOWN]++;
+
+							if (x == maxX - 1) solidFaces[Direction.EAST]++;
+							if (x == minX) solidFaces[Direction.WEST]++;
+
+							if (z == maxZ - 1) solidFaces[Direction.SOUTH]++;
+							if (z == minZ) solidFaces[Direction.NORTH]++;
+
 							FullBlockMesher.renderFaces(model, blockColor, this.sectionCache, x, y, z);
 
 							if (model instanceof BlockModelGrass) {
