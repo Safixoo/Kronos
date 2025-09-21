@@ -12,7 +12,7 @@ import turniplabs.examplemod.client.render.vertex.writer.TerrainFormat;
 
 public class RegionRender {
 	// Region total volume area in SectionRenders.
-	public static final int REGION_SECTION_SIZE = 256;
+	public static final int REGION_SECTION_SIZE = 256; // 8 * 4 * 8
 
 	public static final int TRANSLUCENT_DRAWS = 1;
 	public static final int SOLID_DRAWS = Direction.COUNT + 1;
@@ -59,9 +59,9 @@ public class RegionRender {
 	public static final RegionRender NULL = new RegionRender(0, Integer.MIN_VALUE, 0);
 
 	public RegionRender(int sectionX, int sectionY, int sectionZ) {
-		this.regionX = sectionX >> 3;
-		this.regionY = sectionY >> 2;
-		this.regionZ = sectionZ >> 3;
+		this.regionX = sectionX >> (RegionRender.BLOCK_SHIFT_X - 4);
+		this.regionY = sectionY >> (RegionRender.BLOCK_SHIFT_Y - 4);
+		this.regionZ = sectionZ >> (RegionRender.BLOCK_SHIFT_Z - 4);
 	}
 
 	private void prepareSolidPtr() {
@@ -81,12 +81,16 @@ public class RegionRender {
 	public void clear() {
 		if (this.solidBuffer != null) {
 			SectionManager.getCurrentInstance().removeUsedMemory(this.solidBuffer.offset);
-			this.solidBuffer.vertexBuffer.clear();
+
+			this.solidBuffer.clear();
+			this.solidBuffer = null;
 		}
 
 		if (this.translucentBuffer != null) {
 			SectionManager.getCurrentInstance().removeUsedMemory(this.translucentBuffer.offset);
-			this.translucentBuffer.vertexBuffer.clear();
+
+			this.translucentBuffer.clear();
+			this.translucentBuffer = null;
 		}
 
 		if (this.solidFirst != MemoryUtil.NULL) {
@@ -238,9 +242,9 @@ public class RegionRender {
 	}
 
 	public static int regionIndex(int sectionX, int sectionY, int sectionZ) {
-		int bitsX = sectionX - ((sectionX >>> 3) << 3);
-		int bitsY = sectionY - ((sectionY >>> 2) << 2);
-		int bitsZ = sectionZ - ((sectionZ >>> 3) << 3);
+		int bitsX = sectionX - ((sectionX >> 3) << 3);
+		int bitsY = sectionY - ((sectionY >> 2) << 2);
+		int bitsZ = sectionZ - ((sectionZ >> 3) << 3);
 
 		return (bitsX << 0) | (bitsY << 3) | (bitsZ << 5);
 	}

@@ -41,6 +41,10 @@ public class BFSQueue {
 	}
 
 	public void clear() {
+		for (int i = 0; i < this.position; i++) {
+			this.sectionRenders[i] = null;
+		}
+
 		this.position = 1;
 	}
 

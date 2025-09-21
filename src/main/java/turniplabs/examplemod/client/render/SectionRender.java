@@ -171,14 +171,6 @@ public class SectionRender {
 			timePassed = 0;
 		}
 
-//		for (int y = minY; y < maxY; y++) {
-//			for (int z = minZ; z < maxZ; z++) {
-//				for (int x = minX; x < maxX; x ++) {
-//					solidBlocks = queueBlock(x, y, z, blockRenderer, renderBlocks, blockInfo, solidFaces, solidBlocks, false);
-//				}
-//			}
-//		}
-
 		this.processCullFaces(solidFaces);
 
 		int sumVertices = this.sumAllSolidVertices();
@@ -190,13 +182,12 @@ public class SectionRender {
 		byte drawMask = (byte) (solidDrawMask << 1 & 0b1_111_111_0 | translucentDrawMask);
 		this.region.drawDataMask[this.regionIndex] = drawMask;
 
-		int nonEmptyTranslucent = translucentDrawMask << 1;
+		int nonEmptyTranslucent = (translucentDrawMask << 1) & 0b10;
 		int nonEmptySolid = solidDrawMask != 0 ? 0b01 : 0;
 
 		boolean emptySolid = solidBlocks == 4096 && sumVertices == 0;
 
 		this.flags = SectionFlags.setDirty(this.flags, false);
-		this.flags = SectionFlags.setRegion(this.flags, this.region != RegionRender.NULL);
 		this.flags = SectionFlags.setEmptySolid(this.flags, emptySolid);
 		this.flags = SectionFlags.setPassesNonEmpty(this.flags, nonEmptyTranslucent | nonEmptySolid);
 		this.flags = SectionFlags.setDrawableFaces(this.flags, solidDrawMask);
@@ -216,13 +207,6 @@ public class SectionRender {
 
 	static long samples = 0;
 	static long timePassed = 0;
-
-	private int queueBlock(int x, int y, int z, RenderBlocks renderBlocks,
-							BlockInfo blockInfo, int[] solidFaces, int solidBlocks) {
-
-
-		return solidBlocks;
-	}
 
 	private void uploadMeshesToRegion(SectionManager sectionManager, VertexWriterManager translucentWriter, int sumVertices) {
 		if (sumVertices > 0) {
@@ -339,11 +323,5 @@ public class SectionRender {
 		} else {
 			return this.adjacentSouth;
 		}
-	}
-
-	public static class BlockInfo {
-		public BlockModel<?> lastModel;
-		public BlockColor lastBlockColor;
-		public int lastBlockId = -1;
 	}
 }

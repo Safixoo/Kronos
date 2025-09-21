@@ -397,9 +397,9 @@ public class SectionManager {
 	}
 
 	private SectionRender getSection(SectionRender section, int direction) {
-		int chunkX = (section.blockX >>> 4) + Direction.x(direction);
-		int chunkY = (section.blockY >>> 4) + Direction.y(direction);
-		int chunkZ = (section.blockZ >>> 4) + Direction.z(direction);
+		int chunkX = (section.blockX >> 4) + Direction.x(direction);
+		int chunkY = (section.blockY >> 4) + Direction.y(direction);
+		int chunkZ = (section.blockZ >> 4) + Direction.z(direction);
 
 		return this.sectionMap.getOrDefault(asLong(chunkX, chunkY, chunkZ), null);
 	}

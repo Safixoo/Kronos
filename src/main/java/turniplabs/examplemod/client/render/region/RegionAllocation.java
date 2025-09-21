@@ -86,7 +86,12 @@ public class RegionAllocation {
 				Allocation alloc = this.firstEntry;
 
 				while (alloc != null) {
-					alloc.render.flags = SectionFlags.setDirty(alloc.render.flags, true);
+					int flags = alloc.render.flags;
+
+					flags = SectionFlags.setPassesNonEmpty(flags, 0b00);
+					flags = SectionFlags.setDirty(flags, true);
+
+					alloc.render.flags = flags;
 					alloc = alloc.next;
 				}
 
@@ -116,6 +121,25 @@ public class RegionAllocation {
 		copyReadToTargetBuffer(spareBuffer, 0, regionBuffer, 0, this.offset);
 
 		this.capacity = newSize;
+	}
+
+	// When freeing all the allocations of the region, is also wanted to avoid any interference
+	// with the sections and the invalid region/allocation.
+	public void clear() {
+		this.vertexBuffer.clear();
+		Allocation alloc = this.firstEntry;
+
+		while (alloc != null) {
+			int flags = alloc.render.flags;
+
+			flags = SectionFlags.setPassesNonEmpty(flags, 0b00);
+			flags = SectionFlags.setDrawableFaces(flags, 0b0);
+			flags = SectionFlags.setDirty(flags, true);
+
+			alloc.render.flags = flags;
+			alloc.render.region = RegionRender.NULL;
+			alloc = alloc.next;
+		}
 	}
 
 	// Returns first << 32 | count.

@@ -53,7 +53,8 @@ public class RegionManager {
 			this.lastUpdateX = camera.cameraXD();
 			this.lastUpdateZ = camera.cameraZD();
 
-			this.sanitizeRegions(camera);
+			// TODO: Fix crashes drawing because of region removal.
+			//this.sanitizeRegions(camera);
 		}
 
 	}

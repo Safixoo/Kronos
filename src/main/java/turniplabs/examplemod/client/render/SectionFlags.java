@@ -53,14 +53,6 @@ public class SectionFlags {
 		return (flags & ~EMPTY_SOLID_SECTION) | (emptySolid ? 1 : 0) << 2;
 	}
 
-	public static boolean hasRegion(int flags) {
-		return (flags & HAS_REGION) != 0;
-	}
-
-	public static int setRegion(int flags, boolean yesOrNo) {
-		return (flags & ~HAS_REGION) | (yesOrNo ? 1 : 0) << 23;
-	}
-
 	public static int getCullFaces(int flags) {
 		return (flags & CULL_FACES) >>> 9;
 	}
