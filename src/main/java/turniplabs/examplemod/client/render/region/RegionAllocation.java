@@ -82,7 +82,7 @@ public class RegionAllocation {
 
 			// If the region is more than 64MB avoid allocating a temporal buffer as is preferred
 			// to not duplicate that much memory.
-			if (this.offset > (64 << 20)) {
+			if (this.offset > (64 << 20) || GL31_SUPPORT == 0) {
 				this.vertexBuffer.allocateSpace(newSize);
 
 				Allocation alloc = this.firstEntry;
