@@ -6,15 +6,10 @@
   "client": [
     "BlockModelMixin",
     "DebugInfoMixin",
-    "RenderBlocksMixin",
-    "injects.AABBMixin",
-    "injects.BlockLogicMixin",
-    "injects.BlocksMixin",
     "injects.FogManagerMixin",
     "injects.FrustumMixin",
     "injects.TesselatorStandardMixin",
     "opts.OpenGlHelperMixin",
-    "opts.RenderBlockCacheMixin",
     "opts.rendering.RenderGlobalMixin"
   ],
   "injectors": {

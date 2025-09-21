@@ -7,12 +7,13 @@ import net.minecraft.core.util.helper.Side;
 import org.joml.Vector2i;
 import org.joml.Vector3f;
 import org.joml.Vector3i;
+import org.lwjgl.system.MemoryUtil;
 import turniplabs.examplemod.client.render.data.SectionCache;
 import turniplabs.examplemod.client.util.BlocksFlags;
 import turniplabs.examplemod.client.util.ColorBGRManager;
 import turniplabs.examplemod.client.util.Direction;
 import turniplabs.examplemod.client.vertex.VertexWriterManager;
-import turniplabs.examplemod.client.vertex.writer.TerrainVertexWriter;
+import turniplabs.examplemod.client.vertex.writer.TerrainFormat;
 
 public class FullBlockMesher {
 	private static final int[] SHADE_FULL_COLOR = new int[Direction.COUNT];
@@ -20,6 +21,8 @@ public class FullBlockMesher {
 	private static final float[] VERT_UVS = new float[4];
 
 	private static final Vector2i[] MAP_ID_TO_UV = new Vector2i[4];
+
+	public static final float[] SIDE_LIGHT_MULTIPLIER = new float[] { 0.5F, 1.0F, 0.8F, 0.8F, 0.6F, 0.6F };
 
 	public static void renderFaces(BlockModel<?> model, BlockColor blockColor, SectionCache cache, int x, int y, int z) {
 		int meta = cache.getBlockMetadataCenter(x, y, z);
@@ -92,7 +95,7 @@ public class FullBlockMesher {
 		int color2 = ColorBGRManager.multiplyColor(color, ao(negZ, negX, cornerNN));
 		int color3 = ColorBGRManager.multiplyColor(color, ao(posZ, negX, cornerNP));
 
-		VertexWriterManager.getCurrentInstance().ensureCapacity(TerrainVertexWriter.STRIDE * 4);
+		VertexWriterManager.getCurrentInstance().ensureCapacity(TerrainFormat.STRIDE * 4);
 
 		float inverseW = (float) tex.parentAtlas.getInverseWidth();
 		float inverseH = (float) tex.parentAtlas.getInverseWidth();
@@ -132,12 +135,18 @@ public class FullBlockMesher {
 		float relZ = z + vertOff.z;
 
 		VertexWriterManager manager = VertexWriterManager.getCurrentInstance();
+		long ptr = manager.getTotalOffset();
 
-		manager.setPos(relX, relY, relZ);
-		manager.setUv(u, v);
-		manager.setColor(color | 0xFF_000000);
+		MemoryUtil.memPutFloat(ptr + 0, relX);
+		MemoryUtil.memPutFloat(ptr + 4, relY);
+		MemoryUtil.memPutFloat(ptr + 8, relZ);
 
-		manager.addVertex();
+		MemoryUtil.memPutFloat(ptr + 12, u);
+		MemoryUtil.memPutFloat(ptr + 16, v);
+
+		MemoryUtil.memPutInt(ptr + 20, color | 0xFF_000000);
+
+		manager.addVertexCounter();
 	}
 
 	// Leaves reduce lighting much more than opaque blocks.
@@ -277,8 +286,8 @@ public class FullBlockMesher {
 		POS_Y.processCornersDir();
 
 		for (int i = 0; i < Direction.COUNT; i++) {
-			SHADE_FULL_COLOR[i] = ColorBGRManager.multiplyColor(0xFF_FF_FF, BlockRenderer.SIDE_LIGHT_MULTIPLIER[i]);
-			SHADE_FULL_FACTOR[i] = (int) (BlockRenderer.SIDE_LIGHT_MULTIPLIER[i] * 256.0f);
+			SHADE_FULL_COLOR[i] = ColorBGRManager.multiplyColor(0xFF_FF_FF, SIDE_LIGHT_MULTIPLIER[i]);
+			SHADE_FULL_FACTOR[i] = (int) (SIDE_LIGHT_MULTIPLIER[i] * 256.0f);
 		}
 	}
 }

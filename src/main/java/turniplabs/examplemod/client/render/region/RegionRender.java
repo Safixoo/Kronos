@@ -3,13 +3,12 @@ package turniplabs.examplemod.client.render.region;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL15;
 import org.lwjgl.system.MemoryUtil;
-import turniplabs.examplemod.ExampleMod;
 import turniplabs.examplemod.client.render.SectionManager;
 import turniplabs.examplemod.client.render.SectionRender;
 import turniplabs.examplemod.client.render.data.CameraData;
 import turniplabs.examplemod.client.util.Direction;
 import turniplabs.examplemod.client.vertex.VertexWriterManager;
-import turniplabs.examplemod.client.vertex.writer.TerrainVertexWriter;
+import turniplabs.examplemod.client.vertex.writer.TerrainFormat;
 
 public class RegionRender {
 	// Region total volume area in SectionRenders.
@@ -21,6 +20,14 @@ public class RegionRender {
 
 	// Region coordinates in region space.
 	public int regionX, regionY, regionZ;
+
+	public static final int BLOCK_SHIFT_X = 7;
+	public static final int BLOCK_SHIFT_Y = 6;
+	public static final int BLOCK_SHIFT_Z = 7;
+
+	public static final int RADIUS_X = 1 << (BLOCK_SHIFT_X - 1);
+	public static final int RADIUS_Y = 1 << (BLOCK_SHIFT_Y - 1);
+	public static final int RADIUS_Z = 1 << (BLOCK_SHIFT_Z - 1);
 
 	// The vertex-buffers and its arenas.
 	private RegionAllocation translucentBuffer;
@@ -82,19 +89,24 @@ public class RegionRender {
 			this.translucentBuffer.vertexBuffer.clear();
 		}
 
-		MemoryUtil.nmemFree(this.solidFirst);
-		MemoryUtil.nmemFree(this.translucentFirst);
+		if (this.solidFirst != MemoryUtil.NULL) {
+			MemoryUtil.nmemFree(this.solidFirst);
 
-		this.solidFirst = MemoryUtil.NULL;
-		this.solidCount = MemoryUtil.NULL;
+			this.solidFirst = MemoryUtil.NULL;
+			this.solidCount = MemoryUtil.NULL;
+		}
 
-		this.translucentFirst = MemoryUtil.NULL;
-		this.translucentCount = MemoryUtil.NULL;
+		if (this.translucentFirst != MemoryUtil.NULL) {
+			MemoryUtil.nmemFree(this.translucentFirst);
+
+			this.translucentFirst = MemoryUtil.NULL;
+			this.translucentCount = MemoryUtil.NULL;
+		}
 	}
 
 	public void addSolidMesh(SectionRender render, VertexWriterManager manager, int side) {
 		if (this.solidBuffer == null) {
-			this.solidBuffer = new RegionAllocation(manager.getVertices() * TerrainVertexWriter.STRIDE);
+			this.solidBuffer = new RegionAllocation(manager.getVertices() * TerrainFormat.STRIDE);
 		}
 
 		if (this.solidFirst == MemoryUtil.NULL) {
@@ -113,7 +125,7 @@ public class RegionRender {
 
 	public void addTranslucentMesh(SectionRender render, VertexWriterManager manager) {
 		if (this.translucentBuffer == null) {
-			this.translucentBuffer = new RegionAllocation(manager.getVertices() * TerrainVertexWriter.STRIDE);
+			this.translucentBuffer = new RegionAllocation(manager.getVertices() * TerrainFormat.STRIDE);
 		}
 
 		if (this.translucentFirst == MemoryUtil.NULL) {
@@ -172,9 +184,9 @@ public class RegionRender {
 			return drawCount;
 		}
 
-		int blockX = (sectionX(regionIndex) + (this.regionX << 3)) << 4;
-		int blockY = (sectionY(regionIndex) + (this.regionY << 2)) << 4;
-		int blockZ = (sectionZ(regionIndex) + (this.regionZ << 3)) << 4;
+		int blockX = (sectionX(regionIndex) << 4) + (this.regionX << BLOCK_SHIFT_X);
+		int blockY = (sectionY(regionIndex) << 4) + (this.regionY << BLOCK_SHIFT_Y);
+		int blockZ = (sectionZ(regionIndex) << 4) + (this.regionZ << BLOCK_SHIFT_Z);
 
 		int visibleFaces = getVisibleFaces(camera.intX, camera.intY, camera.intZ, blockX, blockY, blockZ) & solidMask;
 
@@ -243,5 +255,17 @@ public class RegionRender {
 
 	public static int sectionZ(int regionIndex) {
 		return (regionIndex & 0b111_00_000) >>> 5;
+	}
+
+	public int centerBlockX() {
+		return (this.regionX << BLOCK_SHIFT_X) + RADIUS_X;
+	}
+
+	public int centerBlockY() {
+		return (this.regionY << BLOCK_SHIFT_Y) + RADIUS_Y;
+	}
+
+	public int centerBlockZ() {
+		return (this.regionZ << BLOCK_SHIFT_Z) + RADIUS_Z;
 	}
 }

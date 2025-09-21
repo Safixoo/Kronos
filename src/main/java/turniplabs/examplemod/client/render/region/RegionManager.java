@@ -1,6 +1,7 @@
 package turniplabs.examplemod.client.render.region;
 
 import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.objects.*;
 import org.lwjgl.opengl.GL30;
 import turniplabs.examplemod.client.render.SectionManager;
@@ -11,14 +12,15 @@ import turniplabs.examplemod.client.util.MathExt;
 public class RegionManager {
 	public final Long2ReferenceOpenHashMap<RegionRender> regionMap = new Long2ReferenceOpenHashMap<>();
 
-	private long lastPosition = -1;
-	private RegionRender lastRegion;
-
 	private double lastUpdateX;
 	private double lastUpdateZ;
 
 	public RegionRender getRegion(int sectionX, int sectionY, int sectionZ) {
-		long position = SectionManager.asLong(sectionX >> 3, sectionY >> 2, sectionZ >> 3);
+		int regionX = sectionX >> (RegionRender.BLOCK_SHIFT_X - 4);
+		int regionY = sectionY >> (RegionRender.BLOCK_SHIFT_Y - 4);
+		int regionZ = sectionZ >> (RegionRender.BLOCK_SHIFT_Z - 4);
+
+		long position = SectionManager.asLong(regionX, regionY, regionZ);
 		RegionRender region = this.regionMap.getOrDefault(position, null);
 
 		if (region == null) {
@@ -44,17 +46,35 @@ public class RegionManager {
 			this.regionMap.clear();
 		}
 
-		double diffX = MathExt.square(camera.cameraX() - this.lastUpdateX);
-		double diffZ = MathExt.square(camera.cameraZ() - this.lastUpdateZ);
+		double diffX = Math.abs(camera.cameraXD() - this.lastUpdateX);
+		double diffZ = Math.abs(camera.cameraZD() - this.lastUpdateZ);
 
 		if (diffX + diffZ >= 128) {
+			this.lastUpdateX = camera.cameraXD();
+			this.lastUpdateZ = camera.cameraZD();
+
 			this.sanitizeRegions(camera);
 		}
 
 	}
 
 	public void sanitizeRegions(CameraData camera) {
+		ReferenceCollection<RegionRender> regions = this.regionMap.values();
 
+		int maxRadius = Math.max(RegionRender.RADIUS_Z, RegionRender.RADIUS_X);
+		int maxDistance = MathExt.square((camera.renderDistance << 4) + maxRadius + 64);
+		LongArrayList toRemoveList = new LongArrayList();
+
+		for (RegionRender region : regions) {
+			if (MathExt.squaredDistance(region, camera) > maxDistance) {
+				toRemoveList.add(SectionManager.asLong(region.regionX, region.regionY, region.regionZ));
+				region.clear();
+			}
+		}
+
+		for (long position : toRemoveList) {
+			this.regionMap.remove(position);
+		}
 	}
 
 	public void drawAllRegions(BFSQueue queue, CameraData camera, int pass) {

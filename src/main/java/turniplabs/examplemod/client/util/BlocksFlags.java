@@ -6,7 +6,6 @@ import net.minecraft.core.block.Blocks;
 import net.minecraft.core.block.material.Material;
 
 public class BlocksFlags {
-	public static final Block<?>[] BLOCKS_LIST = new Block[2048];
 	public static final Material[] MATERIAL = new Material[2048];
 	public static final boolean[] SOLID = new boolean[2048];
 	public static final byte[] SOLID_LIGHT_MASK = new byte[2048];
@@ -23,7 +22,7 @@ public class BlocksFlags {
 			SOLID_LIGHT_MASK[i] = (byte) ((Blocks.solid[i] || MATERIAL[i] == Material.leaves) ? 1 : 0);
 			SOLID[i] = Blocks.solid[i] || (MATERIAL[i] == Material.leaves && Minecraft.getMinecraft().gameSettings.fancyGraphics.value == 0);
 			SOLID_MASK[i] = (byte) (SOLID[i] ? 1 : 0);
-			LIT_INTERIOR[i] = i != 0 && BLOCKS_LIST[i] != null && BLOCKS_LIST[i].isLitInteriorSurface;
+			LIT_INTERIOR[i] = i != 0 && block != null && block.isLitInteriorSurface;
 		}
 	}
 
@@ -37,9 +36,5 @@ public class BlocksFlags {
 			}
 		}
 
-	}
-
-	public static void addBlockToList(Block<?> block) {
-		BLOCKS_LIST[block.id()] = block;
 	}
 }

@@ -13,15 +13,14 @@ import net.minecraft.core.block.Block;
 import net.minecraft.core.block.Blocks;
 import net.minecraft.core.util.phys.AABB;
 import net.minecraft.core.world.World;
+import turniplabs.examplemod.ExampleMod;
 import turniplabs.examplemod.client.render.meshing.FullBlockMesher;
 import turniplabs.examplemod.client.render.region.RegionRender;
 import turniplabs.examplemod.client.vertex.VertexWriterManager;
 import turniplabs.examplemod.client.render.data.SectionCache;
-import turniplabs.examplemod.client.render.meshing.BlockRenderer;
 import turniplabs.examplemod.client.util.BlocksFlags;
 import turniplabs.examplemod.client.util.Direction;
 import turniplabs.examplemod.client.vertex.format.DefaultVertexFormats;
-import turniplabs.examplemod.mixins.injects.AABBMixin;
 
 // Saves basic info for each section from the world, is used mostly for culling and
 // meshing, rendering is almost only managed in the RegionRender in an objectless fashion.
@@ -54,7 +53,12 @@ public class SectionRender {
 	private static final float EPSILON = 6E-4f;
 	private static final AABB GRASS = AABB.getPermanentBB(-EPSILON, 0, -EPSILON, 1 + EPSILON, 1, 1 + EPSILON);
 
-	public void rebuild(SectionManager sectionManager, BlockRenderer blockRenderer, World world) {
+	public void rebuild(SectionManager sectionManager, World world) {
+		// Shouldn't happen, but it seems that there is a lot of state leak.
+		if (!SectionFlags.isDirty(this.flags)) {
+			return;
+		}
+
 		ChunkRenderer.updates++;
 		BlocksFlags.processLeavesSolid();
 
@@ -75,7 +79,6 @@ public class SectionRender {
 		SectionCache sectionCache = this.sectionCache;
 		RenderBlocks renderBlocks = new RenderBlocks(sectionCache);
 		BlockModel.setRenderBlocks(renderBlocks);
-		blockRenderer.setChunkCache(sectionCache);
 
 		VertexWriterManager translucentWriter = VertexWriterManager.TRANSLUCENT;
 

@@ -21,7 +21,9 @@ public class BlockModelMixin {
 		method = "<init>",
 		at = @At("TAIL")
 	)
-	private void avoidNull(Block block, CallbackInfo ci) {
+	private void avoidNull(Block<?> block, CallbackInfo ci) {
+		// For a reason, in my instance it constantly crashes because of a null
+		// renderBlocks when rendering inventory, using a dummy first time fixes it.
 		if (renderBlocks == null) {
 			renderBlocks = DUMMY;
 		}

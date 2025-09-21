@@ -1,35 +1,31 @@
 package turniplabs.examplemod.client.vertex;
 
-import net.minecraft.client.GLAllocation;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import org.lwjgl.system.MemoryUtil;
 import turniplabs.examplemod.client.util.Direction;
+import turniplabs.examplemod.client.vertex.format.VertexAttribute;
 import turniplabs.examplemod.client.vertex.format.VertexFormat;
-
-import java.nio.ByteBuffer;
 
 // Remplazar toda la clase con una implementacion de MemoryUtil.
 public class VertexWriterManager {
-	public float x;
-	public float y;
-	public float z;
-	public float transX, transY, transZ;
-	public float u, v;
-	public int color;
-	public int lightMap;
-	public int normal;
-
-	private int capacity;
-
-	private ByteBuffer vertexData;
-	private VertexFormat vertexFormat;
-
-	private int vertices = 0;
-	private boolean isDrawing = false;
-	private int offset = 0;
-
 	private static final VertexWriterManager DEFAULT_INSTANCE = new VertexWriterManager();
 
+	public static final ObjectArrayList<VertexWriterManager> VERTEX_WRITERS = new ObjectArrayList<>();
 	public static final VertexWriterManager[] SOLID = new VertexWriterManager[Direction.COUNT + 1];
 	public static final VertexWriterManager TRANSLUCENT = new VertexWriterManager();
+
+	public float x, y, z;
+	public float trasX, trasY, trasZ;
+	public float u, v;
+	public int color, lightMap, normal;
+
+	private long capacity;
+	private long vertexPtr;
+
+	private VertexFormat vertexFormat;
+
+	private int offset, vertices;
+	public boolean isDrawing = false;
 
 	static {
 		for (int dir = 0; dir < Direction.COUNT + 1; dir++) {
@@ -40,9 +36,10 @@ public class VertexWriterManager {
 	private static VertexWriterManager CURRENT_INSTANCE;
 
 	public VertexWriterManager(int capacity) {
+//		VERTEX_WRITERS.add(this);
+
 		this.capacity = capacity;
-		this.vertexData = GLAllocation.createDirectByteBuffer(this.capacity);
-		this.vertexData.clear();
+		this.vertexPtr = MemoryUtil.nmemAlloc(capacity);
 	}
 
 	public VertexWriterManager() {
@@ -62,109 +59,75 @@ public class VertexWriterManager {
 	}
 
 	public void startDrawing() {
-		this.vertices = 0;
 		this.offset = 0;
+		this.vertices = 0;
 		this.isDrawing = true;
 	}
 
 	public void ensureCapacity(int offset) {
-		if ((this.offset + offset * 2) >= this.capacity) {
-			this.grow();
+		if ((this.offset + offset * 2L) >= this.capacity) {
+			this.grow(this.offset + offset * 2L);
 		}
 	}
 
-	public void addVertexUnsafe() {
-		this.vertexFormat.writeVertex(this.vertexData, this.offset);
-		this.vertices++;
+	public void addVertexCounter() {
 		this.offset += this.vertexFormat.getStride();
+		this.vertices++;
 	}
 
 	public void addVertex() {
-		this.ensureCapacity(this.vertexFormat.getStride());
-		this.vertexData.position(this.offset);
+		int stride = this.vertexFormat.getStride();
 
-		this.vertexFormat.writeVertex(this.vertexData, this.offset);
+		this.ensureCapacity(stride);
+		this.vertexFormat.writeVertex(this.vertexPtr + this.offset, this.vertices);
+
+		this.offset += stride;
 		this.vertices++;
-		this.offset += this.vertexFormat.getStride();
 	}
 
 	public void stopDrawing() {
-		this.vertices = 0;
 		this.offset = 0;
+		this.vertices = 0;
 		this.isDrawing = false;
-		this.vertexData.clear();
 	}
 
-	public void grow() {
-		this.vertexData.position(0);
-		long newCapacity = this.capacity * 2L;
-		ByteBuffer newBuffer = GLAllocation.createDirectByteBuffer((int) newCapacity);
-		newBuffer.put(this.vertexData);
-		newBuffer.limit((int) newCapacity);
-		this.vertexData = newBuffer;
-		this.capacity = Math.toIntExact(newCapacity);
+	public void clear() {
+		MemoryUtil.nmemFree(this.vertexPtr);
+
+		this.vertexPtr = MemoryUtil.NULL;
+		this.offset = 0;
+		this.vertices = 0;
 	}
 
-	// <------------------------->
-	// Getters and setters below
-	// <------------------------->
+	public static void clearBuffers() {
+		for (VertexWriterManager manager : VERTEX_WRITERS) {
+			manager.clear();
+		}
 
-	// flag to know for what when pick up data from the tessellator.
-	public boolean isDrawing() {
-		return this.isDrawing;
+		VERTEX_WRITERS.clear();
 	}
 
-	public ByteBuffer getVertexData() {
-		this.vertexData.position(0);
-		return this.vertexData;
+	private void grow(long minSize) {
+		long newCapacity = Math.max((this.capacity * 3) >> 1, minSize);
+
+		long newVertexPtr = MemoryUtil.nmemAlloc(newCapacity);
+		MemoryUtil.memCopy(this.vertexPtr, newVertexPtr, this.offset);
+		MemoryUtil.nmemFree(this.vertexPtr);
+
+		this.capacity = newCapacity;
+		this.vertexPtr = newVertexPtr;
 	}
 
-	public int getCapacity() {
-		return this.capacity;
+	public long getTotalOffset() {
+		return this.vertexPtr + this.offset;
+	}
+
+	public long getVertexData() {
+		return this.vertexPtr;
 	}
 
 	public int getVertices() {
 		return this.vertices;
-	}
-
-	public void setPos(double x, double y, double z) {
-		this.x = (float) x;
-		this.y = (float) y;
-		this.z = (float) z;
-	}
-
-	public void setPos(float x, float y, float z) {
-		this.x = x;
-		this.y = y;
-		this.z = z;
-	}
-
-	public void setTranslation(float transX, float transY, float transZ) {
-		this.transX = transX;
-		this.transY = transY;
-		this.transZ = transZ;
-	}
-
-	public void setUv(float u, float v) {
-		this.u = u;
-		this.v = v;
-	}
-
-	public void setUv(double U, double V) {
-		this.u = (float) U;
-		this.v = (float) V;
-	}
-
-	public void setColor(int color) {
-		this.color = color;
-	}
-
-	public void setNormal(int normal) {
-		this.normal = normal;
-	}
-
-	public void setLightMap(int lightMap) {
-		this.lightMap = lightMap;
 	}
 
 	public void setVertexFormat(VertexFormat vertexFormat) {

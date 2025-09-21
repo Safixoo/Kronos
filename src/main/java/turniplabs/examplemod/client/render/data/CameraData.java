@@ -34,4 +34,16 @@ public class CameraData {
 	public float cameraZ() {
 		return this.intZ + this.fractZ;
 	}
+
+	public double cameraXD() {
+		return this.intX + (double) this.fractX;
+	}
+
+	public double cameraYD() {
+		return this.intY + (double) this.fractY;
+	}
+
+	public double cameraZD() {
+		return this.intZ + (double) this.fractZ;
+	}
 }

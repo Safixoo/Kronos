@@ -11,11 +11,16 @@ import net.minecraft.client.render.terrain.ChunkRenderer;
 import net.minecraft.client.render.terrain.ChunkRendererLegacy;
 import net.minecraft.client.world.WorldClient;
 import net.minecraft.core.block.entity.TileEntity;
+import org.checkerframework.checker.units.qual.A;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import turniplabs.examplemod.client.render.SectionManager;
+import turniplabs.examplemod.client.vertex.VertexWriterManager;
 
 import java.util.List;
 
@@ -55,10 +60,11 @@ public abstract class RenderGlobalMixin {
 	public void loadRenderers() {
 		this.renderDistance = this.mc.gameSettings.renderDistance.value;
 
-		// Many functions access this array, to make
+		// Many functions access this array, to make it work add a dummy value.
 		this.chunkRenderers = new ChunkRenderer[] {
 			new ChunkRendererLegacy(null, null, Integer.MIN_VALUE, Integer.MIN_VALUE, Integer.MIN_VALUE, 0, 0)
 		};
+
 
 		this.manager = SectionManager.getCurrentInstance();
 		this.manager.setWorld(this.worldObj);
@@ -76,6 +82,11 @@ public abstract class RenderGlobalMixin {
 		BlockModelLeaves.setGraphicsLevel(this.mc.gameSettings.fancyGraphics.value == 1);
 
 		this.renderEntitiesStartupCounter = 2;
+	}
+
+	@Inject(method = "deleteRenderListBase", at = @At("HEAD"))
+	private void clearBuffers(CallbackInfo ci) {
+		VertexWriterManager.clearBuffers();
 	}
 
 	/**

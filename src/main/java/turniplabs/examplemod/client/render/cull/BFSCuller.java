@@ -86,9 +86,7 @@ public class BFSCuller {
 		if (spawn != null) {
 			int flags = spawn.flags;
 
-			UpdateQueue.addToQueue(spawn);
 			BFSVisArray.setVisible(spawn.blockX >> 4, spawn.blockY >> 4, spawn.blockZ >> 4);
-
 			exploreNodes(this.bfsQueue, spawn, SectionFlags.getAdjacentMask(flags), this.activeFrame);
 
 			if (SectionFlags.isDirty(flags)) {

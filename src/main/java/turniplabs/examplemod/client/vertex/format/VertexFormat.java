@@ -1,16 +1,12 @@
 package turniplabs.examplemod.client.vertex.format;
 
 import com.google.common.collect.ImmutableList;
-import turniplabs.examplemod.client.util.interfaces.IVertexWriter;
-
-import java.nio.ByteBuffer;
 
 public class VertexFormat {
 	private final ImmutableList<VertexAttribute> vertexProperties;
 	private final int stride;
-	private final IVertexWriter writer;
 
-	public VertexFormat(ImmutableList<VertexAttribute> vertexProperties, IVertexWriter writer) {
+	public VertexFormat(ImmutableList<VertexAttribute> vertexProperties) {
 		int stride = 0;
 
 		for (int i = 0, size = vertexProperties.size(); i < size; i++) {
@@ -24,16 +20,10 @@ public class VertexFormat {
 		}
 
 		this.stride = stride;
-		this.writer = writer;
 		this.vertexProperties = vertexProperties;
 	}
 
-	public void writeVertex(ByteBuffer data, int index) {
-		this.writer.writeVertex(data, index);
-	}
-
-	public void writeVertex(long buffer, long offset) {
-		this.writer.writeVertex(buffer, offset);
+	public void writeVertex(long ptr, int index) {
 	}
 
 	public void setupBufferState() {

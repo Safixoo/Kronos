@@ -8,12 +8,10 @@ import net.minecraft.core.item.ItemEgg;
 import net.minecraft.core.player.inventory.container.ContainerInventory;
 import net.minecraft.core.world.World;
 import org.lwjgl.opengl.GL11;
-import turniplabs.examplemod.client.GlobalFlags;
 import turniplabs.examplemod.client.render.cull.BFSCuller;
 import turniplabs.examplemod.client.render.cull.FrustumCuller;
 import turniplabs.examplemod.client.render.cull.UpdateQueue;
 import turniplabs.examplemod.client.render.data.CameraData;
-import turniplabs.examplemod.client.render.meshing.BlockRenderer;
 import turniplabs.examplemod.client.render.region.RegionManager;
 import turniplabs.examplemod.client.render.region.RegionRender;
 import turniplabs.examplemod.client.util.Direction;
@@ -25,7 +23,6 @@ public class SectionManager {
 	private final Long2ReferenceOpenHashMap<SectionRender> sectionMap = new Long2ReferenceOpenHashMap<>();
 	private final BFSCuller bfsCuller = new BFSCuller();
 	private final RegionManager regionManager = new RegionManager();
-	private final BlockRenderer blockRenderer = new BlockRenderer();
 	private static SectionManager INSTANCE;
 
 	private World worldObj;
@@ -224,8 +221,6 @@ public class SectionManager {
 		int maxSize = Math.min(MAX_UPDATE_QUEUES, UpdateQueue.size() - 1);
 		int i = 0;
 
-		GlobalFlags.MESHING = true;
-
 		int samples = 0;
 		long timePassed = 0L;
 		long estimatedTime = 0L;
@@ -234,9 +229,9 @@ public class SectionManager {
 			currentTime = System.nanoTime();
 
 			SectionRender render = UpdateQueue.get(i++);
-			UpdateQueue.get(i++).rebuild(this, this.blockRenderer, this.worldObj);
+			render.rebuild(this, this.worldObj);
 
-			if (MathExt.euclideanDistance(render, this.camera) > MathExt.square(24.0f)) {
+			if (MathExt.squaredDistance(render, this.camera) > MathExt.square(24.0f)) {
 				samples++;
 				timePassed += System.nanoTime() - currentTime;
 				estimatedTime = (timePassed / samples) * (MAX_UPDATE_QUEUES - i);
@@ -244,8 +239,6 @@ public class SectionManager {
 		}
 
 		UpdateQueue.clear();
-
-		GlobalFlags.MESHING = false;
 	}
 
 	public void addFrameSample(long currentDiff) {
@@ -267,6 +260,8 @@ public class SectionManager {
 		int currentCameraX = Math.floorDiv(this.camera.intX, 16);
 		int currentCameraZ = Math.floorDiv(this.camera.intZ, 16);
 
+		int renderDistance = this.renderDistance + 1;
+
 		// Doing currentCamera - lastChunkCamera is like generating a vector
 		// from the last camera check pos to the current.
 		int offsetX = (currentCameraX - lastChunkCameraX);
@@ -280,20 +275,20 @@ public class SectionManager {
 		// We scan all the render distance volume and if the diff between the last camera pos summed the xz
 		// pos index of the render distance volume goes out of bounds from the xz min-max index it means
 		// that it's a new or old section.
-		for (int x = -this.renderDistance; x <= this.renderDistance; x++) {
-			for (int z = -this.renderDistance; z <= this.renderDistance; z++) {
+		for (int x = -renderDistance; x <= renderDistance; x++) {
+			for (int z = -renderDistance; z <= renderDistance; z++) {
 				int newX = x + offsetX;
 				int newZ = z + offsetZ;
 
 				// Add new sections in distance.
-				if (newX <= -this.renderDistance || newX >= this.renderDistance) {
+				if (newX <= -renderDistance || newX >= renderDistance) {
 					this.lastUpdateX = this.camera.intX;
 
 					for (int y = 0; y < 16; y++) {
 						this.addRender(currentCameraX + x, y, currentCameraZ + z, false);
 					}
 				}
-				if (newZ <= -this.renderDistance || newZ >= this.renderDistance) {
+				if (newZ <= -renderDistance || newZ >= renderDistance) {
 					this.lastUpdateZ = this.camera.intZ;
 
 					for (int y = 0; y < 16; y++) {
@@ -303,7 +298,7 @@ public class SectionManager {
 
 				// Remove sections in the symmetric opposite direction from the point we are adding sections, this
 				// doesn't help tremendously, but it does something.
-				if (newX < -this.renderDistance || newX > this.renderDistance || newZ < -this.renderDistance || newZ > this.renderDistance) {
+				if (newX < -renderDistance || newX > renderDistance || newZ < -renderDistance || newZ > renderDistance) {
 					for (int y = 0; y < 16; y++) {
 						this.removeRender(currentCameraX - x, y, currentCameraZ - z);
 					}

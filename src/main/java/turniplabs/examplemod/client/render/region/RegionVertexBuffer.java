@@ -30,10 +30,10 @@ public class RegionVertexBuffer {
 		this.capacity = space;
 	}
 
-	public void upload(ByteBuffer vertexData, long offset, int size) {
+	public void upload(long vertexData, long offset, int size) {
 		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, this.vboId);
 
-		GL20.nglBufferSubData(GL15.GL_ARRAY_BUFFER, offset, size, MemoryUtil.memAddress(vertexData));
+		GL20.nglBufferSubData(GL15.GL_ARRAY_BUFFER, offset, size, vertexData);
 		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
 	}
 

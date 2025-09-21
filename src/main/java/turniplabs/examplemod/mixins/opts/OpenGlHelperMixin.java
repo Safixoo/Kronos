@@ -9,10 +9,9 @@ public class OpenGlHelperMixin {
 
 	/**
 	 * @author Safixo
-	 * @reason Disable error checking.
+	 * @reason Tends to choke the driver, probably enforces
+	 * waiting for the GPU to finish.
 	 */
 	@Overwrite
-	public static void checkError(String info) {
-
-	}
+	public static void checkError(String info) {}
 }

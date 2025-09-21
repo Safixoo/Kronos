@@ -1,19 +1,18 @@
 package turniplabs.examplemod.client.render.region;
 
-import net.minecraft.client.render.terrain.VertexBuffer;
 import org.lwjgl.opengl.*;
 import turniplabs.examplemod.client.render.SectionFlags;
 import turniplabs.examplemod.client.render.SectionManager;
 import turniplabs.examplemod.client.render.SectionRender;
-import turniplabs.examplemod.client.vertex.writer.TerrainVertexWriter;
+import turniplabs.examplemod.client.vertex.writer.TerrainFormat;
 
 import javax.annotation.Nullable;
-import java.nio.ByteBuffer;
+import java.util.Arrays;
 
 public class RegionAllocation {
 	private static final int SPARE_BUFFER_ALLOC = 1024 * 1024 * 16;
 	private static final int MIN_ALLOC = 1024 * 256;
-	private static final int STRIDE = TerrainVertexWriter.STRIDE;
+	private static final int STRIDE = TerrainFormat.STRIDE;
 
 	private static int GL31_SUPPORT = -1;
 
@@ -121,7 +120,7 @@ public class RegionAllocation {
 	}
 
 	// Returns first << 32 | count.
-	public long allocate(SectionRender render, ByteBuffer vertexData, int size, int side) {
+	public long allocate(SectionRender render, long vertexData, int size, int side) {
 		Allocation alloc = this.fitInFree(size);
 
 		if (alloc == null) {
@@ -139,9 +138,9 @@ public class RegionAllocation {
 		long maxOffset = this.offset / STRIDE;
 		int sizeInBytes = size * STRIDE;
 
-		SectionManager.getCurrentInstance().addUsedMemory(size * TerrainVertexWriter.STRIDE);
+		SectionManager.getCurrentInstance().addUsedMemory(size * TerrainFormat.STRIDE);
 
-		if (this.capacity < this.offset + sizeInBytes) {
+		if (this.offset + sizeInBytes > this.capacity) {
 			this.resize(this.offset + sizeInBytes);
 		}
 
@@ -161,7 +160,7 @@ public class RegionAllocation {
 		return newAlloc;
 	}
 
-	public long renewAllocation(SectionRender render, ByteBuffer data, int size, int side) {
+	public long renewAllocation(SectionRender render, long data, int size, int side) {
 		Allocation alloc = this.findPrevAlloc(render, side);
 		long drawData;
 
@@ -273,7 +272,7 @@ public class RegionAllocation {
 		}
 	}
 
-	public void uploadAllocation(Allocation alloc, ByteBuffer data, int size) {
+	public void uploadAllocation(Allocation alloc, long data, int size) {
 		this.vertexBuffer.upload(data, alloc.offset * STRIDE, size * STRIDE);
 	}
 

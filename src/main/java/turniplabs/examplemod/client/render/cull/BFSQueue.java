@@ -33,10 +33,10 @@ public class BFSQueue {
 	}
 
 	public void prepareRegionArr(int renderDistance) {
-		int region8 = (renderDistance >> 3);
+		int region8 = ((renderDistance * 2 + 1) >> 3);
 		int region4 = (renderDistance >> 2);
 
-		this.regionRenders = new RegionRender[region8 * region4 * region8];
+		this.regionRenders = new RegionRender[region8 * region4 * region8 + 16];
 		this.regionPos = 0;
 	}
 

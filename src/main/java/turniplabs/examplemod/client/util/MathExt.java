@@ -2,12 +2,21 @@ package turniplabs.examplemod.client.util;
 
 import turniplabs.examplemod.client.render.SectionRender;
 import turniplabs.examplemod.client.render.data.CameraData;
+import turniplabs.examplemod.client.render.region.RegionRender;
 
 public class MathExt {
-	public static float euclideanDistance(SectionRender render, CameraData cameraData) {
-		float distX = (render.blockX - cameraData.intX) - cameraData.fractX;
-		float distY = (render.blockY - cameraData.intY) - cameraData.fractY;
-		float distZ = (render.blockZ - cameraData.intZ) - cameraData.fractZ;
+	public static float squaredDistance(SectionRender render, CameraData cameraData) {
+		float distX = (render.blockX - cameraData.intX + 8) - cameraData.fractX;
+		float distY = (render.blockY - cameraData.intY + 8) - cameraData.fractY;
+		float distZ = (render.blockZ - cameraData.intZ + 8) - cameraData.fractZ;
+
+		return MathExt.square(distX) + MathExt.square(distY) + MathExt.square(distZ);
+	}
+
+	public static float squaredDistance(RegionRender region, CameraData cameraData) {
+		float distX = (region.centerBlockX() - cameraData.intX) - cameraData.fractX;
+		float distY = (region.centerBlockY() - cameraData.intY) - cameraData.fractY;
+		float distZ = (region.centerBlockZ() - cameraData.intZ) - cameraData.fractZ;
 
 		return MathExt.square(distX) + MathExt.square(distY) + MathExt.square(distZ);
 	}
