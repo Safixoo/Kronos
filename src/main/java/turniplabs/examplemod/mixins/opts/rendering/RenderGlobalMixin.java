@@ -11,7 +11,6 @@ import net.minecraft.client.render.terrain.ChunkRenderer;
 import net.minecraft.client.render.terrain.ChunkRendererLegacy;
 import net.minecraft.client.world.WorldClient;
 import net.minecraft.core.block.entity.TileEntity;
-import org.checkerframework.checker.units.qual.A;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
@@ -20,7 +19,8 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import turniplabs.examplemod.client.render.SectionManager;
-import turniplabs.examplemod.client.vertex.VertexWriterManager;
+import turniplabs.examplemod.client.render.shader.ShaderLoader;
+import turniplabs.examplemod.client.render.vertex.VertexWriterManager;
 
 import java.util.List;
 

@@ -1,10 +1,10 @@
-package turniplabs.examplemod.client.vertex.writer;
+package turniplabs.examplemod.client.render.vertex.writer;
 
 import com.google.common.collect.ImmutableList;
 import org.lwjgl.system.MemoryUtil;
-import turniplabs.examplemod.client.vertex.VertexWriterManager;
-import turniplabs.examplemod.client.vertex.format.VertexAttribute;
-import turniplabs.examplemod.client.vertex.format.VertexFormat;
+import turniplabs.examplemod.client.render.vertex.VertexWriterManager;
+import turniplabs.examplemod.client.render.vertex.format.VertexFormat;
+import turniplabs.examplemod.client.render.vertex.operations.VertexAttribute;
 
 // In difference with modern Minecraft, beta seems to not use a lighting
 // attribute (???), it simply uses lighting baked in color attribute.

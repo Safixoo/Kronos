@@ -3,10 +3,8 @@ package turniplabs.examplemod.client.render.region;
 import org.lwjgl.opengl.GL15;
 import org.lwjgl.opengl.GL20;
 import org.lwjgl.opengl.GL30;
-import org.lwjgl.system.MemoryUtil;
 import turniplabs.examplemod.client.render.SectionManager;
-import turniplabs.examplemod.client.vertex.format.DefaultVertexFormats;
-import java.nio.ByteBuffer;
+import turniplabs.examplemod.client.render.vertex.format.DefaultVertexFormats;
 
 public class RegionVertexBuffer {
 	private boolean createdVao;

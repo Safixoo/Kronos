@@ -3,7 +3,9 @@ package turniplabs.examplemod.client.render;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL20;
 import org.spongepowered.asm.mixin.Unique;
+import turniplabs.examplemod.ExampleMod;
 import turniplabs.examplemod.client.render.data.FogData;
+import turniplabs.examplemod.client.render.shader.ShaderLoader;
 
 public class ShaderSectionTerrain {
 	private boolean shaderCreated;
@@ -24,21 +26,19 @@ public class ShaderSectionTerrain {
 		int vertexShaderId = GL20.glCreateShader(GL20.GL_VERTEX_SHADER);
 		int fragmentShaderId = GL20.glCreateShader(GL20.GL_FRAGMENT_SHADER);
 
-		GL20.glShaderSource(vertexShaderId, vertexShader);
-		GL20.glShaderSource(fragmentShaderId, fragmentShader);
-
-		GL20.glCompileShader(vertexShaderId);
-
-		System.out.println("\nVertex Shader Errors:\n" + GL20.glGetShaderInfoLog(vertexShaderId, 250));
-
-		GL20.glCompileShader(fragmentShaderId);
-
-		System.out.println("\nFragment Shader Errors:\n" + GL20.glGetShaderInfoLog(fragmentShaderId, 250));
+		ShaderLoader.compileShader("terrain/terrain_fragment.glsl", fragmentShaderId);
+		ShaderLoader.compileShader("terrain/terrain_vertex.glsl", vertexShaderId);
 
 		GL20.glAttachShader(this.programId, vertexShaderId);
 		GL20.glAttachShader(this.programId, fragmentShaderId);
 
 		GL20.glLinkProgram(this.programId);
+
+		String error = GL20.glGetProgramInfoLog(this.programId);
+
+		if (!error.isEmpty()) {
+			ExampleMod.LOGGER.error("Program logged info {}", error);
+		}
 
 		GL20.glDeleteShader(vertexShaderId);
 		GL20.glDeleteShader(fragmentShaderId);

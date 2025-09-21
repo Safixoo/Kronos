@@ -8,7 +8,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import turniplabs.examplemod.client.vertex.VertexWriterManager;
+import turniplabs.examplemod.client.render.vertex.VertexWriterManager;
 
 // TODO: Rewrite injections completely, maybe use ASM to avoid allocations.
 @Mixin(value = TessellatorStandard.class, remap = false)

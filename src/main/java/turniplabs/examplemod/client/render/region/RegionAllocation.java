@@ -4,10 +4,9 @@ import org.lwjgl.opengl.*;
 import turniplabs.examplemod.client.render.SectionFlags;
 import turniplabs.examplemod.client.render.SectionManager;
 import turniplabs.examplemod.client.render.SectionRender;
-import turniplabs.examplemod.client.vertex.writer.TerrainFormat;
+import turniplabs.examplemod.client.render.vertex.writer.TerrainFormat;
 
 import javax.annotation.Nullable;
-import java.util.Arrays;
 
 public class RegionAllocation {
 	private static final int SPARE_BUFFER_ALLOC = 1024 * 1024 * 16;

@@ -1,10 +1,9 @@
-package turniplabs.examplemod.client.vertex;
+package turniplabs.examplemod.client.render.vertex;
 
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import org.lwjgl.system.MemoryUtil;
 import turniplabs.examplemod.client.util.Direction;
-import turniplabs.examplemod.client.vertex.format.VertexAttribute;
-import turniplabs.examplemod.client.vertex.format.VertexFormat;
+import turniplabs.examplemod.client.render.vertex.format.VertexFormat;
 
 // Remplazar toda la clase con una implementacion de MemoryUtil.
 public class VertexWriterManager {

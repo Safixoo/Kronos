@@ -12,8 +12,8 @@ import turniplabs.examplemod.client.render.data.SectionCache;
 import turniplabs.examplemod.client.util.BlocksFlags;
 import turniplabs.examplemod.client.util.ColorBGRManager;
 import turniplabs.examplemod.client.util.Direction;
-import turniplabs.examplemod.client.vertex.VertexWriterManager;
-import turniplabs.examplemod.client.vertex.writer.TerrainFormat;
+import turniplabs.examplemod.client.render.vertex.VertexWriterManager;
+import turniplabs.examplemod.client.render.vertex.writer.TerrainFormat;
 
 public class FullBlockMesher {
 	private static final int[] SHADE_FULL_COLOR = new int[Direction.COUNT];

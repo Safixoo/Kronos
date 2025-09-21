@@ -1,6 +1,7 @@
-package turniplabs.examplemod.client.vertex.format;
+package turniplabs.examplemod.client.render.vertex.format;
 
 import com.google.common.collect.ImmutableList;
+import turniplabs.examplemod.client.render.vertex.operations.VertexAttribute;
 
 public class VertexFormat {
 	private final ImmutableList<VertexAttribute> vertexProperties;
@@ -9,9 +10,9 @@ public class VertexFormat {
 	public VertexFormat(ImmutableList<VertexAttribute> vertexProperties) {
 		int stride = 0;
 
-		for (int i = 0, size = vertexProperties.size(); i < size; i++) {
+		for (int i = 0; i < vertexProperties.size(); i++) {
 			VertexAttribute vertexProperty = vertexProperties.get(i);
-			stride += vertexProperty.getAmount() * vertexProperty.getSize();
+			stride += vertexProperty.getTotalSize();
 		}
 
 		// align to 4-bytes.
@@ -28,17 +29,19 @@ public class VertexFormat {
 
 	public void setupBufferState() {
 		int offset = 0;
+		int index = 0;
 
 		for (VertexAttribute vertexProperty : this.vertexProperties) {
-			vertexProperty.setupAttribute(vertexProperty.getAmount(), vertexProperty.getType(), this.stride, offset);
-
-			offset += vertexProperty.attributeStride();
+			vertexProperty.setupAttribute(index++, this.stride, offset);
+			offset += vertexProperty.getTotalSize();
 		}
 	}
 
 	public void cleanupBufferState() {
+		int index = 0;
+
 		for (VertexAttribute vertexProperty : this.vertexProperties) {
-			vertexProperty.getOperation().cleanupBufferState();
+			vertexProperty.disableAttribute(index++);
 		}
 	}
 

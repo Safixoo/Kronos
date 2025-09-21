@@ -13,14 +13,13 @@ import net.minecraft.core.block.Block;
 import net.minecraft.core.block.Blocks;
 import net.minecraft.core.util.phys.AABB;
 import net.minecraft.core.world.World;
-import turniplabs.examplemod.ExampleMod;
 import turniplabs.examplemod.client.render.meshing.FullBlockMesher;
 import turniplabs.examplemod.client.render.region.RegionRender;
-import turniplabs.examplemod.client.vertex.VertexWriterManager;
+import turniplabs.examplemod.client.render.vertex.VertexWriterManager;
 import turniplabs.examplemod.client.render.data.SectionCache;
 import turniplabs.examplemod.client.util.BlocksFlags;
 import turniplabs.examplemod.client.util.Direction;
-import turniplabs.examplemod.client.vertex.format.DefaultVertexFormats;
+import turniplabs.examplemod.client.render.vertex.format.DefaultVertexFormats;
 
 // Saves basic info for each section from the world, is used mostly for culling and
 // meshing, rendering is almost only managed in the RegionRender in an objectless fashion.

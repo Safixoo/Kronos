@@ -7,8 +7,8 @@ import turniplabs.examplemod.client.render.SectionManager;
 import turniplabs.examplemod.client.render.SectionRender;
 import turniplabs.examplemod.client.render.data.CameraData;
 import turniplabs.examplemod.client.util.Direction;
-import turniplabs.examplemod.client.vertex.VertexWriterManager;
-import turniplabs.examplemod.client.vertex.writer.TerrainFormat;
+import turniplabs.examplemod.client.render.vertex.VertexWriterManager;
+import turniplabs.examplemod.client.render.vertex.writer.TerrainFormat;
 
 public class RegionRender {
 	// Region total volume area in SectionRenders.
