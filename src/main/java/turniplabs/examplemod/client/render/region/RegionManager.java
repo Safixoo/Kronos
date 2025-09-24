@@ -5,6 +5,7 @@ import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.objects.*;
 import org.lwjgl.opengl.GL30;
 import turniplabs.examplemod.client.render.SectionManager;
+import turniplabs.examplemod.client.render.ShaderSectionTerrain;
 import turniplabs.examplemod.client.render.cull.BFSQueue;
 import turniplabs.examplemod.client.render.data.CameraData;
 import turniplabs.examplemod.client.util.MathExt;
@@ -78,7 +79,7 @@ public class RegionManager {
 		}
 	}
 
-	public void drawAllRegions(BFSQueue queue, CameraData camera, int pass) {
+	public void drawAllRegions(ShaderSectionTerrain shader, BFSQueue queue, CameraData camera, int pass) {
 		RegionRender[] regionRenders = queue.regionRenders;
 
 		if (regionRenders == null) {
@@ -92,7 +93,7 @@ public class RegionManager {
 				break;
 			}
 
-			region.prepareAndDraw(camera, pass);
+			region.prepareAndDraw(shader, camera, pass);
 
 			if (pass == 0) {
 				SectionManager.getCurrentInstance().drawnSolidRenderers += region.sectionsToRender;

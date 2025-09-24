@@ -1,6 +1,7 @@
 package turniplabs.examplemod.client.render.vertex.writer;
 
 import com.google.common.collect.ImmutableList;
+import net.minecraft.core.util.helper.MathHelper;
 import org.lwjgl.system.MemoryUtil;
 import turniplabs.examplemod.client.render.vertex.VertexWriterManager;
 import turniplabs.examplemod.client.render.vertex.format.VertexFormat;
@@ -13,7 +14,7 @@ import turniplabs.examplemod.client.render.vertex.operations.VertexAttribute;
 // to redo the vertex data to change lighting, which makes the rare transitions
 // at the morning/afternoon of the game.
 public class TerrainFormat extends VertexFormat {
-	public static final int STRIDE = 24;
+	public static final int STRIDE = 16;
 
 	public TerrainFormat(ImmutableList<VertexAttribute> vertexProperties) {
 		super(vertexProperties);
@@ -23,14 +24,37 @@ public class TerrainFormat extends VertexFormat {
 	public void writeVertex(long ptr, int offset) {
 		VertexWriterManager man = VertexWriterManager.getCurrentInstance();
 
-		MemoryUtil.memPutFloat(ptr + 0, man.x + man.trasX);
-		MemoryUtil.memPutFloat(ptr + 4, man.y + man.trasY);
-		MemoryUtil.memPutFloat(ptr + 8, man.z + man.trasZ);
+		float posX = MathHelper.clamp(man.x + man.trasX, 0.0f, 128.0f);
+		float posY = MathHelper.clamp(man.y + man.trasY, 0.0f, 64.0f);
+		float posZ = MathHelper.clamp(man.z + man.trasZ, 0.0f, 128.0f);
 
-		MemoryUtil.memPutFloat(ptr + 12, man.u);
-		MemoryUtil.memPutFloat(ptr + 16, man.v);
+		writeTerrainVertex(ptr, posX, posY, posZ, man.u, man.v, man.color);
+	}
 
-		MemoryUtil.memPutInt(ptr + 20, man.color);
+	static final double POS_PRECISION = 65535;
+	static final double UV_PRECISION = 65535;
+
+	static final double FACT_X = POS_PRECISION / 128.0d;
+	static final double FACT_Y = POS_PRECISION / 64.0d;
+	static final double FACT_Z = POS_PRECISION / 128.0d;
+
+	private static int extractPos(double pos, double scale) {
+		return (int) (pos * scale) & 0xFFFF;
+	}
+
+	private static int processUv(float u, float v) {
+		int intU = (int) (u * UV_PRECISION) & 0xFFFF;
+		int intV = (int) (v * UV_PRECISION) & 0xFFFF;
+
+		return intU | intV << 16;
+	}
+
+	public static void writeTerrainVertex(long ptr, float x, float y, float z, float u, float v, int color) {
+		long position = extractPos(x, FACT_X) | (long) extractPos(y, FACT_Y) << 16 | (long) extractPos(z, FACT_Z) << 32;
+
+		MemoryUtil.memPutLong(ptr + 0, position);
+		MemoryUtil.memPutInt(ptr + 6, processUv(u, v));
+		MemoryUtil.memPutInt(ptr + 10, color);
 	}
 
 	@Override

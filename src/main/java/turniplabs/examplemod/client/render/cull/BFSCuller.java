@@ -96,7 +96,9 @@ public class BFSCuller {
 			queueRegionNode(this.bfsQueue, spawn, flags);
 		}
 
-		bfsSearch(this.bfsQueue, camera.intX, camera.intY, camera.intZ, (int) MathExt.square(FogData.fogEnd), this.activeFrame);
+		double maxDistance = Math.min(FogData.fogEnd, camera.renderDistance << 4);
+
+		bfsSearch(this.bfsQueue, camera.intX, camera.intY, camera.intZ, (int) MathExt.square(maxDistance), this.activeFrame);
 	}
 
 	private static void queueRegionNode(BFSQueue bfsQueue, SectionRender section, int flags) {
@@ -225,11 +227,11 @@ public class BFSCuller {
 			}
 
 			if (BFSVisArray.notVisible(voxelX, voxelY, voxelZ)) {
-				if (invalid++ > 1) break;
+				if (invalid++ > 2) break;
 			}
 		}
 
-		return invalid <= 1;
+		return invalid <= 2;
 	}
 
 	private static int sign(int num) {

@@ -8,6 +8,7 @@ import net.minecraft.client.render.block.model.BlockModelDispatcher;
 import net.minecraft.client.render.block.model.BlockModelGrass;
 import net.minecraft.client.render.block.model.BlockModelLeaves;
 import net.minecraft.client.render.terrain.ChunkRenderer;
+import net.minecraft.client.render.terrain.RenderRegion;
 import net.minecraft.client.render.tessellator.Tessellator;
 import net.minecraft.core.block.Block;
 import net.minecraft.core.block.Blocks;
@@ -267,6 +268,12 @@ public class SectionRender {
 
 	private void prepareWriterForTerrain(VertexWriterManager writerManager) {
 		writerManager.startDrawing();
+
+		// Region translation-offset.
+		writerManager.trasX = -(this.blockX & ~RegionRender.BLOCK_BITS_X);
+		writerManager.trasY = -(this.blockY & ~RegionRender.BLOCK_BITS_Y);
+		writerManager.trasZ = -(this.blockZ & ~RegionRender.BLOCK_BITS_Z);
+
 		writerManager.setVertexFormat(DefaultVertexFormats.TERRAIN_FORMAT);
 	}
 

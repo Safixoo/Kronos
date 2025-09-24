@@ -5,6 +5,7 @@ import org.lwjgl.opengl.GL15;
 import org.lwjgl.system.MemoryUtil;
 import turniplabs.examplemod.client.render.SectionManager;
 import turniplabs.examplemod.client.render.SectionRender;
+import turniplabs.examplemod.client.render.ShaderSectionTerrain;
 import turniplabs.examplemod.client.render.data.CameraData;
 import turniplabs.examplemod.client.util.Direction;
 import turniplabs.examplemod.client.render.vertex.VertexWriterManager;
@@ -24,6 +25,10 @@ public class RegionRender {
 	public static final int BLOCK_SHIFT_X = 7;
 	public static final int BLOCK_SHIFT_Y = 6;
 	public static final int BLOCK_SHIFT_Z = 7;
+
+	public static final int BLOCK_BITS_X = (1 << BLOCK_SHIFT_X) - 1;
+	public static final int BLOCK_BITS_Y = (1 << BLOCK_SHIFT_Y) - 1;
+	public static final int BLOCK_BITS_Z = (1 << BLOCK_SHIFT_Z) - 1;
 
 	public static final int RADIUS_X = 1 << (BLOCK_SHIFT_X - 1);
 	public static final int RADIUS_Y = 1 << (BLOCK_SHIFT_Y - 1);
@@ -149,7 +154,7 @@ public class RegionRender {
 	// Processing draw data now and not in the BFS, allows decoupling the system and doing the extra
 	// work between draw which doesn't pressure the driver immediately, also as we work in a "small"
 	// and contiguous data-set we don't get penalized too much for pulling SectionRenders from memory.
-	public void prepareAndDraw(CameraData camera, int pass) {
+	public void prepareAndDraw(ShaderSectionTerrain shader, CameraData camera, int pass) {
 		if ((pass == 0 && this.solidFirst == MemoryUtil.NULL) || (pass == 1 && this.translucentFirst == MemoryUtil.NULL)) {
 			return;
 		}
@@ -179,6 +184,12 @@ public class RegionRender {
 
 		long first = pass != 0 ? this.translucentFirst : this.solidFirst;
 		long count = pass != 0 ? this.translucentCount : this.solidCount;
+
+		int blockRegionX = this.regionX << RegionRender.BLOCK_SHIFT_X;
+		int blockRegionY = this.regionY << RegionRender.BLOCK_SHIFT_Y;
+		int blockRegionZ = this.regionZ << RegionRender.BLOCK_SHIFT_Z;
+
+		shader.setupRegionOffset(camera, blockRegionX, blockRegionY, blockRegionZ);
 
 		GL15.nglMultiDrawArrays(GL11.GL_QUADS, first, count, drawCount);
 	}

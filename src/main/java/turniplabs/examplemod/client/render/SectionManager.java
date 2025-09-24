@@ -7,6 +7,7 @@ import net.minecraft.client.entity.player.PlayerLocal;
 import net.minecraft.core.item.ItemEgg;
 import net.minecraft.core.player.inventory.container.ContainerInventory;
 import net.minecraft.core.world.World;
+import org.lwjgl.input.Keyboard;
 import org.lwjgl.opengl.GL11;
 import turniplabs.examplemod.client.render.cull.BFSCuller;
 import turniplabs.examplemod.client.render.cull.FrustumCuller;
@@ -203,9 +204,10 @@ public class SectionManager {
 		return new CameraData(fractX, fractY, fractZ, playerX, playerY, playerZ, renderDistance);
 	}
 
-	// TODO:
-	//  - Implement off-thread chunk updates.
-	//  - Separate in meshing and writing to batch copies.
+	// TODO: Move this later, and if a section is marked dirty between the time, use a auxiliary array
+	//  and check every section update if the marked dirty section based on distance should be meshed
+	//  first. If a lot of time pass between this method and vanilla updateRenderer maybe as well, queue
+	//  some sections if it is async.
 	private void queueRebuilds(float partialTick) {
 		long currentTime = System.nanoTime();
 		long currentDiff = this.lastFrameTime == 0 ? 200_000_000 : currentTime - this.lastFrameTime;
@@ -260,7 +262,7 @@ public class SectionManager {
 		int currentCameraX = Math.floorDiv(this.camera.intX, 16);
 		int currentCameraZ = Math.floorDiv(this.camera.intZ, 16);
 
-		int renderDistance = this.renderDistance + 1;
+		int renderDistance = this.renderDistance;
 
 		// Doing currentCamera - lastChunkCamera is like generating a vector
 		// from the last camera check pos to the current.
@@ -308,11 +310,13 @@ public class SectionManager {
 	}
 
 	private void generateWholeVolume(double cameraX, double cameraZ) {
-		int cameraChunkX = (int) cameraX >>> 4;
-		int cameraChunkZ = (int) cameraZ >>> 4;
+		int cameraChunkX = (int) cameraX >> 4;
+		int cameraChunkZ = (int) cameraZ >> 4;
 
-		for (int x = -this.renderDistance; x <= this.renderDistance; x++) {
-			for (int z = -this.renderDistance; z <= this.renderDistance; z++) {
+		int renderDistance = this.renderDistance;
+
+		for (int x = -renderDistance; x <= renderDistance; x++) {
+			for (int z = -renderDistance; z <= renderDistance; z++) {
 				for (int y = 0; y < 16; y++) {
 					this.addRender(cameraChunkX + x , y, cameraChunkZ + z, true);
 				}
@@ -365,12 +369,20 @@ public class SectionManager {
 			this.terrainShader = new ShaderSectionTerrain();
 		}
 
-		this.terrainShader.bindProgram();
-		this.terrainShader.setupUniforms(this.camera.cameraX(), this.camera.cameraY(), this.camera.cameraZ(), noFog);
+		if (!this.lastEvent && Keyboard.getEventKey() == Keyboard.KEY_ADD) {
+			this.terrainShader.prepareAndCompileShader();
+		}
 
-		this.regionManager.drawAllRegions(this.bfsCuller.bfsQueue, this.camera, renderPass);
+		this.lastEvent = Keyboard.getEventKey() == Keyboard.KEY_ADD;
+
+		this.terrainShader.bindProgram();
+		this.terrainShader.setupUniforms(noFog);
+
+		this.regionManager.drawAllRegions(this.terrainShader, this.bfsCuller.bfsQueue, this.camera, renderPass);
 		this.terrainShader.unbindProgram();
 	}
+
+	boolean lastEvent = false;
 
 	public void connectNeighbors(SectionRender render) {
 		for (int dir = 0; dir < Direction.COUNT; dir++) {

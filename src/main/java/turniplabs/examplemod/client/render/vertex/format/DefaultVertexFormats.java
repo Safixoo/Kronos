@@ -6,8 +6,8 @@ import turniplabs.examplemod.client.render.vertex.operations.VertexAttributeType
 import turniplabs.examplemod.client.render.vertex.writer.TerrainFormat;
 
 public class DefaultVertexFormats {
-	public static final VertexAttribute POSITION = new VertexAttribute(3, false, VertexAttribute.Type.FLOAT, VertexAttributeType.FLOAT);
-	public static final VertexAttribute TEXTURE = new VertexAttribute(2, false, VertexAttribute.Type.FLOAT, VertexAttributeType.FLOAT);
+	public static final VertexAttribute POSITION = new VertexAttribute(3, false, VertexAttribute.Type.USHORT, VertexAttributeType.FLOAT);
+	public static final VertexAttribute TEXTURE = new VertexAttribute(2, true, VertexAttribute.Type.USHORT, VertexAttributeType.FLOAT);
 	public static final VertexAttribute COLOR = new VertexAttribute(4, true, VertexAttribute.Type.UBYTE, VertexAttributeType.FLOAT);
 	//public static final VertexAttribute LIGHTMAP = new VertexAttribute(2, VertexAttribute.Type.USHORT, VertexOperations.LIGHTMAP);
 
