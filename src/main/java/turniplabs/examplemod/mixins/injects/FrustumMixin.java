@@ -42,6 +42,6 @@ public class FrustumMixin {
 		this.modelViewMatrix.set(this._modl);
 
 		this.projectionMatrix.mul(this.modelViewMatrix, this.clippingMatrix);
-		FrustumCuller.set(this.clippingMatrix);
+		FrustumCuller.processMatrices(this.projectionMatrix, this.modelViewMatrix, this.clippingMatrix);
 	}
 }

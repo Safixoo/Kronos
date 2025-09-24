@@ -26,7 +26,7 @@ import turniplabs.examplemod.client.render.vertex.format.DefaultVertexFormats;
 // meshing, rendering is almost only managed in the RegionRender in an objectless fashion.
 public class SectionRender {
 	// Most of the section data, flags is a bit-mask from SectionFlag encoding.
-	public int currentFrame, flags;
+	public int currentFrame, flags = SectionFlags.setDirty(0, true);
 
 	// Section position relative to blocks.
 	public int blockX, blockY, blockZ;
@@ -42,6 +42,8 @@ public class SectionRender {
 	private SectionCache sectionCache;
 	public RegionRender region = RegionRender.NULL;
 
+	private static final int AIR_ID = 0;
+
 	public SectionRender(int blockX, int blockY, int blockZ) {
 		this.blockX = blockX;
 		this.blockY = blockY;
@@ -54,11 +56,6 @@ public class SectionRender {
 	private static final AABB GRASS = AABB.getPermanentBB(-EPSILON, 0, -EPSILON, 1 + EPSILON, 1, 1 + EPSILON);
 
 	public void rebuild(SectionManager sectionManager, World world) {
-		// Shouldn't happen, but it seems that there is a lot of state leak.
-		if (!SectionFlags.isDirty(this.flags)) {
-			return;
-		}
-
 		ChunkRenderer.updates++;
 		BlocksFlags.processLeavesSolid();
 
@@ -98,61 +95,63 @@ public class SectionRender {
 		long start = System.nanoTime();
 
 		if (!sectionCache.isSectionEmpty()) {
-			for (int y = minY; y < maxY; y++) {
-				for (int z = minZ; z < maxZ; z++) {
-					for (int x = minX; x < maxX; x++) {
+			for (int y = 0; y < 16; y++) {
+				for (int z = 0; z < 16; z++) {
+					for (int x = 0; x < 16; x++) {
 						int blockId = this.sectionCache.getBlockIdCenter(x, y, z);
 
-						if (blockId == 0) {
+						if (blockId == AIR_ID) {
 							continue;
 						}
 
 						BlockColor blockColor;
 						BlockModel<?> blockModel;
-						Block<?> block = Blocks.getBlock(blockId);
 
 						if (lastBlockId == blockId) {
 							blockModel = lastModel;
 							blockColor = lastBlockColor;
 						} else {
+							Block<?> block = Blocks.getBlock(blockId);
 							blockModel = lastModel = BlockModelDispatcher.getInstance().getDispatch(block);
-							blockColor = lastBlockColor = BlockColorDispatcher.getInstance().getDispatch(blockModel.block);
+							blockColor = lastBlockColor = BlockColorDispatcher.getInstance().getDispatch(block);
 							lastBlockId = blockId;
 						}
 
 						BlockModel<?> model = blockModel;
 						int blockRenderPass = model.renderLayer();
 
-						if (blockRenderPass != 0) {
-							VertexWriterManager.setCurrentInstance(VertexWriterManager.TRANSLUCENT);
-						}
+						int blockX = x + minX;
+						int blockY = y + minY;
+						int blockZ = z + minZ;
 
-						if (BlocksFlags.SOLID[blockId] || model instanceof BlockModelLeaves) {
+						if (BlocksFlags.SOLID_LIGHT_MASK[blockId] != 0) {
 							solidBlocks++;
-							if (y == maxY - 1) solidFaces[Direction.UP]++;
-							if (y == minY) solidFaces[Direction.DOWN]++;
+							if (y == 15) solidFaces[Direction.UP]++;
+							if (y == 0) solidFaces[Direction.DOWN]++;
 
-							if (x == maxX - 1) solidFaces[Direction.EAST]++;
-							if (x == minX) solidFaces[Direction.WEST]++;
+							if (x == 15) solidFaces[Direction.EAST]++;
+							if (x == 0) solidFaces[Direction.WEST]++;
 
-							if (z == maxZ - 1) solidFaces[Direction.SOUTH]++;
-							if (z == minZ) solidFaces[Direction.NORTH]++;
+							if (z == 15) solidFaces[Direction.SOUTH]++;
+							if (z == 0) solidFaces[Direction.NORTH]++;
 
-							FullBlockMesher.renderFaces(model, blockColor, this.sectionCache, x, y, z);
+							FullBlockMesher.renderFaces(model, blockColor, this.sectionCache, blockX, blockY, blockZ);
 
-							if (model instanceof BlockModelGrass) {
+							if (model.getClass() == BlockModelGrass.class) {
 								VertexWriterManager.setCurrentInstance(VertexWriterManager.SOLID[Direction.COUNT]);
 
 								BlockModelGrass.useOverlay = true;
-								blockModel.renderStandardBlock(Tessellator.instance, GRASS, x, y, z);
+								blockModel.renderStandardBlock(Tessellator.instance, GRASS, blockX, blockY, blockZ);
 								BlockModelGrass.useOverlay = false;
 							}
 						} else {
-							if (blockRenderPass == 0) {
+							if (blockRenderPass != 0) {
+								VertexWriterManager.setCurrentInstance(VertexWriterManager.TRANSLUCENT);
+							} else {
 								VertexWriterManager.setCurrentInstance(VertexWriterManager.SOLID[Direction.COUNT]);
 							}
 
-							this.renderBlock(Tessellator.instance, renderBlocks, model, x, y, z);
+							this.renderBlock(Tessellator.instance, renderBlocks, model, blockX, blockY, blockZ);
 						}
 					}
 				}

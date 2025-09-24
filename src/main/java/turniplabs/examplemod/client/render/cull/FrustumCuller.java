@@ -4,7 +4,8 @@ import org.joml.Math;
 import org.joml.Matrix4f;
 
 public class FrustumCuller {
-//	public static Matrix4f projectionModelViewMatrix = new Matrix4f();
+	public static final Matrix4f projectionMatrix = new Matrix4f();
+	public static final Matrix4f modelViewMatrix = new Matrix4f();
 
 	private static float nxX, nxY, nxZ, nxW;
 	private static float pxX, pxY, pxZ, pxW;
@@ -13,7 +14,7 @@ public class FrustumCuller {
 //	private static float nzX, nzY, nzZ, nzW;
 //	private static float pzX, pzY, pzZ, pzW;
 
-	public static void set(Matrix4f m) {
+	public static void processMatrices(Matrix4f proj, Matrix4f modelView, Matrix4f m) {
 		nxX = m.m03() + m.m00(); nxY = m.m13() + m.m10(); nxZ = m.m23() + m.m20(); nxW = m.m33() + m.m30();
 		float invl = Math.invsqrt(nxX * nxX + nxY * nxY + nxZ * nxZ);
 		nxX *= invl; nxY *= invl; nxZ *= invl; nxW *= invl;
@@ -57,9 +58,12 @@ public class FrustumCuller {
 		if (pyZ > 0) pyW += 16.0;
 
 		FrustumCuller.pyW = (float) -(FrustumCuller.pyW + pyW);
+
+		modelViewMatrix.set(modelView);
+		projectionMatrix.set(proj);
 	}
 
-	public static void addFractCamera(float fractX, float fractY, float fractZ) {
+	public static void addFractToCamera(float fractX, float fractY, float fractZ) {
 		{
 			nxW -= nxX * fractX;
 			nxW -= nxY * fractY;

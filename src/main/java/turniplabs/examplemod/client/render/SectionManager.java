@@ -163,7 +163,7 @@ public class SectionManager {
 		this.camera = extractCameraData(cameraX, cameraY, cameraZ, renderDistance);
 		this.regionManager.update(this.camera, renderDistance, worldChanged);
 
-		FrustumCuller.addFractCamera(this.camera.fractX, this.camera.fractY, this.camera.fractZ);
+		FrustumCuller.addFractToCamera(this.camera.fractX, this.camera.fractY, this.camera.fractZ);
 
 		if (this.renderDistance != renderDistance || worldChanged) {
 			this.renderDistance = renderDistance;
@@ -214,7 +214,7 @@ public class SectionManager {
 
 		this.addFrameSample(currentDiff);
 
-		long maxBudget = Math.min((this.getFrameMedian() * 3) >>> 3, 250_000_000);
+		long maxBudget = Math.min(this.getFrameMedian() >>> 1, 550_000_000);
 		long lerpedBudget = MathExt.lerp(this.lastFrameBudget, maxBudget, partialTick);
 
 		this.lastFrameBudget = lerpedBudget;
@@ -233,7 +233,7 @@ public class SectionManager {
 			SectionRender render = UpdateQueue.get(i++);
 			render.rebuild(this, this.worldObj);
 
-			if (MathExt.squaredDistance(render, this.camera) > MathExt.square(24.0f)) {
+			if (MathExt.squaredDistance(render, this.camera) > MathExt.square(40.0f)) {
 				samples++;
 				timePassed += System.nanoTime() - currentTime;
 				estimatedTime = (timePassed / samples) * (MAX_UPDATE_QUEUES - i);
@@ -262,7 +262,7 @@ public class SectionManager {
 		int currentCameraX = Math.floorDiv(this.camera.intX, 16);
 		int currentCameraZ = Math.floorDiv(this.camera.intZ, 16);
 
-		int renderDistance = this.renderDistance;
+		int renderDistance = this.renderDistance + 1;
 
 		// Doing currentCamera - lastChunkCamera is like generating a vector
 		// from the last camera check pos to the current.
@@ -313,7 +313,7 @@ public class SectionManager {
 		int cameraChunkX = (int) cameraX >> 4;
 		int cameraChunkZ = (int) cameraZ >> 4;
 
-		int renderDistance = this.renderDistance;
+		int renderDistance = this.renderDistance + 1;
 
 		for (int x = -renderDistance; x <= renderDistance; x++) {
 			for (int z = -renderDistance; z <= renderDistance; z++) {

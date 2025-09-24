@@ -16,13 +16,12 @@ import org.jetbrains.annotations.Nullable;
 import turniplabs.examplemod.client.util.BlocksFlags;
 
 public class SectionCache implements WorldSource {
-	private Chunk[] chunks = new Chunk[3 * 3];
+	private final Chunk[] chunks = new Chunk[3 * 3];
 
 	private final World worldObj;
 	private final int sectionX, sectionY, sectionZ;
 
 	private final short[][] sectionBlocks = new short[3 * 3 * 3][];
-
 	private final byte[][] sectionData = new byte[3 * 3 * 3][];
 	private final byte[][] lightSky = new byte[3 * 3 * 3][];
 	private final byte[][] lightBlock = new byte[3 * 3 * 3][];
@@ -57,9 +56,9 @@ public class SectionCache implements WorldSource {
 					int relY = y - this.sectionY;
 					int relZ = z - this.sectionZ;
 
-					Chunk chunk;
+					Chunk chunk = this.chunks[sectionIndex(relX, 0, relZ)];
 
-					if (this.chunks[sectionIndex(relX, 0, relZ)] == null) {
+					if (chunk == null || chunk.getClass() != Chunk.class) {
 						chunk = this.chunks[sectionIndex(relX, 0, relZ)] = world.getChunkFromChunkCoords(x, z);
 					} else {
 						chunk = this.chunks[sectionIndex(relX, 0, relZ)];
@@ -67,6 +66,10 @@ public class SectionCache implements WorldSource {
 
 					ChunkSection section = chunk.getSection((minY >> 4) + relY);
 					int sectionIndex = sectionIndex(relX, relY, relZ);
+
+					if (sectionIndex(1, 1, 1) == sectionIndex) {
+						this.centerSectEmpty = section.blocks == null;
+					}
 
 					if (section != null) {
 						if (section.blocks != null) {
@@ -93,14 +96,6 @@ public class SectionCache implements WorldSource {
 				}
 			}
 		}
-
-		int i = 0;
-
-		while (i < 4096 && this.centerSectBlocks[i] == 0) {
-			i++;
-		}
-
-		this.centerSectEmpty = i == 4096;
 	}
 
 	public static int sectionIndex(int x, int y, int z) {

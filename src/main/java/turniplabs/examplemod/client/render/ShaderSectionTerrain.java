@@ -1,21 +1,26 @@
 package turniplabs.examplemod.client.render;
 
 import net.minecraft.client.Minecraft;
+import org.joml.Matrix4f;
 import org.lwjgl.input.Keyboard;
-import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL20;
-import org.spongepowered.asm.mixin.Unique;
+import org.lwjgl.system.MemoryUtil;
 import turniplabs.examplemod.ExampleMod;
+import turniplabs.examplemod.client.render.cull.FrustumCuller;
 import turniplabs.examplemod.client.render.data.CameraData;
 import turniplabs.examplemod.client.render.data.FogData;
 import turniplabs.examplemod.client.render.shader.ShaderLoader;
 
+import java.nio.FloatBuffer;
+
 public class ShaderSectionTerrain {
-	private boolean shaderCreated;
 	private int programId;
 	private int u_RegionPos;
 	private int u_TexId;
+	private int u_ProjMat, u_ModelViewMat;
 	private int u_FogEnd, u_FogStart, u_FogColor;
+
+	public static final FloatBuffer SCRATCH_BUFFER = MemoryUtil.memAllocFloat(16);
 
 	public ShaderSectionTerrain() {
 		this.prepareAndCompileShader();
@@ -50,8 +55,6 @@ public class ShaderSectionTerrain {
 		GL20.glDeleteShader(fragmentShaderId);
 
 		this.glGetUniformLocation();
-
-		this.shaderCreated = true;
 	}
 
 	public void glGetUniformLocation() {
@@ -61,6 +64,9 @@ public class ShaderSectionTerrain {
 		this.u_FogEnd = GL20.glGetUniformLocation(this.programId, "u_FogEnd");
 		this.u_FogStart = GL20.glGetUniformLocation(this.programId, "u_FogStart");
 		this.u_FogColor = GL20.glGetUniformLocation(this.programId, "u_FogColor");
+
+		this.u_ModelViewMat = GL20.glGetUniformLocation(this.programId, "u_ModelViewMat");
+		this.u_ProjMat = GL20.glGetUniformLocation(this.programId, "u_ProjMat");
 	}
 
 	public void unbindProgram() {
@@ -72,12 +78,18 @@ public class ShaderSectionTerrain {
 	}
 
 	public void setupUniforms(boolean noFog) {
+		Matrix4f modelViewMat = FrustumCuller.modelViewMatrix;
+		Matrix4f projectionMat = FrustumCuller.projectionMatrix;
+
+		GL20.glUniformMatrix4fv(this.u_ModelViewMat, false, modelViewMat.get(SCRATCH_BUFFER));
+		GL20.glUniformMatrix4fv(this.u_ProjMat, false, projectionMat.get(SCRATCH_BUFFER));
+
 		GL20.glUniform1i(this.u_TexId, 0);
 
-		GL20.glUniform1f(this.u_FogEnd, noFog ? 1E+12F : FogData.fogEnd);
-		GL20.glUniform1f(this.u_FogStart, noFog ? 1E+12F : FogData.fogStart);
+		GL20.glUniform1f(this.u_FogEnd, noFog ? 1E+12F : FogData.FOG_END);
+		GL20.glUniform1f(this.u_FogStart, noFog ? 1E+12F : FogData.FOG_START);
 
-		float[] fogColor = FogData.fogColor;
+		float[] fogColor = FogData.FOG_COLOR;
 		GL20.glUniform3f(this.u_FogColor, fogColor[0], fogColor[1], fogColor[2]);
 	}
 

@@ -3,6 +3,7 @@ package turniplabs.examplemod.client.render.region;
 import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.objects.*;
+import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL30;
 import turniplabs.examplemod.client.render.SectionManager;
 import turniplabs.examplemod.client.render.ShaderSectionTerrain;
@@ -86,18 +87,30 @@ public class RegionManager {
 			return;
 		}
 
-		for (int i = 0; i < regionRenders.length; i++) {
-			RegionRender region = regionRenders[i];
+		int index;
+		int end;
+		int inc;
 
-			if (region == null) {
-				break;
-			}
+		if (pass == 1) {
+			index = queue.regionPos - 1;
+			end = -1;
+			inc = -1;
+		} else {
+			index = 0;
+			end = queue.regionPos;
+			inc = 1;
+		}
+
+		while (index != end) {
+			RegionRender region = regionRenders[index];
 
 			region.prepareAndDraw(shader, camera, pass);
 
 			if (pass == 0) {
 				SectionManager.getCurrentInstance().drawnSolidRenderers += region.sectionsToRender;
 			}
+
+			index += inc;
 		}
 
 		GL30.glBindVertexArray(0);

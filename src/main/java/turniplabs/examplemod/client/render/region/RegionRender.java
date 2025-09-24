@@ -161,17 +161,32 @@ public class RegionRender {
 
 		final byte[] renderIndices = this.renderIndices;
 		final byte[] drawDataMask = this.drawDataMask;
-		final int sectionsToRender = this.sectionsToRender & 0xFF;
+
+		int index;
+		int end;
+		int inc;
+
+		if (pass == 1) {
+			index = this.sectionsToRender - 1;
+			end = -1;
+			inc = -1;
+		} else {
+			index = 0;
+			end = this.sectionsToRender;
+			inc = 1;
+		}
 
 		int drawCount = 0;
 
-		for (int i = 0; i < sectionsToRender; i++) {
-			int regionIndex = Byte.toUnsignedInt(renderIndices[i]);
+		while (index != end) {
+			int regionIndex = Byte.toUnsignedInt(renderIndices[index]);
 			int drawMask = drawDataMask[regionIndex];
 
 			drawCount = pass == 0
 						  ? this.prepareSolidBatch(camera, regionIndex, drawMask >>> 1, drawCount)
 						  : this.prepareTranslucentBatch(regionIndex, drawMask & 0b1, drawCount);
+
+			index += inc;
 		}
 
 		if (drawCount == 0) {

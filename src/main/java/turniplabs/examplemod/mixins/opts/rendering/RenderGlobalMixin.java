@@ -65,7 +65,6 @@ public abstract class RenderGlobalMixin {
 			new ChunkRendererLegacy(null, null, Integer.MIN_VALUE, Integer.MIN_VALUE, Integer.MIN_VALUE, 0, 0)
 		};
 
-
 		this.manager = SectionManager.getCurrentInstance();
 		this.manager.setWorld(this.worldObj);
 		this.shouldReload = true;

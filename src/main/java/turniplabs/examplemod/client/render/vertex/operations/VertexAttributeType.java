@@ -7,7 +7,7 @@ import org.lwjgl.opengl.GL30;
 
 public class VertexAttributeType {
 	public static final VertexAttributeType FLOAT = new FloatAttribute();
-	public static final VertexAttributeType INTEGER = new FloatAttribute();
+	public static final VertexAttributeType INTEGER = new IntegerAttribute();
 
 	public void setupAttributeType(int index, int glId, int size, boolean normalized, int stride, int strideOffset) {
 		throw new RuntimeException("Function not implemented!");

@@ -49,8 +49,6 @@ public class BFSCuller {
 
 			int outwardDirections = getOutwardDirections(playerX, playerY, playerZ, node);
 			outwardDirections &= SectionFlags.getAdjacentMask(flags);
-			// 2398 con - 2420 sin
-//			outwardDirections &= getAngleVisibilityMask(playerX, playerY, playerZ, node);
 
 			exploreNodes(bfsQueue, node, outwardDirections, activeFrame);
 		}
@@ -65,7 +63,7 @@ public class BFSCuller {
 
 		int distance = withinRenderDistance(distX, distY, distZ);
 
-		if (distance > fogEnd || !FrustumCuller.testAab(distX, distY, distZ)) {
+		if (distance >= fogEnd || !FrustumCuller.testAab(distX, distY, distZ)) {
 			return true;
 		}
 
@@ -96,7 +94,10 @@ public class BFSCuller {
 			queueRegionNode(this.bfsQueue, spawn, flags);
 		}
 
-		double maxDistance = Math.min(FogData.fogEnd, camera.renderDistance << 4);
+		// Little subtract hack to avoid rare issues with neighbor sections block data not being generated and
+		// generating visual bugs in the world at large render distances, I tried fixing it with marking dirty
+		// sections, but it doesn't help.
+		double maxDistance = Math.min(FogData.FOG_END, camera.renderDistance << 4) - (camera.renderDistance >> 1);
 
 		bfsSearch(this.bfsQueue, camera.intX, camera.intY, camera.intZ, (int) MathExt.square(maxDistance), this.activeFrame);
 	}
