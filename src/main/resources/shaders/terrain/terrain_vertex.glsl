@@ -18,24 +18,18 @@ const uint REGION_BLOCK_SHIFT_Z = 7u;
 
 const uint POSITION_BITS = 20u;
 
-const uint REGION_SCALE_X = (1u << (POSITION_BITS - REGION_BLOCK_SHIFT_X));
-const uint REGION_SCALE_Y = (1u << (POSITION_BITS - REGION_BLOCK_SHIFT_Y));
-const uint REGION_SCALE_Z = (1u << (POSITION_BITS - REGION_BLOCK_SHIFT_Z));
+const uint REGION_SCALE_X = (1u << (POSITION_BITS - REGION_BLOCK_SHIFT_X)) - 1u;
+const uint REGION_SCALE_Y = (1u << (POSITION_BITS - REGION_BLOCK_SHIFT_Y)) - 1u;
+const uint REGION_SCALE_Z = (1u << (POSITION_BITS - REGION_BLOCK_SHIFT_Z)) - 1u;
 
-#define REGION_SCALE vec3(REGION_SCALE_X, REGION_SCALE_Y, REGION_SCALE_Z)
-#define UV_SCALE vec2(1.0 / 65536)
+#define REGION_SCALE vec3(1.0 / REGION_SCALE_X, 1.0 / REGION_SCALE_Y, 1.0 / REGION_SCALE_Z)
+#define UV_SCALE (1.0 / 65535)
 
 vec3 extractBlockPos(uvec2 atPosition) {
-    uint blockX = atPosition.x & 0x1FFFFFu; // bits [0–20]
+    uvec3 lowHalf = (uvec3(atPosition.x) >> uvec3(0u, 10u, 20u)) & 0x3FFu;
+    uvec3 topHalf = (uvec3(atPosition.y) >> uvec3(0u, 10u, 20u)) & 0x3FFu;
 
-    // Y uses 11 bits from atPosition.x, 10 bits from atPosition.y
-    uint blockY_low  = (atPosition.x >> 21);          // bits [21–31] → 11 bits
-    uint blockY_high = (atPosition.y & 0x3FFu);       // bits [32–41] → 10 bits
-    uint blockY = (blockY_high << 11) | blockY_low;   // combine → 21 bits
-
-    uint blockZ = (atPosition.y >> 10) & 0x1FFFFFu;   // bits [42–62]
-
-    return uvec3(blockX, blockY, blockZ) / REGION_SCALE;
+    return vec3(lowHalf | topHalf << 10u) * REGION_SCALE;
 }
 
 void main() {
@@ -45,6 +39,6 @@ void main() {
     gl_Position = u_ProjMat * position;
 
     v_Color = a_Color;
-    v_TextureUv = a_Uv;
+    v_TextureUv = a_Uv * UV_SCALE;
     v_Distance = length(position);
 }

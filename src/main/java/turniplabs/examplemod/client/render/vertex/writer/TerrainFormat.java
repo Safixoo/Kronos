@@ -22,9 +22,9 @@ public class TerrainFormat extends VertexFormat {
 	static final int POSITION_BITS = 20;
 	static final double UV_PRECISION = (1 << 16) - 1;
 
-	static final double FACT_X = (1 << (POSITION_BITS - BLOCK_SHIFT_X));
-	static final double FACT_Y = (1 << (POSITION_BITS - BLOCK_SHIFT_Y));
-	static final double FACT_Z = (1 << (POSITION_BITS - BLOCK_SHIFT_Z));
+	static final double FACT_X = (1 << (POSITION_BITS - BLOCK_SHIFT_X)) - 1;
+	static final double FACT_Y = (1 << (POSITION_BITS - BLOCK_SHIFT_Y)) - 1;
+	static final double FACT_Z = (1 << (POSITION_BITS - BLOCK_SHIFT_Z)) - 1;
 
 	public TerrainFormat(ImmutableList<VertexAttribute> vertexProperties) {
 		super(vertexProperties);
@@ -42,18 +42,39 @@ public class TerrainFormat extends VertexFormat {
 	}
 
 	private static int extractPos(double pos, double scale) {
-		return (int) (pos * scale) & 0x1FFFFF;
+		return (int) (pos * scale) & 0xFFFFF;
 	}
 
-	private static int processUv(float u, float v) {
-		int intU = (int) (u * UV_PRECISION) & 0xFFFF;
-		int intV = (int) (v * UV_PRECISION) & 0xFFFF;
+	private static int processUv(double u, double v) {
+		int intU = (int) Math.round(u * UV_PRECISION) & 0xFFFF;
+		int intV = (int) Math.round(v * UV_PRECISION) & 0xFFFF;
 
 		return intU | intV << 16;
 	}
 
+	// It does use a similar idea to Sodium 20-bit position.
+	private static long processPosition(int x, int y, int z) {
+		int lowHalf = 0;
+
+		lowHalf |= (x >>> 0 & 0x3FF) << 00;
+		lowHalf |= (y >>> 0 & 0x3FF) << 10;
+		lowHalf |= (z >>> 0 & 0x3FF) << 20;
+
+		int topHalf = 0;
+
+		topHalf |= (x >>> 10 & 0x3FF) << 00;
+		topHalf |= (y >>> 10 & 0x3FF) << 10;
+		topHalf |= (z >>> 10 & 0x3FF) << 20;
+
+		return lowHalf | ((long) topHalf << 32L);
+	}
+
 	public static void writeTerrainVertex(long ptr, double x, double y, double z, float u, float v, int color) {
-		long position = extractPos(x, FACT_X) | (long) extractPos(y, FACT_Y) << 21 | (long) extractPos(z, FACT_Z) << 42;
+		int intX = extractPos(x, FACT_X);
+		int intY = extractPos(y, FACT_Y);
+		int intZ = extractPos(z, FACT_Z);
+
+		long position = processPosition(intX, intY, intZ);
 
 		MemoryUtil.memPutLong(ptr + 0, position);
 		MemoryUtil.memPutInt(ptr + 8, processUv(u, v));

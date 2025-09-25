@@ -33,7 +33,7 @@ public class RegionAllocation {
 		int newCapacity = Math.max(MIN_ALLOC, size);
 
 		if (SPARE_BUFFER == null) {
-			SPARE_BUFFER = new RegionVertexBuffer(SPARE_BUFFER_ALLOC);
+			SPARE_BUFFER = new RegionVertexBuffer(SPARE_BUFFER_ALLOC, GL15.GL_DYNAMIC_COPY);
 		}
 
 		if (GL31_SUPPORT == -1) {
