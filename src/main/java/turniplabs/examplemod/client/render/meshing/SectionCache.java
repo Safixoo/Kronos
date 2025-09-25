@@ -1,4 +1,4 @@
-package turniplabs.examplemod.client.render.data;
+package turniplabs.examplemod.client.render.meshing;
 
 import net.minecraft.client.render.LightmapHelper;
 import net.minecraft.core.block.Block;
@@ -13,7 +13,7 @@ import net.minecraft.core.world.chunk.Chunk;
 import net.minecraft.core.world.chunk.ChunkSection;
 import net.minecraft.core.world.season.SeasonManager;
 import org.jetbrains.annotations.Nullable;
-import turniplabs.examplemod.client.util.BlocksFlags;
+import turniplabs.examplemod.client.render.util.data.BlocksFlags;
 
 public class SectionCache implements WorldSource {
 	private final Chunk[] chunks = new Chunk[3 * 3];

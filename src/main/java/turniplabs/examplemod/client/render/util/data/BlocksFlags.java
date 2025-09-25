@@ -1,4 +1,4 @@
-package turniplabs.examplemod.client.util;
+package turniplabs.examplemod.client.render.util.data;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.block.Block;

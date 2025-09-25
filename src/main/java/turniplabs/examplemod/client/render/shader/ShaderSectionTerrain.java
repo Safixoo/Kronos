@@ -1,4 +1,4 @@
-package turniplabs.examplemod.client.render;
+package turniplabs.examplemod.client.render.shader;
 
 import net.minecraft.client.Minecraft;
 import org.joml.Matrix4f;
@@ -7,9 +7,8 @@ import org.lwjgl.opengl.GL20;
 import org.lwjgl.system.MemoryUtil;
 import turniplabs.examplemod.ExampleMod;
 import turniplabs.examplemod.client.render.cull.FrustumCuller;
-import turniplabs.examplemod.client.render.data.CameraData;
-import turniplabs.examplemod.client.render.data.FogData;
-import turniplabs.examplemod.client.render.shader.ShaderLoader;
+import turniplabs.examplemod.client.render.util.data.CameraData;
+import turniplabs.examplemod.client.render.util.data.FogData;
 
 import java.nio.FloatBuffer;
 

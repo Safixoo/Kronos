@@ -4,7 +4,7 @@ import org.lwjgl.opengl.*;
 import turniplabs.examplemod.client.render.SectionFlags;
 import turniplabs.examplemod.client.render.SectionManager;
 import turniplabs.examplemod.client.render.SectionRender;
-import turniplabs.examplemod.client.render.vertex.writer.TerrainFormat;
+import turniplabs.examplemod.client.render.vertex.writers.TerrainFormat;
 
 import javax.annotation.Nullable;
 

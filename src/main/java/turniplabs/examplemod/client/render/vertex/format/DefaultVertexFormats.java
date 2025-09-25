@@ -3,7 +3,7 @@ package turniplabs.examplemod.client.render.vertex.format;
 import com.google.common.collect.ImmutableList;
 import turniplabs.examplemod.client.render.vertex.operations.VertexAttribute;
 import turniplabs.examplemod.client.render.vertex.operations.VertexAttributeType;
-import turniplabs.examplemod.client.render.vertex.writer.TerrainFormat;
+import turniplabs.examplemod.client.render.vertex.writers.TerrainFormat;
 
 public class DefaultVertexFormats {
 	public static final VertexAttribute POSITION = new VertexAttribute(2, false, VertexAttribute.Type.UINT, VertexAttributeType.INTEGER);

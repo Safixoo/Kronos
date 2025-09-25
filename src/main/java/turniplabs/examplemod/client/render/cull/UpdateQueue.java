@@ -5,11 +5,11 @@ import turniplabs.examplemod.client.render.SectionRender;
 import java.util.Arrays;
 
 public class UpdateQueue {
-	public static final SectionRender[] UPDATE_QUEUE = new SectionRender[8];
+	public static final SectionRender[] UPDATE_QUEUE = new SectionRender[32];
 	public static int UPDATE_POSITION = 0;
 
 	public static void addToQueue(SectionRender render) {
-		if (UPDATE_POSITION == 8) {
+		if (UPDATE_POSITION == 32) {
 			return;
 		}
 

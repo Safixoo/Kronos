@@ -1,9 +1,8 @@
-package turniplabs.examplemod.client.render.vertex.writer;
+package turniplabs.examplemod.client.render.vertex.writers;
 
 import com.google.common.collect.ImmutableList;
 import net.minecraft.core.util.helper.MathHelper;
 import org.lwjgl.system.MemoryUtil;
-import turniplabs.examplemod.client.render.region.RegionRender;
 import turniplabs.examplemod.client.render.vertex.VertexWriterManager;
 import turniplabs.examplemod.client.render.vertex.format.VertexFormat;
 import turniplabs.examplemod.client.render.vertex.operations.VertexAttribute;

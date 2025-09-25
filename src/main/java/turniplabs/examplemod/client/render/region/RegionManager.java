@@ -3,13 +3,12 @@ package turniplabs.examplemod.client.render.region;
 import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.objects.*;
-import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL30;
 import turniplabs.examplemod.client.render.SectionManager;
-import turniplabs.examplemod.client.render.ShaderSectionTerrain;
+import turniplabs.examplemod.client.render.shader.ShaderSectionTerrain;
 import turniplabs.examplemod.client.render.cull.BFSQueue;
-import turniplabs.examplemod.client.render.data.CameraData;
-import turniplabs.examplemod.client.util.MathExt;
+import turniplabs.examplemod.client.render.util.data.CameraData;
+import turniplabs.examplemod.client.render.util.MathExt;
 
 public class RegionManager {
 	public final Long2ReferenceOpenHashMap<RegionRender> regionMap = new Long2ReferenceOpenHashMap<>();

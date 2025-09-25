@@ -1,4 +1,4 @@
-package turniplabs.examplemod.client.util;
+package turniplabs.examplemod.client.render.util;
 
 import net.minecraft.core.util.helper.Side;
 

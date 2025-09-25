@@ -12,11 +12,12 @@ import org.lwjgl.opengl.GL11;
 import turniplabs.examplemod.client.render.cull.BFSCuller;
 import turniplabs.examplemod.client.render.cull.FrustumCuller;
 import turniplabs.examplemod.client.render.cull.UpdateQueue;
-import turniplabs.examplemod.client.render.data.CameraData;
+import turniplabs.examplemod.client.render.shader.ShaderSectionTerrain;
+import turniplabs.examplemod.client.render.util.data.CameraData;
 import turniplabs.examplemod.client.render.region.RegionManager;
 import turniplabs.examplemod.client.render.region.RegionRender;
-import turniplabs.examplemod.client.util.Direction;
-import turniplabs.examplemod.client.util.MathExt;
+import turniplabs.examplemod.client.render.util.Direction;
+import turniplabs.examplemod.client.render.util.MathExt;
 
 public class SectionManager {
 	private static final int MAX_UPDATE_QUEUES = 10;

@@ -5,12 +5,12 @@ import net.minecraft.core.util.helper.MathHelper;
 import turniplabs.examplemod.client.render.SectionFlags;
 import turniplabs.examplemod.client.render.SectionManager;
 import turniplabs.examplemod.client.render.SectionRender;
-import turniplabs.examplemod.client.render.data.CameraData;
-import turniplabs.examplemod.client.render.data.FogData;
+import turniplabs.examplemod.client.render.util.data.CameraData;
+import turniplabs.examplemod.client.render.util.data.FogData;
 import turniplabs.examplemod.client.render.region.RegionManager;
 import turniplabs.examplemod.client.render.region.RegionRender;
-import turniplabs.examplemod.client.util.Direction;
-import turniplabs.examplemod.client.util.MathExt;
+import turniplabs.examplemod.client.render.util.Direction;
+import turniplabs.examplemod.client.render.util.MathExt;
 
 public class BFSCuller {
 	public final BFSQueue bfsQueue = new BFSQueue();

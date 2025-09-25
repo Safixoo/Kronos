@@ -2,16 +2,18 @@ package turniplabs.examplemod.client.render.vertex;
 
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import org.lwjgl.system.MemoryUtil;
-import turniplabs.examplemod.client.util.Direction;
+import turniplabs.examplemod.client.render.util.Direction;
+import turniplabs.examplemod.client.render.util.MeshDirection;
 import turniplabs.examplemod.client.render.vertex.format.VertexFormat;
 
-// Remplazar toda la clase con una implementacion de MemoryUtil.
+import java.util.Arrays;
+
 public class VertexWriterManager {
 	private static final VertexWriterManager DEFAULT_INSTANCE = new VertexWriterManager();
 
 	public static final ObjectArrayList<VertexWriterManager> VERTEX_WRITERS = new ObjectArrayList<>();
-	public static final VertexWriterManager[] SOLID = new VertexWriterManager[Direction.COUNT + 1];
-	public static final VertexWriterManager TRANSLUCENT = new VertexWriterManager();
+	public static final VertexWriterManager[] SOLID = new VertexWriterManager[MeshDirection.COUNT];
+	public static VertexWriterManager TRANSLUCENT = new VertexWriterManager();
 
 	public float x, y, z;
 	public float trasX, trasY, trasZ;
@@ -26,16 +28,12 @@ public class VertexWriterManager {
 	private int offset, vertices;
 	public boolean isDrawing = false;
 
-	static {
-		for (int dir = 0; dir < Direction.COUNT + 1; dir++) {
-			SOLID[dir] = new VertexWriterManager();
-		}
-	}
+
 
 	private static VertexWriterManager CURRENT_INSTANCE;
 
 	public VertexWriterManager(int capacity) {
-//		VERTEX_WRITERS.add(this);
+		VERTEX_WRITERS.add(this);
 
 		this.capacity = capacity;
 		this.vertexPtr = MemoryUtil.nmemAlloc(capacity);
@@ -51,6 +49,13 @@ public class VertexWriterManager {
 		}
 
 		return DEFAULT_INSTANCE;
+	}
+
+	public static void startDefaults() {
+		for (int dir = 0; dir < MeshDirection.COUNT; dir++) {
+			SOLID[dir] = new VertexWriterManager();
+		}
+		TRANSLUCENT = new VertexWriterManager();
 	}
 
 	public static void setCurrentInstance(VertexWriterManager manager) {
@@ -104,6 +109,9 @@ public class VertexWriterManager {
 		}
 
 		VERTEX_WRITERS.clear();
+
+		Arrays.fill(VertexWriterManager.SOLID, null);
+		VertexWriterManager.TRANSLUCENT = null;
 	}
 
 	private void grow(long minSize) {

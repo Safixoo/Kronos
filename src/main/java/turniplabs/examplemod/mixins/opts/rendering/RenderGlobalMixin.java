@@ -78,6 +78,8 @@ public abstract class RenderGlobalMixin {
 		// Don't add as many display lists as vanilla, as they won't be used for chunks.
 		this.glRenderListBase = GLAllocation.generateDisplayLists(4096);
 
+		VertexWriterManager.startDefaults();
+
 		BlockModelLeaves.setGraphicsLevel(this.mc.gameSettings.fancyGraphics.value == 1);
 
 		this.renderEntitiesStartupCounter = 2;

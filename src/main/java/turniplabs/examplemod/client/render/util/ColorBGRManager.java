@@ -1,7 +1,4 @@
-package turniplabs.examplemod.client.util;
-
-import net.minecraft.core.util.helper.MathHelper;
-import org.lwjgl.system.JNI;
+package turniplabs.examplemod.client.render.util;
 
 public class ColorBGRManager {
 	private static final float NORMALIZED_TO_INTEGER = 255.0F;

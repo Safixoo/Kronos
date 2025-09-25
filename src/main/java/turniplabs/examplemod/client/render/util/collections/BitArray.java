@@ -1,4 +1,4 @@
-package turniplabs.examplemod.client.util;
+package turniplabs.examplemod.client.render.util.collections;
 
 import java.util.Arrays;
 

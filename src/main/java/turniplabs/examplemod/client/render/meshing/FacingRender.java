@@ -1,8 +1,7 @@
 package turniplabs.examplemod.client.render.meshing;
 
-import org.joml.Vector3f;
 import org.joml.Vector3i;
-import turniplabs.examplemod.client.util.Direction;
+import turniplabs.examplemod.client.render.util.Direction;
 
 public class FacingRender {
 	public byte aoCornerX0, aoCornerY0, aoCornerZ0;

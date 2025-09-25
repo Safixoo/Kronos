@@ -1,4 +1,4 @@
-package turniplabs.examplemod.client.render.data;
+package turniplabs.examplemod.client.render.util.data;
 
 public class CameraData {
 	public int intX;

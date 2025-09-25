@@ -1,6 +1,6 @@
 package turniplabs.examplemod.client.render.cull;
 
-import turniplabs.examplemod.client.util.BitArray;
+import turniplabs.examplemod.client.render.util.collections.BitArray;
 
 public class BFSVisArray {
 	private static int lastDistance;

@@ -1,7 +1,7 @@
-package turniplabs.examplemod.client.util;
+package turniplabs.examplemod.client.render.util;
 
 import turniplabs.examplemod.client.render.SectionRender;
-import turniplabs.examplemod.client.render.data.CameraData;
+import turniplabs.examplemod.client.render.util.data.CameraData;
 import turniplabs.examplemod.client.render.region.RegionRender;
 
 public class MathExt {

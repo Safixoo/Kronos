@@ -8,7 +8,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import turniplabs.examplemod.client.render.data.FogData;
+import turniplabs.examplemod.client.render.util.data.FogData;
 
 @Mixin(value = FogManager.class, remap = false)
 public abstract class FogManagerMixin {

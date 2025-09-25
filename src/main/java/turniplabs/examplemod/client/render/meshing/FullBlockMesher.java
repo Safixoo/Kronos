@@ -2,18 +2,16 @@ package turniplabs.examplemod.client.render.meshing;
 
 import net.minecraft.client.render.block.color.BlockColor;
 import net.minecraft.client.render.block.model.BlockModel;
-import net.minecraft.client.render.terrain.RenderRegion;
 import net.minecraft.client.render.texture.stitcher.IconCoordinate;
 import net.minecraft.core.util.helper.Side;
 import org.joml.Vector2i;
 import org.joml.Vector3i;
-import turniplabs.examplemod.client.render.data.SectionCache;
 import turniplabs.examplemod.client.render.region.RegionRender;
-import turniplabs.examplemod.client.util.BlocksFlags;
-import turniplabs.examplemod.client.util.ColorBGRManager;
-import turniplabs.examplemod.client.util.Direction;
+import turniplabs.examplemod.client.render.util.data.BlocksFlags;
+import turniplabs.examplemod.client.render.util.ColorBGRManager;
+import turniplabs.examplemod.client.render.util.Direction;
 import turniplabs.examplemod.client.render.vertex.VertexWriterManager;
-import turniplabs.examplemod.client.render.vertex.writer.TerrainFormat;
+import turniplabs.examplemod.client.render.vertex.writers.TerrainFormat;
 
 public class FullBlockMesher {
 	private static final int[] SHADE_FULL_COLOR = new int[Direction.COUNT];

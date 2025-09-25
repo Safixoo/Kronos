@@ -5,18 +5,19 @@ import org.lwjgl.opengl.GL15;
 import org.lwjgl.system.MemoryUtil;
 import turniplabs.examplemod.client.render.SectionManager;
 import turniplabs.examplemod.client.render.SectionRender;
-import turniplabs.examplemod.client.render.ShaderSectionTerrain;
-import turniplabs.examplemod.client.render.data.CameraData;
-import turniplabs.examplemod.client.util.Direction;
+import turniplabs.examplemod.client.render.shader.ShaderSectionTerrain;
+import turniplabs.examplemod.client.render.util.MeshDirection;
+import turniplabs.examplemod.client.render.util.data.CameraData;
+import turniplabs.examplemod.client.render.util.Direction;
 import turniplabs.examplemod.client.render.vertex.VertexWriterManager;
-import turniplabs.examplemod.client.render.vertex.writer.TerrainFormat;
+import turniplabs.examplemod.client.render.vertex.writers.TerrainFormat;
 
 public class RegionRender {
 	// Region total volume area in SectionRenders.
 	public static final int REGION_SECTION_SIZE = 256; // 8 * 4 * 8
 
 	public static final int TRANSLUCENT_DRAWS = 1;
-	public static final int SOLID_DRAWS = Direction.COUNT + 1;
+	public static final int SOLID_DRAWS = MeshDirection.COUNT;
 	public static final int TOTAL_DRAWS = SOLID_DRAWS + TRANSLUCENT_DRAWS;
 
 	// Region coordinates in region space.
@@ -165,7 +166,7 @@ public class RegionRender {
 		int index;
 		int end;
 		int inc;
-
+		
 		if (pass == 1) {
 			index = this.sectionsToRender - 1;
 			end = -1;
@@ -220,13 +221,13 @@ public class RegionRender {
 
 		int visibleFaces = getVisibleFaces(camera.intX, camera.intY, camera.intZ, blockX, blockY, blockZ) & solidMask;
 
-		for (int side = 0; side <= Direction.COUNT; side++) {
-			long drawData = this.regionDrawData[regionIndex * TOTAL_DRAWS + side];
+		for (int dir = 0; dir < MeshDirection.COUNT; dir++) {
+			long drawData = this.regionDrawData[regionIndex * TOTAL_DRAWS + dir];
 
 			MemoryUtil.memPutInt((drawCount * 4L) + this.solidFirst, RegionAllocation.unpackFirst(drawData));
 			MemoryUtil.memPutInt((drawCount * 4L) + this.solidCount, RegionAllocation.unpackCount(drawData));
 
-			drawCount += (visibleFaces >>> side) & 1;
+			drawCount += (visibleFaces >>> dir) & 1;
 		}
 
 		return drawCount;
@@ -246,7 +247,7 @@ public class RegionRender {
 	}
 
 	public static int getVisibleFaces(int originX, int originY, int originZ, int chunkX, int chunkY, int chunkZ) {
-		int planes = (1 << Direction.COUNT);
+		int planes = 1 << MeshDirection.GENERIC;
 
 		planes |= greaterThan(originX, (chunkX - 3)) << Direction.EAST;
 		planes |= greaterThan(originY, (chunkY - 3)) << Direction.UP;

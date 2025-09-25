@@ -6,9 +6,7 @@ import net.minecraft.client.render.block.color.BlockColorDispatcher;
 import net.minecraft.client.render.block.model.BlockModel;
 import net.minecraft.client.render.block.model.BlockModelDispatcher;
 import net.minecraft.client.render.block.model.BlockModelGrass;
-import net.minecraft.client.render.block.model.BlockModelLeaves;
 import net.minecraft.client.render.terrain.ChunkRenderer;
-import net.minecraft.client.render.terrain.RenderRegion;
 import net.minecraft.client.render.tessellator.Tessellator;
 import net.minecraft.core.block.Block;
 import net.minecraft.core.block.Blocks;
@@ -16,10 +14,11 @@ import net.minecraft.core.util.phys.AABB;
 import net.minecraft.core.world.World;
 import turniplabs.examplemod.client.render.meshing.FullBlockMesher;
 import turniplabs.examplemod.client.render.region.RegionRender;
+import turniplabs.examplemod.client.render.util.MeshDirection;
 import turniplabs.examplemod.client.render.vertex.VertexWriterManager;
-import turniplabs.examplemod.client.render.data.SectionCache;
-import turniplabs.examplemod.client.util.BlocksFlags;
-import turniplabs.examplemod.client.util.Direction;
+import turniplabs.examplemod.client.render.meshing.SectionCache;
+import turniplabs.examplemod.client.render.util.data.BlocksFlags;
+import turniplabs.examplemod.client.render.util.Direction;
 import turniplabs.examplemod.client.render.vertex.format.DefaultVertexFormats;
 
 // Saves basic info for each section from the world, is used mostly for culling and
@@ -79,7 +78,7 @@ public class SectionRender {
 
 		VertexWriterManager translucentWriter = VertexWriterManager.TRANSLUCENT;
 
-		for (int dir = 0; dir <= Direction.COUNT; dir++) {
+		for (int dir = 0; dir < MeshDirection.COUNT; dir++) {
 			this.prepareWriterForTerrain(VertexWriterManager.SOLID[dir]);
 		}
 
@@ -138,7 +137,7 @@ public class SectionRender {
 							FullBlockMesher.renderFaces(model, blockColor, this.sectionCache, blockX, blockY, blockZ);
 
 							if (model.getClass() == BlockModelGrass.class) {
-								VertexWriterManager.setCurrentInstance(VertexWriterManager.SOLID[Direction.COUNT]);
+								VertexWriterManager.setCurrentInstance(VertexWriterManager.SOLID[MeshDirection.GENERIC]);
 
 								BlockModelGrass.useOverlay = true;
 								blockModel.renderStandardBlock(Tessellator.instance, GRASS, blockX, blockY, blockZ);
@@ -148,7 +147,7 @@ public class SectionRender {
 							if (blockRenderPass != 0) {
 								VertexWriterManager.setCurrentInstance(VertexWriterManager.TRANSLUCENT);
 							} else {
-								VertexWriterManager.setCurrentInstance(VertexWriterManager.SOLID[Direction.COUNT]);
+								VertexWriterManager.setCurrentInstance(VertexWriterManager.SOLID[MeshDirection.GENERIC]);
 							}
 
 							this.renderBlock(Tessellator.instance, renderBlocks, model, blockX, blockY, blockZ);
@@ -198,7 +197,7 @@ public class SectionRender {
 			this.currentFrame = Integer.MIN_VALUE;
 		}
 
-		for (int dir = 0; dir <= Direction.COUNT; dir++) {
+		for (int dir = 0; dir < MeshDirection.COUNT; dir++) {
 			VertexWriterManager.SOLID[dir].stopDrawing();
 		}
 
@@ -214,7 +213,7 @@ public class SectionRender {
 				this.region = sectionManager.getRegion(this.blockX >> 4, this.blockY >> 4, this.blockZ >> 4);
 			}
 
-			for (int dir = 0; dir <= Direction.COUNT; dir++) {
+			for (int dir = 0; dir < MeshDirection.COUNT; dir++) {
 				if (VertexWriterManager.SOLID[dir].getVertices() != 0) {
 					this.region.addSolidMesh(this, VertexWriterManager.SOLID[dir], dir);
 				}
@@ -246,7 +245,7 @@ public class SectionRender {
 	private int sumAllSolidVertices() {
 		int sumVertices = 0;
 
-		for (int dir = 0; dir <= Direction.COUNT; dir++) {
+		for (int dir = 0; dir < MeshDirection.COUNT; dir++) {
 			sumVertices += VertexWriterManager.SOLID[dir].getVertices();
 		}
 
@@ -256,7 +255,7 @@ public class SectionRender {
 	private int nonEmptyFacesMask() {
 		int mask = 0;
 
-		for (int dir = 0; dir <= Direction.COUNT; dir++) {
+		for (int dir = 0; dir < MeshDirection.COUNT; dir++) {
 			if (VertexWriterManager.SOLID[dir].getVertices() != 0) {
 				mask |= 1 << dir;
 			}
