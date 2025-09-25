@@ -9,7 +9,8 @@ import turniplabs.examplemod.client.render.vertex.format.VertexFormat;
 import java.util.Arrays;
 
 public class VertexWriterManager {
-	private static final VertexWriterManager DEFAULT_INSTANCE = new VertexWriterManager();
+	private static final VertexWriterManager DEFAULT_INSTANCE = new VertexWriterManager(false);
+	private static final int DEFAULT_CAPACITY = (1 << 16);
 
 	public static final ObjectArrayList<VertexWriterManager> VERTEX_WRITERS = new ObjectArrayList<>();
 	public static final VertexWriterManager[] SOLID = new VertexWriterManager[MeshDirection.COUNT];
@@ -28,19 +29,27 @@ public class VertexWriterManager {
 	private int offset, vertices;
 	public boolean isDrawing = false;
 
-
-
 	private static VertexWriterManager CURRENT_INSTANCE;
 
 	public VertexWriterManager(int capacity) {
-		VERTEX_WRITERS.add(this);
+		this(capacity, true);
+	}
+
+	public VertexWriterManager(boolean tracked) {
+		this(DEFAULT_CAPACITY, tracked);
+	}
+
+	public VertexWriterManager(int capacity, boolean tracked) {
+		if (tracked) {
+			VERTEX_WRITERS.add(this);
+		}
 
 		this.capacity = capacity;
 		this.vertexPtr = MemoryUtil.nmemAlloc(capacity);
 	}
 
 	public VertexWriterManager() {
-		this(65536 << 1);
+		this(DEFAULT_CAPACITY);
 	}
 
 	public static VertexWriterManager getCurrentInstance() {
