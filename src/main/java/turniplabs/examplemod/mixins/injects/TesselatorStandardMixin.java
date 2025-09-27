@@ -26,9 +26,9 @@ public abstract class TesselatorStandardMixin extends TessellatorBase {
 			return;
 		}
 
-		man.x = (float) x;
-		man.y = (float) y;
-		man.z = (float) z;
+		man.x = x;
+		man.y = y;
+		man.z = z;
 
 		man.addVertex();
 		ci.cancel();
@@ -42,8 +42,8 @@ public abstract class TesselatorStandardMixin extends TessellatorBase {
 			return;
 		}
 
-		man.u = (float) u;
-		man.v = (float) v;
+		man.u = u;
+		man.v = v;
 
 		ci.cancel();
 	}
@@ -81,9 +81,9 @@ public abstract class TesselatorStandardMixin extends TessellatorBase {
 			return;
 		}
 
-		man.trasX = (float) x;
-		man.trasY = (float) y;
-		man.trasZ = (float) z;
+		man.trasX = x;
+		man.trasY = y;
+		man.trasZ = z;
 
 		ci.cancel();
 	}

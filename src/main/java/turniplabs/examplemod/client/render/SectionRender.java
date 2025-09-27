@@ -6,6 +6,7 @@ import net.minecraft.client.render.block.color.BlockColorDispatcher;
 import net.minecraft.client.render.block.model.BlockModel;
 import net.minecraft.client.render.block.model.BlockModelDispatcher;
 import net.minecraft.client.render.block.model.BlockModelGrass;
+import net.minecraft.client.render.block.model.BlockModelLeaves;
 import net.minecraft.client.render.terrain.ChunkRenderer;
 import net.minecraft.client.render.tessellator.Tessellator;
 import net.minecraft.core.block.Block;
@@ -50,9 +51,6 @@ public class SectionRender {
 
 		this.regionIndex = RegionRender.regionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
 	}
-
-	private static final float EPSILON = 6E-4f;
-	private static final AABB GRASS = AABB.getPermanentBB(-EPSILON, 0, -EPSILON, 1 + EPSILON, 1, 1 + EPSILON);
 
 	public void rebuild(SectionManager sectionManager, World world) {
 		ChunkRenderer.updates++;
@@ -136,11 +134,13 @@ public class SectionRender {
 
 							FullBlockMesher.renderFaces(model, blockColor, this.sectionCache, blockX, blockY, blockZ);
 
-							if (model.getClass() == BlockModelGrass.class) {
+							Class<?> modelClass = model.getClass();
+
+							if (modelClass == BlockModelGrass.class || modelClass == BlockModelLeaves.class) {
 								VertexWriterManager.setCurrentInstance(VertexWriterManager.SOLID[MeshDirection.GENERIC]);
 
 								BlockModelGrass.useOverlay = true;
-								blockModel.renderStandardBlock(Tessellator.instance, GRASS, blockX, blockY, blockZ);
+								FullBlockMesher.renderFaces(model, blockColor, this.sectionCache, blockX, blockY, blockZ);
 								BlockModelGrass.useOverlay = false;
 							}
 						} else {

@@ -3,7 +3,9 @@ package turniplabs.examplemod.client.render.meshing;
 import net.minecraft.client.render.block.color.BlockColor;
 import net.minecraft.client.render.block.model.BlockModel;
 import net.minecraft.client.render.texture.stitcher.IconCoordinate;
+import net.minecraft.core.block.Block;
 import net.minecraft.core.util.helper.Side;
+import net.minecraft.core.util.phys.AABB;
 import org.joml.Vector2i;
 import org.joml.Vector3i;
 import turniplabs.examplemod.client.render.region.RegionRender;
@@ -21,6 +23,7 @@ public class FullBlockMesher {
 	private static final Vector2i[] MAP_ID_TO_UV = new Vector2i[4];
 
 	public static final float[] SIDE_LIGHT_MULTIPLIER = new float[] { 0.5F, 1.0F, 0.8F, 0.8F, 0.6F, 0.6F };
+	private static final AABB FULL_BLOCK = AABB.getPermanentBB(0, 0, 0, 1, 1, 1);
 
 	public static void renderFaces(BlockModel<?> model, BlockColor blockColor, SectionCache cache, int x, int y, int z) {
 		int meta = cache.getBlockMetadataCenter(x, y, z);
@@ -31,11 +34,16 @@ public class FullBlockMesher {
 			int dirY = y + Direction.y(dir);
 			int dirZ = z + Direction.z(dir);
 
-			if (cache.isBlockOpaqueCube(dirX, dirY, dirZ)) {
+			if (!model.shouldSideBeRendered(cache, FULL_BLOCK, dirX, dirY, dirZ, dir, 0)) {
 				continue;
 			}
 
 			IconCoordinate tex = model.getBlockTexture(cache, x, y, z, Side.sides[dir]);
+
+			if (tex == null) {
+				continue;
+			}
+
 			VertexWriterManager.setCurrentInstance(VertexWriterManager.SOLID[dir]);
 
 			boolean colorized = model.shouldSideBeColored(cache, x, y, z, dir, meta);

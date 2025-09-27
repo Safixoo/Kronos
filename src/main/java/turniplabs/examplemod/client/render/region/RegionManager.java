@@ -3,7 +3,7 @@ package turniplabs.examplemod.client.render.region;
 import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.objects.*;
-import org.lwjgl.opengl.GL30;
+import org.lwjgl.opengl.*;
 import turniplabs.examplemod.client.render.SectionManager;
 import turniplabs.examplemod.client.render.shader.ShaderSectionTerrain;
 import turniplabs.examplemod.client.render.cull.BFSQueue;

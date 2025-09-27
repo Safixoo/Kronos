@@ -3,7 +3,9 @@ package turniplabs.examplemod.client.render.region;
 import org.lwjgl.opengl.GL15;
 import org.lwjgl.opengl.GL20;
 import org.lwjgl.opengl.GL30;
+import org.lwjgl.opengl.GL44;
 import turniplabs.examplemod.client.render.SectionManager;
+import turniplabs.examplemod.client.render.SectionRender;
 import turniplabs.examplemod.client.render.vertex.format.DefaultVertexFormats;
 
 public class RegionVertexBuffer {

@@ -1,73 +1,43 @@
 package turniplabs.examplemod.client.render.cull;
 
-import turniplabs.examplemod.client.render.util.collections.BitArray;
+import turniplabs.examplemod.client.render.util.MathExt;
+
+import java.util.Arrays;
 
 public class BFSVisArray {
-	private static int lastDistance;
-	private static BitArray visArray;
+	private static final int MAX_DISTANCE = 32;
+	private static final int HOR_SHIFT = Integer.bitCount(MAX_DISTANCE - 1);
 
-	private static int offsetX;
-	private static int offsetZ;
-	private static int volumeInd;
-
-	private static int sizeX;
+	private static int OFFSET_X;
+	private static int OFFSET_Z;
+	private static final short[] FRAME_ARRAY = new short[MathExt.square((MAX_DISTANCE * 2 + 1) * 16) / Short.BYTES];
 
 	public static void start(int cameraX, int cameraZ, int renderDistance) {
-		int powRenderDistance = nextPowerOfTwo(renderDistance);
+		int powRenderDistance = 32;
 
-		int xzWide = (powRenderDistance * 2) + 1;
-		int yLength = 256 / 16;
-
-		int totalVolume = (xzWide * xzWide) * yLength;
-
-		offsetX = cameraX - powRenderDistance;
-		offsetZ = cameraZ - powRenderDistance;
-
-		sizeX = Integer.bitCount(powRenderDistance - 1);
-
-		if (lastDistance == powRenderDistance) {
-			visArray.clear();
-		} else {
-			visArray = new BitArray(volumeInd = totalVolume);
-		}
-
-		lastDistance = powRenderDistance;
-	}
-
-	private static int nextPowerOfTwo(int num) {
-		num--;
-		num |= num >> 1;
-		num |= num >> 2;
-		num |= num >> 4;
-		num |= num >> 8;
-		num |= num >> 16;
-		return num + 1;
+		OFFSET_X = cameraX - powRenderDistance;
+		OFFSET_Z = cameraZ - powRenderDistance;
 	}
 
 	public static boolean notVisible(int sectionX, int sectionY, int sectionZ) {
-		int index = getInd(sectionX, sectionY, sectionZ);
+		int relX = sectionX - OFFSET_X;
+		int relZ = sectionZ - OFFSET_Z;
 
-		if (index < 0 || index >= volumeInd) {
-			return true;
-		}
+		int realInd = (relX << HOR_SHIFT | relZ) << HOR_SHIFT | sectionY;
+		int bitInd = realInd & 0xF;
+		int arrInd = realInd >> 4;
 
-		return visArray.getFalse(index);
+		return (FRAME_ARRAY[arrInd] & (1 << bitInd)) == 0;
 	}
 
 	public static void setVisible(int sectionX, int sectionY, int sectionZ) {
-		int index = getInd(sectionX, sectionY, sectionZ);
+		int relX = sectionX - OFFSET_X;
+		int relZ = sectionZ - OFFSET_Z;
 
-		if (index < 0 || index >= volumeInd) {
-			return;
-		}
+		int realInd = (relX << HOR_SHIFT | relZ) << HOR_SHIFT | sectionY;
+		int bitInd = realInd & 0xF;
+		int arrInd = realInd >> 4;
 
-		visArray.set(index);
-	}
-
-	private static int getInd(int sectionX, int sectionY, int sectionZ) {
-		int relX = sectionX - offsetX;
-		int relZ = sectionZ - offsetZ;
-
-		return ((relX << sizeX) | relZ) << sizeX | sectionY;
+		FRAME_ARRAY[arrInd] |= (short) (1 << bitInd);
 	}
 }

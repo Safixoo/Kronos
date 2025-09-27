@@ -3,12 +3,15 @@ package turniplabs.examplemod.client.render.shader;
 import net.minecraft.client.Minecraft;
 import org.joml.Matrix4f;
 import org.lwjgl.input.Keyboard;
+import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL20;
 import org.lwjgl.system.MemoryUtil;
 import turniplabs.examplemod.ExampleMod;
 import turniplabs.examplemod.client.render.cull.FrustumCuller;
+import turniplabs.examplemod.client.render.util.MathExt;
 import turniplabs.examplemod.client.render.util.data.CameraData;
 import turniplabs.examplemod.client.render.util.data.FogData;
+import turniplabs.examplemod.client.render.vertex.writers.TerrainFormat;
 
 import java.nio.FloatBuffer;
 
@@ -16,10 +19,11 @@ public class ShaderSectionTerrain {
 	private int programId;
 	private int u_RegionPos;
 	private int u_TexId;
-	private int u_ProjMat, u_ModelViewMat;
+	private int u_ProjModelViewMat;
+	private int u_FragCoordToViewCoord;
 	private int u_FogEnd, u_FogStart, u_FogColor;
 
-	public static final FloatBuffer SCRATCH_BUFFER = MemoryUtil.memAllocFloat(16);
+	public static final FloatBuffer TEMP_BUFFER = MemoryUtil.memAllocFloat(16);
 
 	public ShaderSectionTerrain() {
 		this.prepareAndCompileShader();
@@ -64,8 +68,8 @@ public class ShaderSectionTerrain {
 		this.u_FogStart = GL20.glGetUniformLocation(this.programId, "u_FogStart");
 		this.u_FogColor = GL20.glGetUniformLocation(this.programId, "u_FogColor");
 
-		this.u_ModelViewMat = GL20.glGetUniformLocation(this.programId, "u_ModelViewMat");
-		this.u_ProjMat = GL20.glGetUniformLocation(this.programId, "u_ProjMat");
+		this.u_ProjModelViewMat = GL20.glGetUniformLocation(this.programId, "u_ProjModelViewMat");
+		this.u_FragCoordToViewCoord = GL20.glGetUniformLocation(this.programId, "u_FragCoordToViewCoord");
 	}
 
 	public void unbindProgram() {
@@ -80,13 +84,25 @@ public class ShaderSectionTerrain {
 		Matrix4f modelViewMat = FrustumCuller.modelViewMatrix;
 		Matrix4f projectionMat = FrustumCuller.projectionMatrix;
 
-		GL20.glUniformMatrix4fv(this.u_ModelViewMat, false, modelViewMat.get(SCRATCH_BUFFER));
-		GL20.glUniformMatrix4fv(this.u_ProjMat, false, projectionMat.get(SCRATCH_BUFFER));
+		Matrix4f combinedInv = new Matrix4f();
+		projectionMat.mul(modelViewMat, combinedInv);
+
+		float width = Minecraft.getMinecraft().gameWindow.getWidthPixels();
+		float height = Minecraft.getMinecraft().gameWindow.getHeightPixels();
+
+		final Matrix4f fragToNDC = new Matrix4f()
+			.translation(-1, -1, -1)
+			.scale(2.0f / width, 2.0f / height, 2.0f);
+
+		Matrix4f viewCoord = combinedInv.invert(new Matrix4f()).mul(fragToNDC);
+
+		GL20.glUniformMatrix4fv(this.u_FragCoordToViewCoord, false, viewCoord.get(TEMP_BUFFER));
+		GL20.glUniformMatrix4fv(this.u_ProjModelViewMat, false, combinedInv.get(TEMP_BUFFER));
 
 		GL20.glUniform1i(this.u_TexId, 0);
 
-		GL20.glUniform1f(this.u_FogEnd, noFog ? 1E+12F : FogData.FOG_END);
-		GL20.glUniform1f(this.u_FogStart, noFog ? 1E+12F : FogData.FOG_START);
+		GL20.glUniform1f(this.u_FogEnd, noFog ? 1E+12F : MathExt.square(FogData.FOG_END));
+		GL20.glUniform1f(this.u_FogStart, noFog ? 1E+12F : MathExt.square(FogData.FOG_START));
 
 		float[] fogColor = FogData.FOG_COLOR;
 		GL20.glUniform3f(this.u_FogColor, fogColor[0], fogColor[1], fogColor[2]);
@@ -98,6 +114,8 @@ public class ShaderSectionTerrain {
 		float offsetY = (regionY - camera.intY) - camera.fractY;
 		float offsetZ = (regionZ - camera.intZ) - camera.fractZ;
 
-		GL20.glUniform3f(this.u_RegionPos, offsetX, offsetY, offsetZ);
+		float radius = (float) TerrainFormat.RADIUS;
+
+		GL20.glUniform3f(this.u_RegionPos, offsetX - radius, offsetY - radius, offsetZ - radius);
 	}
 }

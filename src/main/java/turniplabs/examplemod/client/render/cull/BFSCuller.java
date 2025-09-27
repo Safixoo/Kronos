@@ -94,10 +94,10 @@ public class BFSCuller {
 			queueRegionNode(this.bfsQueue, spawn, flags);
 		}
 
-		// Little subtract hack to avoid rare issues with neighbor sections block data not being generated and
-		// generating visual bugs in the world at large render distances, I tried fixing it with marking dirty
-		// sections, but it doesn't help.
-		double maxDistance = Math.min(FogData.FOG_END, camera.renderDistance << 4) - (camera.renderDistance >> 1);
+		double realRenderDistance = Math.min(FogData.FOG_END / 16.0d, camera.renderDistance);
+
+		double magicOffset = MathHelper.clamp(0, realRenderDistance * -8.0d + 80.0d, 32.0d) - realRenderDistance;
+		double maxDistance = Math.min(FogData.FOG_END, camera.renderDistance << 4) + magicOffset;
 
 		bfsSearch(this.bfsQueue, camera.intX, camera.intY, camera.intZ, (int) MathExt.square(maxDistance), this.activeFrame);
 	}

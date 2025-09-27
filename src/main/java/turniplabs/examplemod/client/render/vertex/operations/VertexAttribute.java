@@ -2,6 +2,7 @@ package turniplabs.examplemod.client.render.vertex.operations;
 
 import org.lwjgl.opengl.GL15;
 import org.lwjgl.opengl.GL33;
+import org.lwjgl.opengl.GL45;
 
 public class VertexAttribute {
 	private final VertexAttributeType type;

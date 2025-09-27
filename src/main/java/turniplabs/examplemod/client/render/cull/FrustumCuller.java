@@ -3,6 +3,8 @@ package turniplabs.examplemod.client.render.cull;
 import org.joml.Math;
 import org.joml.Matrix4f;
 
+import static org.joml.Math.fma;
+
 public class FrustumCuller {
 	public static final Matrix4f projectionMatrix = new Matrix4f();
 	public static final Matrix4f modelViewMatrix = new Matrix4f();
@@ -15,49 +17,62 @@ public class FrustumCuller {
 //	private static float pzX, pzY, pzZ, pzW;
 
 	public static void processMatrices(Matrix4f proj, Matrix4f modelView, Matrix4f m) {
-		nxX = m.m03() + m.m00(); nxY = m.m13() + m.m10(); nxZ = m.m23() + m.m20(); nxW = m.m33() + m.m30();
-		float invl = Math.invsqrt(nxX * nxX + nxY * nxY + nxZ * nxZ);
+		double nxX, nxY, nxZ, nxW;
+		double pxX, pxY, pxZ, pxW;
+		double nyX, nyY, nyZ, nyW;
+		double pyX, pyY, pyZ, pyW;
+
+		nxX = (double) m.m03() + (double) m.m00(); nxY = (double) m.m13() + (double) m.m10(); nxZ = (double) m.m23() + (double) m.m20(); nxW = (double) m.m33() + (double) m.m30();
+		double invl = Math.invsqrt(nxX * nxX + nxY * nxY + nxZ * nxZ);
 		nxX *= invl; nxY *= invl; nxZ *= invl; nxW *= invl;
 
-		double nxW = 0;
 		if (nxX >= 0) nxW += 16.0;
 		if (nxY >= 0) nxW += 16.0;
 		if (nxZ >= 0) nxW += 16.0;
 
-		FrustumCuller.nxW = (float) -(FrustumCuller.nxW + nxW);
-
-		pxX = m.m03() - m.m00(); pxY = m.m13() - m.m10(); pxZ = m.m23() - m.m20(); pxW = m.m33() - m.m30();
+		pxX = (double) m.m03() - (double) m.m00(); pxY = (double) m.m13() - (double) m.m10(); pxZ = (double) m.m23() - (double) m.m20(); pxW = (double) m.m33() - (double) m.m30();
 		invl = Math.invsqrt(pxX * pxX + pxY * pxY + pxZ * pxZ);
 		pxX *= invl; pxY *= invl; pxZ *= invl; pxW *= invl;
 
-		double pxW = 0;
 		if (pxX > 0) pxW += 16.0;
 		if (pxY > 0) pxW += 16.0;
 		if (pxZ > 0) pxW += 16.0;
 
-		FrustumCuller.pxW = (float) -(FrustumCuller.pxW + pxW);
-
-		nyX = m.m03() + m.m01(); nyY = m.m13() + m.m11(); nyZ = m.m23() + m.m21(); nyW = m.m33() + m.m31();
+		nyX = (double) m.m03() + (double) m.m01(); nyY = (double) m.m13() + (double) m.m11(); nyZ = (double) m.m23() + (double) m.m21(); nyW = (double) m.m33() + (double) m.m31();
 		invl = Math.invsqrt(nyX * nyX + nyY * nyY + nyZ * nyZ);
 		nyX *= invl; nyY *= invl; nyZ *= invl; nyW *= invl;
 
-		double nyW = 0;
 		if (nyX > 0) nyW += 16.0;
 		if (nyY > 0) nyW += 16.0;
 		if (nyZ > 0) nyW += 16.0;
 
-		FrustumCuller.nyW = (float) -(FrustumCuller.nyW + nyW);
-
-		pyX = m.m03() - m.m01(); pyY = m.m13() - m.m11(); pyZ = m.m23() - m.m21(); pyW = m.m33() - m.m31();
+		pyX = (double) m.m03() - (double) m.m01(); pyY = (double) m.m13() - (double) m.m11(); pyZ = (double) m.m23() - (double) m.m21(); pyW = (double) m.m33() - (double) m.m31();
 		invl = Math.invsqrt(pyX * pyX + pyY * pyY + pyZ * pyZ);
 		pyX *= invl; pyY *= invl; pyZ *= invl; pyW *= invl;
 
-		double pyW = 0;
 		if (pyX > 0) pyW += 16.0;
 		if (pyY > 0) pyW += 16.0;
 		if (pyZ > 0) pyW += 16.0;
 
-		FrustumCuller.pyW = (float) -(FrustumCuller.pyW + pyW);
+		FrustumCuller.nxX = (float) nxX;
+		FrustumCuller.nxY = (float) nxY;
+		FrustumCuller.nxZ = (float) nxZ;
+		FrustumCuller.nxW = (float) -nxW;
+
+		FrustumCuller.pxX = (float) pxX;
+		FrustumCuller.pxY = (float) pxY;
+		FrustumCuller.pxZ = (float) pxZ;
+		FrustumCuller.pxW = (float) -pxW;
+
+		FrustumCuller.nyX = (float) nyX;
+		FrustumCuller.nyY = (float) nyY;
+		FrustumCuller.nyZ = (float) nyZ;
+		FrustumCuller.nyW = (float) -nyW;
+
+		FrustumCuller.pyX = (float) pyX;
+		FrustumCuller.pyY = (float) pyY;
+		FrustumCuller.pyZ = (float) pyZ;
+		FrustumCuller.pyW = (float) -pyW;
 
 		modelViewMatrix.set(modelView);
 		projectionMatrix.set(proj);
@@ -65,23 +80,23 @@ public class FrustumCuller {
 
 	public static void addFractToCamera(float fractX, float fractY, float fractZ) {
 		{
-			nxW -= nxX * fractX;
-			nxW -= nxY * fractY;
-			nxW -= nxZ * fractZ;
+			nxW += nxX * fractX;
+			nxW += nxY * fractY;
+			nxW += nxZ * fractZ;
 
-			pxW -= pxX * fractX;
-			pxW -= pxY * fractY;
-			pxW -= pxZ * fractZ;
+			pxW += pxX * fractX;
+			pxW += pxY * fractY;
+			pxW += pxZ * fractZ;
 		}
 
 		{
-			nyW -= nyX * fractX;
-			nyW -= nyY * fractY;
-			nyW -= nyZ * fractZ;
+			nyW += nyX * fractX;
+			nyW += nyY * fractY;
+			nyW += nyZ * fractZ;
 
-			pyW -= pyX * fractX;
-			pyW -= pyY * fractY;
-			pyW -= pyZ * fractZ;
+			pyW += pyX * fractX;
+			pyW += pyY * fractY;
+			pyW += pyZ * fractZ;
 		}
 	}
 

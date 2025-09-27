@@ -1,7 +1,6 @@
 package turniplabs.examplemod.client.render.region;
 
-import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL15;
+import org.lwjgl.opengl.*;
 import org.lwjgl.system.MemoryUtil;
 import turniplabs.examplemod.client.render.SectionManager;
 import turniplabs.examplemod.client.render.SectionRender;
@@ -35,6 +34,10 @@ public class RegionRender {
 	public static final int RADIUS_Y = 1 << (BLOCK_SHIFT_Y - 1);
 	public static final int RADIUS_Z = 1 << (BLOCK_SHIFT_Z - 1);
 
+	public static final int DIAMETER_X = 1 << (BLOCK_SHIFT_X);
+	public static final int DIAMETER_Y = 1 << (BLOCK_SHIFT_Y);
+	public static final int DIAMETER_Z = 1 << (BLOCK_SHIFT_Z);
+
 	// The vertex-buffers and its arenas.
 	private RegionAllocation translucentBuffer;
 	private RegionAllocation solidBuffer;
@@ -58,6 +61,13 @@ public class RegionRender {
 	// Each time a section is queued for rendering, its region index is saved
 	// in the drawIndex position of renderIndices, the top is signaled by drawInd.
 	public final byte[] renderIndices = new byte[REGION_SECTION_SIZE];
+
+	// If nothing has changed since the last draw, including the visible bit-set,
+	// cache the draw result.
+	private boolean shouldCache = false;
+	private int lastVisibleSet = -1, lastVisibleCount;
+	private final int[] lastDrawCount = new int[2];
+	private final byte[] lastRenderIndices = new byte[REGION_SECTION_SIZE];
 
 	// Number of sections queued for draw in the current frame.
 	public int sectionsToRender;
@@ -115,6 +125,8 @@ public class RegionRender {
 	}
 
 	public void addSolidMesh(SectionRender render, VertexWriterManager manager, int side) {
+		this.shouldCache = false;
+
 		if (this.solidBuffer == null) {
 			this.solidBuffer = new RegionAllocation(manager.getVertices() * TerrainFormat.STRIDE);
 		}
@@ -134,6 +146,8 @@ public class RegionRender {
 	}
 
 	public void addTranslucentMesh(SectionRender render, VertexWriterManager manager) {
+		this.shouldCache = false;
+
 		if (this.translucentBuffer == null) {
 			this.translucentBuffer = new RegionAllocation(manager.getVertices() * TerrainFormat.STRIDE);
 		}
@@ -160,13 +174,23 @@ public class RegionRender {
 			return;
 		}
 
+		if (this.shouldCache && this.shouldUseCachedDraw(camera)) {
+			int drawCount = this.lastDrawCount[pass];
+
+			if (drawCount != 0) {
+				this.multiDrawData(camera, shader, pass, drawCount);
+			}
+
+			return;
+		}
+
 		final byte[] renderIndices = this.renderIndices;
 		final byte[] drawDataMask = this.drawDataMask;
 
 		int index;
 		int end;
 		int inc;
-		
+
 		if (pass == 1) {
 			index = this.sectionsToRender - 1;
 			end = -1;
@@ -190,10 +214,17 @@ public class RegionRender {
 			index += inc;
 		}
 
+		this.lastDrawCount[pass] = drawCount;
+
 		if (drawCount == 0) {
 			return;
 		}
 
+		this.multiDrawData(camera, shader, pass, drawCount);
+		this.shouldCache = true;
+	}
+
+	private void multiDrawData(CameraData camera, ShaderSectionTerrain shader, int pass, int drawCount) {
 		RegionVertexBuffer vertexBuffer = pass == 0 ? this.solidBuffer.vertexBuffer : this.translucentBuffer.vertexBuffer;
 
 		vertexBuffer.bind();
@@ -210,6 +241,34 @@ public class RegionRender {
 		GL15.nglMultiDrawArrays(GL11.GL_QUADS, first, count, drawCount);
 	}
 
+	private boolean shouldUseCachedDraw(CameraData camera) {
+		int regionVis = getRegionVisibleFaces(camera.intX, camera.intY, camera.intZ, this.centerBlockX(), this.centerBlockY(), this.centerBlockZ());
+		int oldRegionVis = this.lastVisibleSet;
+
+		this.lastVisibleSet = regionVis;
+
+		if (regionVis != oldRegionVis || this.lastVisibleCount != this.sectionsToRender) {
+			this.lastVisibleCount = this.sectionsToRender;
+			return false;
+		}
+
+		boolean canBeCached = true;
+		int index = 0;
+
+		while (index++ < this.sectionsToRender) {
+			byte lastRenderIndex = this.lastRenderIndices[index];
+			byte renderIndex = this.renderIndices[index];
+
+			this.lastRenderIndices[index] = renderIndex;
+
+			if (lastRenderIndex != renderIndex) {
+				canBeCached = false;
+			}
+		}
+
+		return canBeCached;
+	}
+
 	private int prepareSolidBatch(CameraData camera, int regionIndex, int solidMask, int drawCount) {
 		if (solidMask == 0) {
 			return drawCount;
@@ -219,18 +278,50 @@ public class RegionRender {
 		int blockY = (sectionY(regionIndex) << 4) + (this.regionY << BLOCK_SHIFT_Y);
 		int blockZ = (sectionZ(regionIndex) << 4) + (this.regionZ << BLOCK_SHIFT_Z);
 
-		int visibleFaces = getVisibleFaces(camera.intX, camera.intY, camera.intZ, blockX, blockY, blockZ) & solidMask;
+		int visibleFaces = getSectionVisibleFaces(camera.intX, camera.intY, camera.intZ, blockX, blockY, blockZ) & solidMask;
+
+		int first = -1;
+		int count = -1;
+		boolean meshRemaining = false;
 
 		for (int dir = 0; dir < MeshDirection.COUNT; dir++) {
+			if ((visibleFaces & (1 << dir)) == 0) {
+				continue;
+			}
+
 			long drawData = this.regionDrawData[regionIndex * TOTAL_DRAWS + dir];
 
-			MemoryUtil.memPutInt((drawCount * 4L) + this.solidFirst, RegionAllocation.unpackFirst(drawData));
-			MemoryUtil.memPutInt((drawCount * 4L) + this.solidCount, RegionAllocation.unpackCount(drawData));
+			int meshFirst = RegionAllocation.unpackFirst(drawData);
+			int meshCount = RegionAllocation.unpackCount(drawData);
 
-			drawCount += (visibleFaces >>> dir) & 1;
+			// Always draw the
+			if ((first + count) != meshFirst) {
+				if (meshRemaining) {
+					MemoryUtil.memPutInt((drawCount * 4L) + this.solidFirst, first);
+					MemoryUtil.memPutInt((drawCount * 4L) + this.solidCount, count);
+					drawCount++;
+				}
+
+				first = meshFirst;
+				count = meshCount;
+				meshRemaining = true;
+			} else /* ((first + count) == meshFirst) */ {
+				count += meshCount;
+			}
+
+		}
+
+		if (meshRemaining) {
+			MemoryUtil.memPutInt((drawCount * 4L) + this.solidFirst, first);
+			MemoryUtil.memPutInt((drawCount * 4L) + this.solidCount, count);
+			drawCount++;
 		}
 
 		return drawCount;
+	}
+
+	public static void main(String[] args) {
+
 	}
 
 	private int prepareTranslucentBatch(int regionIndex, int translucentBit, int drawCount) {
@@ -240,13 +331,13 @@ public class RegionRender {
 
 		long drawData = this.regionDrawData[regionIndex * TOTAL_DRAWS + SOLID_DRAWS];
 
-		MemoryUtil.memPutInt((drawCount << 2L) + this.translucentFirst, RegionAllocation.unpackFirst(drawData));
-		MemoryUtil.memPutInt((drawCount << 2L) + this.translucentCount, RegionAllocation.unpackCount(drawData));
+		MemoryUtil.memPutInt((drawCount << 2) + this.translucentFirst, RegionAllocation.unpackFirst(drawData));
+		MemoryUtil.memPutInt((drawCount << 2) + this.translucentCount, RegionAllocation.unpackCount(drawData));
 
 		return ++drawCount;
 	}
 
-	public static int getVisibleFaces(int originX, int originY, int originZ, int chunkX, int chunkY, int chunkZ) {
+	public static int getSectionVisibleFaces(int originX, int originY, int originZ, int chunkX, int chunkY, int chunkZ) {
 		int planes = 1 << MeshDirection.GENERIC;
 
 		planes |= greaterThan(originX, (chunkX - 3)) << Direction.EAST;
@@ -256,6 +347,20 @@ public class RegionRender {
 		planes |= lessThan(originX, (chunkX + 19)) << Direction.WEST;
 		planes |= lessThan(originY, (chunkY + 19)) << Direction.DOWN;
 		planes |= lessThan(originZ, (chunkZ + 19)) << Direction.NORTH;
+
+		return planes;
+	}
+
+	public static int getRegionVisibleFaces(int originX, int originY, int originZ, int centerRegionX, int centerRegionY, int centerRegionZ) {
+		int planes = 1 << MeshDirection.GENERIC;
+
+		planes |= greaterThan(originX, (centerRegionX - RADIUS_X - 19)) << Direction.EAST;
+		planes |= greaterThan(originY, (centerRegionY - RADIUS_Y - 19)) << Direction.UP;
+		planes |= greaterThan(originZ, (centerRegionZ - RADIUS_Z - 19)) << Direction.SOUTH;
+
+		planes |= lessThan(originX, (centerRegionX + RADIUS_X + 19)) << Direction.WEST;
+		planes |= lessThan(originY, (centerRegionY + RADIUS_Y + 19)) << Direction.DOWN;
+		planes |= lessThan(originZ, (centerRegionZ + RADIUS_Z + 19)) << Direction.NORTH;
 
 		return planes;
 	}

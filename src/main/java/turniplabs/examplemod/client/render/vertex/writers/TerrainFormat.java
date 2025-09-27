@@ -3,6 +3,7 @@ package turniplabs.examplemod.client.render.vertex.writers;
 import com.google.common.collect.ImmutableList;
 import net.minecraft.core.util.helper.MathHelper;
 import org.lwjgl.system.MemoryUtil;
+import turniplabs.examplemod.client.render.region.RegionRender;
 import turniplabs.examplemod.client.render.vertex.VertexWriterManager;
 import turniplabs.examplemod.client.render.vertex.format.VertexFormat;
 import turniplabs.examplemod.client.render.vertex.operations.VertexAttribute;
@@ -19,11 +20,15 @@ public class TerrainFormat extends VertexFormat {
 	public static final int STRIDE = 16;
 
 	static final int POSITION_BITS = 20;
-	static final double UV_PRECISION = (1 << 16) - 1;
+	static final int UV_BITS = 16;
+	static final double UV_PRECISION = (1 << UV_BITS);
 
-	static final double FACT_X = (1 << (POSITION_BITS - BLOCK_SHIFT_X)) - 1;
-	static final double FACT_Y = (1 << (POSITION_BITS - BLOCK_SHIFT_Y)) - 1;
-	static final double FACT_Z = (1 << (POSITION_BITS - BLOCK_SHIFT_Z)) - 1;
+	public static final double RADIUS = 0.1d;
+	static final double DIAMETER = RADIUS * 2.0d;
+
+	static final double FACT_X = (1 << POSITION_BITS) / (DIAMETER_X + DIAMETER);
+	static final double FACT_Y = (1 << POSITION_BITS) / (DIAMETER_Y + DIAMETER);
+	static final double FACT_Z = (1 << POSITION_BITS) / (DIAMETER_Z + DIAMETER);
 
 	public TerrainFormat(ImmutableList<VertexAttribute> vertexProperties) {
 		super(vertexProperties);
@@ -33,22 +38,28 @@ public class TerrainFormat extends VertexFormat {
 	public void writeVertex(long ptr, int offset) {
 		VertexWriterManager man = VertexWriterManager.getCurrentInstance();
 
-		float posX = MathHelper.clamp(man.x + man.trasX, 0.0f, RADIUS_X << 1);
-		float posY = MathHelper.clamp(man.y + man.trasY, 0.0f, RADIUS_Y << 1);
-		float posZ = MathHelper.clamp(man.z + man.trasZ, 0.0f, RADIUS_Z << 1);
+		double posX = MathHelper.clamp(man.x + man.trasX, 0.0f, RADIUS_X << 1);
+		double posY = MathHelper.clamp(man.y + man.trasY, 0.0f, RADIUS_Y << 1);
+		double posZ = MathHelper.clamp(man.z + man.trasZ, 0.0f, RADIUS_Z << 1);
 
 		writeTerrainVertex(ptr, posX, posY, posZ, man.u, man.v, man.color);
 	}
 
 	private static int extractPos(double pos, double scale) {
-		return (int) (pos * scale) & 0xFFFFF;
+		return (int) ((pos + RADIUS) * scale) & 0xFFFFF;
 	}
 
 	private static int processUv(double u, double v) {
-		int intU = (int) Math.round(u * UV_PRECISION) & 0xFFFF;
-		int intV = (int) Math.round(v * UV_PRECISION) & 0xFFFF;
+		long roundU = (long) Math.floor(u * UV_PRECISION);
+		long roundV = (long) Math.floor(v * UV_PRECISION);
 
-		return intU | intV << 16;
+		roundU -= (roundU & 0x10000) >>> 16;
+		roundV -= (roundV & 0x10000) >>> 16;
+
+		long intU = roundU & 0xFFFF;
+		long intV = roundV & 0xFFFF;
+
+		return (int) (intU | intV << 16);
 	}
 
 	// It does use a similar idea to Sodium 20-bit position.
@@ -68,14 +79,14 @@ public class TerrainFormat extends VertexFormat {
 		return lowHalf | ((long) topHalf << 32L);
 	}
 
-	public static void writeTerrainVertex(long ptr, double x, double y, double z, float u, float v, int color) {
+	public static void writeTerrainVertex(long ptr, double x, double y, double z, double u, double v, int color) {
 		int intX = extractPos(x, FACT_X);
 		int intY = extractPos(y, FACT_Y);
 		int intZ = extractPos(z, FACT_Z);
 
 		long position = processPosition(intX, intY, intZ);
 
-		MemoryUtil.memPutLong(ptr + 0, position);
+		MemoryUtil.memPutLong(ptr, position);
 		MemoryUtil.memPutInt(ptr + 8, processUv(u, v));
 		MemoryUtil.memPutInt(ptr + 12, color);
 	}

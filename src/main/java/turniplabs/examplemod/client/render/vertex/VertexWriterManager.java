@@ -16,9 +16,9 @@ public class VertexWriterManager {
 	public static final VertexWriterManager[] SOLID = new VertexWriterManager[MeshDirection.COUNT];
 	public static VertexWriterManager TRANSLUCENT = new VertexWriterManager();
 
-	public float x, y, z;
-	public float trasX, trasY, trasZ;
-	public float u, v;
+	public double x, y, z;
+	public double trasX, trasY, trasZ;
+	public double u, v;
 	public int color, lightMap, normal;
 
 	private long capacity;
