@@ -11,11 +11,11 @@ import net.minecraft.client.render.terrain.ChunkRenderer;
 import net.minecraft.client.render.tessellator.Tessellator;
 import net.minecraft.core.block.Block;
 import net.minecraft.core.block.Blocks;
-import net.minecraft.core.util.phys.AABB;
 import net.minecraft.core.world.World;
 import turniplabs.examplemod.client.render.meshing.FullBlockMesher;
 import turniplabs.examplemod.client.render.region.RegionRender;
 import turniplabs.examplemod.client.render.util.MeshDirection;
+import turniplabs.examplemod.client.render.util.data.CameraData;
 import turniplabs.examplemod.client.render.vertex.VertexWriterManager;
 import turniplabs.examplemod.client.render.meshing.SectionCache;
 import turniplabs.examplemod.client.render.util.data.BlocksFlags;
@@ -52,7 +52,7 @@ public class SectionRender {
 		this.regionIndex = RegionRender.regionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
 	}
 
-	public void rebuild(SectionManager sectionManager, World world) {
+	public void rebuild(CameraData camera, SectionManager sectionManager, World world) {
 		ChunkRenderer.updates++;
 		BlocksFlags.processLeavesSolid();
 
@@ -176,7 +176,10 @@ public class SectionRender {
 		int solidDrawMask = this.nonEmptyFacesMask();
 		int translucentDrawMask = translucentWriter.getVertices() != 0 ? 1 : 0;
 
-		this.uploadMeshesToRegion(sectionManager, translucentWriter, sumVertices);
+		int visibleFaces = RegionRender.getSectionVisibleFaces(camera.intX, camera.intY, camera.intZ, this.blockX, this.blockY, this.blockZ);
+		int meshDrawOrder = RegionRender.generateMeshDrawOrderMask(solidDrawMask & visibleFaces);
+
+		this.uploadMeshesToRegion(sectionManager, translucentWriter, sumVertices, meshDrawOrder);
 
 		byte drawMask = (byte) (solidDrawMask << 1 & 0b1_111_111_0 | translucentDrawMask);
 		this.region.drawDataMask[this.regionIndex] = drawMask;
@@ -207,15 +210,20 @@ public class SectionRender {
 	static long samples = 0;
 	static long timePassed = 0;
 
-	private void uploadMeshesToRegion(SectionManager sectionManager, VertexWriterManager translucentWriter, int sumVertices) {
+	private void uploadMeshesToRegion(SectionManager sectionManager, VertexWriterManager translucentWriter, int sumVertices, int meshDrawOrder) {
 		if (sumVertices > 0) {
 			if (this.region == RegionRender.NULL) {
 				this.region = sectionManager.getRegion(this.blockX >> 4, this.blockY >> 4, this.blockZ >> 4);
 			}
 
+			this.region.addMeshOrderMask(this.regionIndex, meshDrawOrder);
+
 			for (int dir = 0; dir < MeshDirection.COUNT; dir++) {
-				if (VertexWriterManager.SOLID[dir].getVertices() != 0) {
-					this.region.addSolidMesh(this, VertexWriterManager.SOLID[dir], dir);
+				int realMeshDir = meshDrawOrder & 0xF;
+				meshDrawOrder >>= 4;
+
+				if (VertexWriterManager.SOLID[realMeshDir].getVertices() != 0) {
+					this.region.addSolidMesh(this, VertexWriterManager.SOLID[realMeshDir], realMeshDir);
 				}
 			}
 		}

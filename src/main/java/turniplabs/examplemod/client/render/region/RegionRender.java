@@ -12,6 +12,11 @@ import turniplabs.examplemod.client.render.vertex.VertexWriterManager;
 import turniplabs.examplemod.client.render.vertex.writers.TerrainFormat;
 
 public class RegionRender {
+	// Count of different render-passes possibly dispatched.
+	// - SOLID (0)
+	// - TRANSLUCENT (1)
+	private static final int RENDER_PASSES = 2;
+
 	// Region total volume area in SectionRenders.
 	public static final int REGION_SECTION_SIZE = 256; // 8 * 4 * 8
 
@@ -46,11 +51,12 @@ public class RegionRender {
 	private long solidFirst, solidCount;
 	private long translucentFirst, translucentCount;
 
-	// struct RegionDrawData[256]
-	// {
-	//		uint_64_t solidDrawData[Direction.COUNT + 1];
+	// struct RegionDrawData[256] {
+	//		// Solid PASS.
+	//		uint_64_t solidDrawData[MeshDirection.COUNT];
+	//		// Translucent PASS.
 	//		uint_64_t translucentDrawData;
-	// }
+	// };
 	// Each region has in total 8 possible different draw-calls.
 	private final long[] regionDrawData = new long[REGION_SECTION_SIZE * TOTAL_DRAWS];
 
@@ -63,11 +69,17 @@ public class RegionRender {
 	public final byte[] renderIndices = new byte[REGION_SECTION_SIZE];
 
 	// If nothing has changed since the last draw, including the visible bit-set,
-	// cache the draw result.
+	// section count and render-indices try to re-use last draw command setup.
+	private final int[] lastDrawCount = new int[RENDER_PASSES];
+	private final byte[] lastRenderIndices = new byte[REGION_SECTION_SIZE];
+
+	// This is important as the direction enum, is ordered in a way that fundamentally
+	// makes impossible batching draw without meshes being meshed in very specific
+	// conditions/ways, also makes batching generally much more effective.
+	private final int[] meshDirectionsOrdered = new int[REGION_SECTION_SIZE];
+
 	private boolean shouldCache = false;
 	private int lastVisibleSet = -1, lastVisibleCount;
-	private final int[] lastDrawCount = new int[2];
-	private final byte[] lastRenderIndices = new byte[REGION_SECTION_SIZE];
 
 	// Number of sections queued for draw in the current frame.
 	public int sectionsToRender;
@@ -174,6 +186,7 @@ public class RegionRender {
 			return;
 		}
 
+		// Try to re-use the last draw command setup.
 		if (this.shouldCache && this.shouldUseCachedDraw(camera)) {
 			int drawCount = this.lastDrawCount[pass];
 
@@ -191,6 +204,7 @@ public class RegionRender {
 		int end;
 		int inc;
 
+		// Change iteration order based in current render-pass.
 		if (pass == 1) {
 			index = this.sectionsToRender - 1;
 			end = -1;
@@ -236,6 +250,7 @@ public class RegionRender {
 		int blockRegionY = this.regionY << RegionRender.BLOCK_SHIFT_Y;
 		int blockRegionZ = this.regionZ << RegionRender.BLOCK_SHIFT_Z;
 
+		// Setup camera and region offset.
 		shader.setupRegionOffset(camera, blockRegionX, blockRegionY, blockRegionZ);
 
 		GL15.nglMultiDrawArrays(GL11.GL_QUADS, first, count, drawCount);
@@ -252,18 +267,22 @@ public class RegionRender {
 			return false;
 		}
 
-		boolean canBeCached = true;
+		final byte[] lastRenderIndices = this.lastRenderIndices;
+		final byte[] renderIndices = this.renderIndices;
+		final int maxIndex = this.sectionsToRender;
+
 		int index = 0;
 
-		while (index++ < this.sectionsToRender) {
-			byte lastRenderIndex = this.lastRenderIndices[index];
-			byte renderIndex = this.renderIndices[index];
+		// Mismatch of section indices.
+		while (index < maxIndex && lastRenderIndices[index] == renderIndices[index]) {
+			index++;
+		}
 
-			this.lastRenderIndices[index] = renderIndex;
+		boolean canBeCached = index < maxIndex;
 
-			if (lastRenderIndex != renderIndex) {
-				canBeCached = false;
-			}
+		// A mismatch was found, copy the indices from the mismatch index.
+		while (index < maxIndex) {
+			lastRenderIndices[index] = renderIndices[index++];
 		}
 
 		return canBeCached;
@@ -280,25 +299,36 @@ public class RegionRender {
 
 		int visibleFaces = getSectionVisibleFaces(camera.intX, camera.intY, camera.intZ, blockX, blockY, blockZ) & solidMask;
 
+		if (visibleFaces == 0) {
+			return drawCount;
+		}
+
 		int first = -1;
 		int count = -1;
 		boolean meshRemaining = false;
 
+		int meshOrderMask = this.meshDirectionsOrdered[regionIndex];
+
 		for (int dir = 0; dir < MeshDirection.COUNT; dir++) {
-			if ((visibleFaces & (1 << dir)) == 0) {
+			int meshCurrentDir = meshOrderMask & 0xF;
+			meshOrderMask >>= 4;
+
+			if ((visibleFaces & (1 << meshCurrentDir)) == 0) {
 				continue;
 			}
 
-			long drawData = this.regionDrawData[regionIndex * TOTAL_DRAWS + dir];
+			long drawData = this.regionDrawData[regionIndex * TOTAL_DRAWS + meshCurrentDir];
 
 			int meshFirst = RegionAllocation.unpackFirst(drawData);
 			int meshCount = RegionAllocation.unpackCount(drawData);
 
-			// Always draw the
+			// Always save the last draw data and if the draw data is contiguous in memory
+			// continue batching the draw, is slower than the normal method but with the draw
+			// caching technique combined with the batching here, is a nice improvement.
 			if ((first + count) != meshFirst) {
 				if (meshRemaining) {
-					MemoryUtil.memPutInt((drawCount * 4L) + this.solidFirst, first);
-					MemoryUtil.memPutInt((drawCount * 4L) + this.solidCount, count);
+					MemoryUtil.memPutInt((drawCount << 2) + this.solidFirst, first);
+					MemoryUtil.memPutInt((drawCount << 2) + this.solidCount, count);
 					drawCount++;
 				}
 
@@ -312,16 +342,12 @@ public class RegionRender {
 		}
 
 		if (meshRemaining) {
-			MemoryUtil.memPutInt((drawCount * 4L) + this.solidFirst, first);
-			MemoryUtil.memPutInt((drawCount * 4L) + this.solidCount, count);
+			MemoryUtil.memPutInt((drawCount << 2) + this.solidFirst, first);
+			MemoryUtil.memPutInt((drawCount << 2) + this.solidCount, count);
 			drawCount++;
 		}
 
 		return drawCount;
-	}
-
-	public static void main(String[] args) {
-
 	}
 
 	private int prepareTranslucentBatch(int regionIndex, int translucentBit, int drawCount) {
@@ -365,6 +391,10 @@ public class RegionRender {
 		return planes;
 	}
 
+	public void addMeshOrderMask(int regionIndex, int mask) {
+		this.meshDirectionsOrdered[regionIndex] = mask;
+	}
+
 	public static int lessThan(int a, int b) {
 		return (a - b) >>> 31;
 	}
@@ -374,11 +404,31 @@ public class RegionRender {
 	}
 
 	public static int regionIndex(int sectionX, int sectionY, int sectionZ) {
-		int bitsX = sectionX - ((sectionX >> 3) << 3);
-		int bitsY = sectionY - ((sectionY >> 2) << 2);
-		int bitsZ = sectionZ - ((sectionZ >> 3) << 3);
+		int bitsX = sectionX & (BLOCK_BITS_X >> 4);
+		int bitsY = sectionY & (BLOCK_BITS_Y >> 4);
+		int bitsZ = sectionZ & (BLOCK_BITS_Z >> 4);
 
 		return (bitsX << 0) | (bitsY << 3) | (bitsZ << 5);
+	}
+
+	// Generates an order of drawing of directions that makes draw-batching more favorable.
+	public static int generateMeshDrawOrderMask(int meshBitDirections) {
+		int preferredCount = 0;
+		int restCount = 0;
+
+		int preferredDirSet = 0;
+		int restDirectionSet = 0;
+
+		for (int dir = 0; dir < MeshDirection.COUNT; dir++) {
+			// Mesh directions are as big as 0b111
+			if ((meshBitDirections & (1 << dir)) != 0) {
+				preferredDirSet |= (dir & 0b111) << (preferredCount++ << 2);
+			} else {
+				restDirectionSet |= (dir & 0b111) << (restCount++ << 2);
+			}
+		}
+
+		return preferredDirSet | (restDirectionSet << (preferredCount << 2));
 	}
 
 	public static int sectionX(int regionIndex) {

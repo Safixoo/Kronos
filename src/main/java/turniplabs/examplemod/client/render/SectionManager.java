@@ -232,7 +232,7 @@ public class SectionManager {
 			currentTime = System.nanoTime();
 
 			SectionRender render = UpdateQueue.get(i++);
-			render.rebuild(this, this.worldObj);
+			render.rebuild(this.camera, this, this.worldObj);
 
 			if (MathExt.squaredDistance(render, this.camera) > MathExt.square(40.0f)) {
 				samples++;
