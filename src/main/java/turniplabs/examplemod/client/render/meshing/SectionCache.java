@@ -151,34 +151,13 @@ public class SectionCache implements WorldSource {
 		z -= this.sectionZ << 4;
 
 		int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
-		int blockId = this.sectionBlocks[sectionIndex(x >> 4, y >> 4, z >> 4)][blockIndex];
+		int sectionIndex = sectionIndex(x >> 4, y >> 4, z >> 4);
+
+		int blockId = this.sectionBlocks[sectionIndex][blockIndex];
 
 		if (BlocksFlags.SOLID[blockId]) {
 			return 0;
 		}
-
-//		boolean litInterior = BlocksFlags.LIT_INTERIOR[blockId];
-//
-//		int lighting = !litInterior ?  : 0;
-//
-//		if (litInterior) {
-//			lighting |= this.getLightmapSpecificCoord(x, y + 1, z);
-//			lighting |= this.getLightmapSpecificCoord(x + 1, y, z);
-//			lighting |= this.getLightmapSpecificCoord(x - 1, y, z);
-//			lighting |= this.getLightmapSpecificCoord(x, y, z + 1);
-//			lighting |= this.getLightmapSpecificCoord(x, y, z - 1);
-//		}
-
-		return this.getLightmapSpecificCoord(x, y, z);
-	}
-
-	private int getLightmapSpecificCoord(int x, int y, int z) {
-		int sectionX = x >> 4;
-		int sectionY = y >> 4;
-		int sectionZ = z >> 4;
-
-		int sectionIndex = sectionIndex(sectionX, sectionY, sectionZ);
-		int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
 
 		int skyLight = getNibble(this.lightSky[sectionIndex], blockIndex);
 		int blockLight = getNibble(this.lightBlock[sectionIndex], blockIndex);

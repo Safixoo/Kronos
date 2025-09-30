@@ -18,7 +18,7 @@ import java.nio.FloatBuffer;
 public class ShaderSectionTerrain {
 	private int programId;
 	private int u_RegionPos;
-	private int u_TexId;
+	private int u_TexId, u_LightTex;
 	private int u_ProjModelViewMat;
 	private int u_FragCoordToViewCoord;
 	private int u_FogEnd, u_FogStart, u_FogColor;
@@ -63,6 +63,7 @@ public class ShaderSectionTerrain {
 	public void glGetUniformLocation() {
 		this.u_RegionPos = GL20.glGetUniformLocation(this.programId, "u_RegionPos");
 		this.u_TexId = GL20.glGetUniformLocation(this.programId, "u_TexId");
+		this.u_LightTex = GL20.glGetUniformLocation(this.programId, "u_LightTex");
 
 		this.u_FogEnd = GL20.glGetUniformLocation(this.programId, "u_FogEnd");
 		this.u_FogStart = GL20.glGetUniformLocation(this.programId, "u_FogStart");
@@ -100,6 +101,7 @@ public class ShaderSectionTerrain {
 		GL20.glUniformMatrix4fv(this.u_ProjModelViewMat, false, combinedInv.get(TEMP_BUFFER));
 
 		GL20.glUniform1i(this.u_TexId, 0);
+		GL20.glUniform1i(this.u_LightTex, 1);
 
 		GL20.glUniform1f(this.u_FogEnd, noFog ? 1E+12F : MathExt.square(FogData.FOG_END));
 		GL20.glUniform1f(this.u_FogStart, noFog ? 1E+12F : MathExt.square(FogData.FOG_START));

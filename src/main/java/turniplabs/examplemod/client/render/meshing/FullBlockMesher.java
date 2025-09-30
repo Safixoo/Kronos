@@ -1,5 +1,6 @@
 package turniplabs.examplemod.client.render.meshing;
 
+import net.minecraft.client.render.LightmapHelper;
 import net.minecraft.client.render.block.color.BlockColor;
 import net.minecraft.client.render.block.model.BlockModel;
 import net.minecraft.client.render.texture.stitcher.IconCoordinate;
@@ -80,9 +81,13 @@ public class FullBlockMesher {
 
 		int posZ = cache.getBlockId(dirX + p2X, dirY + p2Y, dirZ + p2Z);
 		int negZ = cache.getBlockId(dirX - p2X, dirY - p2Y, dirZ - p2Z);
-
 		int posX = cache.getBlockId(dirX + p1X, dirY + p1Y, dirZ + p1Z);
 		int negX = cache.getBlockId(dirX - p1X, dirY - p1Y, dirZ - p1Z);
+
+		int lightPZ = cache.getLightmapCoord(dirX + p2X, dirY + p2Y, dirZ + p2Z, 0);
+		int lightNZ = cache.getLightmapCoord(dirX - p2X, dirY - p2Y, dirZ - p2Z, 0);
+		int lightPX = cache.getLightmapCoord(dirX + p1X, dirY + p1Y, dirZ + p1Z, 0);
+		int lightNX = cache.getLightmapCoord(dirX - p1X, dirY - p1Y, dirZ - p1Z, 0);
 
 		int p12X = p1X + p2X;
 		int p12Y = p1Y + p2Y;
@@ -91,6 +96,11 @@ public class FullBlockMesher {
 		int pd12X = p1X - p2X;
 		int pd12Y = p1Y - p2Y;
 		int pd12Z = p1Z - p2Z;
+
+		int lightPP = cache.getLightmapCoord(dirX + p12X, dirY + p12Y, dirZ + p12Z, 0);
+		int lightPN = cache.getLightmapCoord(dirX + pd12X, dirY + pd12Y, dirZ + pd12Z, 0);
+		int lightNP = cache.getLightmapCoord(dirX - pd12X, dirY - pd12Y, dirZ - pd12Z, 0);
+		int lightNN = cache.getLightmapCoord(dirX - p12X, dirY - p12Y, dirZ - p12Z, 0);
 
 		int cornerPP = cache.getBlockId(dirX + p12X, dirY + p12Y, dirZ + p12Z);
 		int cornerPN = cache.getBlockId(dirX + pd12X, dirY + pd12Y, dirZ + pd12Z);
@@ -103,6 +113,13 @@ public class FullBlockMesher {
 		int color1 = ColorBGRManager.multiplyColor(color, ao(negZ, posX, cornerPN));
 		int color2 = ColorBGRManager.multiplyColor(color, ao(negZ, negX, cornerNN));
 		int color3 = ColorBGRManager.multiplyColor(color, ao(posZ, negX, cornerNP));
+
+		int lightMap = cache.getLightmapCoord(dirX, dirY, dirZ, 0);
+
+		int light0 = avg(avg(lightPP, lightMap), avg(lightPZ, lightPX)); // 0 vertex
+		int light1 = avg(avg(lightPN, lightMap), avg(lightPX, lightNZ)); // 1 vertex
+		int light2 = avg(avg(lightNN, lightMap), avg(lightNZ, lightNX)); // 2 vertex
+		int light3 = avg(avg(lightNP, lightMap), avg(lightNX, lightPZ)); // 3 vertex
 
 		VertexWriterManager.getCurrentInstance().ensureCapacity(TerrainFormat.STRIDE * 4);
 
@@ -119,16 +136,16 @@ public class FullBlockMesher {
 		Vector2i uv2 = MAP_ID_TO_UV[facing.uvData[2]];
 		Vector2i uv3 = MAP_ID_TO_UV[facing.uvData[3]];
 
-		if (color0 > color3 || color2 > color1) {
-			addVertex(facing, 0, x, y, z, uvs[uv0.x], uvs[uv0.y], color0);
-			addVertex(facing, 1, x, y, z, uvs[uv1.x], uvs[uv1.y], color1);
-			addVertex(facing, 2, x, y, z, uvs[uv2.x], uvs[uv2.y], color2);
-			addVertex(facing, 3, x, y, z, uvs[uv3.x], uvs[uv3.y], color3);
+		if ((color0 > color3 || color2 > color1)) {
+			addVertex(facing, 0, x, y, z, uvs[uv0.x], uvs[uv0.y], color0, light0);
+			addVertex(facing, 1, x, y, z, uvs[uv1.x], uvs[uv1.y], color1, light1);
+			addVertex(facing, 2, x, y, z, uvs[uv2.x], uvs[uv2.y], color2, light2);
+			addVertex(facing, 3, x, y, z, uvs[uv3.x], uvs[uv3.y], color3, light3);
 		} else {
-			addVertex(facing, 3, x, y, z, uvs[uv3.x], uvs[uv3.y], color3);
-			addVertex(facing, 0, x, y, z, uvs[uv0.x], uvs[uv0.y], color0);
-			addVertex(facing, 1, x, y, z, uvs[uv1.x], uvs[uv1.y], color1);
-			addVertex(facing, 2, x, y, z, uvs[uv2.x], uvs[uv2.y], color2);
+			addVertex(facing, 3, x, y, z, uvs[uv3.x], uvs[uv3.y], color3, light3);
+			addVertex(facing, 0, x, y, z, uvs[uv0.x], uvs[uv0.y], color0, light0);
+			addVertex(facing, 1, x, y, z, uvs[uv1.x], uvs[uv1.y], color1, light1);
+			addVertex(facing, 2, x, y, z, uvs[uv2.x], uvs[uv2.y], color2, light2);
 		}
 	}
 
@@ -136,7 +153,27 @@ public class FullBlockMesher {
 		return cache.getBlockId(pos.x + off.x, pos.y + off.y, pos.z + off.z);
 	}
 
-	private static void addVertex(FacingRender facing, int vertInd, int x, int y, int z, float u, float v, int color) {
+	private static int avg(int a, int b) {
+		if (b == 0) {
+			return a;
+		}
+		if (a == 0) {
+			return b;
+		}
+		return ((a + b) >>> 1) & 0xF000_F0;
+	}
+
+	private static int avgTowards(int a, int b) {
+		if (b == 0) {
+			return a;
+		}
+		if (a == 0) {
+			return b;
+		}
+		return ((a + b + b + b) >>> 2) & 0xF000_F0;
+	}
+
+	private static void addVertex(FacingRender facing, int vertInd, int x, int y, int z, float u, float v, int color, int lightMap) {
 		Vector3i vertOff = facing.quadVerts[vertInd];
 
 		int relX = x + vertOff.x;
@@ -146,7 +183,7 @@ public class FullBlockMesher {
 		VertexWriterManager manager = VertexWriterManager.getCurrentInstance();
 		long ptr = manager.getTotalOffset();
 
-		TerrainFormat.writeTerrainVertex(ptr, relX, relY, relZ, u, v, color);
+		TerrainFormat.writeTerrainVertex(ptr, relX, relY, relZ, u, v, color, lightMap);
 		manager.addVertexCounter();
 	}
 
@@ -179,6 +216,11 @@ public class FullBlockMesher {
 
 		return Math.min(Math.max(factor, 65), 255);
 	}
+
+//	public static int lightMap(int light1, int light2, int lightCorner) {
+//		light1 = light1 != 0 && ?
+//
+//	}
 
 	private static Vector2i createVec2i(int x, int y) {
 		return new Vector2i(x, y);

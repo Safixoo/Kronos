@@ -110,7 +110,7 @@ public class BFSCuller {
 				bfsQueue.regionRenders[bfsQueue.regionPos++] = region;
 			}
 
-			region.renderIndices[region.sectionsToRender++] = (byte) section.regionIndex;
+			region.renderIndices[region.sectionsToRender++ & 0xFF] = (byte) section.regionIndex;
 		}
 	}
 

@@ -279,6 +279,11 @@ public class RegionAllocation {
 	public void remove(SectionRender render, int side) {
 		Allocation alloc = this.firstEntry;
 
+		// shouldn't happen
+		if (alloc == null) {
+			return;
+		}
+
 		// The allocation shouldn't be null as we are removing an existent
 		// allocation.
 		if (alloc.render == render && alloc.side == side) {

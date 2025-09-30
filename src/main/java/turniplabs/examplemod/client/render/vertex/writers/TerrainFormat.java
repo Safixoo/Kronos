@@ -42,7 +42,7 @@ public class TerrainFormat extends VertexFormat {
 		double posY = MathHelper.clamp(man.y + man.trasY, 0.0f, RADIUS_Y << 1);
 		double posZ = MathHelper.clamp(man.z + man.trasZ, 0.0f, RADIUS_Z << 1);
 
-		writeTerrainVertex(ptr, posX, posY, posZ, man.u, man.v, man.color);
+		writeTerrainVertex(ptr, posX, posY, posZ, man.u, man.v, man.color, man.lightMap);
 	}
 
 	private static int extractPos(double pos, double scale) {
@@ -79,7 +79,7 @@ public class TerrainFormat extends VertexFormat {
 		return lowHalf | ((long) topHalf << 32L);
 	}
 
-	public static void writeTerrainVertex(long ptr, double x, double y, double z, double u, double v, int color) {
+	public static void writeTerrainVertex(long ptr, double x, double y, double z, double u, double v, int color, int lightMap) {
 		int intX = extractPos(x, FACT_X);
 		int intY = extractPos(y, FACT_Y);
 		int intZ = extractPos(z, FACT_Z);
@@ -88,7 +88,16 @@ public class TerrainFormat extends VertexFormat {
 
 		MemoryUtil.memPutLong(ptr, position);
 		MemoryUtil.memPutInt(ptr + 8, processUv(u, v));
-		MemoryUtil.memPutInt(ptr + 12, color);
+		MemoryUtil.memPutInt(ptr + 12, color & 0xFF_FF_FF);
+		MemoryUtil.memPutInt(ptr + 15, getLightmap8Bit(lightMap));
+	}
+
+	// skylight << 20 | blocklight << 4
+	private static int getLightmap8Bit(int lightmap) {
+		int skyLight4 = (lightmap >>> 20) & 0xF;
+		int blockLight4 = (lightmap >>> 4) & 0xF;
+
+		return skyLight4 | blockLight4 << 4;
 	}
 
 	@Override

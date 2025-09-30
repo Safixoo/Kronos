@@ -4,6 +4,7 @@
 in uvec2 a_Position;
 in vec2 a_Uv;
 in vec3 a_Color;
+in uint a_Lightmap;
 
 out vec3 v_Color;
 out vec2 v_TextureUv;
@@ -11,6 +12,8 @@ out vec2 v_TextureUv;
 uniform vec3 u_RegionPos;
 uniform mat4 u_ProjModelViewMat;
 uniform float u_FogEnd;
+
+uniform sampler2D u_LightTex;
 
 const float POSITION_SCALE = 1u << 20u;
 const float RADIUS = 0.1;
@@ -36,12 +39,17 @@ vec3 extractBlockPos(uvec2 atPosition) {
     #endif
 }
 
+vec2 lightmapUv(uint lightmap) {
+    uvec2 uv = (uvec2(a_Lightmap) >> uvec2(4, 0)) & 0xF;
+    return max(vec2(1.0), uv - 0.5) * (1.0 / 15.0);
+}
+
 void main() {
     vec3 blockPosition = extractBlockPos(a_Position);
     vec4 position = u_ProjModelViewMat * vec4(blockPosition, 1.0);
 
     gl_Position = position;
 
-    v_Color = a_Color;
+    v_Color = a_Color * texture(u_LightTex, lightmapUv(a_Lightmap)).rgb;
     v_TextureUv = a_Uv;
 }

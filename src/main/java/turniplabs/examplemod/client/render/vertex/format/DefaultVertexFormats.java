@@ -6,16 +6,17 @@ import turniplabs.examplemod.client.render.vertex.operations.VertexAttributeType
 import turniplabs.examplemod.client.render.vertex.writers.TerrainFormat;
 
 public class DefaultVertexFormats {
-	public static final VertexAttribute POSITION = new VertexAttribute(2, false, VertexAttribute.Type.UINT, VertexAttributeType.INTEGER);
-	public static final VertexAttribute TEXTURE = new VertexAttribute(2, true, VertexAttribute.Type.USHORT, VertexAttributeType.FLOAT);
-	public static final VertexAttribute COLOR = new VertexAttribute(4, true, VertexAttribute.Type.UBYTE, VertexAttributeType.FLOAT);
-	//public static final VertexAttribute LIGHTMAP = new VertexAttribute(2, VertexAttribute.Type.USHORT, VertexOperations.LIGHTMAP);
+	public static final VertexAttribute POSITION = new VertexAttribute(2, false, VertexAttribute.Type.UINT, VertexAttributeType.INTEGER); // 8 bytes
+	public static final VertexAttribute TEXTURE = new VertexAttribute(2, true, VertexAttribute.Type.USHORT, VertexAttributeType.FLOAT); // 4 bytes
+	public static final VertexAttribute COLOR = new VertexAttribute(3, true, VertexAttribute.Type.UBYTE, VertexAttributeType.FLOAT); // 4 bytes
+	public static final VertexAttribute LIGHTMAP = new VertexAttribute(1, false, VertexAttribute.Type.UBYTE, VertexAttributeType.INTEGER);
 
 	public static final VertexFormat TERRAIN_FORMAT = new TerrainFormat(
 		new ImmutableList.Builder<VertexAttribute>()
 			.add(POSITION)
 			.add(TEXTURE)
 			.add(COLOR)
+			.add(LIGHTMAP)
 			.build()
 	);
 }
