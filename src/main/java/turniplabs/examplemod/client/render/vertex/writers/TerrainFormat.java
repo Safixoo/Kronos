@@ -50,16 +50,16 @@ public class TerrainFormat extends VertexFormat {
 	}
 
 	private static int processUv(double u, double v) {
-		long roundU = (long) Math.floor(u * UV_PRECISION);
-		long roundV = (long) Math.floor(v * UV_PRECISION);
+		int roundU = (int) (u * UV_PRECISION);
+		int roundV = (int) (v * UV_PRECISION);
 
 		roundU -= (roundU & 0x10000) >>> 16;
 		roundV -= (roundV & 0x10000) >>> 16;
 
-		long intU = roundU & 0xFFFF;
-		long intV = roundV & 0xFFFF;
+		int intU = roundU & 0xFFFF;
+		int intV = roundV & 0xFFFF;
 
-		return (int) (intU | intV << 16);
+		return (intU | intV << 16);
 	}
 
 	// It does use a similar idea to Sodium 20-bit position.

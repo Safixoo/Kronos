@@ -246,7 +246,7 @@ public class SectionRender {
 			}
 		}
 
-		this.flags = SectionFlags.setAdjacentMask(this.flags, ~solidFacesMask & SectionFlags.getAdjacentMask(this.flags));
+		this.flags = SectionFlags.setAdjacentMask(this.flags, SectionFlags.getAdjacentMask(this.flags));
 		this.flags = SectionFlags.setCullFaces(this.flags, solidFacesMask);
 	}
 

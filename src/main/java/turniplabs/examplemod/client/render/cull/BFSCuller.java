@@ -17,7 +17,6 @@ public class BFSCuller {
 	private int activeFrame;
 
 	public void init(RegionManager regionManager, int cameraX, int cameraZ, int renderDistance) {
-		UpdateQueue.clear();
 		BFSVisArray.start(cameraX >> 4, cameraZ >> 4, renderDistance);
 
 		for (RegionRender render : regionManager.regionMap.values()) {
@@ -48,7 +47,9 @@ public class BFSCuller {
 			queueRegionNode(bfsQueue, node, flags);
 
 			int outwardDirections = getOutwardDirections(playerX, playerY, playerZ, node);
+
 			outwardDirections &= SectionFlags.getAdjacentMask(flags);
+			outwardDirections &= ~SectionFlags.getCullFaces(flags);
 
 			exploreNodes(bfsQueue, node, outwardDirections, activeFrame);
 		}
@@ -88,7 +89,7 @@ public class BFSCuller {
 			exploreNodes(this.bfsQueue, spawn, SectionFlags.getAdjacentMask(flags), this.activeFrame);
 
 			if (SectionFlags.isDirty(flags)) {
-				UpdateQueue.addToQueueUnsafe(spawn);
+				UpdateQueue.addToQueue(spawn);
 			}
 
 			queueRegionNode(this.bfsQueue, spawn, flags);

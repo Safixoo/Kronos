@@ -290,7 +290,7 @@ public class RegionAllocation {
 			this.firstEntry = this.firstEntry.next;
 			this.addToFreeList(alloc);
 		} else {
-			while (alloc.next != null && (alloc.next.render != render && alloc.next.side != side)) {
+			while (alloc.next != null && (alloc.next.render != render || alloc.next.side != side)) {
 				alloc = alloc.next;
 			}
 

@@ -21,7 +21,7 @@ import turniplabs.examplemod.client.render.util.Direction;
 import turniplabs.examplemod.client.render.util.MathExt;
 
 public class SectionManager {
-	private static final int MAX_UPDATE_QUEUES = 10;
+	private static final int MAX_UPDATE_QUEUES = 15;
 
 	private final Long2ReferenceOpenHashMap<SectionRender> sectionMap = new Long2ReferenceOpenHashMap<>();
 	private final LongOpenHashSet chunkExistence = new LongOpenHashSet();
@@ -136,18 +136,14 @@ public class SectionManager {
 
 	public void markDirty(int posX, int posY, int posZ) {
 		long position = asLong(posX, posY, posZ);
-		SectionRender sectionRender;
-
-		// Cache last entry, IDR if this were really necessary.
-		if (position == this.lastPositionCache) {
-			sectionRender = this.lastSectionCache;
-		} else {
-			this.lastSectionCache = sectionRender = this.sectionMap.get(position);
-			this.lastPositionCache = position;
-		}
+		SectionRender sectionRender = this.sectionMap.getOrDefault(position, null);
 
 		if (sectionRender == null) {
 			sectionRender = this.addRender(posX, posY, posZ, true);
+		}
+
+		if (MathExt.squaredDistance(sectionRender, this.camera) < MathExt.square(48.0f)) {
+			UpdateQueue.addToQueue(sectionRender);
 		}
 
 		sectionRender.flags = SectionFlags.setDirty(sectionRender.flags, true);
@@ -233,24 +229,29 @@ public class SectionManager {
 		this.lastFrameBudget = lerpedBudget;
 		this.lastFrameTime = currentTime;
 
-		int maxSize = Math.min(MAX_UPDATE_QUEUES, UpdateQueue.size() - 1);
+		int maxSize = Math.min(MAX_UPDATE_QUEUES, UpdateQueue.size());
 		int i = 0;
 
 		int samples = 0;
 		long timePassed = 0L;
 		long estimatedTime = 0L;
 
+		SectionRender render = UpdateQueue.get(i++);
+
+		while (i < maxSize && MathExt.squaredDistance(render, this.camera) < MathExt.square(40.0f)) {
+			render.rebuild(this.camera, this, this.worldObj);
+			render = UpdateQueue.get(i++);
+		}
+
 		while (i < maxSize && timePassed < lerpedBudget && estimatedTime < lerpedBudget) {
 			currentTime = System.nanoTime();
 
-			SectionRender render = UpdateQueue.get(i++);
+			render = UpdateQueue.get(i++);
 			render.rebuild(this.camera, this, this.worldObj);
 
-			if (MathExt.squaredDistance(render, this.camera) > MathExt.square(40.0f)) {
-				samples++;
-				timePassed += System.nanoTime() - currentTime;
-				estimatedTime = (timePassed / samples) * (MAX_UPDATE_QUEUES - i);
-			}
+			samples++;
+			timePassed += System.nanoTime() - currentTime;
+			estimatedTime = (timePassed / samples) * (MAX_UPDATE_QUEUES - i);
 		}
 
 		UpdateQueue.clear();

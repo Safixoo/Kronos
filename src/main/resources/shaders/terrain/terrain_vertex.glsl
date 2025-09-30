@@ -51,5 +51,5 @@ void main() {
     gl_Position = position;
 
     v_Color = a_Color * texture(u_LightTex, lightmapUv(a_Lightmap)).rgb;
-    v_TextureUv = a_Uv;
+    v_TextureUv = a_Uv * (1.0 / 65536.0);
 }
