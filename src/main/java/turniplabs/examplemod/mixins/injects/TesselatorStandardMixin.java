@@ -4,6 +4,7 @@ import net.minecraft.client.render.terrain.VertexData;
 import net.minecraft.client.render.tessellator.TessellatorBase;
 import net.minecraft.client.render.tessellator.TessellatorStandard;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -14,9 +15,10 @@ import turniplabs.examplemod.client.render.vertex.VertexWriterManager;
 @Mixin(value = TessellatorStandard.class, remap = false)
 public abstract class TesselatorStandardMixin extends TessellatorBase {
 	@Shadow
-	public abstract void checkIsDrawing();
-	@Shadow
 	public VertexData data;
+
+	@Shadow
+	public boolean drawing;
 
 	@Inject(method = "addVertex", at = @At("HEAD"), cancellable = true)
 	public void passPositionAndUV(double x, double y, double z, CallbackInfo ci) {
@@ -103,14 +105,21 @@ public abstract class TesselatorStandardMixin extends TessellatorBase {
 		ci.cancel();
 	}
 
-	@Inject(method = "checkIsDrawing", at = @At("HEAD"), cancellable = true)
-	public void manageDrawing(CallbackInfo ci) {
+	/**
+	 * @author Safixo
+	 * @reason The mixin structure is full of allocations and should be rewritten, meanwhile
+	 * this method is overwritten directly to avoid allocations from CallbackInfo
+	 */
+	@Overwrite
+	public void checkIsDrawing() {
 		VertexWriterManager man = VertexWriterManager.getCurrentInstance();
 
 		if (!man.isDrawing) {
 			return;
 		}
 
-		ci.cancel();
+		if (!this.drawing) {
+			throw new IllegalStateException("Not drawing!");
+		}
 	}
 }

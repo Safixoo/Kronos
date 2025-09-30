@@ -31,7 +31,7 @@ public class RegionVertexBuffer {
 
 	public void allocateSpace(long space, int hint) {
 		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, this.vboId);
-		GL15.glBufferData(GL15.GL_ARRAY_BUFFER, space, GL15.GL_STREAM_DRAW);
+		GL15.glBufferData(GL15.GL_ARRAY_BUFFER, space, hint);
 		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
 
 		SectionManager.getCurrentInstance().addMemory(space);
@@ -75,10 +75,11 @@ public class RegionVertexBuffer {
 		GL30.glBufferData(GL15.GL_ARRAY_BUFFER, 0, GL15.GL_STATIC_DRAW);
 		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
 
+		this.capacity = 0;
 		SectionManager.getCurrentInstance().removeMemory(this.capacity);
 
+		GL30.glDeleteVertexArrays(this.vaoId);
 		GL30.glDeleteBuffers(this.vboId);
-		GL30.glDeleteBuffers(this.vaoId);
 	}
 
 	public void unbind() {

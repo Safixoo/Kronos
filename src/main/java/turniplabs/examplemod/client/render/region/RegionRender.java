@@ -11,6 +11,8 @@ import turniplabs.examplemod.client.render.util.Direction;
 import turniplabs.examplemod.client.render.vertex.VertexWriterManager;
 import turniplabs.examplemod.client.render.vertex.writers.TerrainFormat;
 
+import java.util.Arrays;
+
 public class RegionRender {
 	// Count of different render-passes possibly dispatched.
 	// - SOLID (0)
@@ -48,8 +50,8 @@ public class RegionRender {
 	private RegionAllocation solidBuffer;
 
 	// Draw-data buffers for uploading, and the draw index.
-	private long solidFirst, solidCount;
-	private long translucentFirst, translucentCount;
+	private long solidFirst = MemoryUtil.NULL, solidCount = MemoryUtil.NULL;
+	private long translucentFirst = MemoryUtil.NULL, translucentCount = MemoryUtil.NULL;
 
 	// struct RegionDrawData[256] {
 	//		// Solid PASS.
@@ -106,17 +108,32 @@ public class RegionRender {
 		this.translucentCount = ptrTranslucentData + (REGION_SECTION_SIZE * Integer.BYTES);
 	}
 
+	public boolean canSafelyClear() {
+		return (this.solidBuffer == null || this.solidBuffer.isEmpty()) ||
+			(this.translucentBuffer == null || this.translucentBuffer.isEmpty());
+	}
+
 	public void clear() {
+		this.shouldCache = false;
+
+		Arrays.fill(this.regionDrawData, 0L);
+
 		if (this.solidBuffer != null) {
 			SectionManager.getCurrentInstance().removeUsedMemory(this.solidBuffer.offset);
+			SectionManager.getCurrentInstance().removeMemory(this.solidBuffer.capacity);
 
+			this.solidBuffer.capacity = 0;
+			this.solidBuffer.offset = 0;
 			this.solidBuffer.clear();
 			this.solidBuffer = null;
 		}
 
 		if (this.translucentBuffer != null) {
 			SectionManager.getCurrentInstance().removeUsedMemory(this.translucentBuffer.offset);
+			SectionManager.getCurrentInstance().removeMemory(this.translucentBuffer.capacity);
 
+			this.translucentBuffer.capacity = 0;
+			this.translucentBuffer.offset = 0;
 			this.translucentBuffer.clear();
 			this.translucentBuffer = null;
 		}
@@ -176,6 +193,26 @@ public class RegionRender {
 		}
 
 		this.regionDrawData[index] = this.translucentBuffer.renewAllocation(render, manager.getVertexData(), manager.getVertices(), 0);
+	}
+
+	public void deleteRenderAllocation(SectionRender render) {
+		long[] drawData = this.regionDrawData;
+
+		int translucentDrawData = (render.regionIndex * TOTAL_DRAWS) + SOLID_DRAWS;
+		int solidDrawData = (render.regionIndex * TOTAL_DRAWS);
+
+		if (drawData[translucentDrawData] != 0L) {
+			this.translucentBuffer.remove(render, 0);
+			drawData[translucentDrawData] = 0L;
+		}
+
+		for (int dir = 0; dir < MeshDirection.COUNT; dir++) {
+			if (drawData[solidDrawData + dir] != 0L) {
+				this.solidBuffer.remove(render, dir);
+				drawData[solidDrawData + dir] = 0L;
+			}
+		}
+
 	}
 
 	// Processing draw data now and not in the BFS, allows decoupling the system and doing the extra
@@ -453,5 +490,17 @@ public class RegionRender {
 
 	public int centerBlockZ() {
 		return (this.regionZ << BLOCK_SHIFT_Z) + RADIUS_Z;
+	}
+
+	public int blockX() {
+		return (this.regionX << BLOCK_SHIFT_X);
+	}
+
+	public int blockY() {
+		return (this.regionY << BLOCK_SHIFT_Y);
+	}
+
+	public int blockZ() {
+		return (this.regionZ << BLOCK_SHIFT_Z);
 	}
 }

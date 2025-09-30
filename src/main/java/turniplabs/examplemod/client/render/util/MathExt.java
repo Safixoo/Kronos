@@ -13,19 +13,36 @@ public class MathExt {
 		return MathExt.square(distX) + MathExt.square(distY) + MathExt.square(distZ);
 	}
 
-	public static float squaredDistance(RegionRender region, CameraData cameraData) {
-		float distX = (region.centerBlockX() - cameraData.intX) - cameraData.fractX;
-		float distY = (region.centerBlockY() - cameraData.intY) - cameraData.fractY;
-		float distZ = (region.centerBlockZ() - cameraData.intZ) - cameraData.fractZ;
+	public static float manhattanDistance(RegionRender region, CameraData cameraData) {
+		float distX = (region.blockX() - cameraData.intX) - cameraData.fractX;
+		float distZ = (region.blockZ() - cameraData.intZ) - cameraData.fractZ;
 
-		return MathExt.square(distX) + MathExt.square(distY) + MathExt.square(distZ);
+		if (region.blockX() < cameraData.intX - RegionRender.RADIUS_X) {
+			distX += RegionRender.DIAMETER_X;
+		}
+
+		if (region.blockZ() < cameraData.intZ - RegionRender.RADIUS_Z) {
+			distZ += RegionRender.DIAMETER_Z;
+		}
+
+		return MathExt.square(distX) + MathExt.square(distZ);
 	}
 
 	public static double square(double num) {
 		return num * num;
 	}
 
-	public static float square(float num) {
+	public static int floor(float num) {
+		int integral = (int) num;
+		return num < 0 ? integral - 1 : integral;
+	}
+
+	public static int floor(double num) {
+		int integral = (int) num;
+		return num < 0 ? integral - 1 : integral;
+	}
+
+ 	public static float square(float num) {
 		return num * num;
 	}
 

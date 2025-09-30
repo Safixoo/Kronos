@@ -15,7 +15,7 @@ public class RegionAllocation {
 
 	private static int GL31_SUPPORT = -1;
 
-	public final RegionVertexBuffer vertexBuffer;
+	public RegionVertexBuffer vertexBuffer;
 
 	public long offset;
 	public long capacity;
@@ -127,6 +127,10 @@ public class RegionAllocation {
 	// with the sections and the invalid region/allocation.
 	public void clear() {
 		this.vertexBuffer.clear();
+
+		this.capacity = 0;
+		this.offset = 0;
+
 		Allocation alloc = this.firstEntry;
 
 		while (alloc != null) {
@@ -137,9 +141,18 @@ public class RegionAllocation {
 			flags = SectionFlags.setDirty(flags, true);
 
 			alloc.render.flags = flags;
-			alloc.render.region = RegionRender.NULL;
+			alloc.render.clearAllocations();
+			alloc.render = null;
+
 			alloc = alloc.next;
 		}
+
+		this.firstEntry = null;
+		this.freeAllocations = null;
+	}
+
+	public boolean isEmpty() {
+		return this.firstEntry == null;
 	}
 
 	// Returns first << 32 | count.
@@ -192,7 +205,7 @@ public class RegionAllocation {
 			drawData = packDrawData(size, (int) alloc.offset);
 		} else {
 			if (alloc != null) {
-				this.remove(render);
+				this.remove(render, side);
 			}
 			drawData = this.allocate(render, data, size, side);
 		}
@@ -263,25 +276,39 @@ public class RegionAllocation {
 	}
 
 	// Removes allocation from the main pool, and saves in the free pool.
-	public void remove(SectionRender render) {
+	public void remove(SectionRender render, int side) {
 		Allocation alloc = this.firstEntry;
 
-		// alloc isn't null as we are already removing an existent.
-		if (alloc.render == render) {
-			alloc.render = null;
-			alloc.side = -1;
-			alloc.next = null;
-
+		// The allocation shouldn't be null as we are removing an existent
+		// allocation.
+		if (alloc.render == render && alloc.side == side) {
 			this.firstEntry = this.firstEntry.next;
-		}
+			this.addToFreeList(alloc);
+		} else {
+			while (alloc.next != null && (alloc.next.render != render && alloc.next.side != side)) {
+				alloc = alloc.next;
+			}
 
-		// Next shouldn't be null as first doesn't fit the base case.
-		//noinspection DataFlowIssue
-		while (alloc.next.render != render) {
-			alloc = alloc.next;
-		}
+			// This shouldn't happen, but in the life there's a lot of things that shouldn't,
+			// but they still happen, right?
+			if (alloc.next == null) {
+				return;
+			}
 
+			// alloc.next == render && alloc.next.size == side
+			Allocation next = alloc.next;
+			alloc.next = next.next;
+
+			this.addToFreeList(next);
+		}
+	}
+
+	private void addToFreeList(Allocation alloc) {
 		Allocation free = this.freeAllocations;
+
+		alloc.render = null;
+		alloc.side = -1;
+		alloc.next = null;
 
 		// Save removed alloc in free pool.
 		if (free != null) {

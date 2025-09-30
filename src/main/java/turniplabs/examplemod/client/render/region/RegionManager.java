@@ -36,45 +36,49 @@ public class RegionManager {
 		ReferenceCollection<RegionRender> regions = this.regionMap.values();
 
 		if (worldUpdated) {
+			this.lastUpdateX = camera.cameraXD();
+			this.lastUpdateZ = camera.cameraZD();
+
 			for (RegionRender region : regions) {
 				region.clear();
 			}
+
 			if (RegionAllocation.SPARE_BUFFER != null) {
 				RegionAllocation.SPARE_BUFFER.clear();
 				RegionAllocation.SPARE_BUFFER = null;
 			}
 
 			this.regionMap.clear();
+			return;
 		}
 
 		double diffX = Math.abs(camera.cameraXD() - this.lastUpdateX);
 		double diffZ = Math.abs(camera.cameraZD() - this.lastUpdateZ);
 
-		if (diffX + diffZ >= 128) {
+		if (diffX + diffZ >= 80) {
 			this.lastUpdateX = camera.cameraXD();
 			this.lastUpdateZ = camera.cameraZD();
 
-			// TODO: Fix crashes drawing because of region removal.
-			//this.sanitizeRegions(camera);
+			this.sanitizeRegions(camera, renderDistance);
 		}
-
 	}
 
-	public void sanitizeRegions(CameraData camera) {
+	public void sanitizeRegions(CameraData camera, int renderDistance) {
 		ReferenceCollection<RegionRender> regions = this.regionMap.values();
+		int renderDistanceBlocks = (renderDistance + 1) * 16;
 
-		int maxRadius = Math.max(RegionRender.RADIUS_Z, RegionRender.RADIUS_X);
-		int maxDistance = MathExt.square((camera.renderDistance << 4) + maxRadius + 64);
-		LongArrayList toRemoveList = new LongArrayList();
+		LongArrayList removedList = new LongArrayList();
 
 		for (RegionRender region : regions) {
-			if (MathExt.squaredDistance(region, camera) > maxDistance) {
-				toRemoveList.add(SectionManager.asLong(region.regionX, region.regionY, region.regionZ));
+			if (MathExt.manhattanDistance(region, camera) > MathExt.square(renderDistanceBlocks)) {
+				long regionPos = SectionManager.asLong(region.regionX, region.regionY, region.regionZ);
+
+				removedList.add(regionPos);
 				region.clear();
 			}
 		}
 
-		for (long position : toRemoveList) {
+		for (long position : removedList) {
 			this.regionMap.remove(position);
 		}
 	}

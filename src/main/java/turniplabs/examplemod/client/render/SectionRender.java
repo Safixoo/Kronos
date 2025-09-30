@@ -337,4 +337,15 @@ public class SectionRender {
 			return this.adjacentSouth;
 		}
 	}
+
+	public void clearAllocations() {
+		RegionRender region = this.region;
+		this.region = RegionRender.NULL;
+
+		if (region == RegionRender.NULL) {
+			return;
+		}
+
+		region.deleteRenderAllocation(this);
+	}
 }
