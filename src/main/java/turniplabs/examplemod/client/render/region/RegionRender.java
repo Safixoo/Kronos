@@ -120,17 +120,15 @@ public class RegionRender {
 
 		if (this.solidBuffer != null) {
 			SectionManager.getCurrentInstance().removeUsedMemory(this.solidBuffer.offset);
-			SectionManager.getCurrentInstance().removeMemory(this.solidBuffer.capacity);
 
+			this.solidBuffer.clear();
 			this.solidBuffer.capacity = 0;
 			this.solidBuffer.offset = 0;
-			this.solidBuffer.clear();
 			this.solidBuffer = null;
 		}
 
 		if (this.translucentBuffer != null) {
 			SectionManager.getCurrentInstance().removeUsedMemory(this.translucentBuffer.offset);
-			SectionManager.getCurrentInstance().removeMemory(this.translucentBuffer.capacity);
 
 			this.translucentBuffer.capacity = 0;
 			this.translucentBuffer.offset = 0;

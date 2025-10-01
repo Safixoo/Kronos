@@ -14,6 +14,7 @@ import turniplabs.examplemod.client.render.cull.BFSCuller;
 import turniplabs.examplemod.client.render.cull.FrustumCuller;
 import turniplabs.examplemod.client.render.cull.UpdateQueue;
 import turniplabs.examplemod.client.render.shader.ShaderSectionTerrain;
+import turniplabs.examplemod.client.render.util.data.BlocksFlags;
 import turniplabs.examplemod.client.render.util.data.CameraData;
 import turniplabs.examplemod.client.render.region.RegionManager;
 import turniplabs.examplemod.client.render.region.RegionRender;
@@ -142,7 +143,7 @@ public class SectionManager {
 			sectionRender = this.addRender(posX, posY, posZ, true);
 		}
 
-		if (MathExt.squaredDistance(sectionRender, this.camera) < MathExt.square(48.0f)) {
+		if (this.camera != null && MathExt.squaredDistance(sectionRender, this.camera) < MathExt.square(48.0f)) {
 			UpdateQueue.addToQueue(sectionRender);
 		}
 
@@ -237,6 +238,8 @@ public class SectionManager {
 		long estimatedTime = 0L;
 
 		SectionRender render = UpdateQueue.get(i++);
+
+		BlocksFlags.processLeavesSolid();
 
 		while (i < maxSize && MathExt.squaredDistance(render, this.camera) < MathExt.square(40.0f)) {
 			render.rebuild(this.camera, this, this.worldObj);
@@ -411,9 +414,9 @@ public class SectionManager {
 		boolean noFog = !Minecraft.getMinecraft().gameSettings.fog.value;
 
 		// Look like terrain display lists have some of these states baked.
-		// With my VBO rendering this isn't the case.
 		if (renderPass == 1) {
 			GL11.glColorMask(true, true, true, true);
+			GL11.glDisable(GL11.GL_ALPHA_TEST);
 			GL11.glEnable(GL11.GL_CULL_FACE);
 		}
 

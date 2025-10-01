@@ -16,21 +16,19 @@ import org.jetbrains.annotations.Nullable;
 import turniplabs.examplemod.client.render.util.data.BlocksFlags;
 
 public class SectionCache implements WorldSource {
-	private final Chunk[] chunks = new Chunk[3 * 3];
+	private static final short[] DEFAULT_SHORT_ARRAY = new short[16 * 16 * 16];
+	private static final byte[] DEFAULT_BYTE_ARRAY = new byte[16 * 16 * 16];
 
 	private final World worldObj;
 	private final int sectionX, sectionY, sectionZ;
 
-	private final short[][] sectionBlocks = new short[3 * 3 * 3][];
-	private final byte[][] sectionData = new byte[3 * 3 * 3][];
-	private final byte[][] lightSky = new byte[3 * 3 * 3][];
-	private final byte[][] lightBlock = new byte[3 * 3 * 3][];
+	private static final short[][] SECTION_BLOCKS = new short[3 * 3 * 3][];
+	private static final byte[][] SECTION_DATA = new byte[3 * 3 * 3][];
+	private static final byte[][] SKY_LIGHT = new byte[3 * 3 * 3][];
+	private static final byte[][] BLOCK_LIGHT = new byte[3 * 3 * 3][];
 
-	private static final short[] DEFAULT_SHORT_ARRAY = new short[16 * 16 * 16];
-	private static final byte[] DEFAULT_BYTE_ARRAY = new byte[16 * 16 * 16];
-
-	private short[] centerSectBlocks;
-	private byte[] centerSectData;
+	private static short[] CENTER_BLOCKS;
+	private static byte[] CENTER_DATA;
 
 	private boolean centerSectEmpty;
 
@@ -56,12 +54,10 @@ public class SectionCache implements WorldSource {
 					int relY = y - this.sectionY;
 					int relZ = z - this.sectionZ;
 
-					Chunk chunk = this.chunks[sectionIndex(relX, 0, relZ)];
+					Chunk chunk = world.getChunkFromChunkCoords(x, z);
 
 					if (chunk == null || chunk.getClass() != Chunk.class) {
-						chunk = this.chunks[sectionIndex(relX, 0, relZ)] = world.getChunkFromChunkCoords(x, z);
-					} else {
-						chunk = this.chunks[sectionIndex(relX, 0, relZ)];
+						chunk = world.getChunkFromChunkCoords(x, z);
 					}
 
 					ChunkSection section = chunk.getSection((minY >> 4) + relY);
@@ -73,26 +69,26 @@ public class SectionCache implements WorldSource {
 
 					if (section != null) {
 						if (section.blocks != null) {
-							this.sectionBlocks[sectionIndex] = section.blocks;
+							SECTION_BLOCKS[sectionIndex] = section.blocks;
 						} else {
-							this.sectionBlocks[sectionIndex] = DEFAULT_SHORT_ARRAY;
+							SECTION_BLOCKS[sectionIndex] = DEFAULT_SHORT_ARRAY;
 						}
 
 						if (section.data != null) {
-							this.sectionData[sectionIndex] = section.data.data;
+							SECTION_DATA[sectionIndex] = section.data.data;
 						} else {
-							this.sectionData[sectionIndex] = DEFAULT_BYTE_ARRAY;
+							SECTION_DATA[sectionIndex] = DEFAULT_BYTE_ARRAY;
 						}
 
-						this.lightSky[sectionIndex] = section.skylightMap != null ? section.skylightMap.data : DEFAULT_BYTE_ARRAY;
-						this.lightBlock[sectionIndex] = section.blocklightMap != null ? section.blocklightMap.data : DEFAULT_BYTE_ARRAY;;
+						SKY_LIGHT[sectionIndex] = section.skylightMap != null ? section.skylightMap.data : DEFAULT_BYTE_ARRAY;
+						BLOCK_LIGHT[sectionIndex] = section.blocklightMap != null ? section.blocklightMap.data : DEFAULT_BYTE_ARRAY;
 					} else {
-						this.sectionBlocks[sectionIndex] = DEFAULT_SHORT_ARRAY;
-						this.lightSky[sectionIndex] = DEFAULT_BYTE_ARRAY;
-						this.lightBlock[sectionIndex] = DEFAULT_BYTE_ARRAY;
+						SECTION_BLOCKS[sectionIndex] = DEFAULT_SHORT_ARRAY;
+						SKY_LIGHT[sectionIndex] = DEFAULT_BYTE_ARRAY;
+						BLOCK_LIGHT[sectionIndex] = DEFAULT_BYTE_ARRAY;
 					}
-					this.centerSectBlocks = this.sectionBlocks[sectionIndex(1, 1, 1)];
-					this.centerSectData = this.sectionData[sectionIndex(1, 1, 1)];
+					CENTER_BLOCKS = SECTION_BLOCKS[sectionIndex(1, 1, 1)];
+					CENTER_DATA = SECTION_DATA[sectionIndex(1, 1, 1)];
 				}
 			}
 		}
@@ -122,11 +118,11 @@ public class SectionCache implements WorldSource {
 		int sectionY = (y >> 4) - this.sectionY;
 		int sectionZ = (z >> 4) - this.sectionZ;
 
-		return this.sectionBlocks[sectionIndex(sectionX, sectionY, sectionZ)][makeBlockIndex(x & 15, y & 15, z & 15)];
+		return SECTION_BLOCKS[sectionIndex(sectionX, sectionY, sectionZ)][makeBlockIndex(x & 15, y & 15, z & 15)];
 	}
 
 	public int getBlockIdCenter(int x, int y, int z) {
-		return this.centerSectBlocks[makeBlockIndex(x & 15, y & 15, z & 15)];
+		return CENTER_BLOCKS[makeBlockIndex(x & 15, y & 15, z & 15)];
 	}
 
 	@Override
@@ -153,14 +149,14 @@ public class SectionCache implements WorldSource {
 		int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
 		int sectionIndex = sectionIndex(x >> 4, y >> 4, z >> 4);
 
-		int blockId = this.sectionBlocks[sectionIndex][blockIndex];
+		int blockId = SECTION_BLOCKS[sectionIndex][blockIndex];
 
 		if (BlocksFlags.SOLID[blockId]) {
 			return 0;
 		}
 
-		int skyLight = getNibble(this.lightSky[sectionIndex], blockIndex);
-		int blockLight = getNibble(this.lightBlock[sectionIndex], blockIndex);
+		int skyLight = getNibble(SKY_LIGHT[sectionIndex], blockIndex);
+		int blockLight = getNibble(BLOCK_LIGHT[sectionIndex], blockIndex);
 
 		return LightmapHelper.getLightmapCoord(skyLight, blockLight);
 	}
@@ -188,11 +184,11 @@ public class SectionCache implements WorldSource {
 
 		int sectionIndex = sectionIndex(offX, offY, offZ);
 
-		return this.sectionData[sectionIndex][makeBlockIndex(x & 15, y & 15, z & 15)];
+		return SECTION_DATA[sectionIndex][makeBlockIndex(x & 15, y & 15, z & 15)];
 	}
 
 	public int getBlockMetadataCenter(int x, int y, int z) {
-		return this.centerSectData[makeBlockIndex(x & 15, y & 15, z & 15)];
+		return CENTER_DATA[makeBlockIndex(x & 15, y & 15, z & 15)];
 	}
 
 	@Override
@@ -209,12 +205,12 @@ public class SectionCache implements WorldSource {
 		int sectionIndex = sectionIndex(sectionX, sectionY, sectionZ);
 		int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
 
-		return BlocksFlags.SOLID[this.sectionBlocks[sectionIndex][blockIndex]];
+		return BlocksFlags.SOLID[SECTION_BLOCKS[sectionIndex][blockIndex]];
 	}
 
 	public boolean isBlockOpaqueCubeCenter(int x, int y, int z) {
 		int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
-		return BlocksFlags.SOLID[this.centerSectBlocks[blockIndex]];
+		return BlocksFlags.SOLID[CENTER_BLOCKS[blockIndex]];
 	}
 
 	@Override

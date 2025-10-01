@@ -75,8 +75,8 @@ public class RegionVertexBuffer {
 		GL30.glBufferData(GL15.GL_ARRAY_BUFFER, 0, GL15.GL_STATIC_DRAW);
 		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
 
-		this.capacity = 0;
 		SectionManager.getCurrentInstance().removeMemory(this.capacity);
+		this.capacity = 0;
 
 		GL30.glDeleteVertexArrays(this.vaoId);
 		GL30.glDeleteBuffers(this.vboId);

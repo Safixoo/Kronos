@@ -1,5 +1,6 @@
 package turniplabs.examplemod.client.render;
 
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.render.RenderBlocks;
 import net.minecraft.client.render.block.color.BlockColor;
 import net.minecraft.client.render.block.color.BlockColorDispatcher;
@@ -39,7 +40,6 @@ public class SectionRender {
                         adjacentSouth, adjacentWest, adjacentEast;
 
 	// Section main data structures.
-	private SectionCache sectionCache;
 	public RegionRender region = RegionRender.NULL;
 
 	private static final int AIR_ID = 0;
@@ -54,7 +54,6 @@ public class SectionRender {
 
 	public void rebuild(CameraData camera, SectionManager sectionManager, World world) {
 		ChunkRenderer.updates++;
-		BlocksFlags.processLeavesSolid();
 
 		int minX = this.blockX;
 		int minY = this.blockY;
@@ -64,13 +63,7 @@ public class SectionRender {
 		int maxY = minY + 16;
 		int maxZ = minZ + 16;
 
-		if (this.sectionCache == null) {
-			this.sectionCache = new SectionCache(world, minX - 1, minY - 1, minZ - 1, maxX + 1, maxY + 1, maxZ + 1);
-		} else {
-			this.sectionCache.fillData(world, minX - 1, minY - 1, minZ - 1, maxX + 1, maxY + 1, maxZ + 1);
-		}
-
-		SectionCache sectionCache = this.sectionCache;
+		SectionCache sectionCache = new SectionCache(world, minX - 1, minY - 1, minZ - 1, maxX + 1, maxY + 1, maxZ + 1);
 		RenderBlocks renderBlocks = new RenderBlocks(sectionCache);
 		BlockModel.setRenderBlocks(renderBlocks);
 
@@ -90,12 +83,13 @@ public class SectionRender {
 		BlockModel<?> lastModel = null;
 
 		long start = System.nanoTime();
+		boolean useAmbientOcc = Minecraft.getMinecraft().gameSettings.ambientOcclusion.value;
 
 		if (!sectionCache.isSectionEmpty()) {
 			for (int y = 0; y < 16; y++) {
 				for (int z = 0; z < 16; z++) {
 					for (int x = 0; x < 16; x++) {
-						int blockId = this.sectionCache.getBlockIdCenter(x, y, z);
+						int blockId = sectionCache.getBlockIdCenter(x, y, z);
 
 						if (blockId == AIR_ID) {
 							continue;
@@ -121,8 +115,7 @@ public class SectionRender {
 						int blockY = y + minY;
 						int blockZ = z + minZ;
 
-						if (BlocksFlags.SOLID_LIGHT_MASK[blockId] != 0) {
-							solidBlocks++;
+						if (BlocksFlags.SOLID[blockId]) {
 							if (y == 15) solidFaces[Direction.UP]++;
 							if (y == 0) solidFaces[Direction.DOWN]++;
 
@@ -132,17 +125,12 @@ public class SectionRender {
 							if (z == 15) solidFaces[Direction.SOUTH]++;
 							if (z == 0) solidFaces[Direction.NORTH]++;
 
-							FullBlockMesher.renderFaces(model, blockColor, this.sectionCache, blockX, blockY, blockZ);
+							solidBlocks++;
+						}
 
+						if (BlocksFlags.SOLID_LIGHT_MASK[blockId] != 0) {
 							Class<?> modelClass = model.getClass();
-
-							if (modelClass == BlockModelGrass.class || modelClass == BlockModelLeaves.class) {
-								VertexWriterManager.setCurrentInstance(VertexWriterManager.SOLID[MeshDirection.GENERIC]);
-
-								BlockModelGrass.useOverlay = true;
-								FullBlockMesher.renderFaces(model, blockColor, this.sectionCache, blockX, blockY, blockZ);
-								BlockModelGrass.useOverlay = false;
-							}
+							FullBlockMesher.renderFaces(model, blockColor, sectionCache, blockX, blockY, blockZ, modelClass == BlockModelGrass.class, useAmbientOcc, blockId);
 						} else {
 							if (blockRenderPass != 0) {
 								VertexWriterManager.setCurrentInstance(VertexWriterManager.TRANSLUCENT);
@@ -155,8 +143,6 @@ public class SectionRender {
 					}
 				}
 			}
-		} else {
-			this.sectionCache = null;
 		}
 
 		long end = System.nanoTime();
