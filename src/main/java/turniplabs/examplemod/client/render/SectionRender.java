@@ -1,5 +1,6 @@
 package turniplabs.examplemod.client.render;
 
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.render.RenderBlocks;
 import net.minecraft.client.render.block.color.BlockColor;
 import net.minecraft.client.render.block.color.BlockColorDispatcher;
@@ -91,6 +92,8 @@ public class SectionRender {
 
 		long start = System.nanoTime();
 
+		boolean useAmbientOcc = Minecraft.getMinecraft().gameSettings.ambientOcclusion.value;
+
 		if (!sectionCache.isSectionEmpty()) {
 			for (int y = 0; y < 16; y++) {
 				for (int z = 0; z < 16; z++) {
@@ -132,17 +135,16 @@ public class SectionRender {
 							if (z == 15) solidFaces[Direction.SOUTH]++;
 							if (z == 0) solidFaces[Direction.NORTH]++;
 
-							FullBlockMesher.renderFaces(model, blockColor, this.sectionCache, blockX, blockY, blockZ);
-
 							Class<?> modelClass = model.getClass();
+							FullBlockMesher.renderFaces(model, blockColor, this.sectionCache, blockX, blockY, blockZ, modelClass == BlockModelGrass.class, useAmbientOcc, blockId);
 
-							if (modelClass == BlockModelGrass.class || modelClass == BlockModelLeaves.class) {
-								VertexWriterManager.setCurrentInstance(VertexWriterManager.SOLID[MeshDirection.GENERIC]);
-
-								BlockModelGrass.useOverlay = true;
-								FullBlockMesher.renderFaces(model, blockColor, this.sectionCache, blockX, blockY, blockZ);
-								BlockModelGrass.useOverlay = false;
-							}
+//							if (modelClass == BlockModelGrass.class) {
+//								VertexWriterManager.setCurrentInstance(VertexWriterManager.SOLID[MeshDirection.GENERIC]);
+//
+//								BlockModelGrass.useOverlay = true;
+//								FullBlockMesher.renderFaces(model, blockColor, this.sectionCache, blockX, blockY, blockZ, useAmbientOcc, blockId);
+//								BlockModelGrass.useOverlay = false;
+//							}
 						} else {
 							if (blockRenderPass != 0) {
 								VertexWriterManager.setCurrentInstance(VertexWriterManager.TRANSLUCENT);

@@ -32,5 +32,6 @@ public class ExampleMod implements ModInitializer, RecipeEntrypoint, GameStartEn
 	@Override
 	public void afterGameStart() {
 		BlocksFlags.computeFlagArrays();
+		BlocksFlags.processModelMethods();
 	}
 }

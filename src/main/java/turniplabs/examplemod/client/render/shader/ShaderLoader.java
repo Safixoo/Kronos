@@ -15,9 +15,18 @@ public class ShaderLoader {
 	public static void compileShader(String relPath, int shaderId) {
 		String shaderData;
 
-		try (InputStream inputStream = ClassLoader.getSystemClassLoader().getResourceAsStream(SHADER_PATH + relPath)) {
-			if (inputStream == null) {
-				throw new RuntimeException("Input stream is NULL!");
+		try {
+			InputStream inputStream;
+
+			if (relPath.equals("terrain/terrain_vertex.glsl")) {
+				File devFile = new File("terrain_vertex.glsl");
+				if (devFile.exists()) {
+					inputStream = new FileInputStream(devFile);
+				} else {
+					throw new FileNotFoundException("Shader file not found in dev path: " + devFile.getAbsolutePath());
+				}
+			} else {
+				inputStream = ClassLoader.getSystemClassLoader().getResourceAsStream(SHADER_PATH + relPath);
 			}
 
 			String line;

@@ -142,7 +142,7 @@ public class SectionManager {
 			sectionRender = this.addRender(posX, posY, posZ, true);
 		}
 
-		if (MathExt.squaredDistance(sectionRender, this.camera) < MathExt.square(48.0f)) {
+		if (this.camera != null && MathExt.squaredDistance(sectionRender, this.camera) < MathExt.square(48.0f)) {
 			UpdateQueue.addToQueue(sectionRender);
 		}
 
