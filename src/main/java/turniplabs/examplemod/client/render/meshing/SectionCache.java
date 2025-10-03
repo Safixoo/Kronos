@@ -15,17 +15,19 @@ import net.minecraft.core.world.season.SeasonManager;
 import org.jetbrains.annotations.Nullable;
 import turniplabs.examplemod.client.render.util.data.BlocksFlags;
 
+import java.util.Arrays;
+
 public class SectionCache implements WorldSource {
 	private static final short[] DEFAULT_SHORT_ARRAY = new short[16 * 16 * 16];
 	private static final byte[] DEFAULT_BYTE_ARRAY = new byte[16 * 16 * 16];
 
 	private final World worldObj;
-	private final int sectionX, sectionY, sectionZ;
+	public final int blockX, blockY, blockZ;
 
-	private static final short[][] SECTION_BLOCKS = new short[3 * 3 * 3][];
-	private static final byte[][] SECTION_DATA = new byte[3 * 3 * 3][];
-	private static final byte[][] SKY_LIGHT = new byte[3 * 3 * 3][];
-	private static final byte[][] BLOCK_LIGHT = new byte[3 * 3 * 3][];
+	public static final short[][] SECTION_BLOCKS = new short[3 * 3 * 3][];
+	public static final byte[][] SECTION_DATA = new byte[3 * 3 * 3][];
+	public static final byte[][] SKY_LIGHT = new byte[3 * 3 * 3][];
+	public static final byte[][] BLOCK_LIGHT = new byte[3 * 3 * 3][];
 
 	private static short[] CENTER_BLOCKS;
 	private static byte[] CENTER_DATA;
@@ -35,9 +37,9 @@ public class SectionCache implements WorldSource {
 	public SectionCache(World world, int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
 		this.worldObj = world;
 
-		this.sectionX = Math.floorDiv(minX, 16);
-		this.sectionY = Math.floorDiv(minY, 16);
-		this.sectionZ = Math.floorDiv(minZ, 16);
+		this.blockX = minX & ~0b1111;
+		this.blockY = minY & ~0b1111;
+		this.blockZ = minZ & ~0b1111;
 
 		this.fillData(world, minX, minY, minZ, maxX, maxY, maxZ);
 	}
@@ -47,24 +49,27 @@ public class SectionCache implements WorldSource {
 		int maxChunkZ = Math.floorDiv(maxZ, 16);
 		int maxChunkY = Math.floorDiv(maxY, 16);
 
-		for (int x = this.sectionX; x <= maxChunkX; x++) {
-			for (int z = this.sectionZ; z <= maxChunkZ; z++) {
-				for (int y = this.sectionY; y <= maxChunkY; y++) {
-					int relX = x - this.sectionX;
-					int relY = y - this.sectionY;
-					int relZ = z - this.sectionZ;
+		int sectionX = this.blockX >> 4, sectionY = this.blockY >> 4, sectionZ = this.blockZ >> 4;
 
-					Chunk chunk = world.getChunkFromChunkCoords(x, z);
+		for (int x = sectionX; x <= maxChunkX; x++) {
+			for (int z = sectionZ; z <= maxChunkZ; z++) {
+				int relX = x - sectionX;
+				int relZ = z - sectionZ;
 
-					if (chunk == null || chunk.getClass() != Chunk.class) {
-						chunk = world.getChunkFromChunkCoords(x, z);
-					}
+				Chunk chunk = world.getChunkFromChunkCoords(x, z);
+
+				for (int y = sectionY; y <= maxChunkY; y++) {
+					int relY = y - sectionY;
 
 					ChunkSection section = chunk.getSection((minY >> 4) + relY);
 					int sectionIndex = sectionIndex(relX, relY, relZ);
 
 					if (sectionIndex(1, 1, 1) == sectionIndex) {
 						this.centerSectEmpty = section.blocks == null;
+
+						if (section.blocks == null) {
+							return;
+						}
 					}
 
 					if (section != null) {
@@ -87,11 +92,12 @@ public class SectionCache implements WorldSource {
 						SKY_LIGHT[sectionIndex] = DEFAULT_BYTE_ARRAY;
 						BLOCK_LIGHT[sectionIndex] = DEFAULT_BYTE_ARRAY;
 					}
-					CENTER_BLOCKS = SECTION_BLOCKS[sectionIndex(1, 1, 1)];
-					CENTER_DATA = SECTION_DATA[sectionIndex(1, 1, 1)];
 				}
 			}
 		}
+
+		CENTER_BLOCKS = SECTION_BLOCKS[sectionIndex(1, 1, 1)];
+		CENTER_DATA = SECTION_DATA[sectionIndex(1, 1, 1)];
 	}
 
 	public static int sectionIndex(int x, int y, int z) {
@@ -102,27 +108,46 @@ public class SectionCache implements WorldSource {
 		return this.centerSectEmpty;
 	}
 
-	public int getNibble(byte[] nibbleArray, int blockIndex) {
+	public static int getNibble(byte[] nibbleArray, int blockIndex) {
 		int nibbleIndex = blockIndex >> 1;
 		int nibblePart = blockIndex & 1;
 		return nibbleArray[nibbleIndex] >>> (nibblePart << 2) & 15;
 	}
 
-	private static int makeBlockIndex(int x, int y, int z) {
+	public static int makeBlockIndex(int x, int y, int z) {
 		return y << 8 | z << 4 | x;
+	}
+
+	public static int blockX(int blockIndex) {
+		return (blockIndex >>> 0) & 0xF;
+	}
+
+	public static int blockY(int blockIndex) {
+		return (blockIndex >>> 8) & 0xF;
+	}
+
+	public static int blockZ(int blockIndex) {
+		return (blockIndex >>> 4) & 0xF;
 	}
 
 	@Override
 	public int getBlockId(int x, int y, int z) {
-		int sectionX = (x >> 4) - this.sectionX;
-		int sectionY = (y >> 4) - this.sectionY;
-		int sectionZ = (z >> 4) - this.sectionZ;
+		int blockX = x - this.blockX;
+		int blockY = y - this.blockY;
+		int blockZ = z - this.blockZ;
 
-		return SECTION_BLOCKS[sectionIndex(sectionX, sectionY, sectionZ)][makeBlockIndex(x & 15, y & 15, z & 15)];
+		int sectInd = sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
+		int blockInd = makeBlockIndex(blockX & 15, blockY & 15, blockZ & 15);
+
+		return SECTION_BLOCKS[sectInd][blockInd];
 	}
 
 	public int getBlockIdCenter(int x, int y, int z) {
 		return CENTER_BLOCKS[makeBlockIndex(x & 15, y & 15, z & 15)];
+	}
+
+	public int getBlockIdCenter(int blockIndex) {
+		return CENTER_BLOCKS[blockIndex];
 	}
 
 	@Override
@@ -142,16 +167,15 @@ public class SectionCache implements WorldSource {
 
 	@Override
 	public int getLightmapCoord(int x, int y, int z, int blockLightValue) {
-		x -= this.sectionX << 4;
-		y -= this.sectionY << 4;
-		z -= this.sectionZ << 4;
-
 		int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
-		int sectionIndex = sectionIndex(x >> 4, y >> 4, z >> 4);
 
-		int blockId = SECTION_BLOCKS[sectionIndex][blockIndex];
+		int blockX = x - this.blockX;
+		int blockY = y - this.blockY;
+		int blockZ = z - this.blockZ;
 
-		if (BlocksFlags.SOLID[blockId]) {
+		int sectionIndex = sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
+
+		if (BlocksFlags.SOLID[SECTION_BLOCKS[sectionIndex][blockIndex]]) {
 			return 0;
 		}
 
@@ -178,13 +202,14 @@ public class SectionCache implements WorldSource {
 
 	@Override
 	public int getBlockMetadata(int x, int y, int z) {
-		int offX = (x >> 4) - this.sectionX;
-		int offY = (y >> 4) - this.sectionY;
-		int offZ = (z >> 4) - this.sectionZ;
+		int blockX = x - this.blockX;
+		int blockY = y - this.blockY;
+		int blockZ = z - this.blockZ;
 
-		int sectionIndex = sectionIndex(offX, offY, offZ);
+		int sectInd = sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
+		int blockInd = makeBlockIndex(blockX & 15, blockY & 15, blockZ & 15);
 
-		return SECTION_DATA[sectionIndex][makeBlockIndex(x & 15, y & 15, z & 15)];
+		return SECTION_DATA[sectInd][blockInd];
 	}
 
 	public int getBlockMetadataCenter(int x, int y, int z) {
@@ -196,21 +221,32 @@ public class SectionCache implements WorldSource {
 		return BlocksFlags.MATERIAL[this.getBlockId(x, y, z)];
 	}
 
-	@Override
-	public boolean isBlockOpaqueCube(int x, int y, int z) {
-		int sectionX = (x >> 4) - this.sectionX;
-		int sectionY = (y >> 4) - this.sectionY;
-		int sectionZ = (z >> 4) - this.sectionZ;
-
-		int sectionIndex = sectionIndex(sectionX, sectionY, sectionZ);
+	public int isBlockOpaqueCubeInt(int x, int y, int z) {
 		int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
 
-		return BlocksFlags.SOLID[SECTION_BLOCKS[sectionIndex][blockIndex]];
+		int blockX = x - this.blockX;
+		int blockY = y - this.blockY;
+		int blockZ = z - this.blockZ;
+
+		int sectionIndex = sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
+
+		return BlocksFlags.SOLID_LIGHT_MASK[SECTION_BLOCKS[sectionIndex][blockIndex]];
 	}
 
-	public boolean isBlockOpaqueCubeCenter(int x, int y, int z) {
-		int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
-		return BlocksFlags.SOLID[CENTER_BLOCKS[blockIndex]];
+	public int isBlockOpaqueCubeRel(int x, int y, int z) {
+		int sectionIndex = sectionIndex(x >> 4, y >> 4, z >> 4);
+		int blockInd = makeBlockIndex(x & 15, y & 15, z & 15);
+
+		return BlocksFlags.SOLID_LIGHT_MASK[SECTION_BLOCKS[sectionIndex][blockInd]];
+	}
+
+	@Override
+	public boolean isBlockOpaqueCube(int x, int y, int z) {
+		return this.isBlockOpaqueCubeInt(x, y, z) != 0;
+	}
+
+	public int isBlockOpaqueCubeCenter(int blockIndex) {
+		return BlocksFlags.SOLID_LIGHT_MASK[CENTER_BLOCKS[blockIndex]];
 	}
 
 	@Override

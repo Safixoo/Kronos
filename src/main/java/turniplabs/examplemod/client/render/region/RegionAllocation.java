@@ -164,7 +164,7 @@ public class RegionAllocation {
 		}
 
 		alloc.render = render;
-		alloc.side = side;
+		alloc.sectionId = Allocation.sectionId(render, side);
 		this.uploadAllocation(alloc, vertexData, size);
 
 		return packDrawData(size, (int) alloc.offset);
@@ -251,12 +251,9 @@ public class RegionAllocation {
 	// Searches for a previous allocation.
 	public @Nullable Allocation findPrevAlloc(SectionRender render, int side) {
 		Allocation alloc = this.firstEntry;
+		int sectionId = Allocation.sectionId(render, side);
 
-		while (alloc != null) {
-			if (alloc.render == render && alloc.side == side) {
-				return alloc;
-			}
-
+		while (alloc != null && alloc.sectionId != sectionId) {
 			alloc = alloc.next;
 		}
 
@@ -284,13 +281,15 @@ public class RegionAllocation {
 			return;
 		}
 
+		int sectionId = Allocation.sectionId(render, side);
+
 		// The allocation shouldn't be null as we are removing an existent
 		// allocation.
-		if (alloc.render == render && alloc.side == side) {
+		if (alloc.sectionId == sectionId) {
 			this.firstEntry = this.firstEntry.next;
 			this.addToFreeList(alloc);
 		} else {
-			while (alloc.next != null && (alloc.next.render != render || alloc.next.side != side)) {
+			while (alloc.next != null && alloc.next.sectionId != sectionId) {
 				alloc = alloc.next;
 			}
 
@@ -312,7 +311,7 @@ public class RegionAllocation {
 		Allocation free = this.freeAllocations;
 
 		alloc.render = null;
-		alloc.side = -1;
+		alloc.sectionId = Allocation.UNDEFINED;
 		alloc.next = null;
 
 		// Save removed alloc in free pool.
@@ -332,12 +331,16 @@ public class RegionAllocation {
 	}
 
 	public static class Allocation {
+		public static final int UNDEFINED = 0x8000000;
+
 		public Allocation next;
 		public SectionRender render;
 
+		public int sectionId;
+
 		public Allocation(SectionRender render, long offset, int size, int side) {
 			this.render = render;
-			this.side = side;
+			this.sectionId = sectionId(render, side);
 			this.offset = offset;
 			this.size = size;
 		}
@@ -346,6 +349,9 @@ public class RegionAllocation {
 		// avoid division to translate byte sizes to vertex counts.
 		public long offset;
 		public int size;
-		public int side;
+
+		public static int sectionId(SectionRender render, int side) {
+			return render.regionIndex << 16 | side;
+		}
 	}
 }

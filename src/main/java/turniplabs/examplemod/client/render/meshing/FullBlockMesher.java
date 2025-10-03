@@ -1,5 +1,6 @@
 package turniplabs.examplemod.client.render.meshing;
 
+import net.minecraft.client.render.LightmapHelper;
 import net.minecraft.client.render.block.color.BlockColor;
 import net.minecraft.client.render.block.model.BlockModel;
 import net.minecraft.client.render.block.model.BlockModelGrass;
@@ -15,6 +16,7 @@ import turniplabs.examplemod.client.render.util.Direction;
 import turniplabs.examplemod.client.render.vertex.VertexWriterManager;
 import turniplabs.examplemod.client.render.vertex.writers.TerrainFormat;
 
+import static turniplabs.examplemod.client.render.meshing.SectionCache.makeBlockIndex;
 import static turniplabs.examplemod.client.render.util.Direction.*;
 
 public class FullBlockMesher {
@@ -27,32 +29,27 @@ public class FullBlockMesher {
 	public static final float[] SIDE_LIGHT_MULTIPLIER = new float[] { 0.5F, 1.0F, 0.8F, 0.8F, 0.6F, 0.6F };
 	private static final AABB FULL_BLOCK = AABB.getPermanentBB(0, 0, 0, 1, 1, 1);
 
-	public static void renderFaces(BlockModel<?> model, BlockColor blockColor, SectionCache cache, int x, int y, int z, boolean overlay, boolean useAmbientOcc, int blockId) {
+	public static void renderFaces(BlockModel<?> model, BlockColor blockColor, SectionCache cache, int x, int y, int z, boolean overlay, boolean ambient, int drawSet, int blockId) {
 		int meta = cache.getBlockMetadataCenter(x, y, z);
-		int color = ColorBGRManager.rgbToBgr(blockColor.getWorldColor(cache, x, y, z));
 
-		int drawBitSet = 0;
-
-		if (BlocksFlags.DIRECT_CULL[blockId]) {
-			drawBitSet |= !cache.isBlockOpaqueCube(x, y - 1, z) ? 1 << DOWN : 0;
-			drawBitSet |= !cache.isBlockOpaqueCube(x, y + 1, z) ? 1 << UP : 0;
-			drawBitSet |= !cache.isBlockOpaqueCube(x, y, z - 1) ? 1 << NORTH : 0;
-
-			drawBitSet |= !cache.isBlockOpaqueCube(x, y, z + 1) ? 1 << SOUTH : 0;
-			drawBitSet |= !cache.isBlockOpaqueCube(x - 1, y, z) ? 1 << WEST : 0;
-			drawBitSet |= !cache.isBlockOpaqueCube(x + 1, y, z) ? 1 << EAST : 0;
-		} else {
-			drawBitSet |= model.shouldSideBeRendered(cache, FULL_BLOCK, x, y - 1, z, 0, meta) ? 1 << DOWN : 0;
-			drawBitSet |= model.shouldSideBeRendered(cache, FULL_BLOCK, x, y + 1, z, 0, meta) ? 1 << UP : 0;
-			drawBitSet |= model.shouldSideBeRendered(cache, FULL_BLOCK, x, y, z - 1, 0, meta) ? 1 << NORTH : 0;
-
-			drawBitSet |= model.shouldSideBeRendered(cache, FULL_BLOCK, x, y, z + 1, 0, meta) ? 1 << SOUTH : 0;
-			drawBitSet |= model.shouldSideBeRendered(cache, FULL_BLOCK, x - 1, y, z, 0, meta) ? 1 << WEST : 0;
-			drawBitSet |= model.shouldSideBeRendered(cache, FULL_BLOCK, x + 1, y, z, 0, meta) ? 1 << EAST : 0;
+		if (drawSet == 0) {
+			return;
 		}
 
+		if (!BlocksFlags.DIRECT_CULL[blockId]) {
+			drawSet |= model.shouldSideBeRendered(cache, FULL_BLOCK, x, y - 1, z, 0, meta) ? 1 << DOWN : 0;
+			drawSet |= model.shouldSideBeRendered(cache, FULL_BLOCK, x, y + 1, z, 0, meta) ? 1 << UP : 0;
+			drawSet |= model.shouldSideBeRendered(cache, FULL_BLOCK, x, y, z - 1, 0, meta) ? 1 << NORTH : 0;
+
+			drawSet |= model.shouldSideBeRendered(cache, FULL_BLOCK, x, y, z + 1, 0, meta) ? 1 << SOUTH : 0;
+			drawSet |= model.shouldSideBeRendered(cache, FULL_BLOCK, x - 1, y, z, 0, meta) ? 1 << WEST : 0;
+			drawSet |= model.shouldSideBeRendered(cache, FULL_BLOCK, x + 1, y, z, 0, meta) ? 1 << EAST : 0;
+		}
+
+		int modelColor = ColorBGRManager.rgbToBgr(blockColor.getWorldColor(cache, x, y, z));
+
 		for (int dir = 0; dir < Direction.COUNT; dir++) {
-			if ((drawBitSet & (1 << dir)) == 0) {
+			if ((drawSet & (1 << dir)) == 0) {
 				continue;
 			}
 
@@ -66,28 +63,20 @@ public class FullBlockMesher {
 				BlockModelGrass.useOverlay = true;
 				overlayTex = model.getBlockTextureFromSideAndMetadata(side, meta);
 				BlockModelGrass.useOverlay = false;
-				overlayColor = color;
+				overlayColor = modelColor;
 			}
 
 			boolean colorized = model.shouldSideBeColored(cache, x, y, z, dir, meta);
 			VertexWriterManager.setCurrentInstance(VertexWriterManager.SOLID[dir]);
 
 			FacingRender render = FACE_RENDER[dir];
-			int usedColor = !colorized ? SHADE_FULL_COLOR[dir] : ColorBGRManager.multiplyColor(color, SHADE_FULL_FACTOR[dir]);
+			int usedColor = !colorized ? SHADE_FULL_COLOR[dir] : ColorBGRManager.multiplyColor(modelColor, SHADE_FULL_FACTOR[dir]);
 
-			if (useAmbientOcc) {
+			if (ambient) {
 				renderFace(render, overlayTex, tex, dir, cache, x, y, z, usedColor, overlayColor);
 			} else {
 				renderFaceNoSmooth(render, tex, dir, cache, x, y, z, usedColor);
 			}
-		}
-	}
-
-	private static boolean shouldDrawFace(BlockModel<?> model, int blockId, SectionCache cache, int dirX, int dirY, int dirZ, int dir, int meta) {
-		if (BlocksFlags.DIRECT_CULL[blockId]) {
-			return !cache.isBlockOpaqueCube(dirX, dirY, dirZ);
-		} else {
-			return model.shouldSideBeRendered(cache, FULL_BLOCK, dirX, dirY, dirZ, dir, meta);
 		}
 	}
 
@@ -108,15 +97,10 @@ public class FullBlockMesher {
 		y &= RegionRender.BLOCK_BITS_Y;
 		z &= RegionRender.BLOCK_BITS_Z;
 
-		int posZ = cache.getBlockId(dirX + p2X, dirY + p2Y, dirZ + p2Z);
-		int negZ = cache.getBlockId(dirX - p2X, dirY - p2Y, dirZ - p2Z);
-		int posX = cache.getBlockId(dirX + p1X, dirY + p1Y, dirZ + p1Z);
-		int negX = cache.getBlockId(dirX - p1X, dirY - p1Y, dirZ - p1Z);
-
-		int lightPZ = cache.getLightmapCoord(dirX + p2X, dirY + p2Y, dirZ + p2Z, 0);
-		int lightNZ = cache.getLightmapCoord(dirX - p2X, dirY - p2Y, dirZ - p2Z, 0);
-		int lightPX = cache.getLightmapCoord(dirX + p1X, dirY + p1Y, dirZ + p1Z, 0);
-		int lightNX = cache.getLightmapCoord(dirX - p1X, dirY - p1Y, dirZ - p1Z, 0);
+		int posZ = getBlockCached(cache, dirX + p2X, dirY + p2Y, dirZ + p2Z);
+		int negZ = getBlockCached(cache, dirX - p2X, dirY - p2Y, dirZ - p2Z);
+		int posX = getBlockCached(cache, dirX + p1X, dirY + p1Y, dirZ + p1Z);
+		int negX = getBlockCached(cache, dirX - p1X, dirY - p1Y, dirZ - p1Z);
 
 		int p12X = p1X + p2X;
 		int p12Y = p1Y + p2Y;
@@ -126,17 +110,17 @@ public class FullBlockMesher {
 		int pd12Y = p1Y - p2Y;
 		int pd12Z = p1Z - p2Z;
 
-		int lightPP = posZ == 0 || posX == 0 ? cache.getLightmapCoord(dirX + p12X, dirY + p12Y, dirZ + p12Z, 0) : 0;
-		int lightPN = negZ == 0 || posX == 0 ? cache.getLightmapCoord(dirX + pd12X, dirY + pd12Y, dirZ + pd12Z, 0) : 0;
-		int lightNP = posZ == 0 || negX == 0 ? cache.getLightmapCoord(dirX - pd12X, dirY - pd12Y, dirZ - pd12Z, 0) : 0;
-		int lightNN = negZ == 0 || negX == 0 ? cache.getLightmapCoord(dirX - p12X, dirY - p12Y, dirZ - p12Z, 0) : 0;
+		int cornerPP = getSolidCached(cache, dirX + p12X, dirY + p12Y, dirZ + p12Z);
+		int cornerPN = getSolidCached(cache, dirX + pd12X, dirY + pd12Y, dirZ + pd12Z);
 
-		int cornerPP = cache.getBlockId(dirX + p12X, dirY + p12Y, dirZ + p12Z);
-		int cornerPN = cache.getBlockId(dirX + pd12X, dirY + pd12Y, dirZ + pd12Z);
-		int cornerNP = cache.getBlockId(dirX - pd12X, dirY - pd12Y, dirZ - pd12Z);
-		int cornerNN = cache.getBlockId(dirX - p12X, dirY - p12Y, dirZ - p12Z);
+		int lightPP = fullFace(posZ | posX) != 0 ? light(cache, dirX + p12X, dirY + p12Y, dirZ + p12Z, cornerPP) : 0;
+		int lightPN = fullFace(negZ | posX) != 0 ? light(cache, dirX + pd12X, dirY + pd12Y, dirZ + pd12Z, cornerPN) : 0;
 
-		final float[] uvs = VERT_UVS;
+		int cornerNP = getSolidCached(cache, dirX - pd12X, dirY - pd12Y, dirZ - pd12Z);
+		int cornerNN = getSolidCached(cache, dirX - p12X, dirY - p12Y, dirZ - p12Z);
+
+		int lightNP = fullFace(posZ | negX) != 0 ? light(cache, dirX - pd12X, dirY - pd12Y, dirZ - pd12Z, cornerNP) : 0;
+		int lightNN = fullFace(negZ | negX) != 0 ? light(cache, dirX - p12X, dirY - p12Y, dirZ - p12Z, cornerNN) : 0;
 
 		int shade0 = ao(posZ, posX, cornerPP);
 		int shade1 = ao(negZ, posX, cornerPN);
@@ -144,6 +128,11 @@ public class FullBlockMesher {
 		int shade3 = ao(posZ, negX, cornerNP);
 
 		int lightMap = cache.getLightmapCoord(dirX, dirY, dirZ, 0);
+
+		int lightPZ = light(posZ);
+		int lightPX = light(posX);
+		int lightNZ = light(negZ);
+		int lightNX = light(negX);
 
 		int light0 = avg(avg(lightPP, lightMap), avg(lightPZ, lightPX)); // 0 vertex
 		int light1 = avg(avg(lightPN, lightMap), avg(lightPX, lightNZ)); // 1 vertex
@@ -155,6 +144,7 @@ public class FullBlockMesher {
 		float inverseW = (float) tex.parentAtlas.getInverseWidth();
 		float inverseH = (float) tex.parentAtlas.getInverseWidth();
 
+		final float[] uvs = VERT_UVS;
 		uvs[0] = tex.iconX * inverseW;
 		uvs[1] = tex.iconY * inverseH;
 		uvs[2] = (tex.iconX + tex.width) * inverseW;
@@ -211,24 +201,74 @@ public class FullBlockMesher {
 		}
 	}
 
+	private static int light(int blockCache) {
+		return blockCache >>> 4;
+	}
+
+	private static int light(SectionCache cache, int x, int y, int z, int blockCache) {
+		if (blockCache == ~1) {
+			return cache.getLightmapCoord(x, y, z, 0);
+		}
+
+		return blockCache >>> 4;
+	}
+
+	private static int fullFace(int blockCache) {
+		return blockCache & 0b1;
+	}
+
+	private static int getSolidCached(SectionCache cache, int x, int y, int z) {
+		int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
+
+		int blockX = x - cache.blockX;
+		int blockY = y - cache.blockY;
+		int blockZ = z - cache.blockZ;
+
+		int sectionIndex = SectionCache.sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
+		int solidBlock = BlocksFlags.SOLID_LIGHT_MASK[SectionCache.SECTION_BLOCKS[sectionIndex][blockIndex]];
+
+		if (solidBlock == 1) {
+			return (0 << 4) | solidBlock;
+		}
+
+		return ~1;
+	}
+
+	private static int getBlockCached(SectionCache cache, int x, int y, int z) {
+		int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
+
+		int blockX = x - cache.blockX;
+		int blockY = y - cache.blockY;
+		int blockZ = z - cache.blockZ;
+
+		int sectionIndex = SectionCache.sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
+		int solidBlock = BlocksFlags.SOLID_LIGHT_MASK[SectionCache.SECTION_BLOCKS[sectionIndex][blockIndex]];
+
+		if (solidBlock == 1) {
+			return (0 << 4) | solidBlock;
+		}
+
+		int skyLight = SectionCache.getNibble(SectionCache.SKY_LIGHT[sectionIndex], blockIndex);
+		int blockLight = SectionCache.getNibble(SectionCache.BLOCK_LIGHT[sectionIndex], blockIndex);
+
+		return LightmapHelper.getLightmapCoord(skyLight, blockLight) << 4;
+	}
+
 	public static void renderFaceNoSmooth(FacingRender facing, IconCoordinate tex, int dir, SectionCache cache, int x, int y, int z, int color) {
-		int dirX = x + Direction.x(dir);
-		int dirY = y + Direction.y(dir);
-		int dirZ = z + Direction.z(dir);
+		Vector3i dirVec = Direction.getDirection(dir);
+
+		int lightMap = cache.getLightmapCoord(x + dirVec.x, y + dirVec.y, z + dirVec.z, 0);
 
 		x &= RegionRender.BLOCK_BITS_X;
 		y &= RegionRender.BLOCK_BITS_Y;
 		z &= RegionRender.BLOCK_BITS_Z;
-
-		final float[] uvs = VERT_UVS;
-
-		int lightMap = cache.getLightmapCoord(dirX, dirY, dirZ, 0);
 
 		VertexWriterManager.getCurrentInstance().ensureCapacity(TerrainFormat.STRIDE * 4);
 
 		float inverseW = (float) tex.parentAtlas.getInverseWidth();
 		float inverseH = (float) tex.parentAtlas.getInverseWidth();
 
+		final float[] uvs = VERT_UVS;
 		uvs[0] = tex.iconX * inverseW;
 		uvs[1] = tex.iconY * inverseH;
 		uvs[2] = (tex.iconX + tex.width) * inverseW;
@@ -270,11 +310,11 @@ public class FullBlockMesher {
 		long ptr = manager.getTotalOffset();
 
 		TerrainFormat.writeTerrainVertex(ptr, relX, relY, relZ, u, v, color, lightMap);
-		manager.addVertexCounter();
+		manager.addVertexCounter(TerrainFormat.STRIDE);
 	}
 
-	public static int br(boolean full) {
-		return full ? LIGHT_REDUCE : 0;
+	public static int br(int full) {
+		return -full & LIGHT_REDUCE;
 	}
 
 	public static int full(int blockId) {
@@ -285,20 +325,22 @@ public class FullBlockMesher {
 	public static final int CORNER_LIGHT = 256 - ((LIGHT_REDUCE * 3) >> 2);
 
 	public static int ao(int pos1, int pos2, int corner) {
-		int fullP1 = full(pos1);
-		int fullP2 = full(pos2);
-		int fullC = full(corner);
+		pos1 &= 1;
+		pos2 &= 1;
+		corner &= 1;
 
-		int fullXorP = fullP1 ^ fullP2;
+		int fullXorP = pos1 ^ pos2;
 
-		int factor = fullC == 1 && fullXorP == 0 ? CORNER_LIGHT - ((fullP1 | fullP2) << 8) : 256;
+		int factor = 256;
 
-		if (fullC == 0) {
-			factor += 20;
+		if (corner == 1 && fullXorP == 0) {
+			factor = CORNER_LIGHT - ((pos1 | pos2) << 8);
+		} else if (corner == 0) {
+			factor -= 20;
 		}
 
-		factor -= br(fullP1 == 1);
-		factor -= br(fullP2 == 1);
+		factor -= br(pos1);
+		factor -= br(pos2);
 
 		return Math.min(Math.max(factor, 65), 255);
 	}

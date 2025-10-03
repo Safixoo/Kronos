@@ -1,6 +1,8 @@
 package turniplabs.examplemod.client.render.util.data;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.render.block.color.BlockColor;
+import net.minecraft.client.render.block.color.BlockColorDispatcher;
 import net.minecraft.client.render.block.model.BlockModel;
 import net.minecraft.client.render.block.model.BlockModelDispatcher;
 import net.minecraft.client.render.block.model.BlockModelStandard;
@@ -15,7 +17,11 @@ import java.lang.reflect.Method;
 public class BlocksFlags {
 	public static final Material[] MATERIAL = new Material[2048];
 	public static final boolean[] SOLID = new boolean[2048];
+
 	public static final byte[] SOLID_LIGHT_MASK = new byte[2048];
+	public static final BlockModel<?>[] BLOCK_MODEL = new BlockModel[2048];
+	public static final BlockColor[] BLOCK_COLOR = new BlockColor[2048];
+
 	public static final boolean[] DIRECT_CULL = new boolean[2048];
 
 	private static int LEAVES_TOP_INDEX = 0;
@@ -40,7 +46,10 @@ public class BlocksFlags {
 	// original method overhead with a more direct call.
 	public static void processModelMethods() {
 		for (int i = 0; i < Blocks.highestBlockId; i++) {
-			BlockModel<?> model = BlockModelDispatcher.getInstance().getDispatch(Blocks.getBlock(i));
+			Block<?> block = Blocks.getBlock(i);
+
+			BlockModel<?> model = BlockModelDispatcher.getInstance().getDispatch(block);
+			BlockColor color = BlockColorDispatcher.getInstance().getDispatch(block);
 			Method method;
 
 			try {
@@ -48,6 +57,9 @@ public class BlocksFlags {
 			} catch (NoSuchMethodException e) {
 				throw new RuntimeException(e);
 			}
+
+			BLOCK_MODEL[i] = model;
+			BLOCK_COLOR[i] = color;
 
 			// what a man does to avoid dynamic dispatch.
 			DIRECT_CULL[i] = method.getDeclaringClass() == BlockModelStandard.class;

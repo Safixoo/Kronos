@@ -88,6 +88,11 @@ public class VertexWriterManager {
 		this.vertices++;
 	}
 
+	public void addVertexCounter(int stride) {
+		this.offset += stride;
+		this.vertices++;
+	}
+
 	public void addVertex() {
 		int stride = this.vertexFormat.getStride();
 

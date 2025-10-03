@@ -214,10 +214,6 @@ public class SectionManager {
 		return new CameraData(fractX, fractY, fractZ, playerX, playerY, playerZ, renderDistance);
 	}
 
-	// TODO: Move this later, and if a section is marked dirty between the time, use a auxiliary array
-	//  and check every section update if the marked dirty section based on distance should be meshed
-	//  first. If a lot of time pass between this method and vanilla updateRenderer maybe as well, queue
-	//  some sections if it is async.
 	private void queueRebuilds(float partialTick) {
 		long currentTime = System.nanoTime();
 		long currentDiff = this.lastFrameTime == 0 ? 200_000_000 : currentTime - this.lastFrameTime;
@@ -281,7 +277,7 @@ public class SectionManager {
 		int lastChunkCameraZ = posToSectionIntegral(this.lastUpdateZ);
 
 		int lastChunkRemoveX = posToSectionIntegral(this.lastRemoveX);
-		int lastChunkRemoveZ = posToSectionIntegral(this.lastUpdateZ);
+		int lastChunkRemoveZ = posToSectionIntegral(this.lastRemoveZ);
 
 		int currentCameraX = posToSectionIntegral(this.camera.intX);
 		int currentCameraZ = posToSectionIntegral(this.camera.intZ);

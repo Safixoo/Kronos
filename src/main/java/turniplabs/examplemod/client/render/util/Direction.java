@@ -1,6 +1,7 @@
 package turniplabs.examplemod.client.render.util;
 
 import net.minecraft.core.util.helper.Side;
+import org.joml.Vector3i;
 
 public class Direction {
 	public static final int DOWN    = 0;
@@ -14,6 +15,8 @@ public class Direction {
 
 	private static final Side[] ENUMS;
 	private static final byte[] X, Y, Z;
+
+	private static final Vector3i[] DIRECTIONS = new Vector3i[COUNT];
 
 	static {
 		X = new byte[COUNT];
@@ -35,6 +38,10 @@ public class Direction {
 		ENUMS[SOUTH] = Side.SOUTH;
 		ENUMS[WEST] = Side.WEST;
 		ENUMS[EAST] = Side.EAST;
+
+		for (int dir = 0; dir < COUNT; dir++) {
+			DIRECTIONS[dir] = new Vector3i(X[dir], Y[dir], Z[dir]);
+		}
 	}
 
 	public static int opposite(int direction) {
@@ -59,6 +66,10 @@ public class Direction {
 
 	public static byte z(int direction) {
 		return Z[direction];
+	}
+
+	public static Vector3i getDirection(int index) {
+		return DIRECTIONS[index];
 	}
 
 	public static Side toEnum(int direction) {

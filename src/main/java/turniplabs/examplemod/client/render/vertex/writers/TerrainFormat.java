@@ -3,7 +3,6 @@ package turniplabs.examplemod.client.render.vertex.writers;
 import com.google.common.collect.ImmutableList;
 import net.minecraft.core.util.helper.MathHelper;
 import org.lwjgl.system.MemoryUtil;
-import turniplabs.examplemod.client.render.region.RegionRender;
 import turniplabs.examplemod.client.render.vertex.VertexWriterManager;
 import turniplabs.examplemod.client.render.vertex.format.VertexFormat;
 import turniplabs.examplemod.client.render.vertex.operations.VertexAttribute;
@@ -89,11 +88,11 @@ public class TerrainFormat extends VertexFormat {
 		MemoryUtil.memPutLong(ptr, position);
 		MemoryUtil.memPutInt(ptr + 8, processUv(u, v));
 		MemoryUtil.memPutInt(ptr + 12, color & 0xFF_FF_FF);
-		MemoryUtil.memPutInt(ptr + 15, getLightmap8Bit(lightMap));
+		MemoryUtil.memPutInt(ptr + 15, compressLightmap(lightMap));
 	}
 
 	// skylight << 20 | blocklight << 4
-	private static int getLightmap8Bit(int lightmap) {
+	private static int compressLightmap(int lightmap) {
 		int skyLight4 = (lightmap >>> 20) & 0xF;
 		int blockLight4 = (lightmap >>> 4) & 0xF;
 

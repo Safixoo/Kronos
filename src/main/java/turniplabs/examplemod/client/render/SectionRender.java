@@ -3,15 +3,10 @@ package turniplabs.examplemod.client.render;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.render.RenderBlocks;
 import net.minecraft.client.render.block.color.BlockColor;
-import net.minecraft.client.render.block.color.BlockColorDispatcher;
 import net.minecraft.client.render.block.model.BlockModel;
-import net.minecraft.client.render.block.model.BlockModelDispatcher;
 import net.minecraft.client.render.block.model.BlockModelGrass;
-import net.minecraft.client.render.block.model.BlockModelLeaves;
 import net.minecraft.client.render.terrain.ChunkRenderer;
 import net.minecraft.client.render.tessellator.Tessellator;
-import net.minecraft.core.block.Block;
-import net.minecraft.core.block.Blocks;
 import net.minecraft.core.world.World;
 import turniplabs.examplemod.client.render.meshing.FullBlockMesher;
 import turniplabs.examplemod.client.render.region.RegionRender;
@@ -23,6 +18,10 @@ import turniplabs.examplemod.client.render.util.data.BlocksFlags;
 import turniplabs.examplemod.client.render.util.Direction;
 import turniplabs.examplemod.client.render.vertex.format.DefaultVertexFormats;
 
+import static turniplabs.examplemod.client.render.meshing.SectionCache.makeBlockIndex;
+import static turniplabs.examplemod.client.render.util.Direction.*;
+import static turniplabs.examplemod.client.render.util.Direction.EAST;
+
 // Saves basic info for each section from the world, is used mostly for culling and
 // meshing, rendering is almost only managed in the RegionRender in an objectless fashion.
 public class SectionRender {
@@ -32,7 +31,7 @@ public class SectionRender {
 	// Section position relative to blocks.
 	public int blockX, blockY, blockZ;
 
-	public /* ubyte */ int regionIndex;
+	public int regionIndex;
 
 	// Adjacent nodes that searched during BFS culling, done like this
 	// to avoid array dereferences and checks, inspired from Sodium.
@@ -75,72 +74,54 @@ public class SectionRender {
 
 		this.prepareWriterForTerrain(translucentWriter);
 
-		int solidBlocks = 0;
-		int[] solidFaces = new int[Direction.COUNT];
-
-		int lastBlockId = -1;
-		BlockColor lastBlockColor = null;
-		BlockModel<?> lastModel = null;
+		int[] solidFaces = new int[Direction.COUNT + 1];
+		boolean ambient = Minecraft.getMinecraft().gameSettings.ambientOcclusion.value;
 
 		long start = System.nanoTime();
-		boolean useAmbientOcc = Minecraft.getMinecraft().gameSettings.ambientOcclusion.value;
 
 		if (!sectionCache.isSectionEmpty()) {
+			// 15x15x15 center blocks.
+			for (int y = 1; y < 15; y++) {
+				for (int z = 1; z < 15; z++) {
+					for (int x = 1; x < 15; x++) {
+						this.meshBlockCenter(renderBlocks, sectionCache, x, y, z, solidFaces, ambient);
+					}
+				}
+			}
+
+			// +-X face
 			for (int y = 0; y < 16; y++) {
 				for (int z = 0; z < 16; z++) {
-					for (int x = 0; x < 16; x++) {
-						int blockId = sectionCache.getBlockIdCenter(x, y, z);
+					this.meshBlock(renderBlocks, sectionCache, 15, y, z, solidFaces, ambient);
+				}
+			}
+			for (int y = 0; y < 16; y++) {
+				for (int z = 0; z < 16; z++) {
+					this.meshBlock(renderBlocks, sectionCache, 0, y, z, solidFaces, ambient);
+				}
+			}
 
-						if (blockId == AIR_ID) {
-							continue;
-						}
+			// -+Y face
+			for (int z = 0; z < 16; z++) {
+				for (int x = 1; x < 15; x++) {
+					this.meshBlock(renderBlocks, sectionCache, x, 15, z, solidFaces, ambient);
+				}
+			}
+			for (int z = 0; z < 16; z++) {
+				for (int x = 1; x < 15; x++) {
+					this.meshBlock(renderBlocks, sectionCache, x, 0, z, solidFaces, ambient);
+				}
+			}
 
-						BlockColor blockColor;
-						BlockModel<?> blockModel;
-
-						if (lastBlockId == blockId) {
-							blockModel = lastModel;
-							blockColor = lastBlockColor;
-						} else {
-							Block<?> block = Blocks.getBlock(blockId);
-							blockModel = lastModel = BlockModelDispatcher.getInstance().getDispatch(block);
-							blockColor = lastBlockColor = BlockColorDispatcher.getInstance().getDispatch(block);
-							lastBlockId = blockId;
-						}
-
-						BlockModel<?> model = blockModel;
-						int blockRenderPass = model.renderLayer();
-
-						int blockX = x + minX;
-						int blockY = y + minY;
-						int blockZ = z + minZ;
-
-						if (BlocksFlags.SOLID[blockId]) {
-							if (y == 15) solidFaces[Direction.UP]++;
-							if (y == 0) solidFaces[Direction.DOWN]++;
-
-							if (x == 15) solidFaces[Direction.EAST]++;
-							if (x == 0) solidFaces[Direction.WEST]++;
-
-							if (z == 15) solidFaces[Direction.SOUTH]++;
-							if (z == 0) solidFaces[Direction.NORTH]++;
-
-							solidBlocks++;
-						}
-
-						if (BlocksFlags.SOLID_LIGHT_MASK[blockId] != 0) {
-							Class<?> modelClass = model.getClass();
-							FullBlockMesher.renderFaces(model, blockColor, sectionCache, blockX, blockY, blockZ, modelClass == BlockModelGrass.class, useAmbientOcc, blockId);
-						} else {
-							if (blockRenderPass != 0) {
-								VertexWriterManager.setCurrentInstance(VertexWriterManager.TRANSLUCENT);
-							} else {
-								VertexWriterManager.setCurrentInstance(VertexWriterManager.SOLID[MeshDirection.GENERIC]);
-							}
-
-							this.renderBlock(Tessellator.instance, renderBlocks, model, blockX, blockY, blockZ);
-						}
-					}
+			// -+Z face
+			for (int y = 1; y < 15; y++) {
+				for (int x = 1; x < 15; x++) {
+					this.meshBlock(renderBlocks, sectionCache, x, y, 15, solidFaces, ambient);
+				}
+			}
+			for (int y = 1; y < 15; y++) {
+				for (int x = 1; x < 15; x++) {
+					this.meshBlock(renderBlocks, sectionCache, x, y, 0, solidFaces, ambient);
 				}
 			}
 		}
@@ -150,8 +131,8 @@ public class SectionRender {
 		samples++;
 		timePassed += end - start;
 
-		if (samples == 1600) {
-			System.out.println("Time passed prom: " + ((timePassed / 1600f) / 1_000_000f) + "ms");
+		if (samples == 8000) {
+			System.out.println("Time passed prom: " + ((timePassed / 8000) / 1_000_000f) + "ms");
 			samples = 0;
 			timePassed = 0;
 		}
@@ -173,6 +154,7 @@ public class SectionRender {
 		int nonEmptyTranslucent = (translucentDrawMask << 1) & 0b10;
 		int nonEmptySolid = solidDrawMask != 0 ? 0b01 : 0;
 
+		int solidBlocks = solidFaces[COUNT];
 		boolean emptySolid = solidBlocks == 4096 && sumVertices == 0;
 
 		this.flags = SectionFlags.setDirty(this.flags, false);
@@ -192,6 +174,96 @@ public class SectionRender {
 
 		translucentWriter.stopDrawing();
 	}
+
+	private void meshBlockCenter(RenderBlocks renderBlocks, SectionCache cache, int x, int y, int z, int[] solidBlocks, boolean ambient) {
+		int blockId = cache.getBlockIdCenter(x, y, z);
+
+		if (blockId == AIR_ID) {
+			return;
+		}
+
+		BlockColor blockColor = BlocksFlags.BLOCK_COLOR[blockId];
+		BlockModel<?> blockModel = BlocksFlags.BLOCK_MODEL[blockId];
+		int blockRenderPass = blockModel.renderLayer();
+
+		int blockX = x + this.blockX, blockY = y + this.blockY, blockZ = z + this.blockZ;
+
+		if (BlocksFlags.SOLID_LIGHT_MASK[blockId] != 0) {
+			solidBlocks[Direction.COUNT]++;
+
+			int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
+			int drawBitSet = 0;
+
+			drawBitSet |= cache.isBlockOpaqueCubeCenter(blockIndex + makeBlockIndex(0,1,0)) << UP;
+			drawBitSet |= cache.isBlockOpaqueCubeCenter(blockIndex - makeBlockIndex(0,1,0)) << DOWN;
+			drawBitSet |= cache.isBlockOpaqueCubeCenter(blockIndex - makeBlockIndex(0,0,1)) << NORTH;
+			drawBitSet |= cache.isBlockOpaqueCubeCenter(blockIndex + makeBlockIndex(0,0,1)) << SOUTH;
+			drawBitSet |= cache.isBlockOpaqueCubeCenter(blockIndex - makeBlockIndex(1,0,0)) << WEST;
+			drawBitSet |= cache.isBlockOpaqueCubeCenter(blockIndex + makeBlockIndex(1,0,0)) << EAST;
+
+			FullBlockMesher.renderFaces(blockModel, blockColor, cache, blockX, blockY, blockZ, blockModel.getClass() == BlockModelGrass.class, ambient, ~drawBitSet, blockId);
+		} else {
+			if (blockRenderPass != 0) {
+				VertexWriterManager.setCurrentInstance(VertexWriterManager.TRANSLUCENT);
+			} else {
+				VertexWriterManager.setCurrentInstance(VertexWriterManager.SOLID[MeshDirection.GENERIC]);
+			}
+
+			this.renderBlock(Tessellator.instance, renderBlocks, blockModel, blockX, blockY, blockZ);
+		}
+	}
+
+	private void meshBlock(RenderBlocks renderBlocks, SectionCache cache, int x, int y, int z, int[] solidBlocks, boolean ambient) {
+		int blockId = cache.getBlockIdCenter(x, y, z);
+
+		if (blockId == AIR_ID) {
+			return;
+		}
+
+		BlockColor blockColor = BlocksFlags.BLOCK_COLOR[blockId];
+		BlockModel<?> blockModel = BlocksFlags.BLOCK_MODEL[blockId];
+		int blockRenderPass = blockModel.renderLayer();
+
+		int blockX = x + this.blockX;
+		int blockY = y + this.blockY;
+		int blockZ = z + this.blockZ;
+
+		if (BlocksFlags.SOLID_LIGHT_MASK[blockId] != 0) {
+			if (y == 0 || y == 15) {
+				solidBlocks[Direction.DOWN + (y & 1)]++;
+			}
+			if (x == 0 || x == 15) {
+				solidBlocks[Direction.WEST + (x & 1)]++;
+			}
+			if (z == 0 || z == 15) {
+				solidBlocks[Direction.NORTH + (z & 1)]++;
+			}
+
+			int rX = x + 16;
+			int rY = y + 16;
+			int rZ = z + 16;
+			int drawBitSet = 0;
+
+			drawBitSet |= cache.isBlockOpaqueCubeRel(rX, rY + 1, rZ) << UP;
+			drawBitSet |= cache.isBlockOpaqueCubeRel(rX, rY - 1, rZ) << DOWN;
+			drawBitSet |= cache.isBlockOpaqueCubeRel(rX, rY, rZ - 1) << NORTH;
+			drawBitSet |= cache.isBlockOpaqueCubeRel(rX, rY, rZ + 1) << SOUTH;
+			drawBitSet |= cache.isBlockOpaqueCubeRel(rX - 1, rY, rZ) << WEST;
+			drawBitSet |= cache.isBlockOpaqueCubeRel(rX + 1, rY, rZ) << EAST;
+
+			solidBlocks[Direction.COUNT]++;
+			FullBlockMesher.renderFaces(blockModel, blockColor, cache, blockX, blockY, blockZ, false, ambient, ~drawBitSet, blockId);
+		} else {
+			if (blockRenderPass != 0) {
+				VertexWriterManager.setCurrentInstance(VertexWriterManager.TRANSLUCENT);
+			} else {
+				VertexWriterManager.setCurrentInstance(VertexWriterManager.SOLID[MeshDirection.GENERIC]);
+			}
+
+			this.renderBlock(Tessellator.instance, renderBlocks, blockModel, blockX, blockY, blockZ);
+		}
+	}
+
 
 	static long samples = 0;
 	static long timePassed = 0;
