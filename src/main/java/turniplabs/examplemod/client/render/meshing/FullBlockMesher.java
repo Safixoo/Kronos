@@ -322,7 +322,7 @@ public class FullBlockMesher {
 	}
 
 	public static final int LIGHT_REDUCE = 102;
-	public static final int CORNER_LIGHT = 256 - ((LIGHT_REDUCE * 3) >> 2);
+	public static final int CORNER_LIGHT = 256 - LIGHT_REDUCE;
 
 	public static int ao(int pos1, int pos2, int corner) {
 		pos1 &= 1;
@@ -335,8 +335,6 @@ public class FullBlockMesher {
 
 		if (corner == 1 && fullXorP == 0) {
 			factor = CORNER_LIGHT - ((pos1 | pos2) << 8);
-		} else if (corner == 0) {
-			factor -= 20;
 		}
 
 		factor -= br(pos1);
