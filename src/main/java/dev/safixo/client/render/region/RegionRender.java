@@ -313,7 +313,7 @@ public class RegionRender {
 			index++;
 		}
 
-		boolean canBeCached = index < maxIndex;
+		boolean canBeCached = index == maxIndex;
 
 		// A mismatch was found, copy the indices from the mismatch index.
 		while (index < maxIndex) {

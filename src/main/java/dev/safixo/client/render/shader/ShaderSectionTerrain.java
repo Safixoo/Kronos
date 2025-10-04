@@ -110,7 +110,7 @@ public class ShaderSectionTerrain {
 	}
 
 	public void setupRegionOffset(CameraData camera, int regionX, int regionY, int regionZ) {
-		// First the integer substraction to avoid float precision loss.
+		// First the integer subtraction to avoid float precision loss.
 		float offsetX = (regionX - camera.intX) - camera.fractX;
 		float offsetY = (regionY - camera.intY) - camera.fractY;
 		float offsetZ = (regionZ - camera.intZ) - camera.fractZ;

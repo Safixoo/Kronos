@@ -9,12 +9,6 @@ import dev.safixo.client.render.vertex.operations.VertexAttribute;
 
 import static dev.safixo.client.render.region.RegionRender.*;
 
-// In difference with modern Minecraft, beta seems to not use a lighting
-// attribute (???), it simply uses lighting baked in color attribute.
-// Which makes the difference in whereas not using lighting baked in a
-// texture it doesn't produces as smoothly chunk transitions as it has
-// to redo the vertex data to change lighting, which makes the rare transitions
-// at the morning/afternoon of the game.
 public class TerrainFormat extends VertexFormat {
 	public static final int STRIDE = 16;
 

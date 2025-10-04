@@ -77,8 +77,6 @@ public class SectionRender {
 		int[] solidFaces = new int[Direction.COUNT + 1];
 		boolean ambient = Minecraft.getMinecraft().gameSettings.ambientOcclusion.value;
 
-		long start = System.nanoTime();
-
 		if (!sectionCache.isSectionEmpty()) {
 			// 15x15x15 center blocks.
 			for (int y = 1; y < 15; y++) {
@@ -124,17 +122,6 @@ public class SectionRender {
 					this.meshBlock(renderBlocks, sectionCache, x, y, 0, solidFaces, ambient);
 				}
 			}
-		}
-
-		long end = System.nanoTime();
-
-		samples++;
-		timePassed += end - start;
-
-		if (samples == 8000) {
-			System.out.println("Time passed prom: " + ((timePassed / 8000) / 1_000_000f) + "ms");
-			samples = 0;
-			timePassed = 0;
 		}
 
 		this.processCullFaces(solidFaces);

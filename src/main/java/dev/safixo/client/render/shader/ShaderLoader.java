@@ -6,6 +6,7 @@ import dev.safixo.KronosMod;
 import java.io.*;
 
 public class ShaderLoader {
+	private static final boolean OUTPUT_SHADER_CODE = false;
 	private static final String SHADER_PATH = "shaders/";
 
 	public static void compileShader(String relPath, int shaderId) {
@@ -37,8 +38,8 @@ public class ShaderLoader {
 			KronosMod.LOGGER.error(shaderLog);
 		}
 
-		if (false) {
-			System.out.println(shaderData);
+		if (OUTPUT_SHADER_CODE) {
+			KronosMod.LOGGER.debug(shaderData);
 		}
 
 		GL20.glCompileShader(shaderId);

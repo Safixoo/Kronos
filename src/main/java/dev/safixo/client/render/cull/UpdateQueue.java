@@ -5,11 +5,11 @@ import dev.safixo.client.render.SectionRender;
 import java.util.Arrays;
 
 public class UpdateQueue {
-	public static final SectionRender[] UPDATE_QUEUE = new SectionRender[64];
+	public static final SectionRender[] UPDATE_QUEUE = new SectionRender[128];
 	public static int UPDATE_POSITION = 0;
 
 	public static void addToQueue(SectionRender render) {
-		if (UPDATE_POSITION == 64) {
+		if (UPDATE_POSITION == 128) {
 			return;
 		}
 
@@ -21,7 +21,7 @@ public class UpdateQueue {
 	}
 
 	public static boolean hasSpace() {
-		return UPDATE_POSITION < 64;
+		return UPDATE_POSITION < 128;
 	}
 
 	public static void clear() {

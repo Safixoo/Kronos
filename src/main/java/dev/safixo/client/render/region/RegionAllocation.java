@@ -13,8 +13,6 @@ public class RegionAllocation {
 	private static final int MIN_ALLOC = 1024 * 256;
 	private static final int STRIDE = TerrainFormat.STRIDE;
 
-	private static int GL31_SUPPORT = -1;
-
 	public RegionVertexBuffer vertexBuffer;
 
 	public long offset;
@@ -34,11 +32,6 @@ public class RegionAllocation {
 
 		if (SPARE_BUFFER == null) {
 			SPARE_BUFFER = new RegionVertexBuffer(SPARE_BUFFER_ALLOC, GL15.GL_DYNAMIC_COPY);
-		}
-
-		if (GL31_SUPPORT == -1) {
-			ContextCapabilities cap = GLContext.getCapabilities();
-			GL31_SUPPORT = (cap.GL_ARB_copy_buffer || cap.OpenGL31) ? 1 : 0;
 		}
 
 		this.vertexBuffer = new RegionVertexBuffer(newCapacity);
@@ -74,13 +67,12 @@ public class RegionAllocation {
 
 		SectionManager.getCurrentInstance().removeMemory(this.capacity);
 
-		// If there isn't OpenGL support for using a copy function, or it has been
-		// overpassed the copying buffer limit, do mental gymnastics.
-		if (newSize > SPARE_BUFFER_ALLOC || GL31_SUPPORT == 0) {
+		// If it has been overpassed the copying buffer limit, do mental gymnastics.
+		if (newSize > SPARE_BUFFER_ALLOC) {
 
 			// If the region is more than 64MB avoid allocating a temporal buffer as is preferred
 			// to not duplicate that much memory.
-			if (this.offset > (64 << 20) || GL31_SUPPORT == 0) {
+			if (this.offset > (64 << 20)) {
 				this.vertexBuffer.allocateSpace(newSize);
 
 				Allocation alloc = this.firstEntry;
