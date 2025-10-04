@@ -1,37 +1,40 @@
-# Example Mod
+# ♣️ Kronos Renderer
 
-Template for making Babric mods for BTA!
+Kronos *is for now* a terrain renderer replacement structured upon and for 
+old versions of Minecraft, it has many inspirations from Sodium and previous
+work, but it benefits greatly from being targeted and optimized for old versions
+which have some different architecture and compatibility concerns.
 
-**Note: *DO NOT fork this repository unless you want to contribute!***
+## ⚠️ Compatibility
 
-## Prerequisites
-- JDK for Java 17 ([Eclipse Temurin](https://adoptium.net/temurin/releases/) recommended)
-- [Intellij IDEA](https://www.jetbrains.com/idea/download/) (Scroll down for the free community edition, if using linux **DO NOT** use the flatpak distribution)
-- Minecraft Development plugin (Optional, but highly recommended)
+The mod is still in development and far from well tested, for reporting bugs, compatibility
+problems, vanilla deviations and general concerns, please report a issue in the repository.
 
-## Setup instructions
-   
+## ☢️ Optimizations/Implementation
 
-1. Click the `Use this template` button on this repo's page above (Will only appear if logged in). Choose `Create a new repository`, you will be redirected to a new page. Enter your repo's name and description, and hit `Create repository`.  
-   To get your project, open IntelliJ IDEA and click `Clone Repository` (`Get from VCS` on older versions). Select `Repository URL` and enter your repo's url
+The main premise of the mod is that the terrain loop with a more optimized totally different
+rendering path that doesn't build upon legacy brain-fart code, between all the characteristics,
+these are the main ones:
 
-2. After the project has finished importing, close it and open it again.  
-   If that does not work, open the right sidebar with `Gradle` on it, open `Tasks` > `fabric` and run `ideaSyncTask`.
+- Uses a region draw system that minimizes drawing overhead by setting up work in bigger batches
+  and uses more modern OpenGL rendering techniques.
+- Add more culling in top of vanilla techniques to minimize drawn chunks, as distance culling, 
+  occlusion culling from a graph search and ray-culling, and lastly back-face culling for blocks
+  back-facing.
+- Optimized and rewritten meshing pipeline that in many circumstances can get as much as >x8 faster.
+- Much more compact vertex size (16-bytes), that combined all the culling methods can reduce V-RAM
+  usage >70%.
 
-3. Create a new run configuration by going in `Run > Edit Configurations`.  
-   Then click on the plus icon and select Gradle. In the `Tasks and Arguments` field enter `build`.  
-   Running it will build your finished jar files and put them in `build/libs/`.
+## 🌐 Versions
 
-4. Lastly, open `File` > `Settings` and head to `Build, Execution, Development` > `Build Tools` > `Gradle`.  
-   Make sure `Build and run using` and `Run tests using` is set to `Gradle`.
+For now is only ported for BTA Adventure and 1.6.4 Forge, maybe in the future I maintain as a 
+possibility porting the mod to versions in the range of the betas and <1.6.4 but not forward
+as there is already better maintained optimizations for such versions.
 
-5. Done! Now, all that's left is to change every mention of `examplemod` and `turniplabs` to your own mod id and mod group, respectively. Happy modding!
+## 📠 License
 
-## Tips
+For now is ARR, but it's only for convenience, and for sure in a future I want to use a OSS
+licence or more permissive one to share the work, any concerns about license can also be
+discussed with a issue in the repository.
 
-1. If you haven't already you should join the BTA modding discord! https://discord.gg/FTUNJhswBT
-2. You can set your username when launching the client run configuration by setting `--username <username>` in your program arguments.
-3. When launching the server run configuration you may want to remove the `nogui` program argument in order to see the regular server GUI.
-4. In Intellij you can double press shift or press ctrl+N to search class files, change the search from the default `Project Files` to `All Places` you can easily explore the classes for you dependencies and even BTA itself.
-5. In Intellij if ctrl+left click on a field or method you can quickly get information on when and where that field or method is assign or used.
 
