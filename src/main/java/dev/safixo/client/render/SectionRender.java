@@ -1,13 +1,9 @@
 package dev.safixo.client.render;
 
+import net.minecraft.block.Block;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.render.RenderBlocks;
-import net.minecraft.client.render.block.color.BlockColor;
-import net.minecraft.client.render.block.model.BlockModel;
-import net.minecraft.client.render.block.model.BlockModelGrass;
-import net.minecraft.client.render.terrain.ChunkRenderer;
-import net.minecraft.client.render.tessellator.Tessellator;
-import net.minecraft.core.world.World;
+import net.minecraft.client.renderer.RenderBlocks;
+import net.minecraft.client.renderer.WorldRenderer;
 import dev.safixo.client.render.meshing.FullBlockMesher;
 import dev.safixo.client.render.region.RegionRender;
 import dev.safixo.client.render.util.MeshDirection;
@@ -17,6 +13,7 @@ import dev.safixo.client.render.meshing.SectionCache;
 import dev.safixo.client.render.util.data.BlocksFlags;
 import dev.safixo.client.render.util.Direction;
 import dev.safixo.client.render.vertex.format.DefaultVertexFormats;
+import net.minecraft.world.World;
 
 import static dev.safixo.client.render.meshing.SectionCache.makeBlockIndex;
 import static dev.safixo.client.render.util.Direction.*;
@@ -52,7 +49,7 @@ public class SectionRender {
 	}
 
 	public void rebuild(CameraData camera, SectionManager sectionManager, World world) {
-		ChunkRenderer.updates++;
+		WorldRenderer.chunksUpdated++;
 
 		int minX = this.blockX;
 		int minY = this.blockY;
@@ -64,7 +61,6 @@ public class SectionRender {
 
 		SectionCache sectionCache = new SectionCache(world, minX - 1, minY - 1, minZ - 1, maxX + 1, maxY + 1, maxZ + 1);
 		RenderBlocks renderBlocks = new RenderBlocks(sectionCache);
-		BlockModel.setRenderBlocks(renderBlocks);
 
 		VertexWriterManager translucentWriter = VertexWriterManager.TRANSLUCENT;
 
@@ -169,9 +165,8 @@ public class SectionRender {
 			return;
 		}
 
-		BlockColor blockColor = BlocksFlags.BLOCK_COLOR[blockId];
-		BlockModel<?> blockModel = BlocksFlags.BLOCK_MODEL[blockId];
-		int blockRenderPass = blockModel.renderLayer();
+		Block block = Block.blocksList[blockId];
+		int blockRenderPass = block.getRenderBlockPass();
 
 		int blockX = x + this.blockX, blockY = y + this.blockY, blockZ = z + this.blockZ;
 
@@ -188,7 +183,7 @@ public class SectionRender {
 			drawBitSet |= cache.isBlockOpaqueCubeCenter(blockIndex - makeBlockIndex(1,0,0)) << WEST;
 			drawBitSet |= cache.isBlockOpaqueCubeCenter(blockIndex + makeBlockIndex(1,0,0)) << EAST;
 
-			FullBlockMesher.renderFaces(blockModel, blockColor, cache, blockX, blockY, blockZ, blockModel.getClass() == BlockModelGrass.class, ambient, ~drawBitSet, blockId);
+			FullBlockMesher.renderFaces(block, cache, blockX, blockY, blockZ, ambient, ~drawBitSet, blockId);
 		} else {
 			if (blockRenderPass != 0) {
 				VertexWriterManager.setCurrentInstance(VertexWriterManager.TRANSLUCENT);
@@ -196,7 +191,7 @@ public class SectionRender {
 				VertexWriterManager.setCurrentInstance(VertexWriterManager.SOLID[MeshDirection.GENERIC]);
 			}
 
-			this.renderBlock(Tessellator.instance, renderBlocks, blockModel, blockX, blockY, blockZ);
+			renderBlocks.renderBlockByRenderType(block, blockX, blockY, blockZ);
 		}
 	}
 
@@ -207,9 +202,8 @@ public class SectionRender {
 			return;
 		}
 
-		BlockColor blockColor = BlocksFlags.BLOCK_COLOR[blockId];
-		BlockModel<?> blockModel = BlocksFlags.BLOCK_MODEL[blockId];
-		int blockRenderPass = blockModel.renderLayer();
+		Block block = Block.blocksList[blockId];
+		int blockRenderPass = block.getRenderBlockPass();
 
 		int blockX = x + this.blockX;
 		int blockY = y + this.blockY;
@@ -239,7 +233,7 @@ public class SectionRender {
 			drawBitSet |= cache.isBlockOpaqueCubeRel(rX + 1, rY, rZ) << EAST;
 
 			solidBlocks[Direction.COUNT]++;
-			FullBlockMesher.renderFaces(blockModel, blockColor, cache, blockX, blockY, blockZ, false, ambient, ~drawBitSet, blockId);
+			FullBlockMesher.renderFaces(block, cache, blockX, blockY, blockZ, false, ambient, ~drawBitSet, blockId);
 		} else {
 			if (blockRenderPass != 0) {
 				VertexWriterManager.setCurrentInstance(VertexWriterManager.TRANSLUCENT);
@@ -247,7 +241,7 @@ public class SectionRender {
 				VertexWriterManager.setCurrentInstance(VertexWriterManager.SOLID[MeshDirection.GENERIC]);
 			}
 
-			this.renderBlock(Tessellator.instance, renderBlocks, blockModel, blockX, blockY, blockZ);
+			renderBlocks.renderBlockByRenderType(block, blockX, blockY, blockZ);
 		}
 	}
 
@@ -326,19 +320,6 @@ public class SectionRender {
 		writerManager.trasZ = -(this.blockZ & ~RegionRender.BLOCK_BITS_Z);
 
 		writerManager.setVertexFormat(DefaultVertexFormats.TERRAIN_FORMAT);
-	}
-
-	// Default vanilla pipeline.
-	public void renderBlock(Tessellator tessellator, RenderBlocks renderBlocks, BlockModel<?> model, int x, int y, int z) {
-		// Default model,
-		model.render(tessellator, x, y, z);
-
-		// Overlay.
-		if (model.hasOverbright()) {
-			renderBlocks.overbright = true;
-			model.render(tessellator, x, y, z);
-			renderBlocks.overbright = false;
-		}
 	}
 
 	public void setAdjacentNeighbor(SectionRender render, int direction) {

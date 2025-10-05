@@ -34,12 +34,12 @@ public class ShaderLoader {
 		String shaderLog = GL20.glGetShaderInfoLog(shaderId, 250);
 
 		if (!shaderLog.isEmpty()) {
-			KronosMod.LOGGER.error("Shader {} has logged the next info: ", relPath);
-			KronosMod.LOGGER.error(shaderLog);
+			KronosMod.LOGGER.fine("Shader " + relPath + " has logged the next info: ");
+			KronosMod.LOGGER.fine(shaderLog);
 		}
 
 		if (OUTPUT_SHADER_CODE) {
-			KronosMod.LOGGER.debug(shaderData);
+			KronosMod.LOGGER.fine(shaderData);
 		}
 
 		GL20.glCompileShader(shaderId);

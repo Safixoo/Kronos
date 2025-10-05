@@ -4,10 +4,10 @@ import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrays;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.entity.player.PlayerLocal;
-import net.minecraft.core.item.ItemEgg;
-import net.minecraft.core.player.inventory.container.ContainerInventory;
-import net.minecraft.core.world.World;
+import net.minecraft.client.entity.EntityClientPlayerMP;
+import net.minecraft.entity.player.InventoryPlayer;
+import net.minecraft.item.ItemEgg;
+import net.minecraft.world.World;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.opengl.GL11;
 import dev.safixo.client.render.cull.BFSCuller;
@@ -60,7 +60,7 @@ public class SectionManager {
 
 	public static SectionManager getCurrentInstance() {
 		if (INSTANCE == null) {
-			INSTANCE = new SectionManager(Minecraft.getMinecraft().currentWorld);
+			INSTANCE = new SectionManager(Minecraft.getMinecraft().theWorld);
 		}
 
 		return INSTANCE;
@@ -191,8 +191,8 @@ public class SectionManager {
 			this.generateSections();
 		}
 
-		PlayerLocal playerLocal = Minecraft.getMinecraft().thePlayer;
-		ContainerInventory inventory = playerLocal.inventory;
+		EntityClientPlayerMP playerLocal = Minecraft.getMinecraft().thePlayer;
+		InventoryPlayer inventory = playerLocal.inventory;
 
 		if (inventory == null || inventory.getCurrentItem() == null || !(inventory.getCurrentItem().getItem() instanceof ItemEgg)) {
 			this.bfsCuller.init(this.regionManager, this.camera.intX, this.camera.intZ, renderDistance);

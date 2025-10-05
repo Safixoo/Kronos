@@ -1,7 +1,6 @@
 package dev.safixo.client.render.cull;
 
 import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
-import net.minecraft.core.util.helper.MathHelper;
 import dev.safixo.client.render.SectionFlags;
 import dev.safixo.client.render.SectionManager;
 import dev.safixo.client.render.SectionRender;
@@ -11,6 +10,7 @@ import dev.safixo.client.render.region.RegionManager;
 import dev.safixo.client.render.region.RegionRender;
 import dev.safixo.client.render.util.Direction;
 import dev.safixo.client.render.util.MathExt;
+import net.minecraft.util.MathHelper;
 
 public class BFSCuller {
 	public final BFSQueue bfsQueue = new BFSQueue();
@@ -76,9 +76,9 @@ public class BFSCuller {
 	}
 
 	public void updateRenderList(Long2ReferenceOpenHashMap<SectionRender> sectionMap, CameraData camera) {
-		int chunkX = MathHelper.floor(camera.intX);
-		int chunkY = MathHelper.clamp(MathHelper.floor(camera.intY), 0, 255);
-		int chunkZ = MathHelper.floor(camera.intZ);
+		int chunkX = MathExt.floor(camera.intX);
+		int chunkY = MathHelper.clamp_int(MathExt.floor(camera.intY), 0, 255);
+		int chunkZ = MathExt.floor(camera.intZ);
 
 		SectionRender spawn = sectionMap.get(SectionManager.asLong(chunkX >> 4, chunkY >> 4, chunkZ >> 4));
 
@@ -95,9 +95,9 @@ public class BFSCuller {
 			queueRegionNode(this.bfsQueue, spawn, flags);
 		}
 
-		double realRenderDistance = Math.min(FogData.FOG_END / 16.0d, camera.renderDistance);
+		float realRenderDistance = Math.min(FogData.FOG_END / 16.0f, camera.renderDistance);
 
-		double magicOffset = MathHelper.clamp(0, realRenderDistance * -8.0d + 80.0d, 32.0d) - realRenderDistance;
+		double magicOffset = MathHelper.clamp_float(0, realRenderDistance * -8.0f + 80.0f, 32.0f) - realRenderDistance;
 		double maxDistance = Math.min(FogData.FOG_END, camera.renderDistance << 4) + magicOffset;
 
 		bfsSearch(this.bfsQueue, camera.intX, camera.intY, camera.intZ, (int) MathExt.square(maxDistance), this.activeFrame);

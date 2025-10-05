@@ -1,7 +1,7 @@
 package dev.safixo.client.render.vertex;
 
+import dev.safixo.client.render.util.UnsafeUtil;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import org.lwjgl.system.MemoryUtil;
 import dev.safixo.client.render.util.MeshDirection;
 import dev.safixo.client.render.vertex.format.VertexFormat;
 
@@ -109,9 +109,9 @@ public class VertexWriterManager {
 	}
 
 	public void clear() {
-		MemoryUtil.nmemFree(this.vertexPtr);
+		UnsafeUtil.nmemFree(this.vertexPtr);
 
-		this.vertexPtr = MemoryUtil.NULL;
+		this.vertexPtr = UnsafeUtil.NULL;
 		this.offset = 0;
 		this.vertices = 0;
 	}
@@ -130,9 +130,9 @@ public class VertexWriterManager {
 	private void grow(long minSize) {
 		long newCapacity = Math.max((this.capacity * 3) >> 1, minSize);
 
-		long newVertexPtr = MemoryUtil.nmemAlloc(newCapacity);
-		MemoryUtil.memCopy(this.vertexPtr, newVertexPtr, this.offset);
-		MemoryUtil.nmemFree(this.vertexPtr);
+		long newVertexPtr = UnsafeUtil.nmemAlloc(newCapacity);
+		UnsafeUtil.memCopy(this.vertexPtr, newVertexPtr, this.offset);
+		UnsafeUtil.nmemFree(this.vertexPtr);
 
 		this.capacity = newCapacity;
 		this.vertexPtr = newVertexPtr;

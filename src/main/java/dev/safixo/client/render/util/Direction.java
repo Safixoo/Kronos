@@ -1,7 +1,7 @@
 package dev.safixo.client.render.util;
 
-import net.minecraft.core.util.helper.Side;
-import org.joml.Vector3i;
+import dev.safixo.client.render.util.math.Vector3i;
+import net.minecraftforge.common.ForgeDirection;
 
 public class Direction {
 	public static final int DOWN    = 0;
@@ -13,7 +13,7 @@ public class Direction {
 
 	public static final int COUNT   = 6;
 
-	private static final Side[] ENUMS;
+	private static final ForgeDirection[] ENUMS;
 	private static final byte[] X, Y, Z;
 
 	private static final Vector3i[] DIRECTIONS = new Vector3i[COUNT];
@@ -31,13 +31,13 @@ public class Direction {
 		Z[NORTH] = -1;
 		Z[SOUTH] = 1;
 
-		ENUMS = new Side[COUNT];
-		ENUMS[DOWN] = Side.BOTTOM;
-		ENUMS[UP] = Side.TOP;
-		ENUMS[NORTH] = Side.NORTH;
-		ENUMS[SOUTH] = Side.SOUTH;
-		ENUMS[WEST] = Side.WEST;
-		ENUMS[EAST] = Side.EAST;
+		ENUMS = new ForgeDirection[COUNT];
+		ENUMS[DOWN] = ForgeDirection.DOWN;
+		ENUMS[UP] = ForgeDirection.UP;
+		ENUMS[NORTH] = ForgeDirection.NORTH;
+		ENUMS[SOUTH] = ForgeDirection.SOUTH;
+		ENUMS[WEST] = ForgeDirection.WEST;
+		ENUMS[EAST] = ForgeDirection.EAST;
 
 		for (int dir = 0; dir < COUNT; dir++) {
 			DIRECTIONS[dir] = new Vector3i(X[dir], Y[dir], Z[dir]);

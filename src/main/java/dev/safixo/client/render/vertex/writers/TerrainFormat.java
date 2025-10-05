@@ -1,11 +1,13 @@
 package dev.safixo.client.render.vertex.writers;
 
 import com.google.common.collect.ImmutableList;
-import net.minecraft.core.util.helper.MathHelper;
-import org.lwjgl.system.MemoryUtil;
+import dev.safixo.client.render.util.MathExt;
+import dev.safixo.client.render.util.UnsafeUtil;
 import dev.safixo.client.render.vertex.VertexWriterManager;
 import dev.safixo.client.render.vertex.format.VertexFormat;
 import dev.safixo.client.render.vertex.operations.VertexAttribute;
+import net.minecraft.util.MathHelper;
+import org.lwjgl.MemoryUtil;
 
 import static dev.safixo.client.render.region.RegionRender.*;
 
@@ -31,9 +33,9 @@ public class TerrainFormat extends VertexFormat {
 	public void writeVertex(long ptr, int offset) {
 		VertexWriterManager man = VertexWriterManager.getCurrentInstance();
 
-		double posX = MathHelper.clamp(man.x + man.trasX, 0.0f, RADIUS_X << 1);
-		double posY = MathHelper.clamp(man.y + man.trasY, 0.0f, RADIUS_Y << 1);
-		double posZ = MathHelper.clamp(man.z + man.trasZ, 0.0f, RADIUS_Z << 1);
+		double posX = MathExt.clamp(man.x + man.trasX, 0.0f, RADIUS_X << 1);
+		double posY = MathExt.clamp(man.y + man.trasY, 0.0f, RADIUS_Y << 1);
+		double posZ = MathExt.clamp(man.z + man.trasZ, 0.0f, RADIUS_Z << 1);
 
 		writeTerrainVertex(ptr, posX, posY, posZ, man.u, man.v, man.color, man.lightMap);
 	}
@@ -79,10 +81,10 @@ public class TerrainFormat extends VertexFormat {
 
 		long position = processPosition(intX, intY, intZ);
 
-		MemoryUtil.memPutLong(ptr, position);
-		MemoryUtil.memPutInt(ptr + 8, processUv(u, v));
-		MemoryUtil.memPutInt(ptr + 12, color & 0xFF_FF_FF);
-		MemoryUtil.memPutInt(ptr + 15, compressLightmap(lightMap));
+		UnsafeUtil.memPutLong(ptr, position);
+		UnsafeUtil.memPutInt(ptr + 8, processUv(u, v));
+		UnsafeUtil.memPutInt(ptr + 12, color & 0xFF_FF_FF);
+		UnsafeUtil.memPutInt(ptr + 15, compressLightmap(lightMap));
 	}
 
 	// skylight << 20 | blocklight << 4

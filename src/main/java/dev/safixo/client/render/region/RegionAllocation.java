@@ -6,8 +6,6 @@ import dev.safixo.client.render.SectionManager;
 import dev.safixo.client.render.SectionRender;
 import dev.safixo.client.render.vertex.writers.TerrainFormat;
 
-import javax.annotation.Nullable;
-
 public class RegionAllocation {
 	private static final int SPARE_BUFFER_ALLOC = 1024 * 1024 * 16;
 	private static final int MIN_ALLOC = 1024 * 256;
@@ -206,7 +204,7 @@ public class RegionAllocation {
 	}
 
 	// Searches for a space in allocations already freed.
-	private @Nullable Allocation fitInFree(int spaceNeeded) {
+	private Allocation fitInFree(int spaceNeeded) {
 		Allocation alloc = this.freeAllocations;
 
 		// Base case: isn't any free space.
@@ -241,7 +239,7 @@ public class RegionAllocation {
 	}
 
 	// Searches for a previous allocation.
-	public @Nullable Allocation findPrevAlloc(SectionRender render, int side) {
+	public Allocation findPrevAlloc(SectionRender render, int side) {
 		Allocation alloc = this.firstEntry;
 		int sectionId = Allocation.sectionId(render, side);
 

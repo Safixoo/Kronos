@@ -1,14 +1,10 @@
 package dev.safixo.client.render.meshing;
 
-import net.minecraft.client.render.LightmapHelper;
-import net.minecraft.client.render.block.color.BlockColor;
-import net.minecraft.client.render.block.model.BlockModel;
-import net.minecraft.client.render.block.model.BlockModelGrass;
-import net.minecraft.client.render.texture.stitcher.IconCoordinate;
-import net.minecraft.core.util.helper.Side;
-import net.minecraft.core.util.phys.AABB;
-import org.joml.Vector2i;
-import org.joml.Vector3i;
+import dev.safixo.client.render.util.MathExt;
+import dev.safixo.client.render.util.math.Vector2i;
+import dev.safixo.client.render.util.math.Vector3i;
+import net.minecraft.block.Block;
+import net.minecraft.util.Icon;
 import dev.safixo.client.render.region.RegionRender;
 import dev.safixo.client.render.util.data.BlocksFlags;
 import dev.safixo.client.render.util.ColorBGRManager;
@@ -27,60 +23,44 @@ public class FullBlockMesher {
 	private static final Vector2i[] MAP_ID_TO_UV = new Vector2i[4];
 
 	public static final float[] SIDE_LIGHT_MULTIPLIER = new float[] { 0.5F, 1.0F, 0.8F, 0.8F, 0.6F, 0.6F };
-	private static final AABB FULL_BLOCK = AABB.getPermanentBB(0, 0, 0, 1, 1, 1);
 
-	public static void renderFaces(BlockModel<?> model, BlockColor blockColor, SectionCache cache, int x, int y, int z, boolean overlay, boolean ambient, int drawSet, int blockId) {
-		int meta = cache.getBlockMetadataCenter(x, y, z);
-
+	public static void renderFaces(Block block, SectionCache cache, int x, int y, int z, boolean ambient, int drawSet, int blockId) {
 		if (drawSet == 0) {
 			return;
 		}
 
 		if (!BlocksFlags.DIRECT_CULL[blockId]) {
-			drawSet |= model.shouldSideBeRendered(cache, FULL_BLOCK, x, y - 1, z, 0, meta) ? 1 << DOWN : 0;
-			drawSet |= model.shouldSideBeRendered(cache, FULL_BLOCK, x, y + 1, z, 0, meta) ? 1 << UP : 0;
-			drawSet |= model.shouldSideBeRendered(cache, FULL_BLOCK, x, y, z - 1, 0, meta) ? 1 << NORTH : 0;
+			drawSet |= block.shouldSideBeRendered(cache, x, y - 1, z, 0) ? 1 << DOWN : 0;
+			drawSet |= block.shouldSideBeRendered(cache, x, y + 1, z, 1) ? 1 << UP : 0;
+			drawSet |= block.shouldSideBeRendered(cache, x, y, z - 1, 2) ? 1 << NORTH : 0;
 
-			drawSet |= model.shouldSideBeRendered(cache, FULL_BLOCK, x, y, z + 1, 0, meta) ? 1 << SOUTH : 0;
-			drawSet |= model.shouldSideBeRendered(cache, FULL_BLOCK, x - 1, y, z, 0, meta) ? 1 << WEST : 0;
-			drawSet |= model.shouldSideBeRendered(cache, FULL_BLOCK, x + 1, y, z, 0, meta) ? 1 << EAST : 0;
+			drawSet |= block.shouldSideBeRendered(cache, x, y, z + 1, 3) ? 1 << SOUTH : 0;
+			drawSet |= block.shouldSideBeRendered(cache, x - 1, y, z, 4) ? 1 << WEST : 0;
+			drawSet |= block.shouldSideBeRendered(cache, x + 1, y, z, 5) ? 1 << EAST : 0;
 		}
 
-		int modelColor = ColorBGRManager.rgbToBgr(blockColor.getWorldColor(cache, x, y, z));
+		int modelColor = block.getBlockColor();
 
 		for (int dir = 0; dir < Direction.COUNT; dir++) {
 			if ((drawSet & (1 << dir)) == 0) {
 				continue;
 			}
 
-			Side side = Side.sides[dir];
-			IconCoordinate tex = model.getBlockTextureFromSideAndMetadata(side, meta);
-
-			IconCoordinate overlayTex = null;
-			int overlayColor = 0;
-
-			if (overlay) {
-				BlockModelGrass.useOverlay = true;
-				overlayTex = model.getBlockTextureFromSideAndMetadata(side, meta);
-				BlockModelGrass.useOverlay = false;
-				overlayColor = modelColor;
-			}
-
-			boolean colorized = model.shouldSideBeColored(cache, x, y, z, dir, meta);
+			Icon tex = block.getBlockTextureFromSide(dir);
 			VertexWriterManager.setCurrentInstance(VertexWriterManager.SOLID[dir]);
 
 			FacingRender render = FACE_RENDER[dir];
-			int usedColor = !colorized ? SHADE_FULL_COLOR[dir] : ColorBGRManager.multiplyColor(modelColor, SHADE_FULL_FACTOR[dir]);
+			int usedColor = ColorBGRManager.multiplyColor(modelColor, SHADE_FULL_FACTOR[dir]);
 
 			if (ambient) {
-				renderFace(render, overlayTex, tex, dir, cache, x, y, z, usedColor, overlayColor);
+				renderFace(render, tex, dir, cache, x, y, z, usedColor);
 			} else {
 				renderFaceNoSmooth(render, tex, dir, cache, x, y, z, usedColor);
 			}
 		}
 	}
 
-	public static void renderFace(FacingRender facing, IconCoordinate overlay, IconCoordinate tex, int dir, SectionCache cache, int x, int y, int z, int color, int overlayColor) {
+	public static void renderFace(FacingRender facing, Icon tex, int dir, SectionCache cache, int x, int y, int z, int color) {
 		int p1X = facing.aoCornerX0;
 		int p1Y = facing.aoCornerY0;
 		int p1Z = facing.aoCornerZ0;
@@ -141,14 +121,11 @@ public class FullBlockMesher {
 
 		VertexWriterManager.getCurrentInstance().ensureCapacity(TerrainFormat.STRIDE * 4);
 
-		float inverseW = (float) tex.parentAtlas.getInverseWidth();
-		float inverseH = (float) tex.parentAtlas.getInverseWidth();
-
 		final float[] uvs = VERT_UVS;
-		uvs[0] = tex.iconX * inverseW;
-		uvs[1] = tex.iconY * inverseH;
-		uvs[2] = (tex.iconX + tex.width) * inverseW;
-		uvs[3] = (tex.iconY + tex.height) * inverseH;
+		uvs[0] = tex.getMinU();
+		uvs[1] = tex.getMinV();
+		uvs[2] = tex.getMaxU();
+		uvs[3] = tex.getMaxV();
 
 		Vector2i uv0 = MAP_ID_TO_UV[facing.uvData[0]];
 		Vector2i uv1 = MAP_ID_TO_UV[facing.uvData[1]];
@@ -170,34 +147,6 @@ public class FullBlockMesher {
 			addVertex(facing, 0, x, y, z, uvs[uv0.x], uvs[uv0.y], color0, light0);
 			addVertex(facing, 1, x, y, z, uvs[uv1.x], uvs[uv1.y], color1, light1);
 			addVertex(facing, 2, x, y, z, uvs[uv2.x], uvs[uv2.y], color2, light2);
-		}
-
-		if (overlay != null) {
-			color0 = ColorBGRManager.multiplyColor(overlayColor, shade0);
-			color1 = ColorBGRManager.multiplyColor(overlayColor, shade1);
-			color2 = ColorBGRManager.multiplyColor(overlayColor, shade2);
-			color3 = ColorBGRManager.multiplyColor(overlayColor, shade3);
-
-			inverseW = (float) overlay.parentAtlas.getInverseWidth();
-			inverseH = (float) overlay.parentAtlas.getInverseWidth();
-
-			uvs[0] = overlay.iconX * inverseW;
-			uvs[1] = overlay.iconY * inverseH;
-			uvs[2] = (overlay.iconX + overlay.width) * inverseW;
-			uvs[3] = (overlay.iconY + overlay.height) * inverseH;
-
-			if ((color0 > color3 || color2 > color1)) {
-				addVertex(facing, 0, x, y, z, uvs[uv0.x], uvs[uv0.y], color0, light0);
-				addVertex(facing, 1, x, y, z, uvs[uv1.x], uvs[uv1.y], color1, light1);
-				addVertex(facing, 2, x, y, z, uvs[uv2.x], uvs[uv2.y], color2, light2);
-				addVertex(facing, 3, x, y, z, uvs[uv3.x], uvs[uv3.y], color3, light3);
-			} else {
-				addVertex(facing, 3, x, y, z, uvs[uv3.x], uvs[uv3.y], color3, light3);
-				addVertex(facing, 0, x, y, z, uvs[uv0.x], uvs[uv0.y], color0, light0);
-				addVertex(facing, 1, x, y, z, uvs[uv1.x], uvs[uv1.y], color1, light1);
-				addVertex(facing, 2, x, y, z, uvs[uv2.x], uvs[uv2.y], color2, light2);
-			}
-
 		}
 	}
 
@@ -251,10 +200,10 @@ public class FullBlockMesher {
 		int skyLight = SectionCache.getNibble(SectionCache.SKY_LIGHT[sectionIndex], blockIndex);
 		int blockLight = SectionCache.getNibble(SectionCache.BLOCK_LIGHT[sectionIndex], blockIndex);
 
-		return LightmapHelper.getLightmapCoord(skyLight, blockLight) << 4;
+		return MathExt.getLightmapCoord(skyLight, blockLight) << 4;
 	}
 
-	public static void renderFaceNoSmooth(FacingRender facing, IconCoordinate tex, int dir, SectionCache cache, int x, int y, int z, int color) {
+	public static void renderFaceNoSmooth(FacingRender facing, Icon tex, int dir, SectionCache cache, int x, int y, int z, int color) {
 		Vector3i dirVec = Direction.getDirection(dir);
 
 		int lightMap = cache.getLightmapCoord(x + dirVec.x, y + dirVec.y, z + dirVec.z, 0);
@@ -265,14 +214,11 @@ public class FullBlockMesher {
 
 		VertexWriterManager.getCurrentInstance().ensureCapacity(TerrainFormat.STRIDE * 4);
 
-		float inverseW = (float) tex.parentAtlas.getInverseWidth();
-		float inverseH = (float) tex.parentAtlas.getInverseWidth();
-
 		final float[] uvs = VERT_UVS;
-		uvs[0] = tex.iconX * inverseW;
-		uvs[1] = tex.iconY * inverseH;
-		uvs[2] = (tex.iconX + tex.width) * inverseW;
-		uvs[3] = (tex.iconY + tex.height) * inverseH;
+		uvs[0] = tex.getMinU();
+		uvs[1] = tex.getMinV();
+		uvs[2] = tex.getMaxU();
+		uvs[3] = tex.getMaxV();
 
 		Vector2i uv0 = MAP_ID_TO_UV[facing.uvData[0]];
 		Vector2i uv1 = MAP_ID_TO_UV[facing.uvData[1]];

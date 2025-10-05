@@ -1,10 +1,9 @@
 package dev.safixo.client.render.shader;
 
+import dev.safixo.client.render.util.math.Matrix4f;
 import net.minecraft.client.Minecraft;
-import org.joml.Matrix4f;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.opengl.GL20;
-import org.lwjgl.system.MemoryUtil;
 import dev.safixo.KronosMod;
 import dev.safixo.client.render.cull.FrustumCuller;
 import dev.safixo.client.render.util.MathExt;
@@ -33,7 +32,7 @@ public class ShaderSectionTerrain {
 			GL20.glDeleteProgram(this.programId);
 		}
 
-		Minecraft.getMinecraft().hudIngame.addChatMessage("Terrain shaders reloaded!");
+		Minecraft.getMinecraft().ingameGUI.getChatGUI().printChatMessage("Terrain shaders reloaded!");
 
 		this.programId = GL20.glCreateProgram();
 		int vertexShaderId = GL20.glCreateShader(GL20.GL_VERTEX_SHADER);
@@ -47,10 +46,10 @@ public class ShaderSectionTerrain {
 
 		GL20.glLinkProgram(this.programId);
 
-		String error = GL20.glGetProgramInfoLog(this.programId);
+		String error = GL20.glGetProgramInfoLog(this.programId, 200);
 
 		if (!error.isEmpty()) {
-			KronosMod.LOGGER.error("Program logged info {}", error);
+			KronosMod.LOGGER.fine("Program logged info " + error);
 		}
 
 		GL20.glDeleteShader(vertexShaderId);
@@ -87,8 +86,8 @@ public class ShaderSectionTerrain {
 		Matrix4f combinedInv = new Matrix4f();
 		projectionMat.mul(modelViewMat, combinedInv);
 
-		float width = Minecraft.getMinecraft().gameWindow.getWidthPixels();
-		float height = Minecraft.getMinecraft().gameWindow.getHeightPixels();
+		float width = Minecraft.getMinecraft().displayWidth;
+		float height = Minecraft.getMinecraft().displayHeight;
 
 		final Matrix4f fragToNDC = new Matrix4f()
 			.translation(-1, -1, -1)

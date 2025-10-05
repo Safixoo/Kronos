@@ -1,7 +1,7 @@
 package dev.safixo.client.render.region;
 
+import dev.safixo.client.render.util.UnsafeUtil;
 import org.lwjgl.opengl.*;
-import org.lwjgl.system.MemoryUtil;
 import dev.safixo.client.render.SectionManager;
 import dev.safixo.client.render.SectionRender;
 import dev.safixo.client.render.shader.ShaderSectionTerrain;
@@ -50,8 +50,8 @@ public class RegionRender {
 	private RegionAllocation solidBuffer;
 
 	// Draw-data buffers for uploading, and the draw index.
-	private long solidFirst = MemoryUtil.NULL, solidCount = MemoryUtil.NULL;
-	private long translucentFirst = MemoryUtil.NULL, translucentCount = MemoryUtil.NULL;
+	private long solidFirst = UnsafeUtil.NULL, solidCount = UnsafeUtil.NULL;
+	private long translucentFirst = UnsafeUtil.NULL, translucentCount = UnsafeUtil.NULL;
 
 	// struct RegionDrawData[256] {
 	//		// Solid PASS.
@@ -95,14 +95,14 @@ public class RegionRender {
 	}
 
 	private void prepareSolidPtr() {
-		long ptrSolidData = MemoryUtil.nmemAlloc((REGION_SECTION_SIZE * SOLID_DRAWS * Integer.BYTES) * 2);
+		long ptrSolidData = UnsafeUtil.nmemAlloc((REGION_SECTION_SIZE * SOLID_DRAWS * Integer.BYTES) * 2);
 
 		this.solidFirst = ptrSolidData;
 		this.solidCount = ptrSolidData + (REGION_SECTION_SIZE * SOLID_DRAWS * Integer.BYTES);
 	}
 
 	private void prepareTranslucentPtr() {
-		long ptrTranslucentData = MemoryUtil.nmemAlloc((REGION_SECTION_SIZE * Integer.BYTES) * 2);
+		long ptrTranslucentData = UnsafeUtil.nmemAlloc((REGION_SECTION_SIZE * Integer.BYTES) * 2);
 
 		this.translucentFirst = ptrTranslucentData;
 		this.translucentCount = ptrTranslucentData + (REGION_SECTION_SIZE * Integer.BYTES);
@@ -136,18 +136,18 @@ public class RegionRender {
 			this.translucentBuffer = null;
 		}
 
-		if (this.solidFirst != MemoryUtil.NULL) {
-			MemoryUtil.nmemFree(this.solidFirst);
+		if (this.solidFirst != UnsafeUtil.NULL) {
+			UnsafeUtil.nmemFree(this.solidFirst);
 
-			this.solidFirst = MemoryUtil.NULL;
-			this.solidCount = MemoryUtil.NULL;
+			this.solidFirst = UnsafeUtil.NULL;
+			this.solidCount = UnsafeUtil.NULL;
 		}
 
-		if (this.translucentFirst != MemoryUtil.NULL) {
-			MemoryUtil.nmemFree(this.translucentFirst);
+		if (this.translucentFirst != UnsafeUtil.NULL) {
+			UnsafeUtil.nmemFree(this.translucentFirst);
 
-			this.translucentFirst = MemoryUtil.NULL;
-			this.translucentCount = MemoryUtil.NULL;
+			this.translucentFirst = UnsafeUtil.NULL;
+			this.translucentCount = UnsafeUtil.NULL;
 		}
 	}
 
@@ -158,7 +158,7 @@ public class RegionRender {
 			this.solidBuffer = new RegionAllocation(manager.getVertices() * TerrainFormat.STRIDE);
 		}
 
-		if (this.solidFirst == MemoryUtil.NULL) {
+		if (this.solidFirst == UnsafeUtil.NULL) {
 			this.prepareSolidPtr();
 		}
 
@@ -179,7 +179,7 @@ public class RegionRender {
 			this.translucentBuffer = new RegionAllocation(manager.getVertices() * TerrainFormat.STRIDE);
 		}
 
-		if (this.translucentFirst == MemoryUtil.NULL) {
+		if (this.translucentFirst == UnsafeUtil.NULL) {
 			this.prepareTranslucentPtr();
 		}
 
@@ -217,7 +217,7 @@ public class RegionRender {
 	// work between draw which doesn't pressure the driver immediately, also as we work in a "small"
 	// and contiguous data-set we don't get penalized too much for pulling SectionRenders from memory.
 	public void prepareAndDraw(ShaderSectionTerrain shader, CameraData camera, int pass) {
-		if ((pass == 0 && this.solidFirst == MemoryUtil.NULL) || (pass == 1 && this.translucentFirst == MemoryUtil.NULL)) {
+		if ((pass == 0 && this.solidFirst == UnsafeUtil.NULL) || (pass == 1 && this.translucentFirst == UnsafeUtil.NULL)) {
 			return;
 		}
 
@@ -253,7 +253,7 @@ public class RegionRender {
 		int drawCount = 0;
 
 		while (index != end) {
-			int regionIndex = Byte.toUnsignedInt(renderIndices[index]);
+			int regionIndex = renderIndices[index] & 0xFF;
 			int drawMask = drawDataMask[regionIndex];
 
 			drawCount = pass == 0
@@ -288,7 +288,7 @@ public class RegionRender {
 		// Setup camera and region offset.
 		shader.setupRegionOffset(camera, blockRegionX, blockRegionY, blockRegionZ);
 
-		GL15.nglMultiDrawArrays(GL11.GL_QUADS, first, count, drawCount);
+		GL14.glMultiDrawArrays(GL11.GL_QUADS, first, count, drawCount);
 	}
 
 	private boolean shouldUseCachedDraw(CameraData camera) {
@@ -362,8 +362,8 @@ public class RegionRender {
 			// caching technique combined with the batching here, is a nice improvement.
 			if ((first + count) != meshFirst) {
 				if (meshRemaining) {
-					MemoryUtil.memPutInt((drawCount << 2) + this.solidFirst, first);
-					MemoryUtil.memPutInt((drawCount << 2) + this.solidCount, count);
+					UnsafeUtil.memPutInt((drawCount << 2) + this.solidFirst, first);
+					UnsafeUtil.memPutInt((drawCount << 2) + this.solidCount, count);
 					drawCount++;
 				}
 
@@ -377,8 +377,8 @@ public class RegionRender {
 		}
 
 		if (meshRemaining) {
-			MemoryUtil.memPutInt((drawCount << 2) + this.solidFirst, first);
-			MemoryUtil.memPutInt((drawCount << 2) + this.solidCount, count);
+			UnsafeUtil.memPutInt((drawCount << 2) + this.solidFirst, first);
+			UnsafeUtil.memPutInt((drawCount << 2) + this.solidCount, count);
 			drawCount++;
 		}
 
@@ -392,8 +392,8 @@ public class RegionRender {
 
 		long drawData = this.regionDrawData[regionIndex * TOTAL_DRAWS + SOLID_DRAWS];
 
-		MemoryUtil.memPutInt((drawCount << 2) + this.translucentFirst, RegionAllocation.unpackFirst(drawData));
-		MemoryUtil.memPutInt((drawCount << 2) + this.translucentCount, RegionAllocation.unpackCount(drawData));
+		UnsafeUtil.memPutInt((drawCount << 2) + this.translucentFirst, RegionAllocation.unpackFirst(drawData));
+		UnsafeUtil.memPutInt((drawCount << 2) + this.translucentCount, RegionAllocation.unpackCount(drawData));
 
 		return ++drawCount;
 	}

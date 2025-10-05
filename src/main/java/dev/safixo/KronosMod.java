@@ -1,36 +1,35 @@
 package dev.safixo;
 
-import net.fabricmc.api.ModInitializer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import dev.safixo.client.render.util.data.BlocksFlags;
-import turniplabs.halplibe.util.GameStartEntrypoint;
-import turniplabs.halplibe.util.RecipeEntrypoint;
+import cpw.mods.fml.common.Mod;
+import cpw.mods.fml.common.event.FMLInitializationEvent;
+import net.minecraft.client.gui.GuiMainMenu;
+import net.minecraftforge.client.event.GuiOpenEvent;
+import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.event.ForgeSubscribe;
 
-public class KronosMod implements ModInitializer, RecipeEntrypoint, GameStartEntrypoint {
-    public static final String MOD_ID = "kronos";
-    public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
+import java.util.logging.LogManager;
+import java.util.logging.Logger;
 
-    @Override
-    public void onInitialize() {
-    }
+@Mod(modid = KronosMod.MODID, name = "Kronos", version = "1.0.0")
+public class KronosMod {
+	public static final String MODID = "Kronos";
 
-	@Override
-	public void onRecipesReady() {
+	public static final Logger LOGGER = LogManager.getLogManager().getLogger(MODID);
+
+	public KronosMod() {
+		MinecraftForge.EVENT_BUS.register(this);
 	}
 
-	@Override
-	public void initNamespaces() {
-
+	@Mod.EventHandler
+	public void preInit(FMLInitializationEvent event) {
+		//LOGGER.info("Hello from Minecraft!");
 	}
 
-	@Override
-	public void beforeGameStart() {
+	@ForgeSubscribe
+	public void onMainMenu(GuiOpenEvent event) {
+		if (event.gui instanceof GuiMainMenu) {
+			LOGGER.info("This is the main menu!");
+		}
 	}
 
-	@Override
-	public void afterGameStart() {
-		BlocksFlags.computeFlagArrays();
-		BlocksFlags.processModelMethods();
-	}
 }

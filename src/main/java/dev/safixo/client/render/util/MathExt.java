@@ -13,6 +13,10 @@ public class MathExt {
 		return MathExt.square(distX) + MathExt.square(distY) + MathExt.square(distZ);
 	}
 
+	public static int getLightmapCoord(int skyLight, int blockLight) {
+		return skyLight << 20 | blockLight << 4;
+	}
+
 	public static float manhattanDistance(RegionRender region, CameraData cameraData) {
 		float distX = (region.blockX() - cameraData.intX) - cameraData.fractX;
 		float distZ = (region.blockZ() - cameraData.intZ) - cameraData.fractZ;
@@ -40,6 +44,18 @@ public class MathExt {
 	public static int floor(double num) {
 		int integral = (int) num;
 		return num < 0 ? integral - 1 : integral;
+	}
+
+	public static float clamp(float value, float min, float max) {
+		return Math.max(Math.min(value, max), min);
+	}
+
+	public static double clamp(double value, double min, double max) {
+		return Math.max(Math.min(value, max), min);
+	}
+
+	public static int clamp(int value, int min, int max) {
+		return Math.max(Math.min(value, max), min);
 	}
 
  	public static float square(float num) {

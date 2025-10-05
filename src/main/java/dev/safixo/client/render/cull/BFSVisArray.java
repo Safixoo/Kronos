@@ -8,7 +8,7 @@ public class BFSVisArray {
 
 	private static int OFFSET_X;
 	private static int OFFSET_Z;
-	private static final short[] FRAME_ARRAY = new short[MathExt.square((MAX_DISTANCE * 2 + 1) * 16) / Short.BYTES];
+	private static final short[] FRAME_ARRAY = new short[MathExt.square((MAX_DISTANCE * 2 + 1) * 16) / 2];
 
 	public static void start(int cameraX, int cameraZ, int renderDistance) {
 		int powRenderDistance = 32;

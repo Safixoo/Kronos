@@ -1,33 +1,30 @@
 package dev.safixo.client.render.meshing;
 
-import net.minecraft.client.render.LightmapHelper;
-import net.minecraft.core.block.Block;
-import net.minecraft.core.block.Blocks;
-import net.minecraft.core.block.entity.TileEntity;
-import net.minecraft.core.block.material.Material;
-import net.minecraft.core.enums.LightLayer;
-import net.minecraft.core.world.World;
-import net.minecraft.core.world.WorldSource;
-import net.minecraft.core.world.biome.Biome;
-import net.minecraft.core.world.chunk.Chunk;
-import net.minecraft.core.world.chunk.ChunkSection;
-import net.minecraft.core.world.season.SeasonManager;
-import org.jetbrains.annotations.Nullable;
+import net.minecraft.block.Block;
+import net.minecraft.block.material.Material;
+import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.Vec3Pool;
+import net.minecraft.world.IBlockAccess;
+import net.minecraft.world.World;
+import net.minecraft.world.biome.BiomeGenBase;
+import net.minecraft.world.chunk.Chunk;
+import net.minecraft.world.chunk.storage.ExtendedBlockStorage;
+import net.minecraftforge.common.ForgeDirection;
 import dev.safixo.client.render.util.data.BlocksFlags;
 
-public class SectionCache implements WorldSource {
+public class SectionCache implements IBlockAccess {
 	private static final short[] DEFAULT_SHORT_ARRAY = new short[16 * 16 * 16];
 	private static final byte[] DEFAULT_BYTE_ARRAY = new byte[16 * 16 * 16];
 
 	private final World worldObj;
 	public final int blockX, blockY, blockZ;
 
-	public static final short[][] SECTION_BLOCKS = new short[3 * 3 * 3][];
+	public static final byte[][] SECTION_BLOCKS = new byte[3 * 3 * 3][];
 	public static final byte[][] SECTION_DATA = new byte[3 * 3 * 3][];
 	public static final byte[][] SKY_LIGHT = new byte[3 * 3 * 3][];
 	public static final byte[][] BLOCK_LIGHT = new byte[3 * 3 * 3][];
 
-	private static short[] CENTER_BLOCKS;
+	private static byte[] CENTER_BLOCKS;
 	private static byte[] CENTER_DATA;
 
 	private boolean centerSectEmpty;
@@ -43,9 +40,9 @@ public class SectionCache implements WorldSource {
 	}
 
 	public void fillData(World world, int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
-		int maxChunkX = Math.floorDiv(maxX, 16);
-		int maxChunkZ = Math.floorDiv(maxZ, 16);
-		int maxChunkY = Math.floorDiv(maxY, 16);
+		int maxChunkX = (maxX >> 4);
+		int maxChunkZ = (maxZ >> 4);
+		int maxChunkY = (maxY >> 4);
 
 		int sectionX = this.blockX >> 4, sectionY = this.blockY >> 4, sectionZ = this.blockZ >> 4;
 
@@ -59,34 +56,34 @@ public class SectionCache implements WorldSource {
 				for (int y = sectionY; y <= maxChunkY; y++) {
 					int relY = y - sectionY;
 
-					ChunkSection section = chunk.getSection((minY >> 4) + relY);
+					ExtendedBlockStorage section = chunk.getBlockStorageArray()[(minY >> 4) + relY];
 					int sectionIndex = sectionIndex(relX, relY, relZ);
 
 					if (sectionIndex(1, 1, 1) == sectionIndex) {
-						this.centerSectEmpty = section.blocks == null;
+						this.centerSectEmpty = section.getBlockLSBArray() == null;
 
-						if (section.blocks == null) {
+						if (section.getBlockLSBArray() == null) {
 							return;
 						}
 					}
 
 					if (section != null) {
-						if (section.blocks != null) {
-							SECTION_BLOCKS[sectionIndex] = section.blocks;
+						if (section.getBlockLSBArray() != null) {
+							SECTION_BLOCKS[sectionIndex] = section.getBlockLSBArray();
 						} else {
-							SECTION_BLOCKS[sectionIndex] = DEFAULT_SHORT_ARRAY;
+							SECTION_BLOCKS[sectionIndex] = DEFAULT_BYTE_ARRAY;
 						}
 
-						if (section.data != null) {
-							SECTION_DATA[sectionIndex] = section.data.data;
+						if (section.getMetadataArray() != null) {
+							SECTION_DATA[sectionIndex] = section.getMetadataArray().data;
 						} else {
 							SECTION_DATA[sectionIndex] = DEFAULT_BYTE_ARRAY;
 						}
 
-						SKY_LIGHT[sectionIndex] = section.skylightMap != null ? section.skylightMap.data : DEFAULT_BYTE_ARRAY;
-						BLOCK_LIGHT[sectionIndex] = section.blocklightMap != null ? section.blocklightMap.data : DEFAULT_BYTE_ARRAY;
+						SKY_LIGHT[sectionIndex] = section.getSkylightArray().data != null ? section.getSkylightArray().data : DEFAULT_BYTE_ARRAY;
+						BLOCK_LIGHT[sectionIndex] = section.getBlocklightArray().data != null ? section.getSkylightArray().data : DEFAULT_BYTE_ARRAY;
 					} else {
-						SECTION_BLOCKS[sectionIndex] = DEFAULT_SHORT_ARRAY;
+						SECTION_BLOCKS[sectionIndex] = DEFAULT_BYTE_ARRAY;
 						SKY_LIGHT[sectionIndex] = DEFAULT_BYTE_ARRAY;
 						BLOCK_LIGHT[sectionIndex] = DEFAULT_BYTE_ARRAY;
 					}
@@ -140,22 +137,22 @@ public class SectionCache implements WorldSource {
 		return SECTION_BLOCKS[sectInd][blockInd];
 	}
 
+	@Override
+	public TileEntity getBlockTileEntity(int par1, int par2, int par3) {
+		return null;
+	}
+
+	@Override
+	public int getLightBrightnessForSkyBlocks(int par1, int par2, int par3, int par4) {
+		return 0;
+	}
+
 	public int getBlockIdCenter(int x, int y, int z) {
 		return CENTER_BLOCKS[makeBlockIndex(x & 15, y & 15, z & 15)];
 	}
 
 	public int getBlockIdCenter(int blockIndex) {
 		return CENTER_BLOCKS[blockIndex];
-	}
-
-	@Override
-	public @Nullable Block<?> getBlock(int x, int y, int z) {
-		return Blocks.getBlock(this.getBlockId(x, y, z));
-	}
-
-	@Override
-	public TileEntity getTileEntity(int i, int j, int k) {
-		return null;
 	}
 
 	@Override
@@ -180,17 +177,12 @@ public class SectionCache implements WorldSource {
 		int skyLight = getNibble(SKY_LIGHT[sectionIndex], blockIndex);
 		int blockLight = getNibble(BLOCK_LIGHT[sectionIndex], blockIndex);
 
-		return LightmapHelper.getLightmapCoord(skyLight, blockLight);
-	}
-
-	@Override
-	public int getLightmapCoord(int skylight, int blockLight) {
-		return this.worldObj.getLightmapCoord(skylight, blockLight);
+		return skyLight << 20 | blockLight << 4;
 	}
 
 	@Override
 	public float getLightBrightness(int x, int y, int z) {
-		return this.worldObj.worldType.getBrightnessRamp()[this.getLightValue(x, y, z)];
+		return this.worldObj.getBrightnessRamp()[this.getLightValue(x, y, z)];
 	}
 
 	// AFAIK, not used for rendering.
@@ -256,38 +248,48 @@ public class SectionCache implements WorldSource {
 		}
 
 		// Shouldn't be null as it can't be a air block, but who knows.
-		Block<?> block = Blocks.getBlock(blockId);
+		Block block = Block.blocksList[blockId];
 
-		return block.getMaterial().blocksMotion() && block.isCubeShaped();
+		return block.blockMaterial.blocksMovement() && block.renderAsNormalBlock();
 	}
 
 	@Override
-	public double getBlockTemperature(int x, int z) {
-		return this.worldObj.getBlockTemperature(x, z);
+	public boolean isAirBlock(int par1, int par2, int par3) {
+		return false;
 	}
 
 	@Override
-	public double getBlockHumidity(int x, int z) {
-		return this.worldObj.getBlockHumidity(x, z);
+	public BiomeGenBase getBiomeGenForCoords(int par1, int par2) {
+		return null;
 	}
 
 	@Override
-	public SeasonManager getSeasonManager() {
-		return this.worldObj.getSeasonManager();
+	public int getHeight() {
+		return 0;
 	}
 
 	@Override
-	public Biome getBlockBiome(int x, int y, int z) {
-		return this.worldObj.getBlockBiome(x, y, z);
+	public boolean extendedLevelsInChunkCache() {
+		return false;
 	}
 
 	@Override
-	public int getSavedLightValue(LightLayer layer, int x, int y, int z) {
-		return this.worldObj.getSavedLightValue(layer, x, y, z);
+	public boolean doesBlockHaveSolidTopSurface(int par1, int par2, int par3) {
+		return false;
 	}
 
 	@Override
-	public boolean isRetro() {
-		return this.worldObj.isRetro();
+	public Vec3Pool getWorldVec3Pool() {
+		return null;
+	}
+
+	@Override
+	public int isBlockProvidingPowerTo(int par1, int par2, int par3, int par4) {
+		return 0;
+	}
+
+	@Override
+	public boolean isBlockSolidOnSide(int i, int j, int k, ForgeDirection forgeDirection, boolean bl) {
+		return false;
 	}
 }

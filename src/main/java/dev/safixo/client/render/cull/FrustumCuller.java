@@ -1,9 +1,7 @@
 package dev.safixo.client.render.cull;
 
-import org.joml.Math;
-import org.joml.Matrix4f;
 
-import static org.joml.Math.fma;
+import dev.safixo.client.render.util.math.Matrix4f;
 
 public class FrustumCuller {
 	public static final Matrix4f projectionMatrix = new Matrix4f();

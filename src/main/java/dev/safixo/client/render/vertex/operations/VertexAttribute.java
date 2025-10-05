@@ -1,7 +1,6 @@
 package dev.safixo.client.render.vertex.operations;
 
-import org.lwjgl.opengl.GL15;
-import org.lwjgl.opengl.GL33;
+import org.lwjgl.opengl.*;
 
 public class VertexAttribute {
 	private final VertexAttributeType type;
@@ -37,12 +36,12 @@ public class VertexAttribute {
 	}
 
 	public enum Type {
-		FLOAT(4, GL15.GL_FLOAT),
-		SHORT(2, GL15.GL_SHORT),
-		USHORT(2, GL15.GL_UNSIGNED_SHORT),
-		UINT(4, GL15.GL_UNSIGNED_INT),
-		HALF_FLOAT(2, GL33.GL_HALF_FLOAT),
-		UBYTE(1, GL15.GL_UNSIGNED_BYTE);
+		FLOAT(4, GL11.GL_FLOAT),
+		SHORT(2, GL11.GL_SHORT),
+		USHORT(2, GL11.GL_UNSIGNED_SHORT),
+		UINT(4, GL11.GL_UNSIGNED_INT),
+		HALF_FLOAT(2, GL30.GL_HALF_FLOAT),
+		UBYTE(1, GL11.GL_UNSIGNED_BYTE);
 
 		final int bytes, glId;
 
