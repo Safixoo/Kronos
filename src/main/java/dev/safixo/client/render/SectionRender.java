@@ -71,7 +71,7 @@ public class SectionRender {
 		this.prepareWriterForTerrain(translucentWriter);
 
 		int[] solidFaces = new int[Direction.COUNT + 1];
-		boolean ambient = Minecraft.getMinecraft().gameSettings.ambientOcclusion.value;
+		boolean ambient = Minecraft.getMinecraft().gameSettings.ambientOcclusion == 1;
 
 		if (!sectionCache.isSectionEmpty()) {
 			// 15x15x15 center blocks.
@@ -233,7 +233,7 @@ public class SectionRender {
 			drawBitSet |= cache.isBlockOpaqueCubeRel(rX + 1, rY, rZ) << EAST;
 
 			solidBlocks[Direction.COUNT]++;
-			FullBlockMesher.renderFaces(block, cache, blockX, blockY, blockZ, false, ambient, ~drawBitSet, blockId);
+			FullBlockMesher.renderFaces(block, cache, blockX, blockY, blockZ, ambient, ~drawBitSet, blockId);
 		} else {
 			if (blockRenderPass != 0) {
 				VertexWriterManager.setCurrentInstance(VertexWriterManager.TRANSLUCENT);

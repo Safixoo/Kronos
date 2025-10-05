@@ -107,7 +107,7 @@ public class FullBlockMesher {
 		int shade2 = ao(negZ, negX, cornerNN);
 		int shade3 = ao(posZ, negX, cornerNP);
 
-		int lightMap = cache.getLightmapCoord(dirX, dirY, dirZ, 0);
+		int lightMap = cache.getLightBrightnessForSkyBlocks(dirX, dirY, dirZ, 0);
 
 		int lightPZ = light(posZ);
 		int lightPX = light(posX);
@@ -156,7 +156,7 @@ public class FullBlockMesher {
 
 	private static int light(SectionCache cache, int x, int y, int z, int blockCache) {
 		if (blockCache == ~1) {
-			return cache.getLightmapCoord(x, y, z, 0);
+			return cache.getLightBrightnessForSkyBlocks(x, y, z, 0);
 		}
 
 		return blockCache >>> 4;
@@ -206,7 +206,7 @@ public class FullBlockMesher {
 	public static void renderFaceNoSmooth(FacingRender facing, Icon tex, int dir, SectionCache cache, int x, int y, int z, int color) {
 		Vector3i dirVec = Direction.getDirection(dir);
 
-		int lightMap = cache.getLightmapCoord(x + dirVec.x, y + dirVec.y, z + dirVec.z, 0);
+		int lightMap = cache.getLightBrightnessForSkyBlocks(x + dirVec.x, y + dirVec.y, z + dirVec.z, 0);
 
 		x &= RegionRender.BLOCK_BITS_X;
 		y &= RegionRender.BLOCK_BITS_Y;

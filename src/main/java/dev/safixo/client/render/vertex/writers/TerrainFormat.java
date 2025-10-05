@@ -2,12 +2,10 @@ package dev.safixo.client.render.vertex.writers;
 
 import com.google.common.collect.ImmutableList;
 import dev.safixo.client.render.util.MathExt;
-import dev.safixo.client.render.util.UnsafeUtil;
+import dev.safixo.client.render.util.memory.UnsafeUtil;
 import dev.safixo.client.render.vertex.VertexWriterManager;
 import dev.safixo.client.render.vertex.format.VertexFormat;
 import dev.safixo.client.render.vertex.operations.VertexAttribute;
-import net.minecraft.util.MathHelper;
-import org.lwjgl.MemoryUtil;
 
 import static dev.safixo.client.render.region.RegionRender.*;
 

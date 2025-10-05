@@ -1,6 +1,7 @@
 package dev.safixo.client.render.vertex;
 
-import dev.safixo.client.render.util.UnsafeUtil;
+import dev.safixo.client.render.util.memory.NativeBuffer;
+import dev.safixo.client.render.util.memory.UnsafeUtil;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import dev.safixo.client.render.util.MeshDirection;
 import dev.safixo.client.render.vertex.format.VertexFormat;
@@ -44,7 +45,7 @@ public class VertexWriterManager {
 		}
 
 		this.capacity = capacity;
-		this.vertexPtr = MemoryUtil.nmemAlloc(capacity);
+		this.vertexPtr = NativeBuffer.nmemAlloc(capacity);
 	}
 
 	public VertexWriterManager() {
@@ -109,7 +110,7 @@ public class VertexWriterManager {
 	}
 
 	public void clear() {
-		UnsafeUtil.nmemFree(this.vertexPtr);
+		NativeBuffer.nmemFree(this.vertexPtr);
 
 		this.vertexPtr = UnsafeUtil.NULL;
 		this.offset = 0;
@@ -130,9 +131,9 @@ public class VertexWriterManager {
 	private void grow(long minSize) {
 		long newCapacity = Math.max((this.capacity * 3) >> 1, minSize);
 
-		long newVertexPtr = UnsafeUtil.nmemAlloc(newCapacity);
+		long newVertexPtr = NativeBuffer.nmemAlloc(newCapacity);
 		UnsafeUtil.memCopy(this.vertexPtr, newVertexPtr, this.offset);
-		UnsafeUtil.nmemFree(this.vertexPtr);
+		NativeBuffer.nmemFree(this.vertexPtr);
 
 		this.capacity = newCapacity;
 		this.vertexPtr = newVertexPtr;

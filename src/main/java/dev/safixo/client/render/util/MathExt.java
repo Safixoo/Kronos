@@ -17,6 +17,10 @@ public class MathExt {
 		return skyLight << 20 | blockLight << 4;
 	}
 
+	public static float fma(float a, float b, float c) {
+		return a * b + c;
+	}
+
 	public static float manhattanDistance(RegionRender region, CameraData cameraData) {
 		float distX = (region.blockX() - cameraData.intX) - cameraData.fractX;
 		float distZ = (region.blockZ() - cameraData.intZ) - cameraData.fractZ;

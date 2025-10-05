@@ -1,6 +1,7 @@
 package dev.safixo.client.render.region;
 
-import dev.safixo.client.render.util.UnsafeUtil;
+import dev.safixo.client.render.util.memory.NativeBuffer;
+import dev.safixo.client.render.util.memory.UnsafeUtil;
 import org.lwjgl.opengl.*;
 import dev.safixo.client.render.SectionManager;
 import dev.safixo.client.render.SectionRender;
@@ -11,9 +12,12 @@ import dev.safixo.client.render.util.Direction;
 import dev.safixo.client.render.vertex.VertexWriterManager;
 import dev.safixo.client.render.vertex.writers.TerrainFormat;
 
+import java.nio.IntBuffer;
 import java.util.Arrays;
 
 public class RegionRender {
+	private static final int INT_BYTES = 4;
+
 	// Count of different render-passes possibly dispatched.
 	// - SOLID (0)
 	// - TRANSLUCENT (1)
@@ -95,17 +99,17 @@ public class RegionRender {
 	}
 
 	private void prepareSolidPtr() {
-		long ptrSolidData = UnsafeUtil.nmemAlloc((REGION_SECTION_SIZE * SOLID_DRAWS * Integer.BYTES) * 2);
+		long ptrSolidData = NativeBuffer.nmemAlloc((REGION_SECTION_SIZE * SOLID_DRAWS * INT_BYTES) * 2);
 
 		this.solidFirst = ptrSolidData;
-		this.solidCount = ptrSolidData + (REGION_SECTION_SIZE * SOLID_DRAWS * Integer.BYTES);
+		this.solidCount = ptrSolidData + (REGION_SECTION_SIZE * SOLID_DRAWS * INT_BYTES);
 	}
 
 	private void prepareTranslucentPtr() {
-		long ptrTranslucentData = UnsafeUtil.nmemAlloc((REGION_SECTION_SIZE * Integer.BYTES) * 2);
+		long ptrTranslucentData = NativeBuffer.nmemAlloc((REGION_SECTION_SIZE * INT_BYTES) * 2);
 
 		this.translucentFirst = ptrTranslucentData;
-		this.translucentCount = ptrTranslucentData + (REGION_SECTION_SIZE * Integer.BYTES);
+		this.translucentCount = ptrTranslucentData + (REGION_SECTION_SIZE * INT_BYTES);
 	}
 
 	public boolean canSafelyClear() {
@@ -137,14 +141,14 @@ public class RegionRender {
 		}
 
 		if (this.solidFirst != UnsafeUtil.NULL) {
-			UnsafeUtil.nmemFree(this.solidFirst);
+			NativeBuffer.nmemFree(this.solidFirst);
 
 			this.solidFirst = UnsafeUtil.NULL;
 			this.solidCount = UnsafeUtil.NULL;
 		}
 
 		if (this.translucentFirst != UnsafeUtil.NULL) {
-			UnsafeUtil.nmemFree(this.translucentFirst);
+			NativeBuffer.nmemFree(this.translucentFirst);
 
 			this.translucentFirst = UnsafeUtil.NULL;
 			this.translucentCount = UnsafeUtil.NULL;
@@ -288,7 +292,12 @@ public class RegionRender {
 		// Setup camera and region offset.
 		shader.setupRegionOffset(camera, blockRegionX, blockRegionY, blockRegionZ);
 
-		GL14.glMultiDrawArrays(GL11.GL_QUADS, first, count, drawCount);
+		IntBuffer firstBuff = NativeBuffer.wrap(first).asIntBuffer();
+		IntBuffer countBuff = NativeBuffer.wrap(count).asIntBuffer();
+
+		firstBuff.limit(drawCount);
+
+		GL14.glMultiDrawArrays(GL11.GL_QUADS, firstBuff, countBuff);
 	}
 
 	private boolean shouldUseCachedDraw(CameraData camera) {

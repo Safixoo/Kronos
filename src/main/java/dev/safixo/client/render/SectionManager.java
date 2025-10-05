@@ -137,7 +137,7 @@ public class SectionManager {
 
 	public void markDirty(int posX, int posY, int posZ) {
 		long position = asLong(posX, posY, posZ);
-		SectionRender sectionRender = this.sectionMap.getOrDefault(position, null);
+		SectionRender sectionRender = this.sectionMap.get(position);
 
 		if (sectionRender == null) {
 			sectionRender = this.addRender(posX, posY, posZ, true);
@@ -153,7 +153,7 @@ public class SectionManager {
 	public SectionRender addRender(int posX, int posY, int posZ, boolean trulyNew) {
 		long position = asLong(posX, posY, posZ);
 
-		SectionRender sectionRender = trulyNew ? null : this.sectionMap.getOrDefault(position, null);
+		SectionRender sectionRender = trulyNew ? null : this.sectionMap.get(position);
 
 		if (sectionRender == null) {
 			sectionRender = new SectionRender(posX * 16, posY * 16, posZ * 16);
@@ -264,7 +264,7 @@ public class SectionManager {
 	// Median should give a better result than prom for
 	// avoiding lag spikes it seems.
 	public long getFrameMedian() {
-		LongArrays.unstableSort(this.lastFrameSamples);
+		LongArrays.quickSort(this.lastFrameSamples);
 		return this.lastFrameSamples[16];
 	}
 
@@ -407,7 +407,7 @@ public class SectionManager {
 
 	public void drawRenderPass(int renderPass) {
 		// Disables fog when option is active.
-		boolean noFog = !Minecraft.getMinecraft().gameSettings.fog.value;
+		boolean noFog = false;
 
 		// Look like terrain display lists have some of these states baked.
 		if (renderPass == 1) {

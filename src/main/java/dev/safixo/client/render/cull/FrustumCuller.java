@@ -20,32 +20,32 @@ public class FrustumCuller {
 		double nyX, nyY, nyZ, nyW;
 		double pyX, pyY, pyZ, pyW;
 
-		nxX = (double) m.m03() + (double) m.m00(); nxY = (double) m.m13() + (double) m.m10(); nxZ = (double) m.m23() + (double) m.m20(); nxW = (double) m.m33() + (double) m.m30();
-		double invl = Math.invsqrt(nxX * nxX + nxY * nxY + nxZ * nxZ);
+		nxX = (double) m.m03 + (double) m.m00; nxY = (double) m.m13 + (double) m.m10; nxZ = (double) m.m23 + (double) m.m20; nxW = (double) m.m33 + (double) m.m30;
+		double invl = invSqrt(nxX * nxX + nxY * nxY + nxZ * nxZ);
 		nxX *= invl; nxY *= invl; nxZ *= invl; nxW *= invl;
 
 		if (nxX >= 0) nxW += 16.0;
 		if (nxY >= 0) nxW += 16.0;
 		if (nxZ >= 0) nxW += 16.0;
 
-		pxX = (double) m.m03() - (double) m.m00(); pxY = (double) m.m13() - (double) m.m10(); pxZ = (double) m.m23() - (double) m.m20(); pxW = (double) m.m33() - (double) m.m30();
-		invl = Math.invsqrt(pxX * pxX + pxY * pxY + pxZ * pxZ);
+		pxX = (double) m.m03 - (double) m.m00; pxY = (double) m.m13 - (double) m.m10; pxZ = (double) m.m23 - (double) m.m20; pxW = (double) m.m33 - (double) m.m30;
+		invl = invSqrt(pxX * pxX + pxY * pxY + pxZ * pxZ);
 		pxX *= invl; pxY *= invl; pxZ *= invl; pxW *= invl;
 
 		if (pxX > 0) pxW += 16.0;
 		if (pxY > 0) pxW += 16.0;
 		if (pxZ > 0) pxW += 16.0;
 
-		nyX = (double) m.m03() + (double) m.m01(); nyY = (double) m.m13() + (double) m.m11(); nyZ = (double) m.m23() + (double) m.m21(); nyW = (double) m.m33() + (double) m.m31();
-		invl = Math.invsqrt(nyX * nyX + nyY * nyY + nyZ * nyZ);
+		nyX = (double) m.m03 + (double) m.m01; nyY = (double) m.m13 + (double) m.m11; nyZ = (double) m.m23 + (double) m.m21; nyW = (double) m.m33 + (double) m.m31;
+		invl = invSqrt(nyX * nyX + nyY * nyY + nyZ * nyZ);
 		nyX *= invl; nyY *= invl; nyZ *= invl; nyW *= invl;
 
 		if (nyX > 0) nyW += 16.0;
 		if (nyY > 0) nyW += 16.0;
 		if (nyZ > 0) nyW += 16.0;
 
-		pyX = (double) m.m03() - (double) m.m01(); pyY = (double) m.m13() - (double) m.m11(); pyZ = (double) m.m23() - (double) m.m21(); pyW = (double) m.m33() - (double) m.m31();
-		invl = Math.invsqrt(pyX * pyX + pyY * pyY + pyZ * pyZ);
+		pyX = (double) m.m03 - (double) m.m01; pyY = (double) m.m13 - (double) m.m11; pyZ = (double) m.m23 - (double) m.m21; pyW = (double) m.m33 - (double) m.m31;
+		invl = invSqrt(pyX * pyX + pyY * pyY + pyZ * pyZ);
 		pyX *= invl; pyY *= invl; pyZ *= invl; pyW *= invl;
 
 		if (pyX > 0) pyW += 16.0;
@@ -74,6 +74,10 @@ public class FrustumCuller {
 
 		modelViewMatrix.set(modelView);
 		projectionMatrix.set(proj);
+	}
+
+	private static double invSqrt(double a) {
+		return 1.0 / Math.sqrt(a);
 	}
 
 	public static void addFractToCamera(float fractX, float fractY, float fractZ) {

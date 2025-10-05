@@ -1,6 +1,7 @@
 package dev.safixo.client.render.shader;
 
 import dev.safixo.client.render.util.math.Matrix4f;
+import dev.safixo.client.render.util.memory.NativeBuffer;
 import net.minecraft.client.Minecraft;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.opengl.GL20;
@@ -21,7 +22,7 @@ public class ShaderSectionTerrain {
 	private int u_FragCoordToViewCoord;
 	private int u_FogEnd, u_FogStart, u_FogColor;
 
-	public static final FloatBuffer TEMP_BUFFER = MemoryUtil.memAllocFloat(16);
+	public static final FloatBuffer TEMP_BUFFER = NativeBuffer.memAllocFloat(16);
 
 	public ShaderSectionTerrain() {
 		this.prepareAndCompileShader();
@@ -86,17 +87,7 @@ public class ShaderSectionTerrain {
 		Matrix4f combinedInv = new Matrix4f();
 		projectionMat.mul(modelViewMat, combinedInv);
 
-		float width = Minecraft.getMinecraft().displayWidth;
-		float height = Minecraft.getMinecraft().displayHeight;
-
-		final Matrix4f fragToNDC = new Matrix4f()
-			.translation(-1, -1, -1)
-			.scale(2.0f / width, 2.0f / height, 2.0f);
-
-		Matrix4f viewCoord = combinedInv.invert(new Matrix4f()).mul(fragToNDC);
-
-		GL20.glUniformMatrix4fv(this.u_FragCoordToViewCoord, false, viewCoord.get(TEMP_BUFFER));
-		GL20.glUniformMatrix4fv(this.u_ProjModelViewMat, false, combinedInv.get(TEMP_BUFFER));
+		GL20.glUniformMatrix4(this.u_ProjModelViewMat, false, combinedInv.get(TEMP_BUFFER));
 
 		GL20.glUniform1i(this.u_TexId, 0);
 		GL20.glUniform1i(this.u_LightTex, 1);

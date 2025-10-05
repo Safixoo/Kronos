@@ -72,7 +72,7 @@ public class Direction {
 		return DIRECTIONS[index];
 	}
 
-	public static Side toEnum(int direction) {
+	public static ForgeDirection toEnum(int direction) {
 		return ENUMS[direction];
 	}
 }

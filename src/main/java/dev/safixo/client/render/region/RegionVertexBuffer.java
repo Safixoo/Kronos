@@ -1,10 +1,11 @@
 package dev.safixo.client.render.region;
 
-import org.lwjgl.opengl.GL15;
-import org.lwjgl.opengl.GL20;
-import org.lwjgl.opengl.GL30;
+import dev.safixo.client.render.util.memory.NativeBuffer;
+import org.lwjgl.opengl.*;
 import dev.safixo.client.render.SectionManager;
 import dev.safixo.client.render.vertex.format.DefaultVertexFormats;
+
+import java.nio.ByteBuffer;
 
 public class RegionVertexBuffer {
 	private boolean createdVao;
@@ -40,7 +41,10 @@ public class RegionVertexBuffer {
 	public void upload(long vertexData, long offset, int size) {
 		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, this.vboId);
 
-		GL20.nglBufferSubData(GL15.GL_ARRAY_BUFFER, offset, size, vertexData);
+		ByteBuffer vertexDataBuff = NativeBuffer.wrap(vertexData);
+		vertexDataBuff.limit(size);
+
+		GL15.glBufferSubData(GL15.GL_ARRAY_BUFFER, offset, vertexDataBuff);
 		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
 	}
 
@@ -70,14 +74,14 @@ public class RegionVertexBuffer {
 
 	public void clear() {
 		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, this.vboId);
-		GL30.glBufferData(GL15.GL_ARRAY_BUFFER, 0, GL15.GL_STATIC_DRAW);
+		GL15.glBufferData(GL15.GL_ARRAY_BUFFER, 0, GL15.GL_STATIC_DRAW);
 		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
 
 		SectionManager.getCurrentInstance().removeMemory(this.capacity);
 		this.capacity = 0;
 
 		GL30.glDeleteVertexArrays(this.vaoId);
-		GL30.glDeleteBuffers(this.vboId);
+		GL15.glDeleteBuffers(this.vboId);
 	}
 
 	public void unbind() {

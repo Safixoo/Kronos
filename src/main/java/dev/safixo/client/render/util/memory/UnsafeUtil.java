@@ -1,4 +1,4 @@
-package dev.safixo.client.render.util;
+package dev.safixo.client.render.util.memory;
 
 import sun.misc.Unsafe;
 
@@ -58,7 +58,7 @@ public class UnsafeUtil {
 		UNSAFE.putInt(ptr, value);
 	}
 
-	public static void mmePutFloat(long ptr, float value) {
+	public static void memPutFloat(long ptr, float value) {
 		UNSAFE.putFloat(ptr, value);
 	}
 }

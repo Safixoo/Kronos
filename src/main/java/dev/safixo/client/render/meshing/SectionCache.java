@@ -1,5 +1,6 @@
 package dev.safixo.client.render.meshing;
 
+import dev.safixo.client.render.util.MathExt;
 import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;
 import net.minecraft.tileentity.TileEntity;
@@ -143,8 +144,23 @@ public class SectionCache implements IBlockAccess {
 	}
 
 	@Override
-	public int getLightBrightnessForSkyBlocks(int par1, int par2, int par3, int par4) {
-		return 0;
+	public int getLightBrightnessForSkyBlocks(int x, int y, int z, int defBlockLight) {
+		int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
+
+		int blockX = x - this.blockX;
+		int blockY = y - this.blockY;
+		int blockZ = z - this.blockZ;
+
+		int sectionIndex = sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
+
+		if (BlocksFlags.SOLID[SECTION_BLOCKS[sectionIndex][blockIndex]]) {
+			return 0;
+		}
+
+		int skyLight = getNibble(SKY_LIGHT[sectionIndex], blockIndex);
+		int blockLight = getNibble(BLOCK_LIGHT[sectionIndex], blockIndex);
+
+		return MathExt.getLightmapCoord(skyLight, blockLight);
 	}
 
 	public int getBlockIdCenter(int x, int y, int z) {
@@ -161,28 +177,8 @@ public class SectionCache implements IBlockAccess {
 	}
 
 	@Override
-	public int getLightmapCoord(int x, int y, int z, int blockLightValue) {
-		int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
-
-		int blockX = x - this.blockX;
-		int blockY = y - this.blockY;
-		int blockZ = z - this.blockZ;
-
-		int sectionIndex = sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
-
-		if (BlocksFlags.SOLID[SECTION_BLOCKS[sectionIndex][blockIndex]]) {
-			return 0;
-		}
-
-		int skyLight = getNibble(SKY_LIGHT[sectionIndex], blockIndex);
-		int blockLight = getNibble(BLOCK_LIGHT[sectionIndex], blockIndex);
-
-		return skyLight << 20 | blockLight << 4;
-	}
-
-	@Override
 	public float getLightBrightness(int x, int y, int z) {
-		return this.worldObj.getBrightnessRamp()[this.getLightValue(x, y, z)];
+		return this.worldObj.provider.lightBrightnessTable[this.getLightValue(x, y, z)];
 	}
 
 	// AFAIK, not used for rendering.
@@ -254,42 +250,48 @@ public class SectionCache implements IBlockAccess {
 	}
 
 	@Override
-	public boolean isAirBlock(int par1, int par2, int par3) {
-		return false;
+	public boolean isAirBlock(int x, int y, int z) {
+		return this.getBlockId(x, y, z) == 0;
 	}
 
 	@Override
 	public BiomeGenBase getBiomeGenForCoords(int par1, int par2) {
-		return null;
+		return this.worldObj.getBiomeGenForCoords(par1, par2);
 	}
 
 	@Override
 	public int getHeight() {
-		return 0;
+		return 256;
 	}
 
 	@Override
 	public boolean extendedLevelsInChunkCache() {
-		return false;
+		return this.centerSectEmpty;
 	}
 
 	@Override
-	public boolean doesBlockHaveSolidTopSurface(int par1, int par2, int par3) {
-		return false;
+	public boolean doesBlockHaveSolidTopSurface(int x, int y, int z) {
+		return this.worldObj.doesBlockHaveSolidTopSurface(x, y, z);
 	}
 
 	@Override
 	public Vec3Pool getWorldVec3Pool() {
-		return null;
+		return this.worldObj.getWorldVec3Pool();
 	}
 
 	@Override
 	public int isBlockProvidingPowerTo(int par1, int par2, int par3, int par4) {
-		return 0;
+		int i1 = this.getBlockId(par1, par2, par3);
+		return i1 == 0 ? 0 : Block.blocksList[i1].isProvidingStrongPower(this, par1, par2, par3, par4);
 	}
 
 	@Override
-	public boolean isBlockSolidOnSide(int i, int j, int k, ForgeDirection forgeDirection, boolean bl) {
-		return false;
+	public boolean isBlockSolidOnSide(int x, int y, int z, ForgeDirection side, boolean defaultVal) {
+		if (x < -30000000 || z < -30000000 || x >= 30000000 || z >= 30000000) {
+			return defaultVal;
+		}
+
+		int blockId = this.getBlockId(x, y, z);
+		return blockId != 0 && Block.blocksList[blockId].isBlockSolidOnSide(this.worldObj, x, y, z, side);
 	}
 }

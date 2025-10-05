@@ -52,7 +52,7 @@ public class BlocksFlags {
 	}
 
 	public static void processLeavesSolid() {
-		boolean solid = Minecraft.getMinecraft().gameSettings.fancyGraphics.value == 0;
+		boolean solid = Minecraft.getMinecraft().gameSettings.fancyGraphics;
 
 		for (int i = 0; i < LEAVES_TOP_INDEX; i++) {
 			SOLID[LEAVES_INDICES[i]] = solid;
