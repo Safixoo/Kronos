@@ -27,9 +27,9 @@ public class KronosMod {
 
 	@ForgeSubscribe
 	public void onMainMenu(GuiOpenEvent event) {
-		if (event.gui instanceof GuiMainMenu) {
-			LOGGER.info("This is the main menu!");
-		}
+//		if (event.gui instanceof GuiMainMenu) {
+//			LOGGER.info("This is the main menu!");
+//		}
 	}
 
 }

@@ -17,6 +17,9 @@ sourceCompatibility = JavaVersion.VERSION_1_7
 targetCompatibility = JavaVersion.VERSION_1_7
 
 unimined.minecraft {
+    sourceCompatibility = JavaVersion.VERSION_1_7
+    targetCompatibility = JavaVersion.VERSION_1_7
+
     version "1.6.4"
 
     minecraftForge {
@@ -34,7 +37,24 @@ repositories {
 
 dependencies {
     // https://mvnrepository.com/artifact/it.unimi.dsi/fastutil
-    implementation("it.unimi.dsi:fastutil:7.1.0")
+    implementation('it.unimi.dsi:fastutil:6.5.7')
+}
+
+jar {
+    manifest {
+        attributes(
+                'FMLCorePlugin': 'dev.safixo.core.KronosCoreMod',
+                'FMLCorePluginContainsFMLMod': 'true'
+        )
+    }
+}
+
+tasks.withType(JavaExec).configureEach {
+    doFirst {
+        classpath = classpath.filter { file ->
+            !file.name.contains('annotations')
+        }
+    }
 }
 
 processResources {
