@@ -408,7 +408,7 @@ public class SectionManager {
 
 	public void drawRenderPass(int renderPass) {
 		// Disables fog when option is active.
-		boolean noFog = false;
+		boolean noFog = true;
 
 		// Look like terrain display lists have some of these states baked.
 		if (renderPass == 1) {

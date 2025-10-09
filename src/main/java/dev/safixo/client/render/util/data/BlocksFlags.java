@@ -19,7 +19,7 @@ public class BlocksFlags {
 	private static final int[] LEAVES_INDICES = new int[2048];
 
 	public static void computeFlagArrays() {
-		for (int i = 0; i < 4096; i++) {
+		for (int i = 0; i < 2048; i++) {
 			Block block = Block.blocksList[i];
 
 			if (block != null && block.blockMaterial == Material.leaves) {

@@ -1,9 +1,12 @@
 package dev.safixo.client.render.region;
 
 import dev.safixo.client.render.util.memory.NativeBuffer;
-import org.lwjgl.opengl.*;
 import dev.safixo.client.render.SectionManager;
 import dev.safixo.client.render.vertex.format.DefaultVertexFormats;
+import org.lwjgl.opengl.GL15;
+import org.lwjgl.opengl.GL30;
+
+import java.nio.*;
 
 import java.nio.ByteBuffer;
 
@@ -42,7 +45,7 @@ public class RegionVertexBuffer {
 		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, this.vboId);
 
 		ByteBuffer vertexDataBuff = NativeBuffer.wrap(vertexData);
-		vertexDataBuff.limit(size);
+		((Buffer) vertexDataBuff).limit(size);
 
 		GL15.glBufferSubData(GL15.GL_ARRAY_BUFFER, offset, vertexDataBuff);
 		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);

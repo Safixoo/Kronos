@@ -18,6 +18,10 @@ public class KronosTransformer implements IClassTransformer {
 		byte[][] reference = new byte[1][];
 		reference[0] = basicClass;
 
+		if (false) {
+			return basicClass;
+		}
+
 		// Function overwrites.
 		if (transformedName.equals(RENDER_GLOBAL_PATH)) {
 			replaceClassMethod(RENDER_GLOBAL_HOOK, "loadRenderers", "func_72712_a", reference);

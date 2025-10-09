@@ -12,6 +12,7 @@ import dev.safixo.client.render.util.Direction;
 import dev.safixo.client.render.vertex.VertexWriterManager;
 import dev.safixo.client.render.vertex.writers.TerrainFormat;
 
+import java.nio.Buffer;
 import java.nio.IntBuffer;
 import java.util.Arrays;
 
@@ -283,7 +284,7 @@ public class RegionRender {
 		vertexBuffer.bind();
 
 		long first = pass != 0 ? this.translucentFirst : this.solidFirst;
-		long count = pass != 0 ? this.translucentCount : this.solidCount;
+		// long count = pass != 0 ? this.translucentCount : this.solidCount;
 
 		int blockRegionX = this.regionX << RegionRender.BLOCK_SHIFT_X;
 		int blockRegionY = this.regionY << RegionRender.BLOCK_SHIFT_Y;
@@ -292,10 +293,13 @@ public class RegionRender {
 		// Setup camera and region offset.
 		shader.setupRegionOffset(camera, blockRegionX, blockRegionY, blockRegionZ);
 
+		// As of now count and first use the pointer but with some offset, so simply offset
+		// count itself to make the same effect.
 		IntBuffer firstBuff = NativeBuffer.wrap(first).asIntBuffer();
-		IntBuffer countBuff = NativeBuffer.wrap(count).asIntBuffer();
+		IntBuffer countBuff = NativeBuffer.wrap(first).asIntBuffer();
 
-		firstBuff.limit(drawCount);
+		((Buffer) firstBuff).limit(drawCount);
+		((Buffer) countBuff).position(REGION_SECTION_SIZE * INT_BYTES);
 
 		GL14.glMultiDrawArrays(GL11.GL_QUADS, firstBuff, countBuff);
 	}

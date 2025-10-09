@@ -67,14 +67,14 @@ public class SectionCache implements IBlockAccess {
 					int sectionIndex = sectionIndex(relX, relY, relZ);
 
 					if (sectionIndex(1, 1, 1) == sectionIndex) {
-						this.centerSectEmpty = section == null || section.getBlockLSBArray() == null;
+						this.centerSectEmpty = section == null || section.isEmpty();
 
 						if (this.centerSectEmpty) {
 							return;
 						}
 					}
 
-					if (section != null) {
+					if (section != null && !section.isEmpty()) {
 						if (section.getBlockLSBArray() != null) {
 							SECTION_BLOCKS[sectionIndex] = section.getBlockLSBArray();
 						} else {
@@ -141,7 +141,7 @@ public class SectionCache implements IBlockAccess {
 		int sectInd = sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
 		int blockInd = makeBlockIndex(blockX & 15, blockY & 15, blockZ & 15);
 
-		return SECTION_BLOCKS[sectInd][blockInd];
+		return processSign(SECTION_BLOCKS[sectInd][blockInd]);
 	}
 
 	@Override
@@ -159,7 +159,7 @@ public class SectionCache implements IBlockAccess {
 
 		int sectionIndex = sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
 
-		if (BlocksFlags.SOLID[SECTION_BLOCKS[sectionIndex][blockIndex]]) {
+		if (BlocksFlags.SOLID[processSign(SECTION_BLOCKS[sectionIndex][blockIndex])]) {
 			return 0;
 		}
 
@@ -210,7 +210,9 @@ public class SectionCache implements IBlockAccess {
 
 	@Override
 	public Material getBlockMaterial(int x, int y, int z) {
-		return BlocksFlags.MATERIAL[this.getBlockId(x, y, z)];
+		int blockId = this.getBlockId(x, y, z);
+
+		return blockId != 0 ? Block.blocksList[blockId].blockMaterial : Material.air;
 	}
 
 	public int isBlockOpaqueCubeInt(int x, int y, int z) {
@@ -222,14 +224,14 @@ public class SectionCache implements IBlockAccess {
 
 		int sectionIndex = sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
 
-		return BlocksFlags.SOLID_LIGHT_MASK[SECTION_BLOCKS[sectionIndex][blockIndex]];
+		return BlocksFlags.SOLID_LIGHT_MASK[processSign(SECTION_BLOCKS[sectionIndex][blockIndex])];
 	}
 
 	public int isBlockOpaqueCubeRel(int x, int y, int z) {
 		int sectionIndex = sectionIndex(x >> 4, y >> 4, z >> 4);
 		int blockInd = makeBlockIndex(x & 15, y & 15, z & 15);
 
-		return BlocksFlags.SOLID_LIGHT_MASK[SECTION_BLOCKS[sectionIndex][blockInd]];
+		return BlocksFlags.SOLID_LIGHT_MASK[processSign(SECTION_BLOCKS[sectionIndex][blockInd])];
 	}
 
 	@Override
@@ -238,7 +240,14 @@ public class SectionCache implements IBlockAccess {
 	}
 
 	public int isBlockOpaqueCubeCenter(int blockIndex) {
-		return BlocksFlags.SOLID_LIGHT_MASK[CENTER_BLOCKS[blockIndex]];
+		return BlocksFlags.SOLID_LIGHT_MASK[processSign(CENTER_BLOCKS[blockIndex])];
+	}
+
+	// For some fucking reason there is a block with -127 id.
+	private static int processSign(int id) {
+		// if it is negative it masks off all the bits
+		// if it is positive does work normally.
+		return id & ~(id >> 31);
 	}
 
 	@Override

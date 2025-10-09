@@ -25,6 +25,10 @@ public class BFSVisArray {
 		int bitInd = realInd & 0xF;
 		int arrInd = realInd >> 4;
 
+		if (arrInd < 0) {
+			return false;
+		}
+
 		return (FRAME_ARRAY[arrInd] & (1 << bitInd)) == 0;
 	}
 
@@ -35,6 +39,10 @@ public class BFSVisArray {
 		int realInd = (relX << HOR_SHIFT | relZ) << HOR_SHIFT | sectionY;
 		int bitInd = realInd & 0xF;
 		int arrInd = realInd >> 4;
+
+		if (arrInd < 0) {
+			return;
+		}
 
 		FRAME_ARRAY[arrInd] |= (short) (1 << bitInd);
 	}

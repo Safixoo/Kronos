@@ -43,7 +43,7 @@ public class RenderGlobalHook {
 
 		Minecraft minecraft = Minecraft.getMinecraft();
 
-		MANAGER.update(minecraft.gameSettings.renderDistance << 4, cameraX, cameraY, cameraZ, SHOULD_RELOAD, partialTick);
+		MANAGER.update(minecraft.gameSettings.renderDistance, cameraX, cameraY, cameraZ, SHOULD_RELOAD, partialTick);
 		SHOULD_RELOAD = false;
 	}
 
@@ -51,6 +51,7 @@ public class RenderGlobalHook {
 		MANAGER.drawRenderPass(renderPass);
 
 		if (renderPass == 0) {
+			HookUtils.setField(global, "renderersBeingRendered", MANAGER.drawnSolidRenderers);
 //			this.renderersBeingRendered = this.manager.drawnSolidRenderers;
 //			this.renderersLoaded = this.manager.drawnSolidRenderers;
 			MANAGER.drawnSolidRenderers = 0;

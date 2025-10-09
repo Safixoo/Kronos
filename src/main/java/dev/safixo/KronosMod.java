@@ -2,6 +2,7 @@ package dev.safixo;
 
 import cpw.mods.fml.common.Mod;
 import cpw.mods.fml.common.event.FMLInitializationEvent;
+import dev.safixo.client.render.util.data.BlocksFlags;
 import net.minecraft.client.gui.GuiMainMenu;
 import net.minecraftforge.client.event.GuiOpenEvent;
 import net.minecraftforge.common.MinecraftForge;
@@ -26,9 +27,7 @@ public class KronosMod {
 
 	@ForgeSubscribe
 	public void onMainMenu(GuiOpenEvent event) {
-//		if (event.gui instanceof GuiMainMenu) {
-//			LOGGER.info("This is the main menu!");
-//		}
+		BlocksFlags.computeFlagArrays();
 	}
 
 }
