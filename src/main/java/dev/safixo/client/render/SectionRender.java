@@ -161,7 +161,7 @@ public class SectionRender {
 	private void meshBlockCenter(RenderBlocks renderBlocks, SectionCache cache, int x, int y, int z, int[] solidBlocks, boolean ambient) {
 		int blockId = cache.getBlockIdCenter(x, y, z);
 
-		if (blockId == AIR_ID) {
+		if (blockId <= AIR_ID) {
 			return;
 		}
 
@@ -191,14 +191,14 @@ public class SectionRender {
 				VertexWriterManager.setCurrentInstance(VertexWriterManager.SOLID[MeshDirection.GENERIC]);
 			}
 
-			renderBlocks.renderBlockByRenderType(block, blockX, blockY, blockZ);
+//			renderBlocks.renderBlockByRenderType(block, blockX, blockY, blockZ);
 		}
 	}
 
 	private void meshBlock(RenderBlocks renderBlocks, SectionCache cache, int x, int y, int z, int[] solidBlocks, boolean ambient) {
 		int blockId = cache.getBlockIdCenter(x, y, z);
 
-		if (blockId == AIR_ID) {
+		if (blockId <= AIR_ID) {
 			return;
 		}
 
@@ -241,7 +241,7 @@ public class SectionRender {
 				VertexWriterManager.setCurrentInstance(VertexWriterManager.SOLID[MeshDirection.GENERIC]);
 			}
 
-			renderBlocks.renderBlockByRenderType(block, blockX, blockY, blockZ);
+//			renderBlocks.renderBlockByRenderType(block, blockX, blockY, blockZ);
 		}
 	}
 

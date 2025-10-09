@@ -64,7 +64,7 @@ public class BFSCuller {
 
 		int distance = withinRenderDistance(distX, distY, distZ);
 
-		if (distance >= fogEnd || !FrustumCuller.testAab(distX, distY, distZ)) {
+		if (distance >= fogEnd || !(true || FrustumCuller.testAab(distX, distY, distZ))) {
 			return true;
 		}
 

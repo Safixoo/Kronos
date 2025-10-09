@@ -12,7 +12,7 @@ public class ShaderLoader {
 	public static void compileShader(String relPath, int shaderId) {
 		String shaderData;
 
-		try (InputStream inputStream = ClassLoader.getSystemClassLoader().getResourceAsStream(SHADER_PATH + relPath)) {
+		try (InputStream inputStream = ShaderLoader.class.getResourceAsStream("/" + SHADER_PATH + relPath)) {
 			if (inputStream == null) {
 				throw new RuntimeException("Input stream is NULL!");
 			}
@@ -44,4 +44,5 @@ public class ShaderLoader {
 
 		GL20.glCompileShader(shaderId);
 	}
+
 }

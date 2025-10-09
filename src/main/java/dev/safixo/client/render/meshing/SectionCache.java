@@ -57,13 +57,19 @@ public class SectionCache implements IBlockAccess {
 				for (int y = sectionY; y <= maxChunkY; y++) {
 					int relY = y - sectionY;
 
+					int yInd = (minY >> 4) + relY;
+
+					if (yInd < 0 || yInd > 15) {
+						continue;
+					}
+
 					ExtendedBlockStorage section = chunk.getBlockStorageArray()[(minY >> 4) + relY];
 					int sectionIndex = sectionIndex(relX, relY, relZ);
 
 					if (sectionIndex(1, 1, 1) == sectionIndex) {
-						this.centerSectEmpty = section.getBlockLSBArray() == null;
+						this.centerSectEmpty = section == null || section.getBlockLSBArray() == null;
 
-						if (section.getBlockLSBArray() == null) {
+						if (this.centerSectEmpty) {
 							return;
 						}
 					}
@@ -195,7 +201,7 @@ public class SectionCache implements IBlockAccess {
 		int sectInd = sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
 		int blockInd = makeBlockIndex(blockX & 15, blockY & 15, blockZ & 15);
 
-		return SECTION_DATA[sectInd][blockInd];
+		return getNibble(SECTION_DATA[sectInd], blockInd);
 	}
 
 	public int getBlockMetadataCenter(int x, int y, int z) {

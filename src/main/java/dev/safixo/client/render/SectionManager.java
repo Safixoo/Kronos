@@ -1,5 +1,6 @@
 package dev.safixo.client.render;
 
+import dev.safixo.client.render.util.data.FogData;
 import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrays;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
