@@ -1,6 +1,8 @@
 package dev.safixo.client.render.util.data;
 
 import net.minecraft.block.Block;
+import net.minecraft.block.BlockLeaves;
+import net.minecraft.block.BlockLeavesBase;
 import net.minecraft.block.material.Material;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.IBlockAccess;
@@ -22,13 +24,13 @@ public class BlocksFlags {
 		for (int i = 0; i < 2048; i++) {
 			Block block = Block.blocksList[i];
 
-			if (block != null && block.blockMaterial == Material.leaves) {
+			if (block instanceof BlockLeavesBase) {
 				LEAVES_INDICES[LEAVES_TOP_INDEX++] = i;
 			}
 
 			SOLID[i] = Block.opaqueCubeLookup[i];
 			MATERIAL[i] = (block == null || i == 0) ? Material.air : block.blockMaterial;
-			SOLID_LIGHT_MASK[i] = (byte) ((Block.opaqueCubeLookup[i] || MATERIAL[i] == Material.leaves) ? 1 : 0);
+			SOLID_LIGHT_MASK[i] = (byte) ((Block.opaqueCubeLookup[i] || block instanceof BlockLeavesBase) ? 1 : 0);
 			SOLID[i] = Block.opaqueCubeLookup[i] || (MATERIAL[i] == Material.leaves && Minecraft.getMinecraft().gameSettings.fancyGraphics);
 		}
 	}
@@ -36,8 +38,13 @@ public class BlocksFlags {
 	// Process which methods use default model implementation and based on that avoid the dynamic dispatch and the
 	// original method overhead with a more direct call.
 	public static void processModelMethods() {
-		for (int i = 0; i < 4096; i++) {
+		for (int i = 0; i < 2048; i++) {
 			Block block = Block.blocksList[i];
+
+			if (block == null) {
+				continue;
+			}
+
 			Method method;
 
 			try {
@@ -52,10 +59,11 @@ public class BlocksFlags {
 	}
 
 	public static void processLeavesSolid() {
-		boolean solid = Minecraft.getMinecraft().gameSettings.fancyGraphics;
+		boolean solid = !Minecraft.getMinecraft().gameSettings.fancyGraphics;
 
 		for (int i = 0; i < LEAVES_TOP_INDEX; i++) {
 			SOLID[LEAVES_INDICES[i]] = solid;
+			SOLID_LIGHT_MASK[LEAVES_INDICES[i]] = (byte) (solid ? 1 : 0);
 		}
 
 	}

@@ -43,12 +43,19 @@ public class RenderGlobalHook {
 
 		Minecraft minecraft = Minecraft.getMinecraft();
 
-		MANAGER.update(minecraft.gameSettings.renderDistance, cameraX, cameraY, cameraZ, SHOULD_RELOAD, partialTick);
+		// Old versions of the game use this formula for chunk distance based on the slider.
+		int realRenderDistance = ((512 - minecraft.gameSettings.renderDistance) >> 4) + 1;
+
+		MANAGER.update(realRenderDistance, cameraX, cameraY, cameraZ, SHOULD_RELOAD, partialTick);
 		SHOULD_RELOAD = false;
 	}
 
 	public static void sortAndRender(RenderGlobal global, EntityLivingBase player, int renderPass, double partialTick) {
+		Minecraft minecraft = Minecraft.getMinecraft();
+
+		minecraft.entityRenderer.enableLightmap(partialTick);
 		MANAGER.drawRenderPass(renderPass);
+		minecraft.entityRenderer.disableLightmap(partialTick);
 
 		if (renderPass == 0) {
 			HookUtils.setField(global, "renderersBeingRendered", MANAGER.drawnSolidRenderers);

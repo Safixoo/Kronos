@@ -3,7 +3,10 @@ package dev.safixo.client.render.shader;
 import dev.safixo.client.render.util.math.Matrix4f;
 import dev.safixo.client.render.util.memory.NativeBuffer;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.ActiveRenderInfo;
+import net.minecraft.client.renderer.GLAllocation;
 import org.lwjgl.input.Keyboard;
+import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL20;
 import dev.safixo.KronosMod;
 import dev.safixo.client.render.cull.FrustumCuller;
@@ -12,17 +15,18 @@ import dev.safixo.client.render.util.data.CameraData;
 import dev.safixo.client.render.util.data.FogData;
 import dev.safixo.client.render.vertex.writers.TerrainFormat;
 
+import java.nio.Buffer;
 import java.nio.FloatBuffer;
 
 public class ShaderSectionTerrain {
 	private int programId;
 	private int u_RegionPos;
 	private int u_TexId, u_LightTex;
-	private int u_ProjModelViewMat;
+	private int u_ProjMat, u_ModelViewMat;
 	private int u_FragCoordToViewCoord;
 	private int u_FogEnd, u_FogStart, u_FogColor;
 
-	public static final FloatBuffer TEMP_BUFFER = NativeBuffer.memAllocFloat(16);
+	public static final FloatBuffer TEMP_BUFFER = GLAllocation.createDirectFloatBuffer(16);
 
 	public ShaderSectionTerrain() {
 		this.prepareAndCompileShader();
@@ -68,7 +72,9 @@ public class ShaderSectionTerrain {
 		this.u_FogStart = GL20.glGetUniformLocation(this.programId, "u_FogStart");
 		this.u_FogColor = GL20.glGetUniformLocation(this.programId, "u_FogColor");
 
-		this.u_ProjModelViewMat = GL20.glGetUniformLocation(this.programId, "u_ProjModelViewMat");
+		this.u_ProjMat = GL20.glGetUniformLocation(this.programId, "u_ProjMat");
+		this.u_ModelViewMat = GL20.glGetUniformLocation(this.programId, "u_ModelViewMat");
+
 		this.u_FragCoordToViewCoord = GL20.glGetUniformLocation(this.programId, "u_FragCoordToViewCoord");
 	}
 
@@ -81,13 +87,15 @@ public class ShaderSectionTerrain {
 	}
 
 	public void setupUniforms(boolean noFog) {
-		Matrix4f modelViewMat = FrustumCuller.modelViewMatrix;
-		Matrix4f projectionMat = FrustumCuller.projectionMatrix;
+		((Buffer) TEMP_BUFFER).clear();
+		GL11.glGetFloat(GL11.GL_PROJECTION_MATRIX, TEMP_BUFFER);
+		((Buffer) TEMP_BUFFER).flip().limit(16);
+		GL20.glUniformMatrix4(this.u_ProjMat, false, TEMP_BUFFER);
 
-		Matrix4f combinedInv = new Matrix4f();
-		projectionMat.mul(modelViewMat, combinedInv);
-
-		GL20.glUniformMatrix4(this.u_ProjModelViewMat, false, combinedInv.get(TEMP_BUFFER));
+		((Buffer) TEMP_BUFFER).clear();
+		GL11.glGetFloat(GL11.GL_MODELVIEW_MATRIX, TEMP_BUFFER);
+		((Buffer) TEMP_BUFFER).flip().limit(16);
+		GL20.glUniformMatrix4(this.u_ModelViewMat, false, TEMP_BUFFER);
 
 		GL20.glUniform1i(this.u_TexId, 0);
 		GL20.glUniform1i(this.u_LightTex, 1);

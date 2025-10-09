@@ -177,6 +177,35 @@ public class Matrix4f {
 		return this;
 	}
 
+	public FloatBuffer set(FloatBuffer buffer) {
+		long ptr = MemoryUtil.getAddress(buffer);
+
+		this.m00 = UnsafeUtil.memGetFloat(ptr + 0);
+		this.m01 = UnsafeUtil.memGetFloat(ptr + 4);
+		this.m02 = UnsafeUtil.memGetFloat(ptr + 8);
+		this.m03 = UnsafeUtil.memGetFloat(ptr + 12);
+		ptr += 16;
+
+		this.m10 = UnsafeUtil.memGetFloat(ptr + 0);
+		this.m11 = UnsafeUtil.memGetFloat(ptr + 4);
+		this.m12 = UnsafeUtil.memGetFloat(ptr + 8);
+		this.m13 = UnsafeUtil.memGetFloat(ptr + 12);
+		ptr += 16;
+
+		this.m20 = UnsafeUtil.memGetFloat(ptr + 0);
+		this.m21 = UnsafeUtil.memGetFloat(ptr + 4);
+		this.m22 = UnsafeUtil.memGetFloat(ptr + 8);
+		this.m23 = UnsafeUtil.memGetFloat(ptr + 12);
+		ptr += 16;
+
+		this.m30 = UnsafeUtil.memGetFloat(ptr + 0);
+		this.m31 = UnsafeUtil.memGetFloat(ptr + 4);
+		this.m32 = UnsafeUtil.memGetFloat(ptr + 8);
+		this.m33 = UnsafeUtil.memGetFloat(ptr + 12);
+
+		return buffer;
+	}
+
 	public FloatBuffer get(FloatBuffer buffer) {
 		long ptr = MemoryUtil.getAddress(buffer);
 

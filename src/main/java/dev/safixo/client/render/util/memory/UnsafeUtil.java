@@ -61,4 +61,12 @@ public class UnsafeUtil {
 	public static void memPutFloat(long ptr, float value) {
 		UNSAFE.putFloat(ptr, value);
 	}
+
+	public static float memGetFloat(long ptr) {
+		return UNSAFE.getFloat(ptr);
+	}
+
+	public static int memGetInt(long ptr) {
+		return UNSAFE.getInt(ptr);
+	}
 }

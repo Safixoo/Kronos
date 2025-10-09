@@ -10,8 +10,10 @@ import static org.objectweb.asm.Opcodes.*;
 
 public class KronosTransformer implements IClassTransformer {
 	static final String RENDER_GLOBAL_HOOK = "dev/safixo/core/hooks/RenderGlobalHook";
+	static final String DEBUG_SCREEN_HOOK = "dev/safixo/core/hooks/DebugScreenHook";
 
 	static final String RENDER_GLOBAL_PATH = "net.minecraft.client.renderer.RenderGlobal";
+	static final String FONT_RENDERER = "net.minecraft.client.gui.FontRenderer";
 
 	@Override
 	public byte[] transform(String name, String transformedName, byte[] basicClass) {
@@ -32,6 +34,8 @@ public class KronosTransformer implements IClassTransformer {
 			replaceClassMethod(RENDER_GLOBAL_HOOK, "markBlockForRenderUpdate", "", reference);
 			replaceClassMethod(RENDER_GLOBAL_HOOK, "markBlockRangeForRenderUpdate", "", reference);
 			replaceClassMethod(RENDER_GLOBAL_HOOK, "markBlocksForUpdate", "", reference);
+		} else if (transformedName.equals(FONT_RENDERER)) {
+			replaceClassMethod(DEBUG_SCREEN_HOOK, "drawStringWithShadow", "", reference);
 		}
 
 		return reference[0];

@@ -1,6 +1,7 @@
 package dev.safixo.client.render;
 
 import net.minecraft.block.Block;
+import net.minecraft.block.BlockLeavesBase;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderBlocks;
 import net.minecraft.client.renderer.WorldRenderer;
@@ -170,7 +171,7 @@ public class SectionRender {
 
 		int blockX = x + this.blockX, blockY = y + this.blockY, blockZ = z + this.blockZ;
 
-		if (BlocksFlags.SOLID_LIGHT_MASK[blockId] != 0) {
+		if (BlocksFlags.SOLID_LIGHT_MASK[blockId] != 0 || block instanceof BlockLeavesBase) {
 			solidBlocks[Direction.COUNT]++;
 
 			int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
@@ -209,7 +210,7 @@ public class SectionRender {
 		int blockY = y + this.blockY;
 		int blockZ = z + this.blockZ;
 
-		if (BlocksFlags.SOLID_LIGHT_MASK[blockId] != 0) {
+		if (BlocksFlags.SOLID_LIGHT_MASK[blockId] != 0 || block instanceof BlockLeavesBase) {
 			if (y == 0 || y == 15) {
 				solidBlocks[Direction.DOWN + (y & 1)]++;
 			}

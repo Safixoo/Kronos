@@ -28,6 +28,7 @@ public class KronosMod {
 	@ForgeSubscribe
 	public void onMainMenu(GuiOpenEvent event) {
 		BlocksFlags.computeFlagArrays();
+		BlocksFlags.processModelMethods();
 	}
 
 }

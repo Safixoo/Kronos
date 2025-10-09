@@ -1,5 +1,8 @@
 package dev.safixo.client.render.shader;
 
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiIngame;
+import net.minecraft.client.gui.GuiNewChat;
 import org.lwjgl.opengl.GL20;
 import dev.safixo.KronosMod;
 
@@ -33,13 +36,18 @@ public class ShaderLoader {
 		GL20.glShaderSource(shaderId, shaderData);
 		String shaderLog = GL20.glGetShaderInfoLog(shaderId, 250);
 
+		final GuiNewChat chat = Minecraft.getMinecraft().ingameGUI.getChatGUI();
+
 		if (!shaderLog.isEmpty()) {
-			KronosMod.LOGGER.fine("Shader " + relPath + " has logged the next info: ");
-			KronosMod.LOGGER.fine(shaderLog);
+			chat.printChatMessage("Shader " + relPath + " has logged the next info: ");
+			chat.printChatMessage(shaderLog);
 		}
 
 		if (OUTPUT_SHADER_CODE) {
-			KronosMod.LOGGER.fine(shaderData);
+			chat.printChatMessage("");
+			chat.printChatMessage("§eSHADER PATH: §r" + relPath);
+			chat.printChatMessage("");
+			chat.printChatMessage(shaderData);
 		}
 
 		GL20.glCompileShader(shaderId);

@@ -100,17 +100,13 @@ public class RegionRender {
 	}
 
 	private void prepareSolidPtr() {
-		long ptrSolidData = NativeBuffer.nmemAlloc((REGION_SECTION_SIZE * SOLID_DRAWS * INT_BYTES) * 2);
-
-		this.solidFirst = ptrSolidData;
-		this.solidCount = ptrSolidData + (REGION_SECTION_SIZE * SOLID_DRAWS * INT_BYTES);
+		this.solidFirst = NativeBuffer.nmemAlloc(REGION_SECTION_SIZE * INT_BYTES * SOLID_DRAWS);
+		this.solidCount = NativeBuffer.nmemAlloc(REGION_SECTION_SIZE * INT_BYTES * SOLID_DRAWS);
 	}
 
 	private void prepareTranslucentPtr() {
-		long ptrTranslucentData = NativeBuffer.nmemAlloc((REGION_SECTION_SIZE * INT_BYTES) * 2);
-
-		this.translucentFirst = ptrTranslucentData;
-		this.translucentCount = ptrTranslucentData + (REGION_SECTION_SIZE * INT_BYTES);
+		this.translucentFirst = NativeBuffer.nmemAlloc(REGION_SECTION_SIZE * INT_BYTES);
+		this.translucentCount = NativeBuffer.nmemAlloc(REGION_SECTION_SIZE * INT_BYTES);
 	}
 
 	public boolean canSafelyClear() {
@@ -143,6 +139,7 @@ public class RegionRender {
 
 		if (this.solidFirst != UnsafeUtil.NULL) {
 			NativeBuffer.nmemFree(this.solidFirst);
+			NativeBuffer.nmemFree(this.solidCount);
 
 			this.solidFirst = UnsafeUtil.NULL;
 			this.solidCount = UnsafeUtil.NULL;
@@ -150,6 +147,7 @@ public class RegionRender {
 
 		if (this.translucentFirst != UnsafeUtil.NULL) {
 			NativeBuffer.nmemFree(this.translucentFirst);
+			NativeBuffer.nmemFree(this.translucentCount);
 
 			this.translucentFirst = UnsafeUtil.NULL;
 			this.translucentCount = UnsafeUtil.NULL;
@@ -169,7 +167,7 @@ public class RegionRender {
 
 		int index = (render.regionIndex * TOTAL_DRAWS) + side;
 
-		if (this.regionDrawData[index] != 0) {
+		if (this.regionDrawData[index] == 0) {
 			this.regionDrawData[index] = this.solidBuffer.allocate(render, manager.getVertexData(), manager.getVertices(), side);
 			return;
 		}
@@ -190,7 +188,7 @@ public class RegionRender {
 
 		int index = (render.regionIndex * TOTAL_DRAWS) + SOLID_DRAWS;
 
-		if (this.regionDrawData[index] != 0) {
+		if (this.regionDrawData[index] == 0) {
 			this.regionDrawData[index] = this.translucentBuffer.allocate(render, manager.getVertexData(), manager.getVertices(), 0);
 			return;
 		}
@@ -284,7 +282,7 @@ public class RegionRender {
 		vertexBuffer.bind();
 
 		long first = pass != 0 ? this.translucentFirst : this.solidFirst;
-		// long count = pass != 0 ? this.translucentCount : this.solidCount;
+		long count = pass != 0 ? this.translucentCount : this.solidCount;
 
 		int blockRegionX = this.regionX << RegionRender.BLOCK_SHIFT_X;
 		int blockRegionY = this.regionY << RegionRender.BLOCK_SHIFT_Y;
@@ -296,10 +294,10 @@ public class RegionRender {
 		// As of now count and first use the pointer but with some offset, so simply offset
 		// count itself to make the same effect.
 		IntBuffer firstBuff = NativeBuffer.wrap(first).asIntBuffer();
-		IntBuffer countBuff = NativeBuffer.wrap(first).asIntBuffer();
+		IntBuffer countBuff = NativeBuffer.wrap(count).asIntBuffer();
 
 		((Buffer) firstBuff).limit(drawCount);
-		((Buffer) countBuff).position(REGION_SECTION_SIZE * INT_BYTES);
+		((Buffer) countBuff).limit(drawCount);
 
 		GL14.glMultiDrawArrays(GL11.GL_QUADS, firstBuff, countBuff);
 	}

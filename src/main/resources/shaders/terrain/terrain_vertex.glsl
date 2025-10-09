@@ -10,8 +10,8 @@ out vec3 v_Color;
 out vec2 v_TextureUv;
 
 uniform vec3 u_RegionPos;
-uniform mat4 u_ProjModelViewMat;
-uniform float u_FogEnd;
+uniform mat4 u_ProjMat;
+uniform mat4 u_ModelViewMat;
 
 uniform sampler2D u_LightTex;
 
@@ -46,7 +46,7 @@ vec2 lightmapUv(uint lightmap) {
 
 void main() {
     vec3 blockPosition = extractBlockPos(a_Position);
-    vec4 position = u_ProjModelViewMat * vec4(blockPosition, 1.0);
+    vec4 position = u_ProjMat * u_ModelViewMat * vec4(blockPosition, 1.0);
 
     gl_Position = position;
 

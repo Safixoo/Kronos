@@ -465,7 +465,7 @@ public class SectionManager {
 		int chunkY = (section.blockY >> 4) + Direction.y(direction);
 		int chunkZ = (section.blockZ >> 4) + Direction.z(direction);
 
-		return this.sectionMap.getOrDefault(asLong(chunkX, chunkY, chunkZ), null);
+		return this.sectionMap.get(asLong(chunkX, chunkY, chunkZ));
 	}
 
 }
