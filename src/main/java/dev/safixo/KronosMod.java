@@ -10,10 +10,9 @@ import net.minecraftforge.event.ForgeSubscribe;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
-@Mod(modid = KronosMod.MODID, name = "Kronos", version = "1.0.0")
+@Mod(modid = KronosMod.MODID, name = "kronos", version = "1.0.0")
 public class KronosMod {
-	public static final String MODID = "Kronos";
-
+	public static final String MODID = "kronos";
 	public static final Logger LOGGER = LogManager.getLogManager().getLogger(MODID);
 
 	public KronosMod() {

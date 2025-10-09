@@ -7,7 +7,7 @@ group 'dev.safixo'
 version '1.0-SNAPSHOT'
 
 base {
-    archivesName = 'Kronos'
+    archivesName = 'kronos'
 }
 
 // this is just here so we can test the outputs easier and clean between tests
@@ -48,6 +48,11 @@ jar {
         )
     }
 }
+
+tasks.named("runClient") {
+    jvmArgs += ["-Dfml.coreMods.load=dev.safixo.core.KronosCoreMod"]
+}
+
 
 tasks.withType(JavaExec).configureEach {
     doFirst {

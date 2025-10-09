@@ -1,0 +1,16 @@
+[
+  {
+    "modid": "kronos",
+    "name": "Kronos",
+    "description": "Optimized terrain renderer for 1.6.4.",
+    "version": "1.6.4",
+    "mcversion": "1.6.4",
+    "url": "",
+    "updateUrl": "",
+    "authors": ["Safixo"],
+    "credits": "",
+    "logoFile": "logo.png",
+    "screenshots": [],
+    "dependencies": []
+  }
+]
