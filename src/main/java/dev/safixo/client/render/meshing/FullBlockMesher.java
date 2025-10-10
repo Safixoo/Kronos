@@ -13,6 +13,7 @@ import dev.safixo.client.render.vertex.VertexWriterManager;
 import dev.safixo.client.render.vertex.writers.TerrainFormat;
 
 import static dev.safixo.client.render.meshing.SectionCache.makeBlockIndex;
+import static dev.safixo.client.render.meshing.SectionCache.processSign;
 import static dev.safixo.client.render.util.Direction.*;
 
 public class FullBlockMesher {
@@ -39,18 +40,25 @@ public class FullBlockMesher {
 			drawSet |= block.shouldSideBeRendered(cache, x + 1, y, z, 5) ? 1 << EAST : 0;
 		}
 
-		int modelColor = block.getBlockColor();
+		int modelColor = ColorBGRManager.multiplyColor(block.colorMultiplier(cache, x, y, z), 255);
+		int meta = cache.getBlockMetadataCenter(x, y, z);
 
 		for (int dir = 0; dir < Direction.COUNT; dir++) {
 			if ((drawSet & (1 << dir)) == 0) {
 				continue;
 			}
 
-			Icon tex = block.getBlockTextureFromSide(dir);
+			int sideColor = modelColor;
+			Icon tex = block.getIcon(dir, meta);
+
+			if (Block.grass.blockID == blockId && dir != UP) {
+				sideColor = 0xFFFFFF;
+			}
+
 			VertexWriterManager.setCurrentInstance(VertexWriterManager.SOLID[dir]);
 
 			FacingRender render = FACE_RENDER[dir];
-			int usedColor = ColorBGRManager.multiplyColor(modelColor, SHADE_FULL_FACTOR[dir]);
+			int usedColor = ColorBGRManager.multiplyColor(sideColor, SHADE_FULL_FACTOR[dir]);
 
 			if (ambient) {
 				renderFace(render, tex, dir, cache, x, y, z, usedColor);
@@ -174,10 +182,10 @@ public class FullBlockMesher {
 		int blockZ = z - cache.blockZ;
 
 		int sectionIndex = SectionCache.sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
-		int solidBlock = BlocksFlags.SOLID_LIGHT_MASK[SectionCache.SECTION_BLOCKS[sectionIndex][blockIndex]];
+		boolean solidBlock = BlocksFlags.SOLID[processSign(SectionCache.SECTION_BLOCKS[sectionIndex][blockIndex])];
 
-		if (solidBlock == 1) {
-			return (0 << 4) | solidBlock;
+		if (solidBlock) {
+			return 0 << 4 | 1;
 		}
 
 		return ~1;
@@ -191,7 +199,7 @@ public class FullBlockMesher {
 		int blockZ = z - cache.blockZ;
 
 		int sectionIndex = SectionCache.sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
-		int solidBlock = BlocksFlags.SOLID_LIGHT_MASK[SectionCache.SECTION_BLOCKS[sectionIndex][blockIndex]];
+		int solidBlock = BlocksFlags.SOLID_LIGHT_MASK[processSign(SectionCache.SECTION_BLOCKS[sectionIndex][blockIndex])];
 
 		if (solidBlock == 1) {
 			return (0 << 4) | solidBlock;
@@ -242,7 +250,7 @@ public class FullBlockMesher {
 		if (a == 0) {
 			return b;
 		}
-		return ((a + b) >>> 1) & 0xF000_F0;
+		return ((a + b) >>> 1) & 0xFF00_FF0;
 	}
 
 	private static void addVertex(FacingRender facing, int vertInd, int x, int y, int z, float u, float v, int color, int lightMap) {
@@ -267,7 +275,7 @@ public class FullBlockMesher {
 		return BlocksFlags.SOLID_LIGHT_MASK[blockId];
 	}
 
-	public static final int LIGHT_REDUCE = 102;
+	public static final int LIGHT_REDUCE = 70;
 	public static final int CORNER_LIGHT = 256 - LIGHT_REDUCE;
 
 	public static int ao(int pos1, int pos2, int corner) {
@@ -280,13 +288,13 @@ public class FullBlockMesher {
 		int factor = 256;
 
 		if (corner == 1 && fullXorP == 0) {
-			factor = CORNER_LIGHT - ((pos1 | pos2) << 8);
+			factor = CORNER_LIGHT - ((pos1 | pos2) << 5);
 		}
 
 		factor -= br(pos1);
 		factor -= br(pos2);
 
-		return Math.min(Math.max(factor, 65), 255);
+		return Math.min(Math.max(factor, 90), 255);
 	}
 
 //	public static int lightMap(int light1, int light2, int lightCorner) {

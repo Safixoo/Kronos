@@ -13,9 +13,15 @@ import net.minecraft.world.chunk.storage.ExtendedBlockStorage;
 import net.minecraftforge.common.ForgeDirection;
 import dev.safixo.client.render.util.data.BlocksFlags;
 
+import java.util.Arrays;
+
 public class SectionCache implements IBlockAccess {
-	private static final short[] DEFAULT_SHORT_ARRAY = new short[16 * 16 * 16];
 	private static final byte[] DEFAULT_BYTE_ARRAY = new byte[16 * 16 * 16];
+	private static final byte[] DEFAULT_FULL_BYTE_ARRAY = new byte[16 * 16 * 16];
+
+	static {
+		Arrays.fill(DEFAULT_FULL_BYTE_ARRAY, (byte) 0xFF);
+	}
 
 	private final World worldObj;
 	public final int blockX, blockY, blockZ;
@@ -87,11 +93,11 @@ public class SectionCache implements IBlockAccess {
 							SECTION_DATA[sectionIndex] = DEFAULT_BYTE_ARRAY;
 						}
 
-						SKY_LIGHT[sectionIndex] = section.getSkylightArray().data != null ? section.getSkylightArray().data : DEFAULT_BYTE_ARRAY;
-						BLOCK_LIGHT[sectionIndex] = section.getBlocklightArray().data != null ? section.getSkylightArray().data : DEFAULT_BYTE_ARRAY;
+						SKY_LIGHT[sectionIndex] = section.getSkylightArray().data != null ? section.getSkylightArray().data : DEFAULT_FULL_BYTE_ARRAY;
+						BLOCK_LIGHT[sectionIndex] = section.getBlocklightArray().data != null ? section.getBlocklightArray().data : DEFAULT_BYTE_ARRAY;
 					} else {
 						SECTION_BLOCKS[sectionIndex] = DEFAULT_BYTE_ARRAY;
-						SKY_LIGHT[sectionIndex] = DEFAULT_BYTE_ARRAY;
+						SKY_LIGHT[sectionIndex] = DEFAULT_FULL_BYTE_ARRAY;
 						BLOCK_LIGHT[sectionIndex] = DEFAULT_BYTE_ARRAY;
 					}
 				}
@@ -205,7 +211,7 @@ public class SectionCache implements IBlockAccess {
 	}
 
 	public int getBlockMetadataCenter(int x, int y, int z) {
-		return CENTER_DATA[makeBlockIndex(x & 15, y & 15, z & 15)];
+		return getNibble(CENTER_DATA, makeBlockIndex(x & 15, y & 15, z & 15));
 	}
 
 	@Override
@@ -244,7 +250,7 @@ public class SectionCache implements IBlockAccess {
 	}
 
 	// For some fucking reason there is a block with -127 id.
-	private static int processSign(int id) {
+	public static int processSign(int id) {
 		// if it is negative it masks off all the bits
 		// if it is positive does work normally.
 		return id & ~(id >> 31);

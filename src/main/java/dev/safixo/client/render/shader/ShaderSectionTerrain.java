@@ -104,7 +104,8 @@ public class ShaderSectionTerrain {
 		GL20.glUniform1f(this.u_FogStart, noFog ? 1E+12F : MathExt.square(FogData.FOG_START));
 
 		float[] fogColor = FogData.FOG_COLOR;
-		GL20.glUniform3f(this.u_FogColor, fogColor[0], fogColor[1], fogColor[2]);
+
+		GL20.glUniform4f(this.u_FogColor, fogColor[0], fogColor[1], fogColor[2], fogColor[3]);
 	}
 
 	public void setupRegionOffset(CameraData camera, int regionX, int regionY, int regionZ) {

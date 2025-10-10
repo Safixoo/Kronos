@@ -28,7 +28,7 @@ public class BlocksFlags {
 				LEAVES_INDICES[LEAVES_TOP_INDEX++] = i;
 			}
 
-			SOLID[i] = Block.opaqueCubeLookup[i];
+			SOLID[i] = (Block.opaqueCubeLookup[i] || block instanceof BlockLeavesBase);
 			MATERIAL[i] = (block == null || i == 0) ? Material.air : block.blockMaterial;
 			SOLID_LIGHT_MASK[i] = (byte) ((Block.opaqueCubeLookup[i] || block instanceof BlockLeavesBase) ? 1 : 0);
 			SOLID[i] = Block.opaqueCubeLookup[i] || (MATERIAL[i] == Material.leaves && Minecraft.getMinecraft().gameSettings.fancyGraphics);
@@ -62,7 +62,6 @@ public class BlocksFlags {
 		boolean solid = !Minecraft.getMinecraft().gameSettings.fancyGraphics;
 
 		for (int i = 0; i < LEAVES_TOP_INDEX; i++) {
-			SOLID[LEAVES_INDICES[i]] = solid;
 			SOLID_LIGHT_MASK[LEAVES_INDICES[i]] = (byte) (solid ? 1 : 0);
 		}
 

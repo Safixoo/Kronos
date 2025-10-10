@@ -43,8 +43,11 @@ public class RenderGlobalHook {
 
 		Minecraft minecraft = Minecraft.getMinecraft();
 
-		// Old versions of the game use this formula for chunk distance based on the slider.
-		int realRenderDistance = ((512 - minecraft.gameSettings.renderDistance) >> 4) + 1;
+		// This is more or less the real metric for chunk distance that the game uses.
+		// 0 - Far, 1 - Normal, 2 - Short, 3 - Tiny.
+		// In the future would be productive replace add a bigger slider for render distance,
+		// like optifine.
+		int realRenderDistance = Math.min(400, ((64 << (3 - minecraft.gameSettings.renderDistance)) >> 5)) + 1;
 
 		MANAGER.update(realRenderDistance, cameraX, cameraY, cameraZ, SHOULD_RELOAD, partialTick);
 		SHOULD_RELOAD = false;

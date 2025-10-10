@@ -87,8 +87,8 @@ public class TerrainFormat extends VertexFormat {
 
 	// skylight << 20 | blocklight << 4
 	private static int compressLightmap(int lightmap) {
-		int skyLight4 = (lightmap >>> 20) & 0xF;
-		int blockLight4 = (lightmap >>> 4) & 0xF;
+		int skyLight4 = MathExt.clamp((lightmap >>> 20) & 0xFF, 0, 0xF);
+		int blockLight4 = MathExt.clamp((lightmap >>> 4) & 0xFF, 0, 0xF);
 
 		return skyLight4 | blockLight4 << 4;
 	}

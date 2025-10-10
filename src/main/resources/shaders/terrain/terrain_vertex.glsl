@@ -8,6 +8,7 @@ in uint a_Lightmap;
 
 out vec3 v_Color;
 out vec2 v_TextureUv;
+out float v_Distance;
 
 uniform vec3 u_RegionPos;
 uniform mat4 u_ProjMat;
@@ -41,15 +42,16 @@ vec3 extractBlockPos(uvec2 atPosition) {
 
 vec2 lightmapUv(uint lightmap) {
     uvec2 uv = (uvec2(a_Lightmap) >> uvec2(4, 0)) & 0xF;
-    return max(vec2(1.0), uv - 0.5) * (1.0 / 15.0);
+    return clamp(uv + 0.5, vec2(0.5), vec2(15.5)) * (1.0 / 16.0);
 }
 
 void main() {
     vec3 blockPosition = extractBlockPos(a_Position);
-    vec4 position = u_ProjMat * u_ModelViewMat * vec4(blockPosition, 1.0);
+    vec4 position = u_ModelViewMat * vec4(blockPosition, 1.0);
 
-    gl_Position = position;
+    gl_Position = u_ProjMat * position;
 
-    v_Color = a_Color * textureLod(u_LightTex, lightmapUv(a_Lightmap), 0.0).rgb;
+    v_Distance = dot(position, position);
+    v_Color = a_Color * texture(u_LightTex, lightmapUv(a_Lightmap)).rgb;
     v_TextureUv = a_Uv * (1.0 / 65536.0);
 }

@@ -21,8 +21,10 @@ import dev.safixo.client.render.region.RegionManager;
 import dev.safixo.client.render.region.RegionRender;
 import dev.safixo.client.render.util.Direction;
 import dev.safixo.client.render.util.MathExt;
+import org.lwjgl.opengl.GL20;
 
 public class SectionManager {
+	private static final boolean EXTRACT_FOG_DATA = true;
 	private static final int MAX_UPDATE_QUEUES = 15;
 
 	private final Long2ReferenceOpenHashMap<SectionRender> sectionMap = new Long2ReferenceOpenHashMap<>();
@@ -196,11 +198,32 @@ public class SectionManager {
 		InventoryPlayer inventory = playerLocal.inventory;
 
 		if (inventory == null || inventory.getCurrentItem() == null || !(inventory.getCurrentItem().getItem() instanceof ItemEgg)) {
+			extractFogData();
+
 			this.bfsCuller.init(this.regionManager, this.camera.intX, this.camera.intZ, renderDistance);
 			this.bfsCuller.updateRenderList(this.sectionMap, this.camera);
 		}
 
 		this.queueRebuilds(partialTick);
+	}
+
+	// This is done as injecting with ASM to get fog properties is harder and a
+	// trivial way to get fog parameters without affecting *too* much performance
+	// is simply using glGetFloat.
+	private static void extractFogData() {
+		if (!EXTRACT_FOG_DATA) {
+			return;
+		}
+
+		FogData.FOG_END = GL11.glGetFloat(GL11.GL_FOG_END);
+		FogData.FOG_START = GL11.glGetFloat(GL11.GL_FOG_START);
+
+		GL11.glGetFloat(GL11.GL_FOG_COLOR, ShaderSectionTerrain.TEMP_BUFFER);
+
+		FogData.FOG_COLOR[0] = ShaderSectionTerrain.TEMP_BUFFER.get(0);
+		FogData.FOG_COLOR[1] = ShaderSectionTerrain.TEMP_BUFFER.get(1);
+		FogData.FOG_COLOR[2] = ShaderSectionTerrain.TEMP_BUFFER.get(2);
+		FogData.FOG_COLOR[3] = ShaderSectionTerrain.TEMP_BUFFER.get(3);
 	}
 
 	private static CameraData extractCameraData(double cameraX, double cameraY, double cameraZ, int renderDistance) {
@@ -265,7 +288,7 @@ public class SectionManager {
 	// Median should give a better result than prom for
 	// avoiding lag spikes it seems.
 	public long getFrameMedian() {
-		LongArrays.quickSort(this.lastFrameSamples);
+		LongArrays.radixSort(this.lastFrameSamples);
 		return this.lastFrameSamples[16];
 	}
 
@@ -381,6 +404,9 @@ public class SectionManager {
 	}
 
 	public void blockUpdate(int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
+		minY = MathExt.clamp(minY, 0, 255);
+		maxY = MathExt.clamp(maxY, 0, 255);
+
 		minX = posToSectionIntegral(minX);
 		minY = posToSectionIntegral(minY);
 		minZ = posToSectionIntegral(minZ);
@@ -408,7 +434,7 @@ public class SectionManager {
 
 	public void drawRenderPass(int renderPass) {
 		// Disables fog when option is active.
-		boolean noFog = true;
+		boolean noFog = false;
 
 		// Look like terrain display lists have some of these states baked.
 		if (renderPass == 1) {
@@ -432,6 +458,10 @@ public class SectionManager {
 
 		this.regionManager.drawAllRegions(this.terrainShader, this.bfsCuller.bfsQueue, this.camera, renderPass);
 		this.terrainShader.unbindProgram();
+
+		if (renderPass == 1) {
+			GL11.glEnable(GL11.GL_ALPHA_TEST);
+		}
 	}
 
 	boolean lastEvent = false;
