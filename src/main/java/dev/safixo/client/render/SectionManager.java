@@ -188,14 +188,14 @@ public class SectionManager {
 			this.lastRemoveZ = cameraZ;
 
 			this.clearRenderer();
-//			this.generateWholeVolume(cameraX, cameraZ);
+			this.generateWholeVolume(cameraX, cameraZ);
 		}
 
 		double diffX = MathExt.square(cameraX - this.lastUpdateX);
 		double diffZ = MathExt.square(cameraZ - this.lastUpdateZ);
 
 		if (diffX + diffZ >= MathExt.square(4.0)) {
-			this.generateSections(true);
+			this.generateSections(false);
 		}
 
 		EntityClientPlayerMP playerLocal = Minecraft.getMinecraft().thePlayer;

@@ -165,8 +165,9 @@ public class SectionCache implements IBlockAccess {
 		int blockZ = z - this.blockZ;
 
 		int sectionIndex = sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
+		int blockId = byteToUnsigned(SECTION_BLOCKS[sectionIndex][blockIndex]);
 
-		if (BlocksFlags.SOLID[byteToUnsigned(SECTION_BLOCKS[sectionIndex][blockIndex])]) {
+		if (blockId != 0 && BlocksFlags.SOLID[blockId]) {
 			return 0;
 		}
 
@@ -257,16 +258,7 @@ public class SectionCache implements IBlockAccess {
 
 	@Override
 	public boolean isBlockNormalCube(int x, int y, int z) {
-		int blockId = this.getBlockId(x, y, z);
-
-		if (blockId == 0) {
-			return false;
-		}
-
-		// Shouldn't be null as it can't be a air block, but who knows.
-		Block block = Block.blocksList[blockId];
-
-		return block.blockMaterial.blocksMovement() && block.renderAsNormalBlock();
+		return BlocksFlags.NORMAL_BLOCK[this.getBlockId(x, y, z)];
 	}
 
 	@Override

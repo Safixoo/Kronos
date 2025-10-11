@@ -49,8 +49,8 @@ jar {
         )
     }
 
-//    from { configurations.runtimeClasspath.collect { zipTree(it) } }
-//    exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA'
+    from { configurations.runtimeClasspath.collect { zipTree(it) } }
+    exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA'
 }
 
 tasks.named("runClient") {

@@ -18,6 +18,7 @@ public class BlocksFlags {
 
 	public static final Material[] MATERIAL = new Material[2048];
 	public static final boolean[] SOLID = new boolean[2048];
+	public static final boolean[] NORMAL_BLOCK = new boolean[2048];
 
 	public static final byte[] SOLID_LIGHT_MASK = new byte[2048];
 	public static final boolean[] DIRECT_CULL = new boolean[2048];
@@ -36,6 +37,7 @@ public class BlocksFlags {
 			}
 
 			SOLID[i] = ((block != null && block.isOpaqueCube()));
+			NORMAL_BLOCK[i] = ((block != null && block.blockMaterial.isOpaque() && block.renderAsNormalBlock() && !block.canProvidePower()));
 			MATERIAL[i] = (block == null || i == 0) ? Material.air : block.blockMaterial;
 			SOLID_LIGHT_MASK[i] = (byte) (((block != null && block.isOpaqueCube()) || block instanceof BlockLeavesBase) ? 1 : 0);
 		}

@@ -56,9 +56,7 @@ public class RenderGlobalHook {
 	public static void sortAndRender(RenderGlobal global, EntityLivingBase player, int renderPass, double partialTick) {
 		Minecraft minecraft = Minecraft.getMinecraft();
 
-		minecraft.entityRenderer.enableLightmap(partialTick);
 		MANAGER.drawRenderPass(renderPass);
-		minecraft.entityRenderer.disableLightmap(partialTick);
 
 		if (renderPass == 0) {
 			HookUtils.setField(global, "renderersBeingRendered", "field_72746_N", MANAGER.drawnSolidRenderers);
@@ -80,5 +78,9 @@ public class RenderGlobalHook {
 
 	public static void markBlocksForUpdate(RenderGlobal renderGlobal, int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
 		MANAGER.blockUpdate(minX - 1, minY - 1, minZ - 1,  maxX + 1, maxY + 1, maxZ + 1);
+	}
+
+	public static void renderAllSortedRenderers(RenderGlobal renderGlobal, int pass, double tick) {
+		// NO-OP OptiFine method.
 	}
 }

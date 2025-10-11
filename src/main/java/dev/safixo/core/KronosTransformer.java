@@ -40,6 +40,7 @@ public class KronosTransformer implements IClassTransformer {
 				replaceClassMethod(RENDER_GLOBAL_HOOK, "loadRenderers", "a", "()V", reference);
 				replaceClassMethod(RENDER_GLOBAL_HOOK, "clipRenderersByFrustum", "a", "(Lbft;F)V", reference);
 				replaceClassMethod(RENDER_GLOBAL_HOOK, "sortAndRender", "a", "(Lof;ID)I", reference);
+				replaceClassMethod(RENDER_GLOBAL_HOOK, "renderAllSortedRenderers", "", "", reference);
 
 				replaceClassMethod(RENDER_GLOBAL_HOOK, "markBlockForUpdate", "a", "(III)V", reference);
 				replaceClassMethod(RENDER_GLOBAL_HOOK, "markBlockForRenderUpdate", "b", "(III)V", reference);
@@ -59,14 +60,14 @@ public class KronosTransformer implements IClassTransformer {
 				replaceClassMethod(MINECRAFT_HOOK, "checkGLError", "c", "(Ljava/lang/String;)V", reference);
 				break;
 			case TESSELLATOR:
-				TessellatorHook.redirectTessellatorFunc("addVertexWithUV", "", "(DDDDD)V", reference);
-				TessellatorHook.redirectTessellatorFunc("addVertex", "", "(DDD)V", reference);
-				TessellatorHook.redirectTessellatorFunc("setTextureUV", "", "(DD)V", reference);
-				TessellatorHook.redirectTessellatorFunc("setColorRGBA", "", "(IIII)V", reference);
-				TessellatorHook.redirectTessellatorFunc("setBrightness", "", "(I)V", reference);
-				TessellatorHook.redirectTessellatorFunc("disableColor", "", "()V", reference);
-				TessellatorHook.redirectTessellatorFunc("setTranslation", "", "(DDD)V", reference);
-				TessellatorHook.redirectTessellatorFunc("addTranslation", "", "(FFF)V", reference);
+				TessellatorHook.redirectTessellatorFunc("addVertexWithUV", "a", "(DDDDD)V", reference);
+				TessellatorHook.redirectTessellatorFunc("addVertex", "a", "(DDD)V", reference);
+				TessellatorHook.redirectTessellatorFunc("setTextureUV", "a", "(DD)V", reference);
+				TessellatorHook.redirectTessellatorFunc("setColorRGBA", "a", "(IIII)V", reference);
+				TessellatorHook.redirectTessellatorFunc("setBrightness", "c", "(I)V", reference);
+				TessellatorHook.redirectTessellatorFunc("disableColor", "c", "()V", reference);
+				TessellatorHook.redirectTessellatorFunc("setTranslation", "b", "(DDD)V", reference);
+				TessellatorHook.redirectTessellatorFunc("addTranslation", "c", "(FFF)V", reference);
 				break;
 		}
 
