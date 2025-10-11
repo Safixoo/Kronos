@@ -66,7 +66,15 @@ public class HookUtils {
 		throw new RuntimeException("Couldn't find object");
 	}
 
-	public static Field getField(Object instance, String fieldName) {
+	public static Field getField(Object instance, String fieldName, String fieldNotch) {
+		if (!BlocksFlags.DETECTED) {
+			BlocksFlags.processDevInfo();
+		}
+
+		if (!BlocksFlags.DEV_ENVIRONMENT) {
+			fieldName = fieldNotch;
+		}
+
 		try {
 			Field mcField = instance.getClass().getDeclaredField(fieldName);
 			mcField.setAccessible(true);

@@ -51,7 +51,7 @@ void main() {
 
     gl_Position = u_ProjMat * position;
 
-    v_Distance = dot(position, position);
+    v_Distance = length(position);
     v_Color = a_Color * texture(u_LightTex, lightmapUv(a_Lightmap)).rgb;
     v_TextureUv = a_Uv * (1.0 / 65536.0);
 }

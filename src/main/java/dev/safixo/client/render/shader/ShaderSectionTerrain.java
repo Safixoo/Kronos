@@ -89,8 +89,8 @@ public class ShaderSectionTerrain {
 		GL20.glUniform1i(this.u_TexId, 0);
 		GL20.glUniform1i(this.u_LightTex, 1);
 
-		GL20.glUniform1f(this.u_FogEnd, noFog ? 1E+12F : MathExt.square(FogData.FOG_END));
-		GL20.glUniform1f(this.u_FogStart, noFog ? 1E+12F : MathExt.square(FogData.FOG_START));
+		GL20.glUniform1f(this.u_FogEnd, noFog ? 1E+12F : FogData.FOG_END);
+		GL20.glUniform1f(this.u_FogStart, noFog ? 1E+12F : FogData.FOG_START);
 
 		float[] fogColor = FogData.FOG_COLOR;
 

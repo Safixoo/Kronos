@@ -8,15 +8,23 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderGlobal;
 import net.minecraft.client.renderer.culling.ICamera;
 import net.minecraft.entity.EntityLivingBase;
+import org.lwjgl.opengl.GL11;
 
-import java.lang.reflect.Field;
 import java.util.List;
 
 public class RenderGlobalHook {
-	static SectionManager MANAGER;
-	static boolean SHOULD_RELOAD;
+	public static SectionManager MANAGER;
+	public static boolean SHOULD_RELOAD;
+
+	public static boolean OPTIFINE_CHECKED = false;
+	public static boolean OPTIFINE_ACTIVE = false;
 
 	public static void loadRenderers(RenderGlobal renderGlobal) {
+		if (!OPTIFINE_CHECKED) {
+			checkOptifineExistence();
+			OPTIFINE_CHECKED = true;
+		}
+
 		Block.leaves.setGraphicsLevel(Minecraft.getMinecraft().gameSettings.fancyGraphics);
 		int renderDistance = Minecraft.getMinecraft().gameSettings.renderDistance;
 
@@ -32,6 +40,15 @@ public class RenderGlobalHook {
 		HookUtils.setField(renderGlobal, "renderDistance", "field_72739_F", renderDistance);
 	}
 
+	private static void checkOptifineExistence() {
+		try {
+			HookUtils.getField(Minecraft.getMinecraft().gameSettings, "ofRenderDistanceFine", "ofRenderDistanceFine");
+			OPTIFINE_ACTIVE = true;
+		} catch (Exception e) {
+			OPTIFINE_ACTIVE = false;
+		}
+	}
+
 	private void clearBuffers() {
 		VertexWriterManager.clearBuffers();
 	}
@@ -43,11 +60,17 @@ public class RenderGlobalHook {
 
 		Minecraft minecraft = Minecraft.getMinecraft();
 
-		// This is more or less the real metric for chunk distance that the game uses.
-		// 0 - Far, 1 - Normal, 2 - Short, 3 - Tiny.
-		// In the future would be productive replace add a bigger slider for render distance,
-		// like optifine.
-		int realRenderDistance = Math.min(400, ((64 << (3 - minecraft.gameSettings.renderDistance)) >> 5)) + 1;
+		int realRenderDistance;
+
+		if (!OPTIFINE_ACTIVE) {
+			// This is more or less the real metric for chunk distance that the game uses.
+			// 0 - Far, 1 - Normal, 2 - Short, 3 - Tiny.
+			// In the future would be productive replace add a bigger slider for render distance,
+			// like optifine.
+			realRenderDistance = Math.min(400, ((64 << (3 - minecraft.gameSettings.renderDistance)) >> 5)) + 2;
+		} else {
+			realRenderDistance = (Integer) HookUtils.getFieldObj(minecraft.gameSettings, "ofRenderDistanceFine", "ofRenderDistanceFine") >> 4;
+		}
 
 		MANAGER.update(realRenderDistance, cameraX, cameraY, cameraZ, SHOULD_RELOAD, partialTick);
 		SHOULD_RELOAD = false;
@@ -56,12 +79,34 @@ public class RenderGlobalHook {
 	public static void sortAndRender(RenderGlobal global, EntityLivingBase player, int renderPass, double partialTick) {
 		Minecraft minecraft = Minecraft.getMinecraft();
 
+		if (OPTIFINE_ACTIVE) {
+			if (renderPass == 1) {
+				return;
+			}
+		}
+
+		minecraft.entityRenderer.enableLightmap(partialTick);
+
 		MANAGER.drawRenderPass(renderPass);
 
 		if (renderPass == 0) {
 			HookUtils.setField(global, "renderersBeingRendered", "field_72746_N", MANAGER.drawnSolidRenderers);
 			MANAGER.drawnSolidRenderers = 0;
 		}
+
+		if (OPTIFINE_ACTIVE) {
+
+			GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+			GL11.glDepthMask(true);
+			GL11.glEnable(GL11.GL_BLEND);
+			GL11.glDisable(GL11.GL_CULL_FACE);
+
+			MANAGER.drawRenderPass(1);
+
+			GL11.glDisable(GL11.GL_BLEND);
+		}
+
+		minecraft.entityRenderer.disableLightmap(partialTick);
 	}
 
 	public static void markBlockForUpdate(RenderGlobal renderGlobal, int minX, int minY, int minZ) {
