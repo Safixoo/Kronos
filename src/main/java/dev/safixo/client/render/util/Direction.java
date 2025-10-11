@@ -1,7 +1,7 @@
 package dev.safixo.client.render.util;
 
-import dev.safixo.client.render.util.math.Vector3i;
 import net.minecraftforge.common.ForgeDirection;
+import org.joml.Vector3i;
 
 public class Direction {
 	public static final int DOWN    = 0;

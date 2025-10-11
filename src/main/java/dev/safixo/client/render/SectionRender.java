@@ -162,7 +162,7 @@ public class SectionRender {
 	private void meshBlockCenter(RenderBlocks renderBlocks, SectionCache cache, int x, int y, int z, int[] solidBlocks, boolean ambient) {
 		int blockId = cache.getBlockIdCenter(x, y, z);
 
-		if (blockId <= AIR_ID) {
+		if (blockId == AIR_ID) {
 			return;
 		}
 
@@ -171,9 +171,20 @@ public class SectionRender {
 
 		int blockX = x + this.blockX, blockY = y + this.blockY, blockZ = z + this.blockZ;
 
-		if (BlocksFlags.SOLID_LIGHT_MASK[blockId] != 0 || block instanceof BlockLeavesBase) {
+		if (BlocksFlags.SOLID[blockId]) {
+			if (y == 0 || y == 15) {
+				solidBlocks[Direction.DOWN + (y & 1)]++;
+			}
+			if (x == 0 || x == 15) {
+				solidBlocks[Direction.WEST + (x & 1)]++;
+			}
+			if (z == 0 || z == 15) {
+				solidBlocks[Direction.NORTH + (z & 1)]++;
+			}
 			solidBlocks[Direction.COUNT]++;
+		}
 
+		if (false) {
 			int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
 			int drawBitSet = 0;
 
@@ -192,14 +203,14 @@ public class SectionRender {
 				VertexWriterManager.setCurrentInstance(VertexWriterManager.SOLID[MeshDirection.GENERIC]);
 			}
 
-//			renderBlocks.renderBlockByRenderType(block, blockX, blockY, blockZ);
+			renderBlocks.renderBlockByRenderType(block, blockX, blockY, blockZ);
 		}
 	}
 
 	private void meshBlock(RenderBlocks renderBlocks, SectionCache cache, int x, int y, int z, int[] solidBlocks, boolean ambient) {
 		int blockId = cache.getBlockIdCenter(x, y, z);
 
-		if (blockId <= AIR_ID) {
+		if (blockId == AIR_ID) {
 			return;
 		}
 
@@ -210,7 +221,7 @@ public class SectionRender {
 		int blockY = y + this.blockY;
 		int blockZ = z + this.blockZ;
 
-		if (BlocksFlags.SOLID_LIGHT_MASK[blockId] != 0 || block instanceof BlockLeavesBase) {
+		if (BlocksFlags.SOLID[blockId]) {
 			if (y == 0 || y == 15) {
 				solidBlocks[Direction.DOWN + (y & 1)]++;
 			}
@@ -220,7 +231,10 @@ public class SectionRender {
 			if (z == 0 || z == 15) {
 				solidBlocks[Direction.NORTH + (z & 1)]++;
 			}
+			solidBlocks[Direction.COUNT]++;
+		}
 
+		if (false) {
 			int rX = x + 16;
 			int rY = y + 16;
 			int rZ = z + 16;
@@ -233,7 +247,6 @@ public class SectionRender {
 			drawBitSet |= cache.isBlockOpaqueCubeRel(rX - 1, rY, rZ) << WEST;
 			drawBitSet |= cache.isBlockOpaqueCubeRel(rX + 1, rY, rZ) << EAST;
 
-			solidBlocks[Direction.COUNT]++;
 			FullBlockMesher.renderFaces(block, cache, blockX, blockY, blockZ, ambient, ~drawBitSet, blockId);
 		} else {
 			if (blockRenderPass != 0) {
@@ -242,7 +255,7 @@ public class SectionRender {
 				VertexWriterManager.setCurrentInstance(VertexWriterManager.SOLID[MeshDirection.GENERIC]);
 			}
 
-//			renderBlocks.renderBlockByRenderType(block, blockX, blockY, blockZ);
+			renderBlocks.renderBlockByRenderType(block, blockX, blockY, blockZ);
 		}
 	}
 

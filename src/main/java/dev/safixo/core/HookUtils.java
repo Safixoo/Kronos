@@ -1,9 +1,20 @@
 package dev.safixo.core;
 
+import cpw.mods.fml.common.asm.transformers.deobf.FMLDeobfuscatingRemapper;
+import dev.safixo.client.render.util.data.BlocksFlags;
+
 import java.lang.reflect.Field;
 
 public class HookUtils {
-	public static Object getFieldObj(Object instance, String fieldName) {
+	public static Object getFieldObj(Object instance, String fieldName, String fieldNotch) {
+		if (!BlocksFlags.DETECTED) {
+			BlocksFlags.processDevInfo();
+		}
+
+		if (!BlocksFlags.DEV_ENVIRONMENT) {
+			fieldName = fieldNotch;
+		}
+
 		try {
 			Field mcField = instance.getClass().getDeclaredField(fieldName);
 			mcField.setAccessible(true);
@@ -13,10 +24,18 @@ public class HookUtils {
 			e.printStackTrace();
 		}
 
-		return null;
+		throw new RuntimeException("Couldn't find object");
 	}
 
-	public static void setField(Object instance, String fieldName, Object value) {
+	public static void setField(Object instance, String fieldName, String fieldNotch, Object value) {
+		if (!BlocksFlags.DETECTED) {
+			BlocksFlags.processDevInfo();
+		}
+
+		if (!BlocksFlags.DEV_ENVIRONMENT) {
+			fieldName = fieldNotch;
+		}
+
 		try {
 			Field mcField = instance.getClass().getDeclaredField(fieldName);
 			mcField.setAccessible(true);
@@ -24,6 +43,27 @@ public class HookUtils {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+	}
+
+	public static Object getFieldStatic(Class<?> clazz, String fieldName, String fieldNotch) {
+		if (!BlocksFlags.DETECTED) {
+			BlocksFlags.processDevInfo();
+		}
+
+		if (!BlocksFlags.DEV_ENVIRONMENT) {
+			fieldName = fieldNotch;
+		}
+
+		try {
+			Field mcField = clazz.getDeclaredField(fieldName);
+			mcField.setAccessible(true);
+
+			return mcField.get(null);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		throw new RuntimeException("Couldn't find object");
 	}
 
 	public static Field getField(Object instance, String fieldName) {
@@ -36,6 +76,6 @@ public class HookUtils {
 			e.printStackTrace();
 		}
 
-		return null;
+		throw new RuntimeException("Couldn't find object");
 	}
 }

@@ -42,7 +42,7 @@ vec3 extractBlockPos(uvec2 atPosition) {
 
 vec2 lightmapUv(uint lightmap) {
     uvec2 uv = (uvec2(a_Lightmap) >> uvec2(4, 0)) & 0xF;
-    return clamp(uv + 0.5, vec2(0.5), vec2(15.5)) * (1.0 / 16.0);
+    return max(vec2(1.0), uv - 0.5) * (1.0 / 15.0);
 }
 
 void main() {

@@ -2,11 +2,7 @@ package dev.safixo;
 
 import cpw.mods.fml.common.Mod;
 import cpw.mods.fml.common.event.FMLInitializationEvent;
-import dev.safixo.client.render.util.data.BlocksFlags;
-import net.minecraft.client.gui.GuiMainMenu;
-import net.minecraftforge.client.event.GuiOpenEvent;
 import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.event.ForgeSubscribe;
 
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
@@ -22,13 +18,9 @@ public class KronosMod {
 
 	@Mod.EventHandler
 	public void preInit(FMLInitializationEvent event) {
-		//LOGGER.info("Hello from Minecraft!");
 	}
 
-	@ForgeSubscribe
-	public void onMainMenu(GuiOpenEvent event) {
-		BlocksFlags.computeFlagArrays();
-		BlocksFlags.processModelMethods();
+	@Mod.EventHandler
+	public void init(FMLInitializationEvent event) {
 	}
-
 }

@@ -1,7 +1,7 @@
 package dev.safixo.client.render.meshing;
 
-import dev.safixo.client.render.util.math.Vector3i;
 import dev.safixo.client.render.util.Direction;
+import org.joml.Vector3i;
 
 public class FacingRender {
 	public byte aoCornerX0, aoCornerY0, aoCornerZ0;

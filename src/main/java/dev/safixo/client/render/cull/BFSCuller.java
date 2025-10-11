@@ -64,7 +64,7 @@ public class BFSCuller {
 
 		int distance = withinRenderDistance(distX, distY, distZ);
 
-		if (distance >= fogEnd || !(true || FrustumCuller.testAab(distX, distY, distZ))) {
+		if (distance >= fogEnd || !(FrustumCuller.testAab(distX, distY, distZ))) {
 			return true;
 		}
 
@@ -111,7 +111,7 @@ public class BFSCuller {
 				bfsQueue.regionRenders[bfsQueue.regionPos++] = region;
 			}
 
-			region.renderIndices[region.sectionsToRender++ & 0xFF] = (byte) section.regionIndex;
+			region.renderIndices[region.sectionsToRender++] = (byte) section.regionIndex;
 		}
 	}
 

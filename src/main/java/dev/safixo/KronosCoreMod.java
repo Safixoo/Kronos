@@ -1,10 +1,12 @@
-package dev.safixo.core;
+package dev.safixo;
 
 import cpw.mods.fml.relauncher.IFMLLoadingPlugin;
+import dev.safixo.core.KronosTransformer;
 
 import java.util.Map;
 
-@IFMLLoadingPlugin.Name("KronosCoreMod")
+@IFMLLoadingPlugin.Name("kronos")
+@IFMLLoadingPlugin.MCVersion("1.6.4")
 public class KronosCoreMod implements IFMLLoadingPlugin {
 	@Override
 	public String[] getLibraryRequestClass() {

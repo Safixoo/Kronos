@@ -1,12 +1,8 @@
 package dev.safixo.client.render.shader;
 
-import dev.safixo.client.render.util.math.Matrix4f;
 import dev.safixo.client.render.util.memory.NativeBuffer;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.ActiveRenderInfo;
-import net.minecraft.client.renderer.GLAllocation;
 import org.lwjgl.input.Keyboard;
-import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL20;
 import dev.safixo.KronosMod;
 import dev.safixo.client.render.cull.FrustumCuller;
@@ -26,7 +22,7 @@ public class ShaderSectionTerrain {
 	private int u_FragCoordToViewCoord;
 	private int u_FogEnd, u_FogStart, u_FogColor;
 
-	public static final FloatBuffer TEMP_BUFFER = GLAllocation.createDirectFloatBuffer(16);
+	public static final FloatBuffer TEMP_BUFFER = NativeBuffer.memAllocFloat(16);
 
 	public ShaderSectionTerrain() {
 		this.prepareAndCompileShader();
@@ -87,15 +83,8 @@ public class ShaderSectionTerrain {
 	}
 
 	public void setupUniforms(boolean noFog) {
-		((Buffer) TEMP_BUFFER).clear();
-		GL11.glGetFloat(GL11.GL_PROJECTION_MATRIX, TEMP_BUFFER);
-		((Buffer) TEMP_BUFFER).flip().limit(16);
-		GL20.glUniformMatrix4(this.u_ProjMat, false, TEMP_BUFFER);
-
-		((Buffer) TEMP_BUFFER).clear();
-		GL11.glGetFloat(GL11.GL_MODELVIEW_MATRIX, TEMP_BUFFER);
-		((Buffer) TEMP_BUFFER).flip().limit(16);
-		GL20.glUniformMatrix4(this.u_ModelViewMat, false, TEMP_BUFFER);
+		GL20.glUniformMatrix4(this.u_ProjMat, false, FrustumCuller.projectionBuff);
+		GL20.glUniformMatrix4(this.u_ModelViewMat, false, FrustumCuller.modelViewBuff);
 
 		GL20.glUniform1i(this.u_TexId, 0);
 		GL20.glUniform1i(this.u_LightTex, 1);

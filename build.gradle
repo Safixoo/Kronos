@@ -37,22 +37,25 @@ repositories {
 
 dependencies {
     // https://mvnrepository.com/artifact/it.unimi.dsi/fastutil
-    implementation('it.unimi.dsi:fastutil:6.5.7')
+    implementation('it.unimi.dsi:fastutil:7.1.0')
+    // https://mvnrepository.com/artifact/org.joml/joml
+    implementation("org.joml:joml:1.9.20")
 }
 
 jar {
     manifest {
         attributes(
-                'FMLCorePlugin': 'dev.safixo.core.KronosCoreMod',
-                'FMLCorePluginContainsFMLMod': 'true'
+                'FMLCorePlugin': 'dev.safixo.KronosCoreMod'
         )
     }
+
+//    from { configurations.runtimeClasspath.collect { zipTree(it) } }
+//    exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA'
 }
 
 tasks.named("runClient") {
-    jvmArgs += ["-Dfml.coreMods.load=dev.safixo.core.KronosCoreMod"]
+    jvmArgs += ["-Dfml.coreMods.load=dev.safixo.KronosCoreMod"]
 }
-
 
 tasks.withType(JavaExec).configureEach {
     doFirst {

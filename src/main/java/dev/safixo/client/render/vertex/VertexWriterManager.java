@@ -20,6 +20,7 @@ public class VertexWriterManager {
 	public double trasX, trasY, trasZ;
 	public double u, v;
 	public int color, lightMap, normal;
+	public boolean disableColor;
 
 	private long capacity;
 	private long vertexPtr;
@@ -60,6 +61,10 @@ public class VertexWriterManager {
 		return DEFAULT_INSTANCE;
 	}
 
+	public static boolean isCurrentDrawing() {
+		return getCurrentInstance().isDrawing;
+	}
+
 	public static void startDefaults() {
 		for (int dir = 0; dir < MeshDirection.COUNT; dir++) {
 			SOLID[dir] = new VertexWriterManager();
@@ -75,6 +80,7 @@ public class VertexWriterManager {
 		this.offset = 0;
 		this.vertices = 0;
 		this.isDrawing = true;
+		this.disableColor = false;
 	}
 
 	public void ensureCapacity(int offset) {
@@ -107,6 +113,7 @@ public class VertexWriterManager {
 		this.offset = 0;
 		this.vertices = 0;
 		this.isDrawing = false;
+		this.disableColor = false;
 	}
 
 	public void clear() {

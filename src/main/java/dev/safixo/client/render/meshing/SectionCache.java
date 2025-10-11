@@ -97,6 +97,7 @@ public class SectionCache implements IBlockAccess {
 						BLOCK_LIGHT[sectionIndex] = section.getBlocklightArray().data != null ? section.getBlocklightArray().data : DEFAULT_BYTE_ARRAY;
 					} else {
 						SECTION_BLOCKS[sectionIndex] = DEFAULT_BYTE_ARRAY;
+						SECTION_DATA[sectionIndex] = DEFAULT_BYTE_ARRAY;
 						SKY_LIGHT[sectionIndex] = DEFAULT_FULL_BYTE_ARRAY;
 						BLOCK_LIGHT[sectionIndex] = DEFAULT_BYTE_ARRAY;
 					}
@@ -147,7 +148,7 @@ public class SectionCache implements IBlockAccess {
 		int sectInd = sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
 		int blockInd = makeBlockIndex(blockX & 15, blockY & 15, blockZ & 15);
 
-		return processSign(SECTION_BLOCKS[sectInd][blockInd]);
+		return byteToUnsigned(SECTION_BLOCKS[sectInd][blockInd]);
 	}
 
 	@Override
@@ -165,18 +166,18 @@ public class SectionCache implements IBlockAccess {
 
 		int sectionIndex = sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
 
-		if (BlocksFlags.SOLID[processSign(SECTION_BLOCKS[sectionIndex][blockIndex])]) {
+		if (BlocksFlags.SOLID[byteToUnsigned(SECTION_BLOCKS[sectionIndex][blockIndex])]) {
 			return 0;
 		}
 
 		int skyLight = getNibble(SKY_LIGHT[sectionIndex], blockIndex);
 		int blockLight = getNibble(BLOCK_LIGHT[sectionIndex], blockIndex);
 
-		return MathExt.getLightmapCoord(skyLight, blockLight);
+		return MathExt.getLightmapCoord(skyLight & 0xF, blockLight & 0xF);
 	}
 
 	public int getBlockIdCenter(int x, int y, int z) {
-		return CENTER_BLOCKS[makeBlockIndex(x & 15, y & 15, z & 15)];
+		return byteToUnsigned(CENTER_BLOCKS[makeBlockIndex(x & 15, y & 15, z & 15)]);
 	}
 
 	public int getBlockIdCenter(int blockIndex) {
@@ -230,14 +231,14 @@ public class SectionCache implements IBlockAccess {
 
 		int sectionIndex = sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
 
-		return BlocksFlags.SOLID_LIGHT_MASK[processSign(SECTION_BLOCKS[sectionIndex][blockIndex])];
+		return BlocksFlags.SOLID_LIGHT_MASK[byteToUnsigned(SECTION_BLOCKS[sectionIndex][blockIndex])];
 	}
 
 	public int isBlockOpaqueCubeRel(int x, int y, int z) {
 		int sectionIndex = sectionIndex(x >> 4, y >> 4, z >> 4);
 		int blockInd = makeBlockIndex(x & 15, y & 15, z & 15);
 
-		return BlocksFlags.SOLID_LIGHT_MASK[processSign(SECTION_BLOCKS[sectionIndex][blockInd])];
+		return BlocksFlags.SOLID_LIGHT_MASK[byteToUnsigned(SECTION_BLOCKS[sectionIndex][blockInd])];
 	}
 
 	@Override
@@ -246,14 +247,12 @@ public class SectionCache implements IBlockAccess {
 	}
 
 	public int isBlockOpaqueCubeCenter(int blockIndex) {
-		return BlocksFlags.SOLID_LIGHT_MASK[processSign(CENTER_BLOCKS[blockIndex])];
+		return BlocksFlags.SOLID_LIGHT_MASK[byteToUnsigned(CENTER_BLOCKS[blockIndex])];
 	}
 
 	// For some fucking reason there is a block with -127 id.
-	public static int processSign(int id) {
-		// if it is negative it masks off all the bits
-		// if it is positive does work normally.
-		return id & ~(id >> 31);
+	public static int byteToUnsigned(byte id) {
+		return id & 0xFF;
 	}
 
 	@Override

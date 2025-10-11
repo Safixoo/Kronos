@@ -9,6 +9,7 @@ import net.minecraft.client.renderer.RenderGlobal;
 import net.minecraft.client.renderer.culling.ICamera;
 import net.minecraft.entity.EntityLivingBase;
 
+import java.lang.reflect.Field;
 import java.util.List;
 
 public class RenderGlobalHook {
@@ -23,13 +24,12 @@ public class RenderGlobalHook {
 		MANAGER.setWorld(Minecraft.getMinecraft().theWorld);
 		SHOULD_RELOAD = true;
 
-		((List<?>) HookUtils.getFieldObj(renderGlobal, "worldRenderersToUpdate")).clear();
-		((List<?>) HookUtils.getFieldObj(renderGlobal, "tileEntities")).clear();
+		((List<?>) HookUtils.getFieldObj(renderGlobal, "tileEntities", "field_72762_a")).clear();
 
 		VertexWriterManager.startDefaults();
 
-		HookUtils.setField(renderGlobal, "renderEntitiesStartupCounter", 2);
-		HookUtils.setField(renderGlobal, "renderDistance", renderDistance);
+		HookUtils.setField(renderGlobal, "renderEntitiesStartupCounter", "field_72740_G", 2);
+		HookUtils.setField(renderGlobal, "renderDistance", "field_72739_F", renderDistance);
 	}
 
 	private void clearBuffers() {
@@ -37,9 +37,9 @@ public class RenderGlobalHook {
 	}
 
 	public static void clipRenderersByFrustum(RenderGlobal renderGlobal, ICamera frustum, float partialTick) {
-		double cameraX = (Double) HookUtils.getFieldObj(frustum, "xPosition");
-		double cameraY = (Double) HookUtils.getFieldObj(frustum, "yPosition");
-		double cameraZ = (Double) HookUtils.getFieldObj(frustum, "zPosition");
+		double cameraX = (Double) HookUtils.getFieldObj(frustum, "xPosition", "field_78550_b");
+		double cameraY = (Double) HookUtils.getFieldObj(frustum, "yPosition", "field_78551_c");
+		double cameraZ = (Double) HookUtils.getFieldObj(frustum, "zPosition", "field_78549_d");
 
 		Minecraft minecraft = Minecraft.getMinecraft();
 
@@ -61,9 +61,7 @@ public class RenderGlobalHook {
 		minecraft.entityRenderer.disableLightmap(partialTick);
 
 		if (renderPass == 0) {
-			HookUtils.setField(global, "renderersBeingRendered", MANAGER.drawnSolidRenderers);
-//			this.renderersBeingRendered = this.manager.drawnSolidRenderers;
-//			this.renderersLoaded = this.manager.drawnSolidRenderers;
+			HookUtils.setField(global, "renderersBeingRendered", "field_72746_N", MANAGER.drawnSolidRenderers);
 			MANAGER.drawnSolidRenderers = 0;
 		}
 	}

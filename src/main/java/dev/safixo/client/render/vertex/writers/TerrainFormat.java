@@ -81,14 +81,14 @@ public class TerrainFormat extends VertexFormat {
 
 		UnsafeUtil.memPutLong(ptr, position);
 		UnsafeUtil.memPutInt(ptr + 8, processUv(u, v));
-		UnsafeUtil.memPutInt(ptr + 12, color & 0xFF_FF_FF);
+		UnsafeUtil.memPutInt(ptr + 12, color);
 		UnsafeUtil.memPutInt(ptr + 15, compressLightmap(lightMap));
 	}
 
 	// skylight << 20 | blocklight << 4
 	private static int compressLightmap(int lightmap) {
-		int skyLight4 = MathExt.clamp((lightmap >>> 20) & 0xFF, 0, 0xF);
-		int blockLight4 = MathExt.clamp((lightmap >>> 4) & 0xFF, 0, 0xF);
+		int skyLight4 = MathExt.clamp((lightmap >>> 20) & 0xF, 0, 0xF);
+		int blockLight4 = MathExt.clamp((lightmap >>> 4) & 0xF, 0, 0xF);
 
 		return skyLight4 | blockLight4 << 4;
 	}

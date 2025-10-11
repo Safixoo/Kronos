@@ -12,6 +12,10 @@ public class ColorBGRManager {
 		return (blue << 16) | (green << 8) | (red << 0);
 	}
 
+	public static int packColor(int r, int g, int b) {
+		return (b << 16) | (g << 8) | (r << 0);
+	}
+
 	public static int multiplyColor(int color, float factor) {
 		return multiplyColor(color, (int) (factor * 256));
 	}
@@ -47,7 +51,7 @@ public class ColorBGRManager {
 	}
 
 	public static int normToInt(float color) {
-		return (int) (color * NORMALIZED_TO_INTEGER) & 255;
+		return MathExt.clamp((int) (color * NORMALIZED_TO_INTEGER), 0, 0xFF) & 0xFF;
 	}
 
 	public static int intToNorm(int color) {

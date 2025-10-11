@@ -69,6 +69,10 @@ public class SectionManager {
 		return INSTANCE;
 	}
 
+	public CameraData getCamera() {
+		return this.camera;
+	}
+
 	public static RegionManager getRegionManager() {
 		return getCurrentInstance().regionManager;
 	}
@@ -184,14 +188,14 @@ public class SectionManager {
 			this.lastRemoveZ = cameraZ;
 
 			this.clearRenderer();
-			this.generateWholeVolume(cameraX, cameraZ);
+//			this.generateWholeVolume(cameraX, cameraZ);
 		}
 
 		double diffX = MathExt.square(cameraX - this.lastUpdateX);
 		double diffZ = MathExt.square(cameraZ - this.lastUpdateZ);
 
 		if (diffX + diffZ >= MathExt.square(4.0)) {
-			this.generateSections();
+			this.generateSections(true);
 		}
 
 		EntityClientPlayerMP playerLocal = Minecraft.getMinecraft().thePlayer;
@@ -296,7 +300,7 @@ public class SectionManager {
 		return MathExt.floor(position) >> 4;
 	}
 
-	private void generateSections() {
+	private void generateSections(boolean onlyRemoval) {
 		int lastChunkCameraX = posToSectionIntegral(this.lastUpdateX);
 		int lastChunkCameraZ = posToSectionIntegral(this.lastUpdateZ);
 
@@ -338,27 +342,29 @@ public class SectionManager {
 				int safeDistanceCheck = Math.max(0, renderDistance - 5);
 				long position = asLong(chunkX, chunkZ);
 
-				// Add new sections in distance.
-				if (newX >= safeDistanceCheck) {
-					this.lastUpdateX = this.camera.cameraXD();
+				if (!onlyRemoval) {
+					// Add new sections in distance.
+					if (newX >= safeDistanceCheck) {
+						this.lastUpdateX = this.camera.cameraXD();
 
-					if (!this.chunkExistence.contains(position)) {
-						for (int y = 0; y < 16; y++) {
-							this.addRender(chunkX, y, chunkZ, false);
+						if (!this.chunkExistence.contains(position)) {
+							for (int y = 0; y < 16; y++) {
+								this.addRender(chunkX, y, chunkZ, false);
+							}
+
+							this.chunkExistence.add(position);
 						}
-
-						this.chunkExistence.add(position);
 					}
-				}
-				if (newZ >= safeDistanceCheck) {
-					if (!this.chunkExistence.contains(position)) {
-						this.lastUpdateZ = this.camera.cameraZD();
+					if (newZ >= safeDistanceCheck) {
+						if (!this.chunkExistence.contains(position)) {
+							this.lastUpdateZ = this.camera.cameraZD();
 
-						for (int y = 0; y < 16; y++) {
-							this.addRender(chunkX, y, chunkZ, false);
+							for (int y = 0; y < 16; y++) {
+								this.addRender(chunkX, y, chunkZ, false);
+							}
+
+							this.chunkExistence.add(position);
 						}
-
-						this.chunkExistence.add(position);
 					}
 				}
 
