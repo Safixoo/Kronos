@@ -75,9 +75,9 @@ public class SectionRender {
 		this.prepareWriterForTerrain(translucentWriter);
 
 		int[] solidFaces = new int[Direction.COUNT + 1];
-		boolean ambient = Minecraft.getMinecraft().gameSettings.ambientOcclusion == 1;
+		boolean ambient = Minecraft.getMinecraft().gameSettings.ambientOcclusion != 0;
 
-		if (!sectionCache.isSectionEmpty()) {
+		if (!sectionCache.extendedLevelsInChunkCache()) {
 			// 15x15x15 center blocks.
 			for (int y = 1; y < 15; y++) {
 				for (int z = 1; z < 15; z++) {
@@ -179,7 +179,7 @@ public class SectionRender {
 
 		int blockX = x + this.blockX, blockY = y + this.blockY, blockZ = z + this.blockZ;
 
-		if (BlocksFlags.SOLID_LIGHT_MASK[blockId] != 0) {
+		if (BlocksFlags.SOLID[blockId]) {
 			if (y == 0 || y == 15) {
 				solidBlocks[Direction.DOWN + (y & 1)]++;
 			}
@@ -232,7 +232,7 @@ public class SectionRender {
 		int blockY = y + this.blockY;
 		int blockZ = z + this.blockZ;
 
-		if (BlocksFlags.SOLID_LIGHT_MASK[blockId] != 0) {
+		if (BlocksFlags.SOLID[blockId]) {
 			if (y == 0 || y == 15) {
 				solidBlocks[Direction.DOWN + (y & 1)]++;
 			}

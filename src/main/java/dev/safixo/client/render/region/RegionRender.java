@@ -23,6 +23,7 @@ public class RegionRender {
 	// - SOLID (0)
 	// - TRANSLUCENT (1)
 	private static final int RENDER_PASSES = 2;
+	private static final int SOLID_PASS = 0, TRANSLUCENT_PASS = 1;
 
 	// Region total volume area in SectionRenders.
 	public static final int REGION_SECTION_SIZE = 256; // 8 * 4 * 8
@@ -85,7 +86,7 @@ public class RegionRender {
 	// conditions/ways, also makes batching generally much more effective.
 	private final int[] meshDirectionsOrdered = new int[REGION_SECTION_SIZE];
 
-	private boolean shouldCache = false;
+	private boolean[] shouldCachePass = new boolean[RENDER_PASSES];
 	private int lastVisibleSet = -1, lastVisibleCount;
 
 	// Number of sections queued for draw in the current frame.
@@ -115,7 +116,8 @@ public class RegionRender {
 	}
 
 	public void clear() {
-		this.shouldCache = false;
+		this.shouldCachePass[SOLID_PASS] = false;
+		this.shouldCachePass[TRANSLUCENT_PASS] = false;
 
 		Arrays.fill(this.regionDrawData, 0L);
 
@@ -131,9 +133,9 @@ public class RegionRender {
 		if (this.translucentBuffer != null) {
 			SectionManager.getCurrentInstance().removeUsedMemory(this.translucentBuffer.offset);
 
+			this.translucentBuffer.clear();
 			this.translucentBuffer.capacity = 0;
 			this.translucentBuffer.offset = 0;
-			this.translucentBuffer.clear();
 			this.translucentBuffer = null;
 		}
 
@@ -155,7 +157,7 @@ public class RegionRender {
 	}
 
 	public void addSolidMesh(SectionRender render, VertexWriterManager manager, int side) {
-		this.shouldCache = false;
+		this.shouldCachePass[SOLID_PASS] = false;
 
 		if (this.solidBuffer == null) {
 			this.solidBuffer = new RegionAllocation(manager.getVertices() * TerrainFormat.STRIDE);
@@ -176,7 +178,7 @@ public class RegionRender {
 	}
 
 	public void addTranslucentMesh(SectionRender render, VertexWriterManager manager) {
-		this.shouldCache = false;
+		this.shouldCachePass[TRANSLUCENT_PASS] = false;
 
 		if (this.translucentBuffer == null) {
 			this.translucentBuffer = new RegionAllocation(manager.getVertices() * TerrainFormat.STRIDE);
@@ -189,11 +191,11 @@ public class RegionRender {
 		int index = (render.regionIndex * TOTAL_DRAWS) + SOLID_DRAWS;
 
 		if (this.regionDrawData[index] == 0) {
-			this.regionDrawData[index] = this.translucentBuffer.allocate(render, manager.getVertexData(), manager.getVertices(), 0);
+			this.regionDrawData[index] = this.translucentBuffer.allocate(render, manager.getVertexData(), manager.getVertices(), 1);
 			return;
 		}
 
-		this.regionDrawData[index] = this.translucentBuffer.renewAllocation(render, manager.getVertexData(), manager.getVertices(), 0);
+		this.regionDrawData[index] = this.translucentBuffer.renewAllocation(render, manager.getVertexData(), manager.getVertices(), 1);
 	}
 
 	public void deleteRenderAllocation(SectionRender render) {
@@ -225,7 +227,7 @@ public class RegionRender {
 		}
 
 		// Try to re-use the last draw command setup.
-		if (this.shouldCache && this.shouldUseCachedDraw(camera)) {
+		if (this.shouldCachePass[pass] && this.shouldUseCachedDraw(camera)) {
 			int drawCount = this.lastDrawCount[pass];
 
 			if (drawCount != 0) {
@@ -273,7 +275,7 @@ public class RegionRender {
 		}
 
 		this.multiDrawData(camera, shader, pass, drawCount);
-		this.shouldCache = true;
+		this.shouldCachePass[pass] = true;
 	}
 
 	private void multiDrawData(CameraData camera, ShaderSectionTerrain shader, int pass, int drawCount) {

@@ -72,6 +72,10 @@ public class ShaderSectionTerrain {
 		this.u_FragCoordToViewCoord = GL20.glGetUniformLocation(this.programId, "u_FragCoordToViewCoord");
 	}
 
+	public void delete() {
+		GL20.glDeleteProgram(this.programId);
+	}
+
 	public void unbindProgram() {
 		GL20.glUseProgram(0);
 	}

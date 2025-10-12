@@ -113,10 +113,6 @@ public class SectionCache implements IBlockAccess {
 		return x + (z * 3) + (y * 9);
 	}
 
-	public boolean isSectionEmpty() {
-		return this.centerSectEmpty;
-	}
-
 	public static int getNibble(byte[] nibbleArray, int blockIndex) {
 		int nibbleIndex = blockIndex >> 1;
 		int nibblePart = blockIndex & 1;
@@ -251,7 +247,6 @@ public class SectionCache implements IBlockAccess {
 		return BlocksFlags.SOLID_LIGHT_MASK[byteToUnsigned(CENTER_BLOCKS[blockIndex])];
 	}
 
-	// For some fucking reason there is a block with -127 id.
 	public static int byteToUnsigned(byte id) {
 		return id & 0xFF;
 	}
