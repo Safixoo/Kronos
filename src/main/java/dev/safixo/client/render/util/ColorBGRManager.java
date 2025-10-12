@@ -21,9 +21,9 @@ public class ColorBGRManager {
 	}
 
 	public static int multiplyColorByColor(int color1, int color2) {
-		int r = ((color1 & 0xFF_00_00) * (color2 & 0xFF_00_00)) & 0xFF_00_00_00;
-		int g = ((color1 & 0x00_FF_00) * (color2 & 0x00_FF_00)) & 0x00_FF_00_00;
-		int b = ((color1 & 0x00_00_FF) * (color2 & 0x00_00_FF)) & 0x00_00_FF_00;
+		int r = ((color1 & 0xFF_00_00) * ((color2 >> 16) & 0xFF)) & 0xFF_00_00_00;
+		int g = ((color1 & 0x00_FF_00) * ((color2 >> 8) & 0xFF)) & 0x00_FF_00_00;
+		int b = ((color1 & 0x00_00_FF) * ((color2 >> 0) & 0xFF)) & 0x00_00_FF_00;
 
 		return (r | g | b) >>> 8;
 	}
@@ -56,5 +56,17 @@ public class ColorBGRManager {
 
 	public static int intToNorm(int color) {
 		return (int) (color * INTEGER_TO_NORMALIZED);
+	}
+
+	public static int extractRed(int color) {
+		return (color >>> 0) & 0xFF;
+	}
+
+	public static int extractGreen(int color) {
+		return (color >>> 8) & 0xFF;
+	}
+
+	public static int extractBlue(int color) {
+		return (color >>> 16) & 0xFF;
 	}
 }

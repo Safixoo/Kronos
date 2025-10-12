@@ -9,6 +9,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.EntityClientPlayerMP;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.item.ItemEgg;
+import net.minecraft.profiler.Profiler;
 import net.minecraft.world.World;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.opengl.GL11;
@@ -22,10 +23,10 @@ import dev.safixo.client.render.region.RegionManager;
 import dev.safixo.client.render.region.RegionRender;
 import dev.safixo.client.render.util.Direction;
 import dev.safixo.client.render.util.MathExt;
-import org.lwjgl.opengl.GL20;
 
 public class SectionManager {
-	private static final int MAX_UPDATE_QUEUES = 15;
+	private static final int MAX_UPDATE_QUEUES = 30;
+	private static final long THRESHOLD_IN_NANOS = 1000000000L / 4;
 
 	private final Long2ReferenceOpenHashMap<SectionRender> sectionMap = new Long2ReferenceOpenHashMap<>();
 	private final LongOpenHashSet chunkExistence = new LongOpenHashSet();
@@ -41,9 +42,6 @@ public class SectionManager {
 	private double lastRemoveX, lastRemoveZ;
 	private int renderDistance;
 
-	private long lastPositionCache = -1;
-	private SectionRender lastSectionCache = null;
-
 	private long vramUsed;
 	private long vramAllocated;
 	public int drawnSolidRenderers;
@@ -54,6 +52,7 @@ public class SectionManager {
 	private long lastFrameBudget;
 
 	private ShaderSectionTerrain terrainShader;
+	private long timeSinceNullTerrain;
 
 	public SectionManager(World world) {
 		INSTANCE = this;
@@ -145,11 +144,11 @@ public class SectionManager {
 			return;
 		}
 
-		if (this.camera != null && MathExt.squaredDistance(sectionRender, this.camera) < MathExt.square(48.0f)) {
+		sectionRender.flags = SectionFlags.setDirty(sectionRender.flags, true);
+
+		if (this.camera != null && MathExt.squaredDistance(sectionRender, this.camera) < MathExt.square(64.0f)) {
 			UpdateQueue.addToQueue(sectionRender);
 		}
-
-		sectionRender.flags = SectionFlags.setDirty(sectionRender.flags, true);
 	}
 
 	public SectionRender addRender(int posX, int posY, int posZ, boolean trulyNew) {
@@ -171,7 +170,15 @@ public class SectionManager {
 	public void updateExistentSections(int posX, int posY, int posZ, boolean neighborUpdate) {
 		long position = asLong(posX, posY, posZ);
 
-		SectionRender sectionRender = this.sectionMap.get(position);
+		SectionRender sectionRender = null;
+
+		// Sometimes for some reason this catches some exceptions,
+		// IDK why, maybe something concurrently happens (??).
+		try {
+			sectionRender = this.sectionMap.get(position);
+		} catch (Exception ignored) {
+
+		}
 
 		// Don't really want to mess with chunk loading bullshit, simply load
 		// things already in the distance of the player.
@@ -192,7 +199,19 @@ public class SectionManager {
 				render.flags = SectionFlags.setDirty(render.flags, true);
 			}
 		}
+	}
 
+	public static void destroyInstance() {
+		if (INSTANCE == null) {
+			return;
+		}
+
+		if (INSTANCE.terrainShader != null) {
+			INSTANCE.terrainShader.delete();
+		}
+
+		INSTANCE.clearRenderer();
+		INSTANCE = null;
 	}
 
 	public void update(int renderDistance, double cameraX, double cameraY, double cameraZ, boolean worldChanged, float partialTick) {
@@ -201,7 +220,17 @@ public class SectionManager {
 
 		FrustumCuller.addFractToCamera(this.camera.fractX, this.camera.fractY, this.camera.fractZ);
 
-		if (this.renderDistance != renderDistance || worldChanged) {
+		if (getMemoryTotal() != 0) {
+			this.timeSinceNullTerrain = 0L;
+		} else if (this.timeSinceNullTerrain == 0) {
+			this.timeSinceNullTerrain = System.nanoTime();
+		}
+
+		boolean shouldRebuildAnyway = getMemoryTotal() == 0 && Math.abs(this.timeSinceNullTerrain - System.nanoTime()) > THRESHOLD_IN_NANOS;
+
+		if (this.renderDistance != renderDistance || worldChanged || shouldRebuildAnyway) {
+			this.timeSinceNullTerrain = 0L;
+
 			this.renderDistance = renderDistance;
 			this.lastUpdateX = cameraX;
 			this.lastUpdateZ = cameraZ;
@@ -222,6 +251,9 @@ public class SectionManager {
 
 		EntityClientPlayerMP playerLocal = Minecraft.getMinecraft().thePlayer;
 		InventoryPlayer inventory = playerLocal.inventory;
+		Profiler profiler = Minecraft.getMinecraft().mcProfiler;
+
+		profiler.endStartSection("culling");
 
 		if (inventory == null || inventory.getCurrentItem() == null || !(inventory.getCurrentItem().getItem() instanceof ItemEgg)) {
 			extractFogData();
@@ -229,6 +261,10 @@ public class SectionManager {
 			this.bfsCuller.init(this.regionManager, this.camera.intX, this.camera.intZ, renderDistance);
 			this.bfsCuller.updateRenderList(this.sectionMap, this.camera);
 		}
+
+		profiler.endSection();
+
+		profiler.startSection("updatechunks");
 
 		this.queueRebuilds(partialTick);
 	}
@@ -293,7 +329,7 @@ public class SectionManager {
 
 			render = UpdateQueue.get(i++);
 
-			if (render.currentFrame == this.bfsCuller.getActiveFrame()) {
+			if (SectionFlags.isDirty(render.flags) && render.currentFrame == this.bfsCuller.getActiveFrame()) {
 				render.rebuild(this.camera, this, this.worldObj);
 				samples++;
 				timePassed += System.nanoTime() - currentTime;

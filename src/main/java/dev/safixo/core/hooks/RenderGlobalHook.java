@@ -5,6 +5,7 @@ import dev.safixo.client.render.vertex.VertexWriterManager;
 import dev.safixo.core.HookUtils;
 import net.minecraft.block.Block;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.PlayerControllerMP;
 import net.minecraft.client.renderer.RenderGlobal;
 import net.minecraft.client.renderer.culling.ICamera;
 import net.minecraft.entity.EntityLivingBase;
@@ -34,6 +35,7 @@ public class RenderGlobalHook {
 		}
 
 		if (MANAGER != null) {
+			SectionManager.destroyInstance();
 			clearBuffers();
 		}
 
@@ -104,34 +106,32 @@ public class RenderGlobalHook {
 			return;
 		}
 
-		FIRST_PASS = false;
 		PROCESS_RENDER_INFO = false;
-
-		if (renderPass == 1) {
-			return;
-		}
 
 		// Enable lightmap.
 		minecraft.entityRenderer.enableLightmap(partialTick);
 
-		// Render solid pass.
-		MANAGER.drawRenderPass(0);
-		HookUtils.setField(global, "renderersBeingRendered", "field_72746_N", MANAGER.drawnSolidRenderers);
-		MANAGER.drawnSolidRenderers = 0;
+		if (renderPass == 0) {
+			// Render solid pass.
+			MANAGER.drawRenderPass(0);
+			HookUtils.setField(global, "renderersBeingRendered", "field_72746_N", MANAGER.drawnSolidRenderers);
+			MANAGER.drawnSolidRenderers = 0;
+		} else {
+			GL11.glDisable(GL11.GL_ALPHA_TEST);
+			FIRST_PASS = false;
 
-		// Prepare translucent pass.
-		GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
-		GL11.glDepthMask(true);
-		GL11.glEnable(GL11.GL_BLEND);
+			// Render translucent passes.
+			if (minecraft.gameSettings.fancyGraphics) {
+				// Pre-pass, replace with correct sorting.
+				MANAGER.drawRenderPass(1);
+			}
 
-		// Render 2 passes translucent (pre-pass, pass).
-		GL11.glColorMask(false, false, false, false);
-		MANAGER.drawRenderPass(1);
-		GL11.glColorMask(true, true, true, true);
-		MANAGER.drawRenderPass(1);
+			GL11.glColorMask(true, true, true, true);
+			GL11.glEnable(GL11.GL_ALPHA_TEST);
+			MANAGER.drawRenderPass(1);
+		}
 
-		GL11.glDisable(GL11.GL_BLEND);
-
+		// Disable lightmap.
 		minecraft.entityRenderer.disableLightmap(partialTick);
 	}
 
