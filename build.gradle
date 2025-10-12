@@ -37,7 +37,7 @@ repositories {
 
 dependencies {
     // https://mvnrepository.com/artifact/it.unimi.dsi/fastutil
-    implementation('it.unimi.dsi:fastutil:7.1.0')
+    implementation("it.unimi.dsi:fastutil:7.2.1")
     // https://mvnrepository.com/artifact/org.joml/joml
     implementation("org.joml:joml:1.9.20")
 }

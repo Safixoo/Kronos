@@ -220,7 +220,7 @@ public class SectionCache implements IBlockAccess {
 	public Material getBlockMaterial(int x, int y, int z) {
 		int blockId = this.getBlockId(x, y, z);
 
-		return blockId != 0 ? Block.blocksList[blockId].blockMaterial : Material.air;
+		return BlocksFlags.MATERIAL[blockId];
 	}
 
 	public int isBlockOpaqueCubeInt(int x, int y, int z) {
@@ -299,11 +299,18 @@ public class SectionCache implements IBlockAccess {
 
 	@Override
 	public boolean isBlockSolidOnSide(int x, int y, int z, ForgeDirection side, boolean defaultVal) {
-		if (x < -30000000 || z < -30000000 || x >= 30000000 || z >= 30000000) {
-			return defaultVal;
+		int blockId = this.getBlockId(x, y, z);
+
+		if (blockId == 0) {
+			return false;
 		}
 
-		int blockId = this.getBlockId(x, y, z);
-		return blockId != 0 && Block.blocksList[blockId].isBlockSolidOnSide(this.worldObj, x, y, z, side);
+		Block block = Block.blocksList[blockId];
+
+		if (block == null) {
+			return false;
+		}
+
+		return block.isBlockSolidOnSide(this.worldObj, x, y, z, side);
 	}
 }

@@ -4,12 +4,12 @@ import dev.safixo.client.render.SectionManager;
 import net.minecraft.client.gui.FontRenderer;
 
 public class DebugScreenHook {
-	public static void drawStringWithShadow(FontRenderer fontRenderer, String text, int x, int y, int color) {
+	public static int drawStringWithShadow(FontRenderer fontRenderer, String text, int x, int y, int color) {
 		if (text.contains("Allocated")) {
 			SectionManager manager = SectionManager.getCurrentInstance();
 
 			int charWidth = fontRenderer.getStringWidth(text);
-			int offY = y + 70;
+			int offY = y + 80;
 			x += charWidth;
 
 			int effect = (int) (((Math.sin(System.nanoTime() / 5E+8D) + 1) * 128) % 256);
@@ -25,7 +25,7 @@ public class DebugScreenHook {
 			x -= charWidth;
 		}
 
-		fontRenderer.drawString(text, x, y, color, true);
+		return fontRenderer.drawString(text, x, y, color, true);
 	}
 
 	public static void renderDebugOption(FontRenderer fontRenderer, String string, int x, int y, int color) {

@@ -40,8 +40,8 @@ public class BFSCuller {
 				continue;
 			}
 
-			if (UpdateQueue.hasSpace() && SectionFlags.isDirty(flags)) {
-				UpdateQueue.addToQueueUnsafe(node);
+			if (SectionFlags.isDirty(flags)) {
+				UpdateQueue.addToQueue(node);
 			}
 
 			queueRegionNode(bfsQueue, node, flags);
@@ -77,7 +77,7 @@ public class BFSCuller {
 
 	public void updateRenderList(Long2ReferenceOpenHashMap<SectionRender> sectionMap, CameraData camera) {
 		int chunkX = MathExt.floor(camera.intX);
-		int chunkY = MathHelper.clamp_int(MathExt.floor(camera.intY), 0, 255);
+		int chunkY = MathExt.clamp(MathExt.floor(camera.intY), 0, 255);
 		int chunkZ = MathExt.floor(camera.intZ);
 
 		SectionRender spawn = sectionMap.get(SectionManager.asLong(chunkX >> 4, chunkY >> 4, chunkZ >> 4));
@@ -87,6 +87,8 @@ public class BFSCuller {
 
 			BFSVisArray.setVisible(spawn.blockX >> 4, spawn.blockY >> 4, spawn.blockZ >> 4);
 			exploreNodes(this.bfsQueue, spawn, SectionFlags.getAdjacentMask(flags), this.activeFrame);
+
+			spawn.currentFrame = this.activeFrame;
 
 			if (SectionFlags.isDirty(flags)) {
 				UpdateQueue.addToQueue(spawn);
@@ -234,6 +236,10 @@ public class BFSCuller {
 		}
 
 		return invalid <= 2;
+	}
+
+	public int getActiveFrame() {
+		return this.activeFrame;
 	}
 
 	private static int sign(int num) {

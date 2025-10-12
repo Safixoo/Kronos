@@ -66,6 +66,18 @@ public class HookUtils {
 		throw new RuntimeException("Couldn't find object");
 	}
 
+	public static boolean existsField(Object instance, String fieldName) {
+		Field[] fields = instance.getClass().getFields();
+
+		for (Field field : fields) {
+			if (field != null && field.getName().equals(fieldName)) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 	public static Field getField(Object instance, String fieldName, String fieldNotch) {
 		if (!BlocksFlags.DETECTED) {
 			BlocksFlags.processDevInfo();

@@ -1,5 +1,6 @@
 package dev.safixo.client.render;
 
+import dev.safixo.client.render.util.MathExt;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockLeavesBase;
 import net.minecraft.client.Minecraft;
@@ -30,6 +31,7 @@ public class SectionRender {
 	public int blockX, blockY, blockZ;
 
 	public int regionIndex;
+	public long sectionPos;
 
 	// Adjacent nodes that searched during BFS culling, done like this
 	// to avoid array dereferences and checks, inspired from Sodium.
@@ -46,6 +48,7 @@ public class SectionRender {
 		this.blockY = blockY;
 		this.blockZ = blockZ;
 
+		this.sectionPos = SectionManager.asLong(blockX >> 4, blockY >> 4, blockZ >> 4);
 		this.regionIndex = RegionRender.regionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
 	}
 
@@ -167,11 +170,16 @@ public class SectionRender {
 		}
 
 		Block block = Block.blocksList[blockId];
+
+		if (block == null) {
+			return;
+		}
+
 		int blockRenderPass = block.getRenderBlockPass();
 
 		int blockX = x + this.blockX, blockY = y + this.blockY, blockZ = z + this.blockZ;
 
-		if (BlocksFlags.SOLID[blockId]) {
+		if (BlocksFlags.SOLID_LIGHT_MASK[blockId] != 0) {
 			if (y == 0 || y == 15) {
 				solidBlocks[Direction.DOWN + (y & 1)]++;
 			}
@@ -182,9 +190,7 @@ public class SectionRender {
 				solidBlocks[Direction.NORTH + (z & 1)]++;
 			}
 			solidBlocks[Direction.COUNT]++;
-		}
 
-		if (false) {
 			int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
 			int drawBitSet = 0;
 
@@ -215,13 +221,18 @@ public class SectionRender {
 		}
 
 		Block block = Block.blocksList[blockId];
+
+		if (block == null) {
+			return;
+		}
+
 		int blockRenderPass = block.getRenderBlockPass();
 
 		int blockX = x + this.blockX;
 		int blockY = y + this.blockY;
 		int blockZ = z + this.blockZ;
 
-		if (BlocksFlags.SOLID[blockId]) {
+		if (BlocksFlags.SOLID_LIGHT_MASK[blockId] != 0) {
 			if (y == 0 || y == 15) {
 				solidBlocks[Direction.DOWN + (y & 1)]++;
 			}
@@ -232,9 +243,7 @@ public class SectionRender {
 				solidBlocks[Direction.NORTH + (z & 1)]++;
 			}
 			solidBlocks[Direction.COUNT]++;
-		}
 
-		if (false) {
 			int rX = x + 16;
 			int rY = y + 16;
 			int rZ = z + 16;

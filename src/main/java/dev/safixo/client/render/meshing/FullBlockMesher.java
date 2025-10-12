@@ -182,9 +182,9 @@ public class FullBlockMesher {
 		int blockZ = z - cache.blockZ;
 
 		int sectionIndex = SectionCache.sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
-		int solidBlock = BlocksFlags.SOLID_LIGHT_MASK[byteToUnsigned(SectionCache.SECTION_BLOCKS[sectionIndex][blockIndex])];
+		boolean solidBlock = BlocksFlags.SOLID[byteToUnsigned(SectionCache.SECTION_BLOCKS[sectionIndex][blockIndex])];
 
-		if (solidBlock == 1) {
+		if (solidBlock) {
 			return 1;
 		}
 
@@ -199,10 +199,10 @@ public class FullBlockMesher {
 		int blockZ = z - cache.blockZ;
 
 		int sectionIndex = SectionCache.sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
-		int solidBlock = BlocksFlags.SOLID_LIGHT_MASK[byteToUnsigned(SectionCache.SECTION_BLOCKS[sectionIndex][blockIndex])];
+		boolean solidBlock = BlocksFlags.SOLID[byteToUnsigned(SectionCache.SECTION_BLOCKS[sectionIndex][blockIndex])];
 
-		if (solidBlock == 1) {
-			return (0 << 4) | solidBlock;
+		if (solidBlock) {
+			return (0 << 4) | 1;
 		}
 
 		int skyLight = SectionCache.getNibble(SectionCache.SKY_LIGHT[sectionIndex], blockIndex);
@@ -279,7 +279,7 @@ public class FullBlockMesher {
 		return BlocksFlags.SOLID_LIGHT_MASK[blockId];
 	}
 
-	public static final int LIGHT_REDUCE = 60;
+	public static final int LIGHT_REDUCE = 80;
 	public static final int CORNER_LIGHT = 256 - LIGHT_REDUCE;
 
 	public static int ao(int pos1, int pos2, int corner) {
@@ -290,15 +290,17 @@ public class FullBlockMesher {
 		int fullXorP = pos1 ^ pos2;
 
 		int factor = 256;
+		int min = 120;
 
 		if (corner == 1 && fullXorP == 0) {
 			factor = CORNER_LIGHT;
+			min = 80;
 		}
 
 		factor -= br(pos1);
 		factor -= br(pos2);
 
-		return Math.min(Math.max(factor, 90), 255);
+		return Math.min(Math.max(factor, min), 255);
 	}
 
 //	public static int lightMap(int light1, int light2, int lightCorner) {

@@ -1,8 +1,12 @@
 package dev.safixo;
 
 import cpw.mods.fml.common.Mod;
-import cpw.mods.fml.common.event.FMLInitializationEvent;
+import dev.safixo.client.render.SectionManager;
+import net.minecraft.client.Minecraft;
+import net.minecraft.world.chunk.Chunk;
 import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.event.ForgeSubscribe;
+import net.minecraftforge.event.world.ChunkEvent;
 
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
@@ -16,11 +20,16 @@ public class KronosMod {
 		MinecraftForge.EVENT_BUS.register(this);
 	}
 
-	@Mod.EventHandler
-	public void preInit(FMLInitializationEvent event) {
-	}
+	@ForgeSubscribe
+	public void onChunkLoad(ChunkEvent.Load event) {
+		Chunk chunk = event.getChunk();
 
-	@Mod.EventHandler
-	public void init(FMLInitializationEvent event) {
+		if (Minecraft.getMinecraft().thePlayer == null) {
+			return;
+		}
+
+		for (int y = 0; y < 16; y++) {
+			SectionManager.getCurrentInstance().updateExistentSections(chunk.xPosition, y, chunk.zPosition, true);
+		}
 	}
 }

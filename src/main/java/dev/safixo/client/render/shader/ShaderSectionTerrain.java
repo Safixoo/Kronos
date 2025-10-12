@@ -6,12 +6,10 @@ import org.lwjgl.input.Keyboard;
 import org.lwjgl.opengl.GL20;
 import dev.safixo.KronosMod;
 import dev.safixo.client.render.cull.FrustumCuller;
-import dev.safixo.client.render.util.MathExt;
 import dev.safixo.client.render.util.data.CameraData;
 import dev.safixo.client.render.util.data.FogData;
 import dev.safixo.client.render.vertex.writers.TerrainFormat;
 
-import java.nio.Buffer;
 import java.nio.FloatBuffer;
 
 public class ShaderSectionTerrain {

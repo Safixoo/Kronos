@@ -2,7 +2,9 @@ package dev.safixo.client.render.util.data;
 
 import cpw.mods.fml.common.asm.transformers.deobf.FMLDeobfuscatingRemapper;
 import cpw.mods.fml.relauncher.FMLLaunchHandler;
+import dev.safixo.core.HookUtils;
 import net.minecraft.block.Block;
+import net.minecraft.block.BlockLeaves;
 import net.minecraft.block.BlockLeavesBase;
 import net.minecraft.block.material.Material;
 import net.minecraft.client.Minecraft;
@@ -36,10 +38,10 @@ public class BlocksFlags {
 				LEAVES_INDICES[LEAVES_TOP_INDEX++] = i;
 			}
 
-			SOLID[i] = ((block != null && block.isOpaqueCube()));
+			SOLID[i] = ((block != null && block.isOpaqueCube()) || block instanceof BlockLeaves);
 			NORMAL_BLOCK[i] = ((block != null && block.blockMaterial.isOpaque() && block.renderAsNormalBlock() && !block.canProvidePower()));
 			MATERIAL[i] = (block == null || i == 0) ? Material.air : block.blockMaterial;
-			SOLID_LIGHT_MASK[i] = (byte) (((block != null && block.isOpaqueCube()) || block instanceof BlockLeavesBase) ? 1 : 0);
+			SOLID_LIGHT_MASK[i] = (byte) (((block != null && block.isOpaqueCube()) || block instanceof BlockLeaves) ? 1 : 0);
 		}
 	}
 

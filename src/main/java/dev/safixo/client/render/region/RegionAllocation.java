@@ -247,7 +247,7 @@ public class RegionAllocation {
 			alloc = alloc.next;
 		}
 
-		return null;
+		return alloc;
 	}
 
 	public static long packDrawData(int count, int first) {

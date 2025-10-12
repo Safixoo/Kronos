@@ -1,6 +1,7 @@
 package dev.safixo.client.render;
 
 import dev.safixo.client.render.util.data.FogData;
+import dev.safixo.core.HookUtils;
 import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrays;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
@@ -24,7 +25,6 @@ import dev.safixo.client.render.util.MathExt;
 import org.lwjgl.opengl.GL20;
 
 public class SectionManager {
-	private static final boolean EXTRACT_FOG_DATA = true;
 	private static final int MAX_UPDATE_QUEUES = 15;
 
 	private final Long2ReferenceOpenHashMap<SectionRender> sectionMap = new Long2ReferenceOpenHashMap<>();
@@ -94,13 +94,7 @@ public class SectionManager {
 	}
 
 	public static long asLong(int x, int y, int z) {
-		long pos = 0L;
-
-		pos |= ((long) x & 0x3FFFFFL) << 42;
-		pos |= ((long) y & 0xFFFFFL) << 0;
-		pos |= ((long) z & 0x3FFFFFL) << 20;
-
-		return pos;
+		return ((long)(x & 0x3FFFFFF) << 38) | ((long)(z & 0x3FFFFFF) << 12) | (y & 0xFFF);
 	}
 
 	public static long asLong(int x, int z) {
@@ -110,7 +104,7 @@ public class SectionManager {
 	public void removeRender(int posX, int posY, int posZ) {
 		long position = asLong(posX, posY, posZ);
 
-		SectionRender sectionRender = this.sectionMap.remove(position);
+		SectionRender sectionRender = this.sectionMap.containsKey(position) ? this.sectionMap.remove(position) : null;
 
 		if (sectionRender != null) {
 			sectionRender.clearAllocations();
@@ -146,8 +140,9 @@ public class SectionManager {
 		long position = asLong(posX, posY, posZ);
 		SectionRender sectionRender = this.sectionMap.get(position);
 
+		// If it wasn't near the player simply ignore it.
 		if (sectionRender == null) {
-			sectionRender = this.addRender(posX, posY, posZ, true);
+			return;
 		}
 
 		if (this.camera != null && MathExt.squaredDistance(sectionRender, this.camera) < MathExt.square(48.0f)) {
@@ -160,7 +155,7 @@ public class SectionManager {
 	public SectionRender addRender(int posX, int posY, int posZ, boolean trulyNew) {
 		long position = asLong(posX, posY, posZ);
 
-		SectionRender sectionRender = trulyNew ? null : this.sectionMap.get(position);
+		SectionRender sectionRender = this.sectionMap.get(position);
 
 		if (sectionRender == null) {
 			sectionRender = new SectionRender(posX * 16, posY * 16, posZ * 16);
@@ -171,6 +166,33 @@ public class SectionManager {
 
 		sectionRender.flags = SectionFlags.setDirty(sectionRender.flags, true);
 		return sectionRender;
+	}
+
+	public void updateExistentSections(int posX, int posY, int posZ, boolean neighborUpdate) {
+		long position = asLong(posX, posY, posZ);
+
+		SectionRender sectionRender = this.sectionMap.get(position);
+
+		// Don't really want to mess with chunk loading bullshit, simply load
+		// things already in the distance of the player.
+		if (sectionRender == null) {
+			return;
+		}
+
+		sectionRender.flags = SectionFlags.setDirty(sectionRender.flags, true);
+
+		if (!neighborUpdate) {
+			return;
+		}
+
+		for (int dir = 0; dir < Direction.COUNT; dir++) {
+			SectionRender render = sectionRender.getAdjacent(dir);
+
+			if (render != null) {
+				render.flags = SectionFlags.setDirty(render.flags, true);
+			}
+		}
+
 	}
 
 	public void update(int renderDistance, double cameraX, double cameraY, double cameraZ, boolean worldChanged, float partialTick) {
@@ -215,25 +237,21 @@ public class SectionManager {
 	// trivial way to get fog parameters without affecting *too* much performance
 	// is simply using glGetFloat.
 	private static void extractFogData() {
-		if (!EXTRACT_FOG_DATA) {
-			return;
-		}
-
 		FogData.FOG_END = GL11.glGetFloat(GL11.GL_FOG_END);
 		FogData.FOG_START = GL11.glGetFloat(GL11.GL_FOG_START);
 
-		GL11.glGetFloat(GL11.GL_FOG_COLOR, ShaderSectionTerrain.TEMP_BUFFER);
+		Minecraft minecraft = Minecraft.getMinecraft();
 
-		FogData.FOG_COLOR[0] = ShaderSectionTerrain.TEMP_BUFFER.get(0);
-		FogData.FOG_COLOR[1] = ShaderSectionTerrain.TEMP_BUFFER.get(1);
-		FogData.FOG_COLOR[2] = ShaderSectionTerrain.TEMP_BUFFER.get(2);
-		FogData.FOG_COLOR[3] = ShaderSectionTerrain.TEMP_BUFFER.get(3);
+		FogData.FOG_COLOR[0] = (Float) HookUtils.getFieldObj(minecraft.entityRenderer, "fogColorRed", "field_78518_n");
+		FogData.FOG_COLOR[1] = (Float) HookUtils.getFieldObj(minecraft.entityRenderer, "fogColorGreen", "field_78519_o");
+		FogData.FOG_COLOR[2] = (Float) HookUtils.getFieldObj(minecraft.entityRenderer, "fogColorBlue", "field_78533_p");
+		FogData.FOG_COLOR[3] = 1.0f;
 	}
 
 	private static CameraData extractCameraData(double cameraX, double cameraY, double cameraZ, int renderDistance) {
-		int playerX = (int) Math.floor(cameraX);
-		int playerY = (int) Math.floor(cameraY);
-		int playerZ = (int) Math.floor(cameraZ);
+		int playerX = MathExt.floor(cameraX);
+		int playerY = MathExt.floor(cameraY);
+		int playerZ = MathExt.floor(cameraZ);
 
 		float fractX = (float) (cameraX - playerX);
 		float fractY = (float) (cameraY - playerY);
@@ -274,11 +292,13 @@ public class SectionManager {
 			currentTime = System.nanoTime();
 
 			render = UpdateQueue.get(i++);
-			render.rebuild(this.camera, this, this.worldObj);
 
-			samples++;
-			timePassed += System.nanoTime() - currentTime;
-			estimatedTime = (timePassed / samples) * (MAX_UPDATE_QUEUES - i);
+			if (render.currentFrame == this.bfsCuller.getActiveFrame()) {
+				render.rebuild(this.camera, this, this.worldObj);
+				samples++;
+				timePassed += System.nanoTime() - currentTime;
+				estimatedTime = (timePassed / samples) * (MAX_UPDATE_QUEUES - i);
+			}
 		}
 
 		UpdateQueue.clear();
@@ -442,13 +462,6 @@ public class SectionManager {
 		// Disables fog when option is active.
 		boolean noFog = false;
 
-		// Look like terrain display lists have some of these states baked.
-		if (renderPass == 1) {
-			GL11.glColorMask(true, true, true, true);
-			GL11.glDisable(GL11.GL_ALPHA_TEST);
-			GL11.glEnable(GL11.GL_CULL_FACE);
-		}
-
 		if (this.terrainShader == null) {
 			this.terrainShader = new ShaderSectionTerrain();
 		}
@@ -464,10 +477,6 @@ public class SectionManager {
 
 		this.regionManager.drawAllRegions(this.terrainShader, this.bfsCuller.bfsQueue, this.camera, renderPass);
 		this.terrainShader.unbindProgram();
-
-		if (renderPass == 1) {
-			GL11.glEnable(GL11.GL_ALPHA_TEST);
-		}
 	}
 
 	boolean lastEvent = false;
