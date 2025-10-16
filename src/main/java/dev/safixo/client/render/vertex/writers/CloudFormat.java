@@ -24,4 +24,15 @@ public class CloudFormat extends GlVertexFormat {
 
 		UnsafeUtil.memPutInt(ptr + 20, manager.color);
 	}
+
+	public static void writeCloudVertex(long ptr, float x, float y, float z, float u, float v, int color) {
+		UnsafeUtil.memPutFloat(ptr + 0, x);
+		UnsafeUtil.memPutFloat(ptr + 4, y);
+		UnsafeUtil.memPutFloat(ptr + 8, z);
+
+		UnsafeUtil.memPutFloat(ptr + 12, u);
+		UnsafeUtil.memPutFloat(ptr + 16, v);
+
+		UnsafeUtil.memPutInt(ptr + 20, color);
+	}
 }

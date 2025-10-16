@@ -6,6 +6,8 @@ import dev.safixo.client.render.util.ColorBGRManager;
 import dev.safixo.client.render.util.MathExt;
 import dev.safixo.client.render.vertex.VertexWriterManager;
 import dev.safixo.client.render.vertex.DefaultVertexFormats;
+import dev.safixo.client.render.vertex.writers.CloudFormat;
+import dev.safixo.client.render.vertex.writers.TerrainFormat;
 import dev.safixo.core.HookUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.WorldClient;
@@ -16,6 +18,7 @@ import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL15;
 
 public class CloudRenderer {
+	private static final int CLOUD_STRIDE = DefaultVertexFormats.CLOUD_FORMAT.getStride();
 	private static final boolean DEBUG_WIREFRAME = false;
 
 	private static final ResourceLocation CLOUD_TEXTURE = new ResourceLocation("textures/environment/clouds.png");
@@ -106,57 +109,67 @@ public class CloudRenderer {
 				final float cloudY = viewY;
 				final float cloudZ = cellZ - cloudFractZ;
 
+				writer.ensureCapacity(CLOUD_STRIDE * 8);
+
 				if (cloudY > -5.0f) {
-					setColor(r * 0.7F, g * 0.7F, b * 0.7F, CLOUD_ALPHA);
-					addVertex(cloudX + 0, cloudY + 0, cloudZ + 8, (cellX + 0) + f8, (cellZ + 8) + f9);
-					addVertex(cloudX + 8, cloudY + 0, cloudZ + 8, (cellX + 8) + f8, (cellZ + 8) + f9);
-					addVertex(cloudX + 8, cloudY + 0, cloudZ + 0, (cellX + 8) + f8, (cellZ + 0) + f9);
-					addVertex(cloudX + 0, cloudY + 0, cloudZ + 0, (cellX + 0) + f8, (cellZ + 0) + f9);
+					writer.ensureCapacity(CLOUD_STRIDE * 4);
+
+					setColor(writer, r * 0.7F, g * 0.7F, b * 0.7F, CLOUD_ALPHA);
+					addVertex(writer, cloudX + 0, cloudY + 0, cloudZ + 8, (cellX + 0) + f8, (cellZ + 8) + f9);
+					addVertex(writer, cloudX + 8, cloudY + 0, cloudZ + 8, (cellX + 8) + f8, (cellZ + 8) + f9);
+					addVertex(writer, cloudX + 8, cloudY + 0, cloudZ + 0, (cellX + 8) + f8, (cellZ + 0) + f9);
+					addVertex(writer, cloudX + 0, cloudY + 0, cloudZ + 0, (cellX + 0) + f8, (cellZ + 0) + f9);
 				}
 
 				if (cloudY < 5.0f) {
-					setColor(r, g, b, CLOUD_ALPHA);
-					addVertex(cloudX + 0, cloudY + CLOUD_HEIGHT - EPSILON, cloudZ + 8, (cellX + 0) + f8, (cellZ + 8) + f9);
-					addVertex(cloudX + 8, cloudY + CLOUD_HEIGHT - EPSILON, cloudZ + 8, (cellX + 8) + f8, (cellZ + 8) + f9);
-					addVertex(cloudX + 8, cloudY + CLOUD_HEIGHT - EPSILON, cloudZ + 0, (cellX + 8) + f8, (cellZ + 0) + f9);
-					addVertex(cloudX + 0, cloudY + CLOUD_HEIGHT - EPSILON, cloudZ + 0, (cellX + 0) + f8, (cellZ + 0) + f9);
+
+					setColor(writer, r, g, b, CLOUD_ALPHA);
+					addVertex(writer, cloudX + 0, cloudY + CLOUD_HEIGHT - EPSILON, cloudZ + 8, (cellX + 0) + f8, (cellZ + 8) + f9);
+					addVertex(writer, cloudX + 8, cloudY + CLOUD_HEIGHT - EPSILON, cloudZ + 8, (cellX + 8) + f8, (cellZ + 8) + f9);
+					addVertex(writer, cloudX + 8, cloudY + CLOUD_HEIGHT - EPSILON, cloudZ + 0, (cellX + 8) + f8, (cellZ + 0) + f9);
+					addVertex(writer, cloudX + 0, cloudY + CLOUD_HEIGHT - EPSILON, cloudZ + 0, (cellX + 0) + f8, (cellZ + 0) + f9);
 				}
 
-				setColor(r * 0.9F, g * 0.9F, b * 0.9F, CLOUD_ALPHA);
+				writer.ensureCapacity(CLOUD_STRIDE * 4 * 16);
+
+				setColor(writer, r * 0.9F, g * 0.9F, b * 0.9F, CLOUD_ALPHA);
 				if (octCellX > -1) {
+
 					for (int quad = 0; quad < 8; quad++) {
-						addVertex(cloudX + quad + 0, cloudY + 0, cloudZ + 8, (cellX + quad + 0.5F)  + f8, (cellZ + 8) + f9);
-						addVertex(cloudX + quad + 0, cloudY + CLOUD_HEIGHT, cloudZ + 8, (cellX + quad + 0.5F)  + f8, (cellZ + 8) + f9);
-						addVertex(cloudX + quad + 0, cloudY + CLOUD_HEIGHT, cloudZ + 0, (cellX + quad + 0.5F)  + f8, (cellZ + 0) + f9);
-						addVertex(cloudX + quad + 0, cloudY + 0, cloudZ + 0, (cellX + quad + 0.5F)  + f8, (cellZ + 0) + f9);
+						addVertex(writer, cloudX + quad + 0, cloudY + 0, cloudZ + 8, (cellX + quad + 0.5F)  + f8, (cellZ + 8) + f9);
+						addVertex(writer, cloudX + quad + 0, cloudY + CLOUD_HEIGHT, cloudZ + 8, (cellX + quad + 0.5F)  + f8, (cellZ + 8) + f9);
+						addVertex(writer, cloudX + quad + 0, cloudY + CLOUD_HEIGHT, cloudZ + 0, (cellX + quad + 0.5F)  + f8, (cellZ + 0) + f9);
+						addVertex(writer, cloudX + quad + 0, cloudY + 0, cloudZ + 0, (cellX + quad + 0.5F)  + f8, (cellZ + 0) + f9);
 					}
 				}
 
 				if (octCellX < 1) {
 					for (int quad = 0; quad < 8; quad++) {
-						addVertex(cloudX + quad + 1 - EPSILON, cloudY + 0, cloudZ + 8, (cellX + quad + 0.5F) + f8, (cellZ + 8) + f9);
-						addVertex(cloudX + quad + 1 - EPSILON, cloudY + CLOUD_HEIGHT, cloudZ + 8, (cellX + quad + 0.5F) + f8, (cellZ + 8) + f9);
-						addVertex(cloudX + quad + 1 - EPSILON, cloudY + CLOUD_HEIGHT, cloudZ + 0, (cellX + quad + 0.5F) + f8, (cellZ + 0) + f9);
-						addVertex(cloudX + quad + 1 - EPSILON, cloudY + 0, cloudZ + 0, (cellX + quad + 0.5F) + f8, (cellZ + 0) + f9);
+						addVertex(writer, cloudX + quad + 1 - EPSILON, cloudY + 0, cloudZ + 8, (cellX + quad + 0.5F) + f8, (cellZ + 8) + f9);
+						addVertex(writer, cloudX + quad + 1 - EPSILON, cloudY + CLOUD_HEIGHT, cloudZ + 8, (cellX + quad + 0.5F) + f8, (cellZ + 8) + f9);
+						addVertex(writer, cloudX + quad + 1 - EPSILON, cloudY + CLOUD_HEIGHT, cloudZ + 0, (cellX + quad + 0.5F) + f8, (cellZ + 0) + f9);
+						addVertex(writer, cloudX + quad + 1 - EPSILON, cloudY + 0, cloudZ + 0, (cellX + quad + 0.5F) + f8, (cellZ + 0) + f9);
 					}
 				}
 
-				setColor(r * 0.8F, g * 0.8F, b * 0.8F, CLOUD_ALPHA);
+				writer.ensureCapacity(CLOUD_STRIDE * 4 * 16);
+
+				setColor(writer, r * 0.8F, g * 0.8F, b * 0.8F, CLOUD_ALPHA);
 				if (octCellZ > -1) {
 					for (int quad = 0; quad < 8; quad++) {
-						addVertex(cloudX + 0, cloudY + CLOUD_HEIGHT, cloudZ + quad + 0, (cellX + 0) + f8, (cellZ + quad + 0.5F) + f9);
-						addVertex(cloudX + 8, cloudY + CLOUD_HEIGHT, cloudZ + quad + 0, (cellX + 8) + f8, (cellZ + quad + 0.5F) + f9);
-						addVertex(cloudX + 8, cloudY + 0, cloudZ + quad + 0, (cellX + 8) + f8, (cellZ + quad + 0.5F) + f9);
-						addVertex(cloudX + 0, cloudY + 0, cloudZ + quad + 0, (cellX + 0) + f8, (cellZ + quad + 0.5F) + f9);
+						addVertex(writer, cloudX + 0, cloudY + CLOUD_HEIGHT, cloudZ + quad + 0, (cellX + 0) + f8, (cellZ + quad + 0.5F) + f9);
+						addVertex(writer, cloudX + 8, cloudY + CLOUD_HEIGHT, cloudZ + quad + 0, (cellX + 8) + f8, (cellZ + quad + 0.5F) + f9);
+						addVertex(writer, cloudX + 8, cloudY + 0, cloudZ + quad + 0, (cellX + 8) + f8, (cellZ + quad + 0.5F) + f9);
+						addVertex(writer, cloudX + 0, cloudY + 0, cloudZ + quad + 0, (cellX + 0) + f8, (cellZ + quad + 0.5F) + f9);
 					}
 				}
 
 				if (octCellZ < 1) {
 					for (int quad = 0; quad < 8; quad++) {
-						addVertex(cloudX + 0, cloudY + CLOUD_HEIGHT, cloudZ + quad + 1 - EPSILON, (cellX + 0) + f8, (cellZ + quad + 0.5F) + f9);
-						addVertex(cloudX + 8, cloudY + CLOUD_HEIGHT, cloudZ + quad + 1 - EPSILON, (cellX + 8) + f8, (cellZ + quad + 0.5F) + f9);
-						addVertex(cloudX + 8, cloudY + 0, cloudZ + quad + 1 - EPSILON, (cellX + 8) + f8, (cellZ + quad + 0.5F) + f9);
-						addVertex(cloudX + 0, cloudY + 0, cloudZ + quad + 1 - EPSILON, (cellX + 0) + f8, (cellZ + quad + 0.5F) + f9);
+						addVertex(writer, cloudX + 0, cloudY + CLOUD_HEIGHT, cloudZ + quad + 1 - EPSILON, (cellX + 0) + f8, (cellZ + quad + 0.5F) + f9);
+						addVertex(writer, cloudX + 8, cloudY + CLOUD_HEIGHT, cloudZ + quad + 1 - EPSILON, (cellX + 8) + f8, (cellZ + quad + 0.5F) + f9);
+						addVertex(writer, cloudX + 8, cloudY + 0, cloudZ + quad + 1 - EPSILON, (cellX + 8) + f8, (cellZ + quad + 0.5F) + f9);
+						addVertex(writer, cloudX + 0, cloudY + 0, cloudZ + quad + 1 - EPSILON, (cellX + 0) + f8, (cellZ + quad + 0.5F) + f9);
 					}
 				}
 			}
@@ -193,22 +206,13 @@ public class CloudRenderer {
 		}
 	}
 
-	private static void addVertex(float x, float y, float z, float u, float v) {
-		VertexWriterManager writerManager = VertexWriterManager.getCurrentInstance();
-
-		writerManager.x = x;
-		writerManager.y = y;
-		writerManager.z = z;
-
-		writerManager.u = u;
-		writerManager.v = v;
-
-		writerManager.addVertex();
+	private static void addVertex(VertexWriterManager writer, float x, float y, float z, float u, float v) {
+		CloudFormat.writeCloudVertex(writer.getTotalOffset(), x, y, z, u, v, writer.color);
+		writer.addVertexCounter(CLOUD_STRIDE);
 	}
 
-	private static void setColor(float r, float g, float b, float a) {
-		VertexWriterManager writerManager = VertexWriterManager.getCurrentInstance();
-		writerManager.color = ColorBGRManager.packColor(r, g, b);
+	private static void setColor(VertexWriterManager writer, float r, float g, float b, float a) {
+		writer.color = ColorBGRManager.packColor(r, g, b);
 	}
 
 	private static void setNormal(float x, float y, float z) {

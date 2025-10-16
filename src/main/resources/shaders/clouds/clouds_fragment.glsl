@@ -12,8 +12,8 @@ uniform vec4 u_FogColor;
 out vec4 fragColor;
 
 void main() {
-    vec4 texColor = v_Color * texture(u_CloudTex, v_Uv);
+    vec4 texColor = texture(u_CloudTex, v_Uv);
     float factor = smoothstep(u_FogEnd, u_FogEnd * 1.6, v_Distance);
 
-    fragColor = mix(texColor, u_FogColor, factor);
+    fragColor = mix(texColor * v_Color, u_FogColor, factor);
 }
