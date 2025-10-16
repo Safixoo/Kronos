@@ -1,11 +1,11 @@
 package dev.safixo.core.hooks;
 
-import dev.safixo.client.render.SectionManager;
+import dev.safixo.client.render.pipelines.cloud.CloudRenderer;
+import dev.safixo.client.render.pipelines.terrain.SectionManager;
 import dev.safixo.client.render.vertex.VertexWriterManager;
 import dev.safixo.core.HookUtils;
 import net.minecraft.block.Block;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.PlayerControllerMP;
 import net.minecraft.client.renderer.RenderGlobal;
 import net.minecraft.client.renderer.culling.ICamera;
 import net.minecraft.entity.EntityLivingBase;
@@ -96,6 +96,10 @@ public class RenderGlobalHook {
 
 	public static void clipRenderersByFrustum(RenderGlobal renderGlobal, ICamera frustum, float partialTick) {
 		PARTIAL_TICK = partialTick;
+	}
+
+	public static void renderCloudsFancy(RenderGlobal renderGlobal, float partialTick) {
+		CloudRenderer.renderCloudsFancy(partialTick);
 	}
 
 	public static void sortAndRender(RenderGlobal global, EntityLivingBase player, int renderPass, double partialTick) {

@@ -1,15 +1,15 @@
 package dev.safixo.client.render.vertex;
 
+import dev.safixo.client.render.gfx.vertex.GlVertexFormat;
 import dev.safixo.client.render.util.memory.NativeBuffer;
 import dev.safixo.client.render.util.memory.UnsafeUtil;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import dev.safixo.client.render.util.MeshDirection;
-import dev.safixo.client.render.vertex.format.VertexFormat;
 
 import java.util.Arrays;
 
 public class VertexWriterManager {
-	private static final VertexWriterManager DEFAULT_INSTANCE = new VertexWriterManager(false);
+	public static final VertexWriterManager DEFAULT_INSTANCE = new VertexWriterManager(false);
 	private static final int DEFAULT_CAPACITY = (1 << 16);
 
 	public static final ObjectArrayList<VertexWriterManager> VERTEX_WRITERS = new ObjectArrayList<>();
@@ -25,7 +25,7 @@ public class VertexWriterManager {
 	private long capacity;
 	private long vertexPtr;
 
-	private VertexFormat vertexFormat;
+	private GlVertexFormat vertexFormat;
 
 	private int offset, vertices;
 	public boolean isDrawing = false;
@@ -158,7 +158,7 @@ public class VertexWriterManager {
 		return this.vertices;
 	}
 
-	public void setVertexFormat(VertexFormat vertexFormat) {
+	public void setVertexFormat(GlVertexFormat vertexFormat) {
 		this.vertexFormat = vertexFormat;
 	}
 }

@@ -4,12 +4,12 @@ import com.google.common.collect.ImmutableList;
 import dev.safixo.client.render.util.MathExt;
 import dev.safixo.client.render.util.memory.UnsafeUtil;
 import dev.safixo.client.render.vertex.VertexWriterManager;
-import dev.safixo.client.render.vertex.format.VertexFormat;
-import dev.safixo.client.render.vertex.operations.VertexAttribute;
+import dev.safixo.client.render.gfx.vertex.GlVertexFormat;
+import dev.safixo.client.render.gfx.vertex.attribute.GlVertexAttribute;
 
-import static dev.safixo.client.render.region.RegionRender.*;
+import static dev.safixo.client.render.pipelines.terrain.region.RegionRender.*;
 
-public class TerrainFormat extends VertexFormat {
+public class TerrainFormat extends GlVertexFormat {
 	public static final int STRIDE = 16;
 
 	static final int POSITION_BITS = 20;
@@ -23,7 +23,7 @@ public class TerrainFormat extends VertexFormat {
 	static final double FACT_Y = (1 << POSITION_BITS) / (DIAMETER_Y + DIAMETER);
 	static final double FACT_Z = (1 << POSITION_BITS) / (DIAMETER_Z + DIAMETER);
 
-	public TerrainFormat(ImmutableList<VertexAttribute> vertexProperties) {
+	public TerrainFormat(ImmutableList<GlVertexAttribute> vertexProperties) {
 		super(vertexProperties);
 	}
 

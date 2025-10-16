@@ -1,6 +1,6 @@
 package dev.safixo.core.hooks;
 
-import dev.safixo.client.render.SectionManager;
+import dev.safixo.client.render.pipelines.terrain.SectionManager;
 import net.minecraft.client.gui.FontRenderer;
 
 public class DebugScreenHook {

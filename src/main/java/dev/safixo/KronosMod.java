@@ -1,9 +1,11 @@
 package dev.safixo;
 
 import cpw.mods.fml.common.Mod;
-import dev.safixo.client.render.SectionManager;
+import dev.safixo.client.render.gfx.util.GpuFlags;
+import dev.safixo.client.render.pipelines.terrain.SectionManager;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.chunk.Chunk;
+import net.minecraftforge.client.event.GuiOpenEvent;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.ForgeSubscribe;
 import net.minecraftforge.event.world.ChunkEvent;
@@ -18,6 +20,11 @@ public class KronosMod {
 
 	public KronosMod() {
 		MinecraftForge.EVENT_BUS.register(this);
+	}
+
+	@ForgeSubscribe
+	public void onMainMenu(GuiOpenEvent event) {
+		GpuFlags.checkModSupport();
 	}
 
 	@ForgeSubscribe

@@ -49,6 +49,7 @@ public class KronosTransformer implements IClassTransformer {
 				replaceClassMethod(RENDER_GLOBAL_HOOK, "markBlockForRenderUpdate", "b", "(III)V", reference, true);
 				replaceClassMethod(RENDER_GLOBAL_HOOK, "markBlockRangeForRenderUpdate", "a", "(IIIIII)V", reference, true);
 				replaceClassMethod(RENDER_GLOBAL_HOOK, "markBlocksForUpdate", "b", "(IIIIII)V", reference, true);
+				replaceClassMethod(RENDER_GLOBAL_HOOK, "renderCloudsFancy", "b", "(IIIIII)V", reference, true);
 				break;
 			case FONT_RENDERER:
 				replaceClassMethod(DEBUG_SCREEN_HOOK, "drawStringWithShadow", "a", "(Ljava/lang/String;III)I", reference, false);

@@ -1,8 +1,8 @@
 package dev.safixo.client.render.util;
 
-import dev.safixo.client.render.SectionRender;
+import dev.safixo.client.render.pipelines.terrain.SectionRender;
 import dev.safixo.client.render.util.data.CameraData;
-import dev.safixo.client.render.region.RegionRender;
+import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
 
 public class MathExt {
 	public static float squaredDistance(SectionRender render, CameraData cameraData) {

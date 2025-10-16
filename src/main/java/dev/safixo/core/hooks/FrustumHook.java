@@ -1,9 +1,6 @@
 package dev.safixo.core.hooks;
 
-import dev.safixo.client.render.SectionManager;
-import dev.safixo.client.render.cull.FrustumCuller;
-import dev.safixo.client.render.util.data.BlocksFlags;
-import dev.safixo.client.render.util.data.CameraData;
+import dev.safixo.client.render.pipelines.terrain.cull.FrustumCuller;
 import dev.safixo.core.HookUtils;
 import net.minecraft.client.renderer.ActiveRenderInfo;
 import net.minecraft.client.renderer.culling.ClippingHelper;

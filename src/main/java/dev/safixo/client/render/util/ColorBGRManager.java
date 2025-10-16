@@ -51,7 +51,7 @@ public class ColorBGRManager {
 	}
 
 	public static int normToInt(float color) {
-		return MathExt.clamp((int) (color * NORMALIZED_TO_INTEGER), 0, 0xFF) & 0xFF;
+		return (int) (color * NORMALIZED_TO_INTEGER) & 0xFF;
 	}
 
 	public static int intToNorm(int color) {
