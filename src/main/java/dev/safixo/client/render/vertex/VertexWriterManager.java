@@ -84,7 +84,7 @@ public class VertexWriterManager {
 	}
 
 	public void ensureCapacity(int offset) {
-		if ((this.offset + offset * 2L) >= this.capacity) {
+		if (this.offset + offset >= this.capacity) {
 			this.grow(this.offset + offset * 2L);
 		}
 	}

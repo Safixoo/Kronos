@@ -1,8 +1,11 @@
 package dev.safixo.client.render.util;
 
 public class ColorBGRManager {
-	private static final float NORMALIZED_TO_INTEGER = 255.0F;
-	private static final float INTEGER_TO_NORMALIZED = 1.0F / NORMALIZED_TO_INTEGER;
+	private static final float NORMALIZED_TO_U8 = 255.0F;
+	private static final float U8_TO_NORMALIZED = 1.0F / NORMALIZED_TO_U8;
+
+	private static final float NORMALIZED_TO_FACTOR = 256.0F;
+	private static final float FACTOR_TO_NORMALIZED = 1.0F / NORMALIZED_TO_FACTOR;
 
 	public static int packColor(float r, float g, float b) {
 		int blue = normToInt(b);
@@ -51,11 +54,15 @@ public class ColorBGRManager {
 	}
 
 	public static int normToInt(float color) {
-		return (int) (color * NORMALIZED_TO_INTEGER) & 0xFF;
+		return (int) (color * NORMALIZED_TO_U8) & 0xFF;
+	}
+
+	public static int normToFactor(float color) {
+		return (int) (color * NORMALIZED_TO_FACTOR) & 0xFF;
 	}
 
 	public static int intToNorm(int color) {
-		return (int) (color * INTEGER_TO_NORMALIZED);
+		return (int) (color * U8_TO_NORMALIZED);
 	}
 
 	public static int extractRed(int color) {

@@ -1,7 +1,9 @@
 package dev.safixo.client.render.gfx.buffer;
 
+import dev.safixo.client.render.gfx.util.GpuFlags;
 import dev.safixo.client.render.util.memory.NativeBuffer;
 import dev.safixo.client.render.util.memory.UnsafeUtil;
+import org.lwjgl.opengl.EXTDirectStateAccess;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL15;
 
@@ -45,14 +47,16 @@ public class GlVertexBuffer {
 	}
 
 	public void upload(long vertexData, int offset, int size) {
-		this.bind();
-
 		ByteBuffer vertexDataBuffer = NativeBuffer.wrap(vertexData);
 		((Buffer) vertexDataBuffer).limit(size);
 
-		GL15.glBufferSubData(GL15.GL_ARRAY_BUFFER, offset, vertexDataBuffer);
-
-		this.unbind();
+		if (GpuFlags.EXT_DSA) {
+			EXTDirectStateAccess.glNamedBufferSubDataEXT(this.id, offset, vertexDataBuffer);
+		} else {
+			this.bind();
+			GL15.glBufferSubData(GL15.GL_ARRAY_BUFFER, offset, vertexDataBuffer);
+			this.unbind();
+		}
 	}
 
 	public void draw(int vertices, int first) {

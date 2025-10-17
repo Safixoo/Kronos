@@ -36,7 +36,6 @@ public class RegionAllocation {
 		}
 
 		this.vertexBuffer = new RegionBuffer(newCapacity, GL15.GL_STATIC_DRAW);
-		SectionManager.getCurrentInstance().addMemory(newCapacity);
 
 		this.capacity = newCapacity;
 	}
@@ -57,8 +56,6 @@ public class RegionAllocation {
 		if (newSize > SPARE_BUFFER_ALLOC && size <= SPARE_BUFFER_ALLOC) {
 			newSize = SPARE_BUFFER_ALLOC;
 		}
-
-		SectionManager.getCurrentInstance().removeMemory(this.capacity);
 
 		// If it has been overpassed the copying buffer limit, do mental gymnastics.
 		if (newSize > SPARE_BUFFER_ALLOC) {
@@ -106,7 +103,6 @@ public class RegionAllocation {
 		GlBufferUtil.copyBufferToBuffer(regionBuffer, spareBuffer, 0, 0, (int) this.offset);
 
 		this.vertexBuffer.allocateSpace((int) newSize, GL15.GL_STATIC_DRAW);
-		SectionManager.getCurrentInstance().addMemory(size);
 
 		GlBufferUtil.copyBufferToBuffer(spareBuffer, regionBuffer, 0, 0, (int) this.offset);
 
@@ -117,7 +113,6 @@ public class RegionAllocation {
 	// with the sections and the invalid region/allocation.
 	public void clear() {
 		this.vertexBuffer.clear();
-		SectionManager.getCurrentInstance().removeMemory(this.vertexBuffer.getCapacity());
 
 		this.capacity = 0;
 		this.offset = 0;

@@ -24,7 +24,7 @@ public class CloudProgram extends GlProgram {
 
 	public void uploadUniforms() {
 		GL20.glUniform1i(this.u_CloudTex, GL13.GL_TEXTURE0);
-		GL20.glUniform1f(this.u_FogEnd, GL11.glGetFloat(GL11.GL_FOG_END));
+		GL20.glUniform1f(this.u_FogEnd, FogData.FOG_END);
 
 		float[] fogColor = FogData.FOG_COLOR;
 		GL20.glUniform4f(this.u_FogColor, fogColor[0], fogColor[1], fogColor[2], 0.0f);
