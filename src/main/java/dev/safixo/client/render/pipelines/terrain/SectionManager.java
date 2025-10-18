@@ -25,7 +25,7 @@ import dev.safixo.client.render.util.MathExt;
 
 public class SectionManager {
 	private static final int MAX_UPDATE_QUEUES = 30;
-	private static final long THRESHOLD_IN_NANOS = 1000000000L / 4;
+	private static final long THRESHOLD_IN_NANOS = 1000000000L;
 
 	private final Long2ReferenceOpenHashMap<SectionRender> sectionMap = new Long2ReferenceOpenHashMap<>();
 	private final LongOpenHashSet chunkExistence = new LongOpenHashSet();

@@ -30,7 +30,6 @@ public class DefaultVertexFormats {
 	public static final GlVertexFormat CLOUD_FORMAT = new CloudFormat(
 		new ImmutableList.Builder<GlVertexAttribute>()
 			.add(POSITION_3F)
-			.add(TEXTURE_2F)
 			.add(COLOR)
 			.build()
 	);

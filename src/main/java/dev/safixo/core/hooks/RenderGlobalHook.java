@@ -98,8 +98,24 @@ public class RenderGlobalHook {
 		PARTIAL_TICK = partialTick;
 	}
 
+	static long samples = 0;
+	static long time;
+
 	public static void renderCloudsFancy(RenderGlobal renderGlobal, float partialTick) {
+		long startTime = System.nanoTime();
+
 		CloudRenderer.renderCloudsFancy(partialTick);
+
+		long endTime = System.nanoTime() - startTime;
+
+		samples++;
+		time += endTime;
+
+		if (samples > 8000) {
+			System.out.println("Average time : " + ((time / 1E-6D) / 8000.0D) + "ms");
+			samples = 0;
+			time = 0;
+		}
 	}
 
 	public static void sortAndRender(RenderGlobal global, EntityLivingBase player, int renderPass, double partialTick) {
@@ -115,6 +131,8 @@ public class RenderGlobalHook {
 		// Enable lightmap.
 		minecraft.entityRenderer.enableLightmap(partialTick);
 
+		GL11.glEnable(GL11.GL_CULL_FACE);
+
 		if (renderPass == 0) {
 			// Render solid pass.
 			MANAGER.drawRenderPass(0);
@@ -122,6 +140,7 @@ public class RenderGlobalHook {
 			MANAGER.drawnSolidRenderers = 0;
 		} else {
 			GL11.glDisable(GL11.GL_ALPHA_TEST);
+
 			FIRST_PASS = false;
 
 			// Render translucent passes.
@@ -132,8 +151,11 @@ public class RenderGlobalHook {
 
 			GL11.glColorMask(true, true, true, true);
 			MANAGER.drawRenderPass(1);
+
 			GL11.glEnable(GL11.GL_ALPHA_TEST);
 		}
+
+		GL11.glDisable(GL11.GL_CULL_FACE);
 
 		// Disable lightmap.
 		minecraft.entityRenderer.disableLightmap(partialTick);
