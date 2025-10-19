@@ -8,6 +8,7 @@ import net.minecraft.util.Vec3Pool;
 import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
 import net.minecraft.world.biome.BiomeGenBase;
+import net.minecraft.world.biome.WorldChunkManager;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.storage.ExtendedBlockStorage;
 import net.minecraftforge.common.ForgeDirection;
@@ -26,10 +27,19 @@ public class SectionCache implements IBlockAccess {
 	private final World worldObj;
 	public final int blockX, blockY, blockZ;
 
+	private static final int UNDEFINED_COLOR = 0xF5010348;
+	private static final int BIOME_RADIUS = 2;
+	private static final int BIOME_CHUNK_WIDTH = 16 + (BIOME_RADIUS * 2);
+
+	private static final int[][] BIOME_COLOR_CACHE = new int[BlocksFlags.COLOR_TYPE_CACHED][BIOME_CHUNK_WIDTH * BIOME_CHUNK_WIDTH];
+	private static final byte[] BIOMES = new byte[BIOME_CHUNK_WIDTH * BIOME_CHUNK_WIDTH];
+
 	public static final byte[][] SECTION_BLOCKS = new byte[3 * 3 * 3][];
 	public static final byte[][] SECTION_DATA = new byte[3 * 3 * 3][];
 	public static final byte[][] SKY_LIGHT = new byte[3 * 3 * 3][];
 	public static final byte[][] BLOCK_LIGHT = new byte[3 * 3 * 3][];
+
+	private static final Chunk[] CHUNKS = new Chunk[3 * 3];
 
 	private static byte[] CENTER_BLOCKS;
 	private static byte[] CENTER_DATA;
@@ -53,12 +63,16 @@ public class SectionCache implements IBlockAccess {
 
 		int sectionX = this.blockX >> 4, sectionY = this.blockY >> 4, sectionZ = this.blockZ >> 4;
 
+		Arrays.fill(BIOME_COLOR_CACHE[0], UNDEFINED_COLOR);
+		Arrays.fill(BIOME_COLOR_CACHE[1], UNDEFINED_COLOR);
+
 		for (int x = sectionX; x <= maxChunkX; x++) {
 			for (int z = sectionZ; z <= maxChunkZ; z++) {
 				int relX = x - sectionX;
 				int relZ = z - sectionZ;
 
 				Chunk chunk = world.getChunkFromChunkCoords(x, z);
+				CHUNKS[sectionIndex(relX, 0, relZ)] = chunk;
 
 				for (int y = sectionY; y <= maxChunkY; y++) {
 					int relY = y - sectionY;
@@ -101,6 +115,32 @@ public class SectionCache implements IBlockAccess {
 						SKY_LIGHT[sectionIndex] = DEFAULT_FULL_BYTE_ARRAY;
 						BLOCK_LIGHT[sectionIndex] = DEFAULT_BYTE_ARRAY;
 					}
+				}
+			}
+
+			WorldChunkManager manager = this.worldObj.getWorldChunkManager();
+
+			int centerBlockX = this.blockX + 16;
+			int centerBlockZ = this.blockZ + 16;
+
+			for (int blockX = centerBlockX - BIOME_RADIUS; blockX < centerBlockX + 16 + BIOME_RADIUS; blockX++) {
+				for (int blockZ = centerBlockZ - BIOME_RADIUS; blockZ < centerBlockZ + 16 + BIOME_RADIUS; blockZ++) {
+					int actChunkX = (blockX >> 4) - sectionX;
+					int actChunkZ = (blockZ >> 4) - sectionZ;
+
+					int relBiomeX = blockX - (centerBlockX - BIOME_RADIUS);
+					int relBiomeZ = blockZ - (centerBlockZ - BIOME_RADIUS);
+
+					int chunkIndex = sectionIndex(actChunkX, 0, actChunkZ);
+
+					Chunk chunk = CHUNKS[chunkIndex];
+					BiomeGenBase biomeGenBase = BiomeGenBase.plains;
+
+					if (chunk != null) {
+						biomeGenBase = chunk.getBiomeGenForWorldCoords(blockX & 15, blockZ & 15, manager);
+					}
+
+					BIOMES[relBiomeX + relBiomeZ * BIOME_CHUNK_WIDTH] = (byte) biomeGenBase.biomeID;
 				}
 			}
 		}
@@ -262,8 +302,16 @@ public class SectionCache implements IBlockAccess {
 	}
 
 	@Override
-	public BiomeGenBase getBiomeGenForCoords(int par1, int par2) {
-		return this.worldObj.getBiomeGenForCoords(par1, par2);
+	public BiomeGenBase getBiomeGenForCoords(int x, int z) {
+		int biomeX = x - (this.blockX + 16 - BIOME_RADIUS);
+		int biomeZ = z - (this.blockZ + 16 - BIOME_RADIUS);
+
+		return BiomeGenBase.biomeList[byteToUnsigned(BIOMES[biomeX + biomeZ * BIOME_CHUNK_WIDTH])];
+	}
+
+	public int getColorMultiplier(Block block, int x, int y, int z) {
+
+		return 0;
 	}
 
 	@Override

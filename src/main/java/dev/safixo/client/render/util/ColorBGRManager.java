@@ -20,7 +20,7 @@ public class ColorBGRManager {
 	}
 
 	public static int multiplyColor(int color, float factor) {
-		return multiplyColor(color, (int) (factor * 256));
+		return multiplyColor(color, normToFactor(factor));
 	}
 
 	public static int multiplyColorByColor(int color1, int color2) {
@@ -58,7 +58,7 @@ public class ColorBGRManager {
 	}
 
 	public static int normToFactor(float color) {
-		return (int) (color * NORMALIZED_TO_FACTOR) & 0xFF;
+		return Math.min(256, (int) (color * NORMALIZED_TO_FACTOR + 1));
 	}
 
 	public static int intToNorm(int color) {

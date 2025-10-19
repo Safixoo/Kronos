@@ -16,6 +16,7 @@ public class KronosTransformer implements IClassTransformer {
 	static final String DEBUG_SCREEN_HOOK = "dev/safixo/core/hooks/DebugScreenHook";
 	static final String FRUSTUM_HOOK = "dev/safixo/core/hooks/FrustumHook";
 	static final String MINECRAFT_HOOK = "dev/safixo/core/hooks/MinecraftHook";
+	static final String BIOME_GEN_BASE_HOOK = "dev/safixo/core/hooks/BiomeGenBaseHook";
 
 	static final String RENDER_GLOBAL = "net.minecraft.client.renderer.RenderGlobal";
 	static final String CLIPPING_HELPER_IMPL = "net.minecraft.client.renderer.culling.ClippingHelperImpl";
@@ -25,6 +26,7 @@ public class KronosTransformer implements IClassTransformer {
 	static final String MINECRAFT = "net.minecraft.client.Minecraft";
 	static final String BLOCK_ICE = "net.minecraft.block.BlockIce";
 	static final String ACTIVE_RENDER_INFO = "net.minecraft.client.renderer.ActiveRenderInfo";
+	static final String BIOME_GEN_BASE = "net.minecraft.world.biome.BiomeGenBase";
 
 	@Override
 	public byte[] transform(String name, String transformedName, byte[] basicClass) {
@@ -76,6 +78,10 @@ public class KronosTransformer implements IClassTransformer {
 				TessellatorHook.redirectTessellatorFunc("setTranslation", "b", "(DDD)V", reference);
 				TessellatorHook.redirectTessellatorFunc("addTranslation", "c", "(FFF)V", reference);
 				break;
+			case BIOME_GEN_BASE:
+//				replaceClassMethod(BIOME_GEN_BASE_HOOK, "getWaterColorMultiplier", "", "", reference, false);
+//				replaceClassMethod(BIOME_GEN_BASE_HOOK, "getModdedBiomeGrassColor", "", "", reference, false);
+//				replaceClassMethod(BIOME_GEN_BASE_HOOK, "getModdedBiomeFoliageColor", "", "", reference, false);
 			case ACTIVE_RENDER_INFO:
 				prePassBullShit(reference);
 				break;

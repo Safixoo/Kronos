@@ -21,6 +21,7 @@ public class FullBlockMesher {
 	private static final int[] SHADE_FULL_COLOR = new int[Direction.COUNT];
 	private static final int[] SHADE_FULL_FACTOR = new int[Direction.COUNT];
 	private static final float[] VERT_UVS = new float[4];
+	private static final float[] OVERLAY_UVS = new float[4];
 
 	private static final Icon SIDE_GRASS_NON_OVERLAY = Block.grass.getIcon(5, 5);
 	private static final Vector2i[] MAP_ID_TO_UV = new Vector2i[4];
@@ -54,15 +55,26 @@ public class FullBlockMesher {
 			Icon tex = block.getBlockTexture(cache, x, y, z, dir);
 			FacingRender render = FACE_RENDER[dir];
 
+			boolean shouldColor = modelColor != 0xFFFFFF && blockId != Block.grass.blockID || dir == UP;
+
+			int blockColor = shouldColor ? ColorBGRManager.multiplyColor(modelColor, SHADE_FULL_FACTOR[dir]) : SHADE_FULL_COLOR[dir];
+			int overlayColor = tex == SIDE_GRASS_NON_OVERLAY && !shouldColor ? ColorBGRManager.multiplyColorByColor(modelColor, blockColor) : blockColor;
+
+			final float[] uvs = VERT_UVS;
+			uvs[0] = tex.getMinU();
+			uvs[1] = tex.getMinV();
+			uvs[2] = tex.getMaxU();
+			uvs[3] = tex.getMaxV();
+
 			if (ambient) {
-				renderFace(block, render, tex, dir, cache, x, y, z, modelColor != 0xFFFFFF && (blockId != Block.grass.blockID || dir == UP));
+				renderFace(render, tex, dir, cache, x, y, z, blockColor, overlayColor);
 			} else {
-				renderFaceNoSmooth(block, render, tex, dir, cache, x, y, z, SHADE_FULL_FACTOR[dir]);
+				renderFaceNoSmooth(render, dir, cache, x, y, z, blockColor);
 			}
 		}
 	}
 
-	public static void renderFace(Block block, FacingRender facing, Icon tex, int dir, SectionCache cache, int x, int y, int z, boolean shouldColor) {
+	public static void renderFace(FacingRender facing, Icon tex, int dir, SectionCache cache, int x, int y, int z, int blockColor, int overlayColor) {
 		int p1X = facing.aoCornerX0;
 		int p1Y = facing.aoCornerY0;
 		int p1Z = facing.aoCornerZ0;
@@ -100,12 +112,10 @@ public class FullBlockMesher {
 		int lightNP = fullFace(posZ | negX) != 0 ? light(cache, dirX - pd12X, dirY - pd12Y, dirZ - pd12Z, cornerNP) : 0;
 		int lightNN = fullFace(negZ | negX) != 0 ? light(cache, dirX - p12X, dirY - p12Y, dirZ - p12Z, cornerNN) : 0;
 
-		int faceShade = SHADE_FULL_COLOR[dir];
-
-		int shade0 = ColorBGRManager.multiplyColor(faceShade, ao(posZ, posX, cornerPP, dir));
-		int shade1 = ColorBGRManager.multiplyColor(faceShade, ao(negZ, posX, cornerPN, dir));
-		int shade2 = ColorBGRManager.multiplyColor(faceShade, ao(negZ, negX, cornerNN, dir));
-		int shade3 = ColorBGRManager.multiplyColor(faceShade, ao(posZ, negX, cornerNP, dir));
+		int shade0 = ao(posZ, posX, cornerPP);
+		int shade1 = ao(negZ, posX, cornerPN);
+		int shade2 = ao(negZ, negX, cornerNN);
+		int shade3 = ao(posZ, negX, cornerNP);
 
 		int lightMap = cache.getLightBrightnessForSkyBlocks(dirX, dirY, dirZ, 0);
 
@@ -122,36 +132,36 @@ public class FullBlockMesher {
 		VertexWriterManager.getCurrentInstance().ensureCapacity(TerrainFormat.STRIDE * 4);
 
 		final float[] uvs = VERT_UVS;
-		uvs[0] = tex.getMinU();
-		uvs[1] = tex.getMinV();
-		uvs[2] = tex.getMaxU();
-		uvs[3] = tex.getMaxV();
-
 		Vector2i uv0 = MAP_ID_TO_UV[facing.uvData[0]];
 		Vector2i uv1 = MAP_ID_TO_UV[facing.uvData[1]];
 		Vector2i uv2 = MAP_ID_TO_UV[facing.uvData[2]];
 		Vector2i uv3 = MAP_ID_TO_UV[facing.uvData[3]];
 
-		int color0 = ColorBGRManager.multiplyColorByColor(processVertexColor(facing, cache, block, x, y, z, 0), shade0);
-		int color1 = ColorBGRManager.multiplyColorByColor(processVertexColor(facing, cache, block, x, y, z, 1), shade1);
-		int color2 = ColorBGRManager.multiplyColorByColor(processVertexColor(facing, cache, block, x, y, z, 2), shade2);
-		int color3 = ColorBGRManager.multiplyColorByColor(processVertexColor(facing, cache, block, x, y, z, 3), shade3);
+		int color0 = ColorBGRManager.multiplyColor(blockColor, shade0);
+		int color1 = ColorBGRManager.multiplyColor(blockColor, shade1);
+		int color2 = ColorBGRManager.multiplyColor(blockColor, shade2);
+		int color3 = ColorBGRManager.multiplyColor(blockColor, shade3);
 
 		x &= RegionRender.BLOCK_BITS_X;
 		y &= RegionRender.BLOCK_BITS_Y;
 		z &= RegionRender.BLOCK_BITS_Z;
 
 		if ((color0 > color3 || color2 > color1)) {
-			addVertex(facing, 0, x, y, z, uvs[uv0.x], uvs[uv0.y], shouldColor ? color0 : shade0, light0);
-			addVertex(facing, 1, x, y, z, uvs[uv1.x], uvs[uv1.y], shouldColor ? color1 : shade1, light1);
-			addVertex(facing, 2, x, y, z, uvs[uv2.x], uvs[uv2.y], shouldColor ? color2 : shade2, light2);
-			addVertex(facing, 3, x, y, z, uvs[uv3.x], uvs[uv3.y], shouldColor ? color3 : shade3, light3);
+			addVertex(facing, 0, x, y, z, uvs[uv0.x], uvs[uv0.y], color0, light0);
+			addVertex(facing, 1, x, y, z, uvs[uv1.x], uvs[uv1.y], color1, light1);
+			addVertex(facing, 2, x, y, z, uvs[uv2.x], uvs[uv2.y], color2, light2);
+			addVertex(facing, 3, x, y, z, uvs[uv3.x], uvs[uv3.y], color3, light3);
 
 			if (tex == SIDE_GRASS_NON_OVERLAY) {
 				uvs[0] = BlockGrass.getIconSideOverlay().getMinU();
 				uvs[1] = BlockGrass.getIconSideOverlay().getMinV();
 				uvs[2] = BlockGrass.getIconSideOverlay().getMaxU();
 				uvs[3] = BlockGrass.getIconSideOverlay().getMaxV();
+
+				color0 = ColorBGRManager.multiplyColor(overlayColor, shade0);
+				color1 = ColorBGRManager.multiplyColor(overlayColor, shade1);
+				color2 = ColorBGRManager.multiplyColor(overlayColor, shade2);
+				color3 = ColorBGRManager.multiplyColor(overlayColor, shade3);
 
 				addVertex(facing, 0, x, y, z, uvs[uv0.x], uvs[uv0.y], color0, light0);
 				addVertex(facing, 1, x, y, z, uvs[uv1.x], uvs[uv1.y], color1, light1);
@@ -159,10 +169,10 @@ public class FullBlockMesher {
 				addVertex(facing, 3, x, y, z, uvs[uv3.x], uvs[uv3.y], color3, light3);
 			}
 		} else {
-			addVertex(facing, 3, x, y, z, uvs[uv3.x], uvs[uv3.y], shouldColor ? color3 : shade3, light3);
-			addVertex(facing, 0, x, y, z, uvs[uv0.x], uvs[uv0.y], shouldColor ? color0 : shade0, light0);
-			addVertex(facing, 1, x, y, z, uvs[uv1.x], uvs[uv1.y], shouldColor ? color1 : shade1, light1);
-			addVertex(facing, 2, x, y, z, uvs[uv2.x], uvs[uv2.y], shouldColor ? color2 : shade2, light2);
+			addVertex(facing, 3, x, y, z, uvs[uv3.x], uvs[uv3.y], color3, light3);
+			addVertex(facing, 0, x, y, z, uvs[uv0.x], uvs[uv0.y], color0, light0);
+			addVertex(facing, 1, x, y, z, uvs[uv1.x], uvs[uv1.y], color1, light1);
+			addVertex(facing, 2, x, y, z, uvs[uv2.x], uvs[uv2.y], color2, light2);
 
 			if (tex == SIDE_GRASS_NON_OVERLAY) {
 				uvs[0] = BlockGrass.getIconSideOverlay().getMinU();
@@ -170,17 +180,17 @@ public class FullBlockMesher {
 				uvs[2] = BlockGrass.getIconSideOverlay().getMaxU();
 				uvs[3] = BlockGrass.getIconSideOverlay().getMaxV();
 
-				addVertex(facing, 3, x, y, z, uvs[uv3.x], uvs[uv3.y], color3, light3);
-				addVertex(facing, 0, x, y, z, uvs[uv0.x], uvs[uv0.y], color0, light0);
-				addVertex(facing, 1, x, y, z, uvs[uv1.x], uvs[uv1.y], color1, light1);
-				addVertex(facing, 2, x, y, z, uvs[uv2.x], uvs[uv2.y], color2, light2);
+				color0 = ColorBGRManager.multiplyColor(overlayColor, shade0);
+				color1 = ColorBGRManager.multiplyColor(overlayColor, shade1);
+				color2 = ColorBGRManager.multiplyColor(overlayColor, shade2);
+				color3 = ColorBGRManager.multiplyColor(overlayColor, shade3);
+
+				addVertex(facing, 3, x, y, z, uvs[uv3.x], uvs[uv3.y], color0, light3);
+				addVertex(facing, 0, x, y, z, uvs[uv0.x], uvs[uv0.y], color1, light0);
+				addVertex(facing, 1, x, y, z, uvs[uv1.x], uvs[uv1.y], color2, light1);
+				addVertex(facing, 2, x, y, z, uvs[uv2.x], uvs[uv2.y], color3, light2);
 			}
 		}
-	}
-
-	private static int processVertexColor(FacingRender facingRender, SectionCache cache, Block block, int x, int y, int z, int vertexInd) {
-		Vector3i offset = facingRender.quadVerts[vertexInd];
-		return ColorBGRManager.rgbToBgr(block.colorMultiplier(cache, x + offset.x, y + offset.y, z + offset.z));
 	}
 
 	private static int light(int blockCache) {
@@ -236,7 +246,7 @@ public class FullBlockMesher {
 		return MathExt.getLightmapCoord(skyLight, blockLight) << 4;
 	}
 
-	public static void renderFaceNoSmooth(Block block, FacingRender facing, Icon tex, int dir, SectionCache cache, int x, int y, int z, int shade) {
+	public static void renderFaceNoSmooth(FacingRender facing, int dir, SectionCache cache, int x, int y, int z, int blockColor) {
 		Vector3i dirVec = Direction.getDirection(dir);
 
 		int lightMap = cache.getLightBrightnessForSkyBlocks(x + dirVec.x, y + dirVec.y, z + dirVec.z, 0);
@@ -244,32 +254,19 @@ public class FullBlockMesher {
 		VertexWriterManager.getCurrentInstance().ensureCapacity(TerrainFormat.STRIDE * 4);
 
 		final float[] uvs = VERT_UVS;
-		uvs[0] = tex.getMinU();
-		uvs[1] = tex.getMinV();
-		uvs[2] = tex.getMaxU();
-		uvs[3] = tex.getMaxV();
-
 		Vector2i uv0 = MAP_ID_TO_UV[facing.uvData[0]];
 		Vector2i uv1 = MAP_ID_TO_UV[facing.uvData[1]];
 		Vector2i uv2 = MAP_ID_TO_UV[facing.uvData[2]];
 		Vector2i uv3 = MAP_ID_TO_UV[facing.uvData[3]];
 
-		int modelColor = 0xFFFFFFFF;
-
-		if (tex != SIDE_GRASS_NON_OVERLAY) {
-			modelColor = ColorBGRManager.rgbToBgr(block.colorMultiplier(cache, x, y, z));
-		}
-
-		shade = ColorBGRManager.multiplyColor(modelColor, shade);
-
 		x &= RegionRender.BLOCK_BITS_X;
 		y &= RegionRender.BLOCK_BITS_Y;
 		z &= RegionRender.BLOCK_BITS_Z;
 
-		addVertex(facing, 0, x, y, z, uvs[uv0.x], uvs[uv0.y], shade, lightMap);
-		addVertex(facing, 1, x, y, z, uvs[uv1.x], uvs[uv1.y], shade, lightMap);
-		addVertex(facing, 2, x, y, z, uvs[uv2.x], uvs[uv2.y], shade, lightMap);
-		addVertex(facing, 3, x, y, z, uvs[uv3.x], uvs[uv3.y], shade, lightMap);
+		addVertex(facing, 0, x, y, z, uvs[uv0.x], uvs[uv0.y], blockColor, lightMap);
+		addVertex(facing, 1, x, y, z, uvs[uv1.x], uvs[uv1.y], blockColor, lightMap);
+		addVertex(facing, 2, x, y, z, uvs[uv2.x], uvs[uv2.y], blockColor, lightMap);
+		addVertex(facing, 3, x, y, z, uvs[uv3.x], uvs[uv3.y], blockColor, lightMap);
 	}
 
 	private int getBlockId(SectionCache cache, Vector3i pos, Vector3i off) {
@@ -284,10 +281,8 @@ public class FullBlockMesher {
 			return b;
 		}
 
-		int blockLight = MathExt.clamp((((a >>> 4) + (b >>> 4)) & 0xFF) >>> 1, 0, 15);
-		int skyLight = MathExt.clamp((((a >>> 20) + (b >>> 20)) & 0xFF) >>> 1, 0, 15);
-
-		return MathExt.getLightmapCoord(skyLight, blockLight);
+		int sumLight = (a + b);
+		return (sumLight >>> 1) & 0xF000F0;
 	}
 
 	private static void addVertex(FacingRender facing, int vertInd, int x, int y, int z, float u, float v, int color, int lightMap) {
@@ -315,7 +310,7 @@ public class FullBlockMesher {
 	public static final int LIGHT_REDUCE = 70;
 	public static final int CORNER_LIGHT = 256 - LIGHT_REDUCE;
 
-	public static int ao(int pos1, int pos2, int corner, int dir) {
+	public static int ao(int pos1, int pos2, int corner) {
 		pos1 &= 1;
 		pos2 &= 1;
 		corner &= 1;
@@ -334,15 +329,6 @@ public class FullBlockMesher {
 		factor -= br(pos2);
 
 		return Math.min(Math.max(factor, min), 255);
-	}
-
-//	public static int lightMap(int light1, int light2, int lightCorner) {
-//		light1 = light1 != 0 && ?
-//
-//	}
-
-	private static Vector2i createVec2i(int x, int y) {
-		return new Vector2i(x, y);
 	}
 
 	private static Vector3i createVec3i(int x, int y, int z) {
@@ -446,7 +432,7 @@ public class FullBlockMesher {
 
 		for (int i = 0; i < Direction.COUNT; i++) {
 			SHADE_FULL_COLOR[i] = ColorBGRManager.multiplyColor(0xFF_FF_FF, SIDE_LIGHT_MULTIPLIER[i]);
-			SHADE_FULL_FACTOR[i] = (int) (SIDE_LIGHT_MULTIPLIER[i] * 255.0f);
+			SHADE_FULL_FACTOR[i] = ColorBGRManager.normToFactor(SIDE_LIGHT_MULTIPLIER[i]);
 		}
 	}
 }

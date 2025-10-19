@@ -1,8 +1,5 @@
 package dev.safixo.client.render.util.data;
 
-import cpw.mods.fml.common.asm.transformers.deobf.FMLDeobfuscatingRemapper;
-import cpw.mods.fml.relauncher.FMLLaunchHandler;
-import dev.safixo.core.HookUtils;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockLeaves;
 import net.minecraft.block.BlockLeavesBase;
@@ -10,7 +7,6 @@ import net.minecraft.block.material.Material;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderGlobal;
 import net.minecraft.world.IBlockAccess;
-import org.lwjgl.Sys;
 
 import java.lang.reflect.Method;
 
@@ -27,6 +23,10 @@ public class BlocksFlags {
 
 	private static int LEAVES_TOP_INDEX = 0;
 	private static final int[] LEAVES_INDICES = new int[2048];
+
+	public static final int COLOR_TYPE_CACHED = 2;
+	public static final int FOLIAGE_TYPE = 0;
+	public static final int GRASS_TYPE = 0;
 
 	public static void computeFlagArrays() {
 		LEAVES_TOP_INDEX = 0;

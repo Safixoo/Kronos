@@ -1,6 +1,5 @@
 package dev.safixo.core;
 
-import cpw.mods.fml.common.asm.transformers.deobf.FMLDeobfuscatingRemapper;
 import dev.safixo.client.render.util.data.BlocksFlags;
 
 import java.lang.reflect.Field;
@@ -76,6 +75,27 @@ public class HookUtils {
 		}
 
 		return false;
+	}
+
+	public static Field getField(Class<?> clazz, String fieldName, String fieldNotch) {
+		if (!BlocksFlags.DETECTED) {
+			BlocksFlags.processDevInfo();
+		}
+
+		if (!BlocksFlags.DEV_ENVIRONMENT) {
+			fieldName = fieldNotch;
+		}
+
+		try {
+			Field mcField = clazz.getDeclaredField(fieldName);
+			mcField.setAccessible(true);
+
+			return mcField;
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		throw new RuntimeException("Couldn't find object");
 	}
 
 	public static Field getField(Object instance, String fieldName, String fieldNotch) {
