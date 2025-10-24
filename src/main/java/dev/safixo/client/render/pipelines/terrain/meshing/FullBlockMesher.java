@@ -185,10 +185,10 @@ public class FullBlockMesher {
 				color2 = ColorBGRManager.multiplyColor(overlayColor, shade2);
 				color3 = ColorBGRManager.multiplyColor(overlayColor, shade3);
 
-				addVertex(facing, 3, x, y, z, uvs[uv3.x], uvs[uv3.y], color0, light3);
-				addVertex(facing, 0, x, y, z, uvs[uv0.x], uvs[uv0.y], color1, light0);
-				addVertex(facing, 1, x, y, z, uvs[uv1.x], uvs[uv1.y], color2, light1);
-				addVertex(facing, 2, x, y, z, uvs[uv2.x], uvs[uv2.y], color3, light2);
+				addVertex(facing, 3, x, y, z, uvs[uv3.x], uvs[uv3.y], color3, light3);
+				addVertex(facing, 0, x, y, z, uvs[uv0.x], uvs[uv0.y], color0, light0);
+				addVertex(facing, 1, x, y, z, uvs[uv1.x], uvs[uv1.y], color1, light1);
+				addVertex(facing, 2, x, y, z, uvs[uv2.x], uvs[uv2.y], color2, light2);
 			}
 		}
 	}

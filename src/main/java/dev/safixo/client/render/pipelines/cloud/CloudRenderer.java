@@ -510,17 +510,8 @@ public class CloudRenderer {
 		}
 	}
 
-	private static void addVertex(VertexWriterManager writer, float x, float y, float z) {
-		CloudFormat.writeCloudVertex(writer.getTotalOffset(), x, y, z, writer.color);
-		writer.addVertexCounter(CLOUD_STRIDE);
-	}
-
 	private static void addVertex(VertexWriterManager writer, float x, float y, float z, int color) {
 		CloudFormat.writeCloudVertex(writer.getTotalOffset(), x, y, z, color);
 		writer.addVertexCounter(CLOUD_STRIDE);
-	}
-
-	private static void setColor(VertexWriterManager writer, int color) {
-		writer.color = color;
 	}
 }

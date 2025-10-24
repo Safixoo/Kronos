@@ -17,6 +17,7 @@ public class GlVertexBuffer {
 
 	public GlVertexBuffer(int hint) {
 		this.id = GL15.glGenBuffers();
+		this.setHint(hint);
 	}
 
 	public GlVertexBuffer(int size, int hint) {

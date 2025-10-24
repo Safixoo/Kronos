@@ -3,7 +3,6 @@ package dev.safixo.core.hooks;
 import net.minecraft.world.biome.BiomeGenBase;
 import net.minecraftforge.event.terraingen.BiomeEvent;
 
-// Avoid allocations and big
 public class BiomeGenBaseHook {
 	public static int getWaterColorMultiplier(BiomeGenBase biome) {
 //		BiomeEvent.GetWaterColor event = BIOME_CONTAINER.get().waterColor;

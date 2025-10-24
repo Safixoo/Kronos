@@ -150,6 +150,10 @@ public class VertexWriterManager {
 		return this.vertexPtr + this.offset;
 	}
 
+	public int getOffset() {
+		return this.offset;
+	}
+
 	public long getVertexData() {
 		return this.vertexPtr;
 	}

@@ -14,6 +14,7 @@ import dev.safixo.client.render.util.data.BlocksFlags;
 import dev.safixo.client.render.util.Direction;
 import dev.safixo.client.render.vertex.DefaultVertexFormats;
 import net.minecraft.world.World;
+import net.minecraft.world.chunk.Chunk;
 
 import static dev.safixo.client.render.pipelines.terrain.meshing.SectionCache.makeBlockIndex;
 import static dev.safixo.client.render.util.Direction.*;
@@ -52,6 +53,7 @@ public class SectionRender {
 
 	public void rebuild(CameraData camera, SectionManager sectionManager, World world) {
 		WorldRenderer.chunksUpdated++;
+		Chunk.isLit = false;
 
 		int minX = this.blockX;
 		int minY = this.blockY;

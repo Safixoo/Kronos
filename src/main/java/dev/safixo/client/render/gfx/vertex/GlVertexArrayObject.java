@@ -37,6 +37,14 @@ public class GlVertexArrayObject {
 		GL30.glDeleteVertexArrays(this.id);
 	}
 
+	public void generateHandle() {
+		this.id = GL30.glGenVertexArrays();
+	}
+
+	public int getHandle() {
+		return this.id;
+	}
+
 	public void bind(GlVertexBuffer vbo) {
 		if (this.id == 0x80000000) {
 			this.saveStateInVao(vbo);

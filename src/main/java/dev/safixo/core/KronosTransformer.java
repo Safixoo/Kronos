@@ -14,6 +14,7 @@ public class KronosTransformer implements IClassTransformer {
 
 	static final String RENDER_GLOBAL_HOOK = "dev/safixo/core/hooks/RenderGlobalHook";
 	static final String DEBUG_SCREEN_HOOK = "dev/safixo/core/hooks/DebugScreenHook";
+	static final String FONT_RENDERER_HOOK = "dev/safixo/core/hooks/FontRendererHook";
 	static final String FRUSTUM_HOOK = "dev/safixo/core/hooks/FrustumHook";
 	static final String MINECRAFT_HOOK = "dev/safixo/core/hooks/MinecraftHook";
 	static final String BIOME_GEN_BASE_HOOK = "dev/safixo/core/hooks/BiomeGenBaseHook";
@@ -24,7 +25,6 @@ public class KronosTransformer implements IClassTransformer {
 	static final String FONT_RENDERER = "net.minecraft.client.gui.FontRenderer";
 	static final String TESSELLATOR = "net.minecraft.client.renderer.Tessellator";
 	static final String MINECRAFT = "net.minecraft.client.Minecraft";
-	static final String BLOCK_ICE = "net.minecraft.block.BlockIce";
 	static final String ACTIVE_RENDER_INFO = "net.minecraft.client.renderer.ActiveRenderInfo";
 	static final String BIOME_GEN_BASE = "net.minecraft.world.biome.BiomeGenBase";
 
@@ -41,34 +41,45 @@ public class KronosTransformer implements IClassTransformer {
 		// args and with the instance of the original class.
 		switch (transformedName) {
 			case RENDER_GLOBAL:
+				// Redirect terrain rendering calls.
 				replaceClassMethod(RENDER_GLOBAL_HOOK, "loadRenderers", "a", "()V", reference, true);
 				replaceClassMethod(RENDER_GLOBAL_HOOK, "clipRenderersByFrustum", "a", "(Lbft;F)V", reference, true);
 				replaceClassMethod(RENDER_GLOBAL_HOOK, "sortAndRender", "a", "(Lof;ID)I", reference, true);
-				replaceClassMethod(RENDER_GLOBAL_HOOK, "renderAllSortedRenderers", "", "", reference, true);
 				replaceClassMethod(RENDER_GLOBAL_HOOK, "updateRenderers", "a", "(Lof;Z)Z", reference, false);
 
+				// NO-OP without OptiFine, it OptiFine is present it avoids a crash for invalid null terrain arrays.
+				replaceClassMethod(RENDER_GLOBAL_HOOK, "renderAllSortedRenderers", "", "", reference, true);
+
+				// Redirect most renderer updates.
 				replaceClassMethod(RENDER_GLOBAL_HOOK, "markBlockForUpdate", "a", "(III)V", reference, true);
 				replaceClassMethod(RENDER_GLOBAL_HOOK, "markBlockForRenderUpdate", "b", "(III)V", reference, true);
 				replaceClassMethod(RENDER_GLOBAL_HOOK, "markBlockRangeForRenderUpdate", "a", "(IIIIII)V", reference, true);
 				replaceClassMethod(RENDER_GLOBAL_HOOK, "markBlocksForUpdate", "b", "(IIIIII)V", reference, true);
+
+				// Improved clouds.
 				replaceClassMethod(RENDER_GLOBAL_HOOK, "renderCloudsFancy", "b", "(IIIIII)V", reference, true);
 				break;
 			case FONT_RENDERER:
+				// Debug info.
 				replaceClassMethod(DEBUG_SCREEN_HOOK, "drawStringWithShadow", "a", "(Ljava/lang/String;III)I", reference, false);
+
+				// Redirect improved font-renderer draw loop.
+				replaceClassMethod(FONT_RENDERER_HOOK, "renderString", "a", "(Ljava/lang/String;III)I", reference, false);
 				break;
 			case CLIPPING_HELPER_IMPL:
+				// Redirect frustum setup to a more optimized and used one.
 				replaceClassMethod(FRUSTUM_HOOK, "init", "b", "()V", reference, true);
 				break;
 			case CLIPPING_HELPER:
-				replaceClassMethodBoolRet(FRUSTUM_HOOK, "isBoxInFrustum", "b", "(DDDDDD)Z", reference);
+				// Uses the optimized implementation of frustum.
+				replaceClassMethod(FRUSTUM_HOOK, "isBoxInFrustum", "b", "(DDDDDD)Z", reference, false);
 				break;
 			case MINECRAFT:
+				// In many drivers in make stalls the GPU too soon in the tick loop.
 				replaceClassMethod(MINECRAFT_HOOK, "checkGLError", "c", "(Ljava/lang/String;)V", reference, true);
 				break;
-			case BLOCK_ICE:
-				replaceClassMethod(MINECRAFT_HOOK, "shouldSideBeRendered", "a", "(Lacf;IIII)Z", reference, false);
-				break;
 			case TESSELLATOR:
+				// When drawing with VertexWriterManager redirects vertices to our buffers.
 				TessellatorHook.redirectTessellatorFunc("addVertexWithUV", "a", "(DDDDD)V", reference);
 				TessellatorHook.redirectTessellatorFunc("addVertex", "a", "(DDD)V", reference);
 				TessellatorHook.redirectTessellatorFunc("setTextureUV", "a", "(DD)V", reference);
@@ -79,10 +90,14 @@ public class KronosTransformer implements IClassTransformer {
 				TessellatorHook.redirectTessellatorFunc("addTranslation", "c", "(FFF)V", reference);
 				break;
 			case BIOME_GEN_BASE:
+				// TODO: Save a event instance per-thread to avoid creating events for every-biome fetched
+				//  in meshing which is stupid slow thanks to Forge.
 //				replaceClassMethod(BIOME_GEN_BASE_HOOK, "getWaterColorMultiplier", "", "", reference, false);
 //				replaceClassMethod(BIOME_GEN_BASE_HOOK, "getModdedBiomeGrassColor", "", "", reference, false);
 //				replaceClassMethod(BIOME_GEN_BASE_HOOK, "getModdedBiomeFoliageColor", "", "", reference, false);
 			case ACTIVE_RENDER_INFO:
+				// TODO: this is not even verified to help even, to avoid this mess the best option is to backport
+				//  Angelica's ASM GlStateManager or hooking to the matrices setup which is ugly.
 				prePassBullShit(reference);
 				break;
 		}
@@ -162,65 +177,6 @@ public class KronosTransformer implements IClassTransformer {
 			}
 
 			method.instructions.add(inject);
-		}
-
-		ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
-		classNode.accept(writer);
-
-		basicClass[0] = writer.toByteArray();
-	}
-
-	static void replaceClassMethodBoolRet(String hookPath, String methodName, String runtimeName, String descriptor, byte[][] basicClass) {
-		ClassReader reader = new ClassReader(basicClass[0]);
-
-		ClassNode classNode = new ClassNode();
-		reader.accept(classNode, 0);
-
-		String classDesc = Type.getObjectType(classNode.name).getDescriptor();
-
-		for (int i = 0; i < classNode.methods.size(); i++) {
-			MethodNode method = (MethodNode) classNode.methods.get(i);
-
-			// Clear methods data and replace it with a direct call to the new function.
-			if ((method.name.equals(methodName) || (method.name.equals(runtimeName)) && method.desc.contains(descriptor))) {
-				// Clear method data.
-				method.localVariables = null;
-				method.instructions.clear();
-
-				Type[] types = Type.getArgumentTypes(method.desc);
-
-				InsnList inject = new InsnList();
-				StringBuilder newDesc = new StringBuilder();
-
-				int argumentOffset;
-
-				boolean isStatic = (method.access & ACC_STATIC) != 0;
-
-				if (!isStatic) {
-					inject.add(new VarInsnNode(ALOAD, 0));
-					newDesc.append("(").append(classDesc);
-					argumentOffset = 1;
-				} else {
-					newDesc.append("(");
-					argumentOffset = 0;
-				}
-
-				// Process argument types.
-				for (int j = 0; j < types.length; j++) {
-					argumentOffset = processType(newDesc, types[j], inject, argumentOffset);
-				}
-
-				newDesc.append(")Z");
-
-				inject.add(new MethodInsnNode(INVOKESTATIC,
-					hookPath,
-					methodName,
-					newDesc.toString()
-				));
-				inject.add(new InsnNode(IRETURN));
-
-				method.instructions.add(inject);
-			}
 		}
 
 		ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
