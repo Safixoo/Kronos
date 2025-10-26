@@ -1,4 +1,4 @@
-package dev.safixo.client.render.util.memory;
+package dev.safixo.client.util.memory;
 
 import sun.misc.Unsafe;
 

@@ -2,8 +2,7 @@ package dev.safixo.client.render.gfx.util;
 
 import dev.safixo.client.render.gfx.vertex.GlVertexArrayObject;
 import dev.safixo.client.render.gfx.buffer.GlVertexBuffer;
-import dev.safixo.client.render.pipelines.terrain.SectionManager;
-import dev.safixo.client.render.util.memory.UnsafeUtil;
+import dev.safixo.client.util.memory.UnsafeUtil;
 import dev.safixo.client.render.vertex.DefaultVertexFormats;
 import dev.safixo.client.render.gfx.vertex.GlVertexFormat;
 

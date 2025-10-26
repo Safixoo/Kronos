@@ -1,8 +1,8 @@
 package dev.safixo.client.render.vertex.writers;
 
 import com.google.common.collect.ImmutableList;
-import dev.safixo.client.render.util.MathExt;
-import dev.safixo.client.render.util.memory.UnsafeUtil;
+import dev.safixo.client.util.MathExt;
+import dev.safixo.client.util.memory.UnsafeUtil;
 import dev.safixo.client.render.vertex.VertexWriterManager;
 import dev.safixo.client.render.gfx.vertex.GlVertexFormat;
 import dev.safixo.client.render.gfx.vertex.attribute.GlVertexAttribute;

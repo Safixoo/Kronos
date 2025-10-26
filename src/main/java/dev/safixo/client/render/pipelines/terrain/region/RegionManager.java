@@ -7,8 +7,8 @@ import org.lwjgl.opengl.*;
 import dev.safixo.client.render.pipelines.terrain.SectionManager;
 import dev.safixo.client.render.pipelines.terrain.TerrainProgram;
 import dev.safixo.client.render.pipelines.terrain.cull.BFSQueue;
-import dev.safixo.client.render.util.data.CameraData;
-import dev.safixo.client.render.util.MathExt;
+import dev.safixo.client.util.data.CameraData;
+import dev.safixo.client.util.MathExt;
 
 public class RegionManager {
 	public final Long2ReferenceOpenHashMap<RegionRender> regionMap = new Long2ReferenceOpenHashMap<>();

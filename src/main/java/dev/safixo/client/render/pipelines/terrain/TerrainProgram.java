@@ -5,8 +5,8 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiNewChat;
 import org.lwjgl.opengl.GL20;
 import dev.safixo.client.render.pipelines.terrain.cull.FrustumCuller;
-import dev.safixo.client.render.util.data.CameraData;
-import dev.safixo.client.render.util.data.FogData;
+import dev.safixo.client.util.data.CameraData;
+import dev.safixo.client.util.data.FogData;
 import dev.safixo.client.render.vertex.writers.TerrainFormat;
 
 public class TerrainProgram extends GlProgram {

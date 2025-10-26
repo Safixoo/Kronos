@@ -6,19 +6,19 @@ import net.minecraft.client.renderer.RenderBlocks;
 import net.minecraft.client.renderer.WorldRenderer;
 import dev.safixo.client.render.pipelines.terrain.meshing.FullBlockMesher;
 import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
-import dev.safixo.client.render.util.MeshDirection;
-import dev.safixo.client.render.util.data.CameraData;
+import dev.safixo.client.util.MeshDirection;
+import dev.safixo.client.util.data.CameraData;
 import dev.safixo.client.render.vertex.VertexWriterManager;
 import dev.safixo.client.render.pipelines.terrain.meshing.SectionCache;
-import dev.safixo.client.render.util.data.BlocksFlags;
-import dev.safixo.client.render.util.Direction;
+import dev.safixo.client.util.data.BlocksFlags;
+import dev.safixo.client.util.Direction;
 import dev.safixo.client.render.vertex.DefaultVertexFormats;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
 
 import static dev.safixo.client.render.pipelines.terrain.meshing.SectionCache.makeBlockIndex;
-import static dev.safixo.client.render.util.Direction.*;
-import static dev.safixo.client.render.util.Direction.EAST;
+import static dev.safixo.client.util.Direction.*;
+import static dev.safixo.client.util.Direction.EAST;
 
 // Saves basic info for each section from the world, is used mostly for culling and
 // meshing, rendering is almost only managed in the RegionRender in an objectless fashion.
@@ -159,6 +159,7 @@ public class SectionRender {
 			VertexWriterManager.SOLID[dir].stopDrawing();
 		}
 
+		VertexWriterManager.DEFAULT_INSTANCE.stopDrawing();
 		translucentWriter.stopDrawing();
 	}
 

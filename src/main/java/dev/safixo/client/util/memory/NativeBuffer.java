@@ -1,4 +1,4 @@
-package dev.safixo.client.render.util.memory;
+package dev.safixo.client.util.memory;
 
 import it.unimi.dsi.fastutil.longs.Long2ReferenceMap;
 import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;

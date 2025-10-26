@@ -4,12 +4,12 @@ import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
 import dev.safixo.client.render.pipelines.terrain.SectionFlags;
 import dev.safixo.client.render.pipelines.terrain.SectionManager;
 import dev.safixo.client.render.pipelines.terrain.SectionRender;
-import dev.safixo.client.render.util.data.CameraData;
-import dev.safixo.client.render.util.data.FogData;
+import dev.safixo.client.util.data.CameraData;
+import dev.safixo.client.util.data.FogData;
 import dev.safixo.client.render.pipelines.terrain.region.RegionManager;
 import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
-import dev.safixo.client.render.util.Direction;
-import dev.safixo.client.render.util.MathExt;
+import dev.safixo.client.util.Direction;
+import dev.safixo.client.util.MathExt;
 import net.minecraft.util.MathHelper;
 
 public class BFSCuller {

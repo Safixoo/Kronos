@@ -1,11 +1,12 @@
 package dev.safixo.client.render.vertex;
 
 import dev.safixo.client.render.gfx.vertex.GlVertexFormat;
-import dev.safixo.client.render.util.memory.NativeBuffer;
-import dev.safixo.client.render.util.memory.UnsafeUtil;
+import dev.safixo.client.util.memory.NativeBuffer;
+import dev.safixo.client.util.memory.UnsafeUtil;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import dev.safixo.client.render.util.MeshDirection;
+import dev.safixo.client.util.MeshDirection;
 
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 public class VertexWriterManager {
@@ -24,13 +25,14 @@ public class VertexWriterManager {
 
 	private long capacity;
 	private long vertexPtr;
+	private ByteBuffer vertexPtrNio;
 
 	private GlVertexFormat vertexFormat;
 
 	private int offset, vertices;
 	public boolean isDrawing = false;
 
-	private static VertexWriterManager CURRENT_INSTANCE;
+	private static VertexWriterManager CURRENT_INSTANCE = DEFAULT_INSTANCE;
 
 	public VertexWriterManager(int capacity) {
 		this(capacity, true);
@@ -47,6 +49,7 @@ public class VertexWriterManager {
 
 		this.capacity = capacity;
 		this.vertexPtr = NativeBuffer.nmemAlloc(capacity);
+		this.vertexPtrNio = NativeBuffer.wrap(this.vertexPtr);
 	}
 
 	public VertexWriterManager() {
@@ -54,11 +57,7 @@ public class VertexWriterManager {
 	}
 
 	public static VertexWriterManager getCurrentInstance() {
-		if (CURRENT_INSTANCE != null) {
-			return CURRENT_INSTANCE;
-		}
-
-		return DEFAULT_INSTANCE;
+		return CURRENT_INSTANCE;
 	}
 
 	public static boolean isCurrentDrawing() {
@@ -120,6 +119,7 @@ public class VertexWriterManager {
 		NativeBuffer.nmemFree(this.vertexPtr);
 
 		this.vertexPtr = UnsafeUtil.NULL;
+		this.vertexPtrNio = null;
 		this.offset = 0;
 		this.vertices = 0;
 	}
@@ -144,6 +144,7 @@ public class VertexWriterManager {
 
 		this.capacity = newCapacity;
 		this.vertexPtr = newVertexPtr;
+		this.vertexPtrNio = NativeBuffer.wrap(newVertexPtr);
 	}
 
 	public long getTotalOffset() {
@@ -156,6 +157,10 @@ public class VertexWriterManager {
 
 	public long getVertexData() {
 		return this.vertexPtr;
+	}
+
+	public ByteBuffer getVertexDataNio() {
+		return this.vertexPtrNio;
 	}
 
 	public int getVertices() {

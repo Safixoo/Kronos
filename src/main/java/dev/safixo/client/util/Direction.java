@@ -1,4 +1,4 @@
-package dev.safixo.client.render.util;
+package dev.safixo.client.util;
 
 import net.minecraftforge.common.ForgeDirection;
 import org.joml.Vector3i;

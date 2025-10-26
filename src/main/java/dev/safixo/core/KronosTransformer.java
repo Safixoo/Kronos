@@ -1,6 +1,6 @@
 package dev.safixo.core;
 
-import dev.safixo.core.hooks.TessellatorHook;
+import dev.safixo.core.hooks.LongHashMapHook;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.ClassWriter;
 import net.minecraft.launchwrapper.IClassTransformer;
@@ -17,16 +17,16 @@ public class KronosTransformer implements IClassTransformer {
 	static final String FONT_RENDERER_HOOK = "dev/safixo/core/hooks/FontRendererHook";
 	static final String FRUSTUM_HOOK = "dev/safixo/core/hooks/FrustumHook";
 	static final String MINECRAFT_HOOK = "dev/safixo/core/hooks/MinecraftHook";
-	static final String BIOME_GEN_BASE_HOOK = "dev/safixo/core/hooks/BiomeGenBaseHook";
 
 	static final String RENDER_GLOBAL = "net.minecraft.client.renderer.RenderGlobal";
+	static final String ITEM_RENDERER = "net.minecraft.client.renderer.ItemRenderer";
 	static final String CLIPPING_HELPER_IMPL = "net.minecraft.client.renderer.culling.ClippingHelperImpl";
 	static final String CLIPPING_HELPER = "net.minecraft.client.renderer.culling.ClippingHelper";
 	static final String FONT_RENDERER = "net.minecraft.client.gui.FontRenderer";
-	static final String TESSELLATOR = "net.minecraft.client.renderer.Tessellator";
 	static final String MINECRAFT = "net.minecraft.client.Minecraft";
 	static final String ACTIVE_RENDER_INFO = "net.minecraft.client.renderer.ActiveRenderInfo";
 	static final String BIOME_GEN_BASE = "net.minecraft.world.biome.BiomeGenBase";
+	static final String LONG_HASH_MAP = "net.minecraft.util.LongHashMap";
 
 	@Override
 	public byte[] transform(String name, String transformedName, byte[] basicClass) {
@@ -40,6 +40,8 @@ public class KronosTransformer implements IClassTransformer {
 		// Overwrites classes methods completely with a function call with the same
 		// args and with the instance of the original class.
 		switch (transformedName) {
+			case LONG_HASH_MAP:
+				 return LongHashMapHook.rewriteHashMapClass();
 			case RENDER_GLOBAL:
 				// Redirect terrain rendering calls.
 				replaceClassMethod(RENDER_GLOBAL_HOOK, "loadRenderers", "a", "()V", reference, true);
@@ -59,6 +61,9 @@ public class KronosTransformer implements IClassTransformer {
 				// Improved clouds.
 				replaceClassMethod(RENDER_GLOBAL_HOOK, "renderCloudsFancy", "b", "(IIIIII)V", reference, true);
 				break;
+			case ITEM_RENDERER:
+				// Batches all Tessellator calls to item renderer.
+				replaceClassMethod(MINECRAFT_HOOK, "renderItemIn2D", "a", "(Ljava/lang/String;III)I", reference, false);
 			case FONT_RENDERER:
 				// Debug info.
 				replaceClassMethod(DEBUG_SCREEN_HOOK, "drawStringWithShadow", "a", "(Ljava/lang/String;III)I", reference, false);
@@ -77,17 +82,6 @@ public class KronosTransformer implements IClassTransformer {
 			case MINECRAFT:
 				// In many drivers in make stalls the GPU too soon in the tick loop.
 				replaceClassMethod(MINECRAFT_HOOK, "checkGLError", "c", "(Ljava/lang/String;)V", reference, true);
-				break;
-			case TESSELLATOR:
-				// When drawing with VertexWriterManager redirects vertices to our buffers.
-				TessellatorHook.redirectTessellatorFunc("addVertexWithUV", "a", "(DDDDD)V", reference);
-				TessellatorHook.redirectTessellatorFunc("addVertex", "a", "(DDD)V", reference);
-				TessellatorHook.redirectTessellatorFunc("setTextureUV", "a", "(DD)V", reference);
-				TessellatorHook.redirectTessellatorFunc("setColorRGBA", "a", "(IIII)V", reference);
-				TessellatorHook.redirectTessellatorFunc("setBrightness", "c", "(I)V", reference);
-				TessellatorHook.redirectTessellatorFunc("disableColor", "c", "()V", reference);
-				TessellatorHook.redirectTessellatorFunc("setTranslation", "b", "(DDD)V", reference);
-				TessellatorHook.redirectTessellatorFunc("addTranslation", "c", "(FFF)V", reference);
 				break;
 			case BIOME_GEN_BASE:
 				// TODO: Save a event instance per-thread to avoid creating events for every-biome fetched

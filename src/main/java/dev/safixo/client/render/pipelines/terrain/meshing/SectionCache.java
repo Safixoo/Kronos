@@ -1,6 +1,6 @@
 package dev.safixo.client.render.pipelines.terrain.meshing;
 
-import dev.safixo.client.render.util.MathExt;
+import dev.safixo.client.util.MathExt;
 import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;
 import net.minecraft.tileentity.TileEntity;
@@ -12,7 +12,7 @@ import net.minecraft.world.biome.WorldChunkManager;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.storage.ExtendedBlockStorage;
 import net.minecraftforge.common.ForgeDirection;
-import dev.safixo.client.render.util.data.BlocksFlags;
+import dev.safixo.client.util.data.BlocksFlags;
 
 import java.util.Arrays;
 

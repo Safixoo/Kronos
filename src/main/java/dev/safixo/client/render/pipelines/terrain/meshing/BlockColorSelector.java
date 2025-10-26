@@ -1,7 +1,6 @@
 package dev.safixo.client.render.pipelines.terrain.meshing;
 
-import dev.safixo.client.render.util.MathExt;
-import net.minecraft.block.material.Material;
+import dev.safixo.client.util.MathExt;
 import net.minecraft.world.ColorizerFoliage;
 import net.minecraft.world.ColorizerGrass;
 import net.minecraft.world.IBlockAccess;

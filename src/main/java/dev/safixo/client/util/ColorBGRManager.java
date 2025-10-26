@@ -1,4 +1,4 @@
-package dev.safixo.client.render.util;
+package dev.safixo.client.util;
 
 public class ColorBGRManager {
 	private static final float NORMALIZED_TO_U8 = 255.0F;

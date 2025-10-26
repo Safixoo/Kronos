@@ -1,6 +1,6 @@
 package dev.safixo.core;
 
-import dev.safixo.client.render.util.data.BlocksFlags;
+import dev.safixo.client.util.data.BlocksFlags;
 import java.lang.reflect.Field;
 
 public class HookUtils {

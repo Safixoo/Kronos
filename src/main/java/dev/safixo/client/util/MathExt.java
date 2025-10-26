@@ -1,7 +1,7 @@
-package dev.safixo.client.render.util;
+package dev.safixo.client.util;
 
 import dev.safixo.client.render.pipelines.terrain.SectionRender;
-import dev.safixo.client.render.util.data.CameraData;
+import dev.safixo.client.util.data.CameraData;
 import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
 
 public class MathExt {
@@ -72,6 +72,18 @@ public class MathExt {
 
 	public static long lerp(long start, long end, double t) {
 		return (long) (start + (end - start) * t);
+	}
+
+	public static float lerp(float start, float end, float t) {
+		return (start + (end - start) * t);
+	}
+
+	public static int packedNormal(float normalX, float normalY, float normalZ) {
+		int nX = (byte) (normalX * 0x7F);
+		int nY = (byte) (normalY * 0x7F);
+		int nZ = (byte) (normalZ * 0x7F);
+
+		return (nX & 0xFF) << 0 | (nY & 0xFF) << 8 | (nZ & 0xFF) << 16;
 	}
 
 	public static double smoothStep(double t) {

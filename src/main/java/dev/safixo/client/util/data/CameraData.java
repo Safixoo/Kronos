@@ -1,4 +1,4 @@
-package dev.safixo.client.render.util.data;
+package dev.safixo.client.util.data;
 
 public class CameraData {
 	public int intX;

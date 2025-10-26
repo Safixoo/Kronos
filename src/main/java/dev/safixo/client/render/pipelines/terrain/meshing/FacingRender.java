@@ -1,6 +1,6 @@
 package dev.safixo.client.render.pipelines.terrain.meshing;
 
-import dev.safixo.client.render.util.Direction;
+import dev.safixo.client.util.Direction;
 import org.joml.Vector3i;
 
 public class FacingRender {

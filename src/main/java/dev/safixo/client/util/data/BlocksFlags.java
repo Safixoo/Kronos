@@ -1,4 +1,4 @@
-package dev.safixo.client.render.util.data;
+package dev.safixo.client.util.data;
 
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockLeaves;

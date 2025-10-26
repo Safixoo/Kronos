@@ -1,4 +1,4 @@
-package dev.safixo.client.render.util.data;
+package dev.safixo.client.util.data;
 
 public class FogData {
 	public static float[] FOG_COLOR = new float[4];

@@ -1,6 +1,6 @@
 package dev.safixo.client.render.pipelines.terrain.cull;
 
-import dev.safixo.client.render.util.MathExt;
+import dev.safixo.client.util.MathExt;
 
 public class BFSVisArray {
 	private static final int MAX_DISTANCE = 32;

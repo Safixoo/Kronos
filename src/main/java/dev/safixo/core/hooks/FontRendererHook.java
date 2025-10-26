@@ -2,7 +2,8 @@ package dev.safixo.core.hooks;
 
 import dev.safixo.client.render.gfx.buffer.GlVertexBuffer;
 import dev.safixo.client.render.gfx.vertex.GlVertexArrayObject;
-import dev.safixo.client.render.util.memory.UnsafeUtil;
+import dev.safixo.client.util.memory.NativeBuffer;
+import dev.safixo.client.util.memory.UnsafeUtil;
 import dev.safixo.client.render.vertex.DefaultVertexFormats;
 import dev.safixo.client.render.vertex.VertexWriterManager;
 import dev.safixo.core.HookUtils;
@@ -16,7 +17,6 @@ import net.minecraft.client.renderer.texture.TextureObject;
 import net.minecraft.client.resources.ResourcePackRepository;
 import net.minecraft.util.ChatAllowedCharacters;
 import net.minecraft.util.ResourceLocation;
-import org.lwjgl.opengl.EXTDirectStateAccess;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL15;
 
@@ -288,7 +288,7 @@ public class FontRendererHook {
 		}
 
 		if (this.lastTexture != null) {
-			this.vertexBuffer.upload(writer.getVertexData(), 0, writer.getOffset());
+			this.vertexBuffer.bufferSubData(writer.getVertexDataNio(), 0, writer.getOffset());
 			this.vertexBuffer.draw(writer.getVertices(), 0);
 
 			writer.stopDrawing();
@@ -381,7 +381,7 @@ public class FontRendererHook {
 
 		if (texture != this.lastTexture) {
 			if (this.lastTexture != null) {
-				this.vertexBuffer.upload(writer.getVertexData(), 0, writer.getOffset());
+				this.vertexBuffer.bufferSubData(writer.getVertexDataNio(), 0, writer.getOffset());
 				this.vertexBuffer.draw(writer.getVertices(), 0);
 			}
 

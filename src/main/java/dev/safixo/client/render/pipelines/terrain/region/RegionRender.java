@@ -1,14 +1,14 @@
 package dev.safixo.client.render.pipelines.terrain.region;
 
 import dev.safixo.client.render.pipelines.terrain.TerrainProgram;
-import dev.safixo.client.render.util.memory.NativeBuffer;
-import dev.safixo.client.render.util.memory.UnsafeUtil;
+import dev.safixo.client.util.memory.NativeBuffer;
+import dev.safixo.client.util.memory.UnsafeUtil;
 import org.lwjgl.opengl.*;
 import dev.safixo.client.render.pipelines.terrain.SectionManager;
 import dev.safixo.client.render.pipelines.terrain.SectionRender;
-import dev.safixo.client.render.util.MeshDirection;
-import dev.safixo.client.render.util.data.CameraData;
-import dev.safixo.client.render.util.Direction;
+import dev.safixo.client.util.MeshDirection;
+import dev.safixo.client.util.data.CameraData;
+import dev.safixo.client.util.Direction;
 import dev.safixo.client.render.vertex.VertexWriterManager;
 import dev.safixo.client.render.vertex.writers.TerrainFormat;
 

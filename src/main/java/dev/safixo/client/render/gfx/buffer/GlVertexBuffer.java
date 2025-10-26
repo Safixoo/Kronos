@@ -1,8 +1,8 @@
 package dev.safixo.client.render.gfx.buffer;
 
 import dev.safixo.client.render.gfx.util.GpuFlags;
-import dev.safixo.client.render.util.memory.NativeBuffer;
-import dev.safixo.client.render.util.memory.UnsafeUtil;
+import dev.safixo.client.util.memory.NativeBuffer;
+import dev.safixo.client.util.memory.UnsafeUtil;
 import org.lwjgl.opengl.EXTDirectStateAccess;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL15;
@@ -49,19 +49,47 @@ public class GlVertexBuffer {
 
 	public void upload(long vertexData, int offset, int size) {
 		ByteBuffer vertexDataBuffer = NativeBuffer.wrap(vertexData);
-		((Buffer) vertexDataBuffer).limit(size);
+		this.upload(vertexDataBuffer, offset, size);
+	}
+
+	public void bufferData(ByteBuffer buffer, int size) {
+		((Buffer) buffer).limit(size);
 
 		if (GpuFlags.EXT_DSA) {
-			EXTDirectStateAccess.glNamedBufferSubDataEXT(this.id, offset, vertexDataBuffer);
+			EXTDirectStateAccess.glNamedBufferDataEXT(this.id, buffer, this.hint);
+		} else {
+			GL15.glBufferData(GL15.GL_ARRAY_BUFFER, buffer, this.hint);
+		}
+	}
+
+	public void bufferSubData(ByteBuffer buffer, int offset, int size) {
+		((Buffer) buffer).limit(size);
+
+		if (GpuFlags.EXT_DSA) {
+			EXTDirectStateAccess.glNamedBufferSubDataEXT(this.id, offset, buffer);
+		} else {
+			GL15.glBufferSubData(GL15.GL_ARRAY_BUFFER, offset, buffer);
+		}
+	}
+
+	public void upload(ByteBuffer buffer, int offset, int size) {
+		((Buffer) buffer).limit(size);
+
+		if (GpuFlags.EXT_DSA) {
+			EXTDirectStateAccess.glNamedBufferSubDataEXT(this.id, offset, buffer);
 		} else {
 			this.bind();
-			GL15.glBufferSubData(GL15.GL_ARRAY_BUFFER, offset, vertexDataBuffer);
+			GL15.glBufferSubData(GL15.GL_ARRAY_BUFFER, offset, buffer);
 			this.unbind();
 		}
 	}
 
 	public void draw(int vertices, int first) {
 		GL11.glDrawArrays(GL11.GL_QUADS, first, vertices);
+	}
+
+	public void draw(int drawMode, int vertices, int first) {
+		GL11.glDrawArrays(drawMode, first, vertices);
 	}
 
 	public void setHint(int hint) {

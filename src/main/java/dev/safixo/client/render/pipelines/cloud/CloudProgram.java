@@ -1,8 +1,7 @@
 package dev.safixo.client.render.pipelines.cloud;
 
 import dev.safixo.client.render.gfx.shader.GlProgram;
-import dev.safixo.client.render.util.data.FogData;
-import org.lwjgl.opengl.GL13;
+import dev.safixo.client.util.data.FogData;
 import org.lwjgl.opengl.GL20;
 
 public class CloudProgram extends GlProgram {

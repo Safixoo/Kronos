@@ -1,6 +1,6 @@
 package dev.safixo.client.render.pipelines.terrain;
 
-import dev.safixo.client.render.util.data.FogData;
+import dev.safixo.client.util.data.FogData;
 import dev.safixo.core.HookUtils;
 import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrays;
@@ -11,17 +11,18 @@ import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.item.ItemEgg;
 import net.minecraft.profiler.Profiler;
 import net.minecraft.world.World;
+import org.lwjgl.Sys;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.opengl.GL11;
 import dev.safixo.client.render.pipelines.terrain.cull.BFSCuller;
 import dev.safixo.client.render.pipelines.terrain.cull.FrustumCuller;
 import dev.safixo.client.render.pipelines.terrain.cull.UpdateQueue;
-import dev.safixo.client.render.util.data.BlocksFlags;
-import dev.safixo.client.render.util.data.CameraData;
+import dev.safixo.client.util.data.BlocksFlags;
+import dev.safixo.client.util.data.CameraData;
 import dev.safixo.client.render.pipelines.terrain.region.RegionManager;
 import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
-import dev.safixo.client.render.util.Direction;
-import dev.safixo.client.render.util.MathExt;
+import dev.safixo.client.util.Direction;
+import dev.safixo.client.util.MathExt;
 
 public class SectionManager {
 	private static final int MAX_UPDATE_QUEUES = 30;
@@ -265,7 +266,12 @@ public class SectionManager {
 
 		profiler.startSection("updatechunks");
 
-		this.queueRebuilds(partialTick);
+		try	{
+			this.queueRebuilds(partialTick);
+		} catch (NullPointerException e) {
+			System.err.println("[Kronos] Null PTR in meshing!");
+		}
+
 	}
 
 	// This is done as injecting with ASM to get fog properties is harder and a
@@ -302,7 +308,7 @@ public class SectionManager {
 		this.addFrameSample(currentDiff);
 
 		long maxBudget = Math.min(this.getFrameMedian() >>> 1, 550_000_000);
-		long lerpedBudget = MathExt.lerp(this.lastFrameBudget, maxBudget, partialTick);
+		long lerpedBudget = MathExt.lerp(this.lastFrameBudget, maxBudget, (double) partialTick);
 
 		this.lastFrameBudget = lerpedBudget;
 		this.lastFrameTime = currentTime;

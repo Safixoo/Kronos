@@ -1,4 +1,4 @@
-package dev.safixo.client.render.util;
+package dev.safixo.client.util;
 
 public class MeshDirection {
 	public static final int YN = Direction.DOWN;

@@ -50,10 +50,21 @@ public class GlVertexArrayObject {
 			this.saveStateInVao(vbo);
 		}
 
-		GL30.glBindVertexArray(this.id);
+		bindVertexArray(this.id);
 	}
 
 	public void unbind() {
-		GL30.glBindVertexArray(0);
+		bindVertexArray(0);
+	}
+
+	static int LAST_VAO = -777;
+
+	public static void bindVertexArray(int vao) {
+		if (LAST_VAO == vao) {
+			return;
+		}
+
+		LAST_VAO = vao;
+		GL30.glBindVertexArray(vao);
 	}
 }

@@ -1,13 +1,13 @@
 package dev.safixo.client.render.pipelines.terrain.meshing;
 
-import dev.safixo.client.render.util.MathExt;
+import dev.safixo.client.util.MathExt;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockGrass;
 import net.minecraft.util.Icon;
 import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
-import dev.safixo.client.render.util.data.BlocksFlags;
-import dev.safixo.client.render.util.ColorBGRManager;
-import dev.safixo.client.render.util.Direction;
+import dev.safixo.client.util.data.BlocksFlags;
+import dev.safixo.client.util.ColorBGRManager;
+import dev.safixo.client.util.Direction;
 import dev.safixo.client.render.vertex.VertexWriterManager;
 import dev.safixo.client.render.vertex.writers.TerrainFormat;
 import org.joml.Vector2i;
@@ -15,7 +15,7 @@ import org.joml.Vector3i;
 
 import static dev.safixo.client.render.pipelines.terrain.meshing.SectionCache.makeBlockIndex;
 import static dev.safixo.client.render.pipelines.terrain.meshing.SectionCache.byteToUnsigned;
-import static dev.safixo.client.render.util.Direction.*;
+import static dev.safixo.client.util.Direction.*;
 
 public class FullBlockMesher {
 	private static final int[] SHADE_FULL_COLOR = new int[Direction.COUNT];

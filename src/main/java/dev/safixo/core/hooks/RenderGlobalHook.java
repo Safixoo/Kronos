@@ -1,5 +1,6 @@
 package dev.safixo.core.hooks;
 
+import dev.safixo.client.render.ImprovedTessellator;
 import dev.safixo.client.render.pipelines.cloud.CloudRenderer;
 import dev.safixo.client.render.pipelines.terrain.SectionManager;
 import dev.safixo.client.render.vertex.VertexWriterManager;
@@ -7,6 +8,7 @@ import dev.safixo.core.HookUtils;
 import net.minecraft.block.Block;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderGlobal;
+import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.culling.ICamera;
 import net.minecraft.entity.EntityLivingBase;
 import org.lwjgl.opengl.GL11;
@@ -37,6 +39,8 @@ public class RenderGlobalHook {
 		if (MANAGER != null) {
 			SectionManager.destroyInstance();
 			clearBuffers();
+		} else {
+			Tessellator.instance = new ImprovedTessellator();
 		}
 
 		Block.leaves.setGraphicsLevel(Minecraft.getMinecraft().gameSettings.fancyGraphics);
