@@ -7,10 +7,13 @@ import net.minecraft.launchwrapper.IClassTransformer;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.tree.*;
 
+import java.util.HashSet;
+
 import static org.objectweb.asm.Opcodes.*;
 
 public class KronosTransformer implements IClassTransformer {
 	static final boolean DISABLE_INJECTION = false;
+	static final boolean GL_STATE_MANAGER = true;
 
 	static final String RENDER_GLOBAL_HOOK = "dev/safixo/core/hooks/RenderGlobalHook";
 	static final String DEBUG_SCREEN_HOOK = "dev/safixo/core/hooks/DebugScreenHook";
@@ -28,12 +31,23 @@ public class KronosTransformer implements IClassTransformer {
 	static final String BIOME_GEN_BASE = "net.minecraft.world.biome.BiomeGenBase";
 	static final String LONG_HASH_MAP = "net.minecraft.util.LongHashMap";
 
+	static HashSet<String> FUNCTION_NAMES;
+
 	@Override
 	public byte[] transform(String name, String transformedName, byte[] basicClass) {
 		byte[][] reference = new byte[1][];
 		reference[0] = basicClass;
 
-		if (DISABLE_INJECTION) {
+		if (DISABLE_INJECTION && !GL_STATE_MANAGER) {
+			return basicClass;
+		}
+
+		if (GL_STATE_MANAGER && !name.contains("GlStateManager")) {
+			fillStateMachineFunctions();
+			redirectGlCalls(reference);
+		}
+
+		if (DISABLE_INJECTION && GL_STATE_MANAGER) {
 			return basicClass;
 		}
 
@@ -86,17 +100,33 @@ public class KronosTransformer implements IClassTransformer {
 			case BIOME_GEN_BASE:
 				// TODO: Save a event instance per-thread to avoid creating events for every-biome fetched
 				//  in meshing which is stupid slow thanks to Forge.
-//				replaceClassMethod(BIOME_GEN_BASE_HOOK, "getWaterColorMultiplier", "", "", reference, false);
-//				replaceClassMethod(BIOME_GEN_BASE_HOOK, "getModdedBiomeGrassColor", "", "", reference, false);
-//				replaceClassMethod(BIOME_GEN_BASE_HOOK, "getModdedBiomeFoliageColor", "", "", reference, false);
 			case ACTIVE_RENDER_INFO:
 				// TODO: this is not even verified to help even, to avoid this mess the best option is to backport
 				//  Angelica's ASM GlStateManager or hooking to the matrices setup which is ugly.
-				prePassBullShit(reference);
-				break;
 		}
 
 		return reference[0];
+	}
+
+	static void fillStateMachineFunctions() {
+		if (FUNCTION_NAMES == null) {
+			FUNCTION_NAMES = new HashSet<>();
+		}
+
+		FUNCTION_NAMES.add("glEnable");
+		FUNCTION_NAMES.add("glDisable");
+		FUNCTION_NAMES.add("glMatrixMode");
+		FUNCTION_NAMES.add("glGetFloat");
+		FUNCTION_NAMES.add("glLoadIdentity");
+		FUNCTION_NAMES.add("glLoadMatrix");
+		FUNCTION_NAMES.add("glMultMatrix");
+		FUNCTION_NAMES.add("glScalef");
+		FUNCTION_NAMES.add("glScaled");
+		FUNCTION_NAMES.add("glRotatef");
+		FUNCTION_NAMES.add("glRotated");
+		FUNCTION_NAMES.add("glTranslatef");
+		FUNCTION_NAMES.add("glBindFramebuffer");
+		FUNCTION_NAMES.add("glFlush");
 	}
 
 	static void replaceClassMethod(String hookPath, String methodName, String runtimeName, String descriptor, byte[][] basicClass, boolean voidRet) {
@@ -203,7 +233,45 @@ public class KronosTransformer implements IClassTransformer {
 				method.instructions.add(inject);
 			}
 		}
+	}
 
+	static void redirectGlCalls(byte[][] basicClass) {
+		ClassReader reader = new ClassReader(basicClass[0]);
+		ClassNode classNode = new ClassNode();
+		reader.accept(classNode, 0);
+
+		boolean shouldReplace = false;
+
+		for (int i = 0; i < classNode.methods.size(); i++) {
+			InsnList inns = ((MethodNode) classNode.methods.get(i)).instructions;
+			AbstractInsnNode insn = inns.getFirst();
+
+			while (insn != null) {
+				if (insn.getType() == AbstractInsnNode.METHOD_INSN) {
+					MethodInsnNode m = (MethodInsnNode) insn;
+
+					if (m.owner.contains("org/lwjgl/")) {
+						if (FUNCTION_NAMES.contains(m.name)) {
+							inns.insertBefore(m, new MethodInsnNode(INVOKESTATIC,
+								"dev/safixo/core/hooks/GlStateManager",
+								m.name,
+								m.desc
+							));
+							inns.remove(m);
+
+							shouldReplace = true;
+						}
+					}
+				}
+				insn = insn.getNext();
+			}
+		}
+
+		if (shouldReplace) {
+			ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+			classNode.accept(writer);
+			basicClass[0] = writer.toByteArray();
+		}
 	}
 
 	static int processType(StringBuilder newDesc, Type type, InsnList inject, int offset) {

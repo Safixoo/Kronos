@@ -3,7 +3,6 @@ package dev.safixo.client.render;
 import dev.safixo.client.render.gfx.buffer.GlVertexBuffer;
 import dev.safixo.client.render.gfx.vertex.GlVertexArrayObject;
 import dev.safixo.client.render.vertex.VertexWriterManager;
-import dev.safixo.client.util.MathExt;
 import dev.safixo.client.util.memory.NativeBuffer;
 import dev.safixo.client.util.memory.UnsafeUtil;
 import dev.safixo.core.hooks.TessellatorHook;

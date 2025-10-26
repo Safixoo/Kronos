@@ -15,6 +15,7 @@ public class MinecraftHook {
 			BlocksFlags.processDevInfo();
 		}
 
+		GlStateManager.reset();
 		// NO-OP
 	}
 
