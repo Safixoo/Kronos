@@ -1,10 +1,13 @@
 package dev.safixo.core.hooks;
 
+import dev.safixo.client.util.data.BlocksFlags;
 import org.objectweb.asm.*;
 import static org.objectweb.asm.Opcodes.*;
 
 public class LongHashMapHook {
 	public static byte[] rewriteHashMapClass() {
+		boolean inDev = BlocksFlags.DEV_ENVIRONMENT;
+
 		ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
 
 		cw.visit(V1_7, ACC_PUBLIC, "net/minecraft/util/LongHashMap", null,
@@ -18,6 +21,7 @@ public class LongHashMapHook {
 
 		// Constructor
 		MethodVisitor mv = cw.visitMethod(ACC_PUBLIC, "<init>", "()V", null, null);
+
 		mv.visitCode();
 		mv.visitVarInsn(ALOAD, 0);
 		mv.visitMethodInsn(INVOKESPECIAL, "java/lang/Object", "<init>", "()V");
@@ -32,7 +36,8 @@ public class LongHashMapHook {
 		mv.visitEnd();
 
 		// public int getNumHashElements() { return this.map.size(); }
-		mv = cw.visitMethod(ACC_PUBLIC, "getNumHashElements", "()I", null, null);
+		mv = cw.visitMethod(ACC_PUBLIC, inDev ? "getNumHashElements" : "func_76162_a", "()I", null, null);
+
 		mv.visitCode();
 		mv.visitVarInsn(ALOAD, 0);
 		mv.visitFieldInsn(GETFIELD, "net/minecraft/util/LongHashMap", "map",
@@ -44,7 +49,8 @@ public class LongHashMapHook {
 		mv.visitEnd();
 
 		// public Object getValueByKey(long key) { return this.map.get(key); }
-		mv = cw.visitMethod(ACC_PUBLIC, "getValueByKey", "(J)Ljava/lang/Object;", null, null);
+		mv = cw.visitMethod(ACC_PUBLIC, inDev ? "getValueByKey" : "func_76164_a", "(J)Ljava/lang/Object;", null, null);
+
 		mv.visitCode();
 		mv.visitVarInsn(ALOAD, 0);
 		mv.visitFieldInsn(GETFIELD, "net/minecraft/util/LongHashMap", "map",
@@ -57,7 +63,8 @@ public class LongHashMapHook {
 		mv.visitEnd();
 
 		// public boolean containsItem(long key) { return this.map.containsKey(key); }
-		mv = cw.visitMethod(ACC_PUBLIC, "containsItem", "(J)Z", null, null);
+		mv = cw.visitMethod(ACC_PUBLIC, inDev ? "containsItem" : "func_76161_b", "(J)Z", null, null);
+
 		mv.visitCode();
 		mv.visitVarInsn(ALOAD, 0);
 		mv.visitFieldInsn(GETFIELD, "net/minecraft/util/LongHashMap", "map",
@@ -70,7 +77,8 @@ public class LongHashMapHook {
 		mv.visitEnd();
 
 		// public void add(long key, Object obj) { this.map.put(key, obj); }
-		mv = cw.visitMethod(ACC_PUBLIC, "add", "(JLjava/lang/Object;)V", null, null);
+		mv = cw.visitMethod(ACC_PUBLIC, inDev ? "add" : "func_76163_a", "(JLjava/lang/Object;)V", null, null);
+
 		mv.visitCode();
 		mv.visitVarInsn(ALOAD, 0);
 		mv.visitFieldInsn(GETFIELD, "net/minecraft/util/LongHashMap", "map",
@@ -85,7 +93,8 @@ public class LongHashMapHook {
 		mv.visitEnd();
 
 		// public Object remove(long key) { return this.map.remove(key); }
-		mv = cw.visitMethod(ACC_PUBLIC, "remove", "(J)Ljava/lang/Object;", null, null);
+		mv = cw.visitMethod(ACC_PUBLIC, inDev ? "remove" : "func_76159_d", "(J)Ljava/lang/Object;", null, null);
+
 		mv.visitCode();
 		mv.visitVarInsn(ALOAD, 0);
 		mv.visitFieldInsn(GETFIELD, "net/minecraft/util/LongHashMap", "map",

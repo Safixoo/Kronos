@@ -27,11 +27,8 @@ public class SectionCache implements IBlockAccess {
 	private final World worldObj;
 	public final int blockX, blockY, blockZ;
 
-	private static final int UNDEFINED_COLOR = 0xF5010348;
-	private static final int BIOME_RADIUS = 2;
+	private static final int BIOME_RADIUS = 1;
 	private static final int BIOME_CHUNK_WIDTH = 16 + (BIOME_RADIUS * 2);
-
-	private static final int[][] BIOME_COLOR_CACHE = new int[BlocksFlags.COLOR_TYPE_CACHED][BIOME_CHUNK_WIDTH * BIOME_CHUNK_WIDTH];
 	private static final byte[] BIOMES = new byte[BIOME_CHUNK_WIDTH * BIOME_CHUNK_WIDTH];
 
 	public static final byte[][] SECTION_BLOCKS = new byte[3 * 3 * 3][];
@@ -62,9 +59,6 @@ public class SectionCache implements IBlockAccess {
 		int maxChunkY = (maxY >> 4);
 
 		int sectionX = this.blockX >> 4, sectionY = this.blockY >> 4, sectionZ = this.blockZ >> 4;
-
-		Arrays.fill(BIOME_COLOR_CACHE[0], UNDEFINED_COLOR);
-		Arrays.fill(BIOME_COLOR_CACHE[1], UNDEFINED_COLOR);
 
 		for (int x = sectionX; x <= maxChunkX; x++) {
 			for (int z = sectionZ; z <= maxChunkZ; z++) {

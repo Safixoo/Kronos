@@ -1,5 +1,6 @@
 package dev.safixo.core.hooks;
 
+import dev.safixo.client.render.ImprovedTessellator;
 import dev.safixo.client.render.gfx.buffer.GlVertexBuffer;
 import dev.safixo.client.render.gfx.vertex.GlVertexArrayObject;
 import dev.safixo.client.util.memory.NativeBuffer;
@@ -31,7 +32,6 @@ public class FontRendererHook {
 	private final ResourceLocation FONT_TEXTURE = new ResourceLocation("textures/font/ascii.png");
 	private static int FONT_TEXTURE_ID = -1;
 
-	private float posX, posY;
 	private float r, g, b, a;
 	private int textColor, currentColor;
 
@@ -49,50 +49,47 @@ public class FontRendererHook {
 	private final ObjectArrayFIFOQueue<FontRenderData> underlines = new ObjectArrayFIFOQueue<>();
 	private final ObjectArrayFIFOQueue<FontRenderData> spikeThrough = new ObjectArrayFIFOQueue<>();
 
-	private final GlVertexBuffer vertexBuffer = new GlVertexBuffer(GL15.GL_STREAM_DRAW);
-	private final GlVertexArrayObject vertexArrayObject = new GlVertexArrayObject(DefaultVertexFormats.TERRAIN_FORMAT);
-
 	private static final Reference2ReferenceOpenHashMap<FontRenderer, FontRendererHook> HOOKS = new Reference2ReferenceOpenHashMap<>();
 
 	private void copyFontRendererData(FontRenderer renderer) {
-		this.charWidth = (int[]) HookUtils.getFieldObj(renderer, "charWidth", "");
-		this.fontRandom = (Random) HookUtils.getFieldObj(renderer, "fontRandom", "");
-		this.glyphWidth = (byte[]) HookUtils.getFieldObj(renderer, "glyphWidth", "");
-		this.colorCode = (int[]) HookUtils.getFieldObj(renderer, "colorCode", "");
+		this.charWidth = (int[]) HookUtils.getFieldObj(renderer, "charWidth", "field_78286_d");
+		this.fontRandom = (Random) HookUtils.getFieldObj(renderer, "fontRandom", "field_78289_c");
+		this.glyphWidth = (byte[]) HookUtils.getFieldObj(renderer, "glyphWidth", "field_78287_e");
+		this.colorCode = (int[]) HookUtils.getFieldObj(renderer, "colorCode", "field_78285_g");
 		this.textureManager = Minecraft.getMinecraft().getTextureManager();
-		this.unicodeText = (Boolean) HookUtils.getFieldObj(renderer, "unicodeFlag", "");
+		this.unicodeText = (Boolean) HookUtils.getFieldObj(renderer, "unicodeFlag", "field_78293_l");
 
 		for (char i = 0; i < 256; i++) {
 			ALLOWED_CHARACTERS_INDEX[i] = ChatAllowedCharacters.allowedCharacters.indexOf(i);
 		}
 
-		int handle = this.vertexArrayObject.getHandle();
-
-		if (handle == 0x80000000) {
-			this.vertexArrayObject.generateHandle();
-		}
+//		int handle = this.vertexArrayObject.getHandle();
+//
+//		if (handle == 0x80000000) {
+//			this.vertexArrayObject.generateHandle();
+//		}
 
 		if (FONT_TEXTURE_ID == -1) {
-			Map<?, ?> textureMap = (Map<?, ?>) HookUtils.getFieldObj(this.textureManager, "mapTextureObjects", "");
+			Map<?, ?> textureMap = (Map<?, ?>) HookUtils.getFieldObj(this.textureManager, "mapTextureObjects", "field_110585_a");
 			TextureObject texObj = (TextureObject) textureMap.get(FONT_TEXTURE);
 			FONT_TEXTURE_ID = texObj.getGlTextureId();
 		}
 
-		this.vertexBuffer.allocate(UnsafeUtil.NULL, 16 * 4 * 1024);
-
-		{
-			this.vertexArrayObject.bind(this.vertexBuffer);
-			this.vertexBuffer.bind();
-
-			GL11.glEnableClientState(GL11.GL_VERTEX_ARRAY);
-			GL11.glVertexPointer(2, GL11.GL_FLOAT, 16, 0);
-
-			GL11.glEnableClientState(GL11.GL_TEXTURE_COORD_ARRAY);
-			GL11.glTexCoordPointer(2, GL11.GL_FLOAT, 16, 8);
-
-			this.vertexBuffer.unbind();
-			this.vertexArrayObject.unbind();
-		}
+//		this.vertexBuffer.allocate(UnsafeUtil.NULL, 16 * 4 * 1024);
+//
+//		{
+//			this.vertexArrayObject.bind(this.vertexBuffer);
+//			this.vertexBuffer.bind();
+//
+//			GL11.glEnableClientState(GL11.GL_VERTEX_ARRAY);
+//			GL11.glVertexPointer(2, GL11.GL_FLOAT, 16, 0);
+//
+//			GL11.glEnableClientState(GL11.GL_TEXTURE_COORD_ARRAY);
+//			GL11.glTexCoordPointer(2, GL11.GL_FLOAT, 16, 8);
+//
+//			this.vertexBuffer.unbind();
+//			this.vertexArrayObject.unbind();
+//		}
 	}
 
 	public static FontRendererHook getUsableInstance(FontRenderer renderer) {
@@ -125,8 +122,8 @@ public class FontRendererHook {
 	}
 
 	public int renderStringFast(String text, int posX, int posZ, int color, boolean margin) {
-		this.vertexArrayObject.bind(this.vertexBuffer);
-		VertexWriterManager.DEFAULT_INSTANCE.startDrawing();
+//		this.vertexArrayObject.bind(this.vertexBuffer);
+//		VertexWriterManager.DEFAULT_INSTANCE.startDrawing();
 
 		if ((color & 0xFF000000) == 0) {
 			color |= 0xFF000000;
@@ -143,15 +140,11 @@ public class FontRendererHook {
 		GL11.glColor4f(this.r, this.b, this.g, this.a);
 		this.currentColor = this.textColor = color;
 
-		this.posX = posX;
-		this.posY = posZ;
+		ImprovedTessellator tes = (ImprovedTessellator) Tessellator.instance;
+		tes.startDrawing(GL11.GL_QUADS);
 
 		// Render main string.
-		this.renderStringAtPos(VertexWriterManager.DEFAULT_INSTANCE, text, margin);
-
-		this.vertexArrayObject.unbind();
-
-		Tessellator tes = Tessellator.instance;
+		float returnVal = this.renderStringAtPos(tes, posX, posZ, text, margin);
 
 		// Draw extra styles.
 		if (!this.underlines.isEmpty() || !this.spikeThrough.isEmpty()){
@@ -165,11 +158,14 @@ public class FontRendererHook {
 			GL11.glEnable(GL11.GL_TEXTURE_2D);
 		}
 
+		if (this.lastTexture != null || tes.isDrawing) {
+			tes.draw();
+		}
+
 		// Flush cached last texture bind.
 		this.lastTexture = null;
-		VertexWriterManager.DEFAULT_INSTANCE.stopDrawing();
 
-		return (int) this.posX;
+		return (int) returnVal;
 	}
 
 	private static char toLowerCase(char ch) {
@@ -223,11 +219,8 @@ public class FontRendererHook {
 		}
 	}
 
-	private void renderStringAtPos(VertexWriterManager writer, String text, boolean cond) {
+	private float renderStringAtPos(ImprovedTessellator tes, float posX, float posY, String text, boolean cond) {
 		char[] textArr = text.toCharArray();
-
-		float posX = this.posX;
-		float posY = this.posY;
 
 		for (int charInd = 0; charInd < textArr.length; charInd++) {
 			char asciiChar = textArr[charInd];
@@ -237,6 +230,10 @@ public class FontRendererHook {
 				customizeMessage(text, charInd, cond);
 				charInd++;
 				continue;
+			}
+
+			if (tes.offset + 80 > tes.capacity) {
+				tes.resize();
 			}
 
 			int allowedIndex = asciiChar >= 256 ? -1 : ALLOWED_CHARACTERS_INDEX[asciiChar];
@@ -256,16 +253,16 @@ public class FontRendererHook {
 			float offset;
 
 			if (margin) {
-				offset = this.renderCharAtPos(writer, posX - marginSize, posY - marginSize, allowedIndex, asciiChar, this.italicStyle);
+				offset = this.renderCharAtPos(tes, posX - marginSize, posY - marginSize, allowedIndex, asciiChar, this.italicStyle);
 			} else {
-				offset = this.renderCharAtPos(writer, posX, posY, allowedIndex, asciiChar, this.italicStyle);
+				offset = this.renderCharAtPos(tes, posX, posY, allowedIndex, asciiChar, this.italicStyle);
 			}
 
 			if (this.boldStyle) {
 				if (margin) {
-					this.renderCharAtPos(writer, posX, posY - marginSize, allowedIndex, asciiChar, this.italicStyle);
+					this.renderCharAtPos(tes, posX, posY - marginSize, allowedIndex, asciiChar, this.italicStyle);
 				} else {
-					this.renderCharAtPos(writer, posX + marginSize, posY, allowedIndex, asciiChar, this.italicStyle);
+					this.renderCharAtPos(tes, posX + marginSize, posY, allowedIndex, asciiChar, this.italicStyle);
 				}
 
 				if (margin) {
@@ -287,12 +284,7 @@ public class FontRendererHook {
 			posX += (int) offset;
 		}
 
-		if (this.lastTexture != null) {
-			this.vertexBuffer.bufferSubData(writer.getVertexDataNio(), 0, writer.getOffset());
-			this.vertexBuffer.draw(writer.getVertices(), 0);
-
-			writer.stopDrawing();
-		}
+		return posX;
 	}
 
 	private void drawUnderlines() {
@@ -309,15 +301,19 @@ public class FontRendererHook {
 		}
 	}
 
-	private static void addVertexWithUV(VertexWriterManager writer, float x, float y, float u, float v) {
-		long ptr = writer.getTotalOffset();
+	private static void addVertexWithUV(ImprovedTessellator tes, float x, float y, float u, float v) {
+		long ptr = tes.vertexPtr + tes.offset;
 
 		UnsafeUtil.memPutFloat(ptr + 0, x);
 		UnsafeUtil.memPutFloat(ptr + 4, y);
-		UnsafeUtil.memPutFloat(ptr + 8, u);
-		UnsafeUtil.memPutFloat(ptr + 12, v);
+		UnsafeUtil.memPutFloat(ptr + 8, 0);
 
-		writer.addVertexCounter(16);
+		UnsafeUtil.memPutFloat(ptr + 12, u);
+		UnsafeUtil.memPutFloat(ptr + 16, v);
+
+		tes.vertices++;
+		tes.flags |= ImprovedTessellator.VERTEX_UV;
+		tes.offset += 20;
 	}
 
 	private void drawSpikeThrough() {
@@ -334,16 +330,16 @@ public class FontRendererHook {
 		}
 	}
 
-	private float renderCharAtPos(VertexWriterManager writer, float posX, float posY, int allowedIndex, char textChar, boolean margin) {
+	private float renderCharAtPos(ImprovedTessellator tes, float posX, float posY, int allowedIndex, char textChar, boolean margin) {
 		if (textChar == ' ') {
 			return 4.0F;
 		}
 
 		if (allowedIndex > 0 && !this.unicodeText) {
-			return this.renderDefaultChar(writer, posX, posY, allowedIndex + 32, margin);
+			return this.renderDefaultChar(tes, posX, posY, allowedIndex + 32, margin);
 		}
 
-		return this.renderUnicodeChar(writer, posX, posY, textChar, margin);
+		return this.renderUnicodeChar(tes, posX, posY, textChar, margin);
 	}
 
 	private ResourceLocation getUnicodePageLocation(int par1) {
@@ -354,35 +350,33 @@ public class FontRendererHook {
 		return this.unicodePageLocations[par1];
 	}
 
-	private float renderDefaultChar(VertexWriterManager writer, float posX, float posY, int textChar, boolean shouldMargin) {
+	private float renderDefaultChar(ImprovedTessellator tes, float posX, float posY, int textChar, boolean shouldMargin) {
 		float u = ((textChar & 15) * FONT_WIDTH);
 		float v = ((textChar >> 4) * FONT_WIDTH);
 		float margin = shouldMargin ? 1.0F : 0.0F;
 
-		bindTextureAndRender(FONT_TEXTURE);
+		bindTextureAndRender(tes, FONT_TEXTURE);
 
 		float width = this.charWidth[textChar] - 0.01F - 1.0f;
 		float invTex = 1.0f / 128.0f;
 
-		addVertexWithUV(writer, posX + margin, posY, u * invTex, v * invTex);
-		addVertexWithUV(writer, posX - margin, posY + 7.99F, u * invTex, (v + 7.99F) * invTex);
-		addVertexWithUV(writer, posX + width - margin, posY + 7.99F, (u + width) * invTex, (v + 7.99F) * invTex);
-		addVertexWithUV(writer, posX + width + margin, posY, (u + width) * invTex, v * invTex);
+		addVertexWithUV(tes, posX + margin, posY, u * invTex, v * invTex);
+		addVertexWithUV(tes, posX - margin, posY + 7.99F, u * invTex, (v + 7.99F) * invTex);
+		addVertexWithUV(tes, posX + width - margin, posY + 7.99F, (u + width) * invTex, (v + 7.99F) * invTex);
+		addVertexWithUV(tes, posX + width + margin, posY, (u + width) * invTex, v * invTex);
 
 		return this.charWidth[textChar];
 	}
 
-	private void loadGlyphTexture(int par1) {
-		bindTextureAndRender(getUnicodePageLocation(par1));
+	private void loadGlyphTexture(ImprovedTessellator tes, int par1) {
+		bindTextureAndRender(tes, getUnicodePageLocation(par1));
 	}
 
-	private void bindTextureAndRender(ResourceLocation texture) {
-		VertexWriterManager writer = VertexWriterManager.DEFAULT_INSTANCE;
-
+	private void bindTextureAndRender(ImprovedTessellator tes, ResourceLocation texture) {
 		if (texture != this.lastTexture) {
 			if (this.lastTexture != null) {
-				this.vertexBuffer.bufferSubData(writer.getVertexDataNio(), 0, writer.getOffset());
-				this.vertexBuffer.draw(writer.getVertices(), 0);
+				tes.draw();
+				tes.startDrawing(GL11.GL_QUADS);
 			}
 
 			this.lastTexture = texture;
@@ -392,18 +386,16 @@ public class FontRendererHook {
 			} else {
 				GL11.glBindTexture(GL11.GL_TEXTURE_2D, FONT_TEXTURE_ID);
 			}
-
-			writer.startDrawing();
 		}
 	}
 
-	private float renderUnicodeChar(VertexWriterManager writer, float posX, float posY, char unicode, boolean margin) {
+	private float renderUnicodeChar(ImprovedTessellator tes, float posX, float posY, char unicode, boolean margin) {
 		if (this.glyphWidth[unicode] == 0) {
 			return 0.0F;
 		}
 
 		int unicodeType = unicode >> 8;
-		this.loadGlyphTexture(unicodeType);
+		this.loadGlyphTexture(tes, unicodeType);
 
 		int glyphHigh = this.glyphWidth[unicode] >>> 4;
 		int glyphLow = (this.glyphWidth[unicode] & 0xF) + 1;
@@ -416,10 +408,10 @@ public class FontRendererHook {
 
 		float invTex = 1.0f / 256.0f;
 
-		addVertexWithUV(writer, posX + marginSize, posY, u * invTex, v * invTex);
-		addVertexWithUV(writer, posX - marginSize, posY + 7.99F, u * invTex, (v + 15.98F) * invTex);
-		addVertexWithUV(writer, posX + diff / 2.0F - marginSize, posY + 7.99F, (u + diff) * invTex, (v + 15.98F) * invTex);
-		addVertexWithUV(writer, posX + diff / 2.0F + marginSize, posY, (u + diff) * invTex, v * invTex);
+		addVertexWithUV(tes, posX + marginSize, posY, u * invTex, v * invTex);
+		addVertexWithUV(tes, posX - marginSize, posY + 7.99F, u * invTex, (v + 15.98F) * invTex);
+		addVertexWithUV(tes, posX + diff / 2.0F - marginSize, posY + 7.99F, (u + diff) * invTex, (v + 15.98F) * invTex);
+		addVertexWithUV(tes, posX + diff / 2.0F + marginSize, posY, (u + diff) * invTex, v * invTex);
 
 		return (glyphLow - glyphHigh) * 0.5F + 1.0F;
 	}

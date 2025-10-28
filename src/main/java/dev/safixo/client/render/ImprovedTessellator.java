@@ -5,59 +5,76 @@ import dev.safixo.client.render.gfx.vertex.GlVertexArrayObject;
 import dev.safixo.client.render.vertex.VertexWriterManager;
 import dev.safixo.client.util.memory.NativeBuffer;
 import dev.safixo.client.util.memory.UnsafeUtil;
+import dev.safixo.core.hooks.GlStateManager;
 import dev.safixo.core.hooks.TessellatorHook;
 import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.Tessellator;
-import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL13;
-import org.lwjgl.opengl.GL15;
-import org.lwjgl.opengl.GL30;
+import org.lwjgl.opengl.*;
 
 import java.nio.*;
 import java.util.Arrays;
 
+// TODO: Use newer LWJGL to abuse persistent mapped buffers to improve uploading overhead
+//  and use u16 o i16 to compact UVs representations (idk).
+
 // Compared to the 1.6.4 Tessellator this one has the improvements:
 // - Uses direct Unsafe writes to the upload buffer improving writing performance.
-// - Changes immediate mode to a naive VBO drawing/uploading technique with a cached VAO per state combination.
+// - Changes immediate mode to a naive VBO drawing/uploading technique with a cached VAO per state permutation.
 // - Compacts vertex format based in the used attributes (vanilla uses 32-byte at all times).
 // - Overall more optimized and clean code.
 public class ImprovedTessellator extends Tessellator {
 	private static final int UNDEFINED_FORMAT = 12; // start position after position attribute.
 	private static final int UNDEFINED_VERTEX_ARRAY = -1;
 
-	public static final int VERTEX_UV     = 0b0001;
+	public static final int VERTEX_UV     = 0b0100;
 	public static final int VERTEX_COLOR  = 0b0010;
-	public static final int VERTEX_NORMAL = 0b0100;
+	public static final int VERTEX_NORMAL = 0b0001;
 	public static final int VERTEX_LIGHT  = 0b1000;
 
 	private static final int MIN_ALLOC = 1024 * 128;
 
-	private GlVertexBuffer vertexBuffer = new GlVertexBuffer(MIN_ALLOC, GL15.GL_STREAM_DRAW);
+	private GlVertexBuffer vertexBuffer = new GlVertexBuffer(MIN_ALLOC, GL15.GL_STATIC_DRAW);
 
 	private boolean disabledColor;
 	public int drawMode, flags, capacity = MIN_ALLOC;
 
-	private boolean isDrawing;
+	public boolean isDrawing;
 	public int vertices, offset;
 
 	public float xOff, yOff, zOff;
 	public int color, light, normal;
 
-	public byte formatFlag = UNDEFINED_FORMAT;
-	private byte colorOff, lightOff, normalOff;
-
-	public int drawInd;
+	private int lastFlag = -1;
 
 	public long vertexPtr = NativeBuffer.nmemAlloc(MIN_ALLOC);
 	private ByteBuffer vertexPtrNio = NativeBuffer.wrap(this.vertexPtr);
 
 	private final int[] VERTEX_ARRAYS = new int[0b1111 + 1];
+	private static final byte[] STRIDES = new byte[0b1111 + 1];
+
+	static {
+		for (int flagInd = 0; flagInd <= 0b1111; flagInd++) {
+			int stride = 12;
+
+			stride += (flagInd & VERTEX_UV) != 0 ? 8 : 0;
+			stride += (flagInd & VERTEX_NORMAL) != 0 ? 4 : 0;
+			stride += (flagInd & VERTEX_LIGHT) != 0 ? 4 : 0;
+			stride += (flagInd & VERTEX_COLOR) != 0 ? 4 : 0;
+
+			STRIDES[flagInd] = (byte) stride;
+		}
+	}
 
 	public ImprovedTessellator() {
 		Arrays.fill(VERTEX_ARRAYS, UNDEFINED_VERTEX_ARRAY);
 	}
 
-	private int getVertexArray(int flags, int stride) {
+	// Caches the stride and buffer state abusing the idea that each format attribute
+	// order and offset in the written format is unique to the flag which saves the
+	// permutation of current vertex attributes, which means that the count of every
+	// permutation possible is 16 (1 bit per attribute, 4 possibles in total => 0b1111 + 1 =>
+	// 15 + 1 (0b0000 counts)).
+	private int getVertexArray(int flags) {
 		int vertexArray = VERTEX_ARRAYS[flags];
 
 		if (vertexArray != UNDEFINED_VERTEX_ARRAY) {
@@ -65,52 +82,58 @@ public class ImprovedTessellator extends Tessellator {
 		}
 
 		vertexArray = GL30.glGenVertexArrays();
+		int stride = STRIDES[flags];
 
 		GlVertexArrayObject.bindVertexArray(vertexArray);
 		this.vertexBuffer.bind();
 
-		GL11.glEnableClientState(GL11.GL_VERTEX_ARRAY);
+		GlStateManager.glEnableClientStateDirect(GL11.GL_VERTEX_ARRAY);
 		GL11.glVertexPointer(3, GL11.GL_FLOAT, stride, 0);
 
+		int offset = UNDEFINED_FORMAT;
+
 		if ((flags & VERTEX_UV) != 0) {
-			GL11.glEnableClientState(GL11.GL_TEXTURE_COORD_ARRAY);
-			GL11.glTexCoordPointer(2, GL11.GL_FLOAT, stride, 12);
+			GlStateManager.glEnableClientStateDirect(GL11.GL_TEXTURE_COORD_ARRAY);
+			GL11.glTexCoordPointer(2, GL11.GL_FLOAT, stride, offset);
+			offset += 8;
 		}
 		if ((flags & VERTEX_COLOR) != 0) {
-			GL11.glEnableClientState(GL11.GL_COLOR_ARRAY);
-			GL11.glColorPointer(4, GL11.GL_UNSIGNED_BYTE, stride, this.colorOff);
+			GlStateManager.glEnableClientStateDirect(GL11.GL_COLOR_ARRAY);
+			GL11.glColorPointer(4, GL11.GL_UNSIGNED_BYTE, stride, offset);
+			offset += 4;
 		}
 		if ((flags & VERTEX_NORMAL) != 0) {
-			GL11.glEnableClientState(GL11.GL_NORMAL_ARRAY);
-			GL11.glNormalPointer(GL11.GL_BYTE, stride, this.normalOff);
+			GlStateManager.glEnableClientStateDirect(GL11.GL_NORMAL_ARRAY);
+			GL11.glNormalPointer(GL11.GL_BYTE, stride, offset);
+			offset += 4;
 		}
 		if ((flags & VERTEX_LIGHT) != 0) {
 			GL13.glClientActiveTexture(OpenGlHelper.lightmapTexUnit);
 
-			GL11.glEnableClientState(GL11.GL_TEXTURE_COORD_ARRAY);
-			GL11.glTexCoordPointer(2, GL11.GL_SHORT, stride, this.lightOff);
+			GlStateManager.glEnableClientStateDirect(GL11.GL_TEXTURE_COORD_ARRAY);
+			GL11.glTexCoordPointer(2, GL11.GL_SHORT, stride, offset);
+			offset += 4;
 		}
 
 		this.vertexBuffer.unbind();
 		GlVertexArrayObject.bindVertexArray(0);
 
 		if ((flags & VERTEX_LIGHT) != 0) {
-			GL11.glDisableClientState(GL11.GL_TEXTURE_COORD_ARRAY);
+			GlStateManager.glDisableClientStateDirect(GL11.GL_TEXTURE_COORD_ARRAY);
 			GL13.glClientActiveTexture(OpenGlHelper.defaultTexUnit);
 		}
+		if ((flags & VERTEX_NORMAL) != 0) {
+			GlStateManager.glDisableClientStateDirect(GL11.GL_NORMAL_ARRAY);
+		}
 		if ((flags & VERTEX_COLOR) != 0) {
-			GL11.glDisableClientState(GL11.GL_COLOR_ARRAY);
+			GlStateManager.glDisableClientStateDirect(GL11.GL_COLOR_ARRAY);
 		}
 		if ((flags & VERTEX_UV) != 0) {
-			GL11.glDisableClientState(GL11.GL_TEXTURE_COORD_ARRAY);
-		}
-		if ((flags & VERTEX_NORMAL) != 0) {
-			GL11.glDisableClientState(GL11.GL_NORMAL_ARRAY);
+			GlStateManager.glDisableClientStateDirect(GL11.GL_TEXTURE_COORD_ARRAY);
 		}
 
-		VERTEX_ARRAYS[flags] = vertexArray;
-
-		return vertexArray;
+		VERTEX_ARRAYS[flags] = vertexArray | offset << 24;
+		return vertexArray | offset << 24;
 	}
 
 	@Override
@@ -119,38 +142,33 @@ public class ImprovedTessellator extends Tessellator {
 			throw new IllegalStateException("Not tesselating!");
 		}
 
-		int drawMode = this.drawMode;
-		int flags = this.flags;
-		int offset = this.offset;
-		int stride = this.formatFlag;
+		this.lastFlag = this.flags;
+		this.flags = 0;
 
-		int vertexArray = this.getVertexArray(flags, stride);
+		this.isDrawing = false;
+		return this.offset;
+	}
+
+	public void flushState() {
+		if (this.vertices == 0 || this.lastFlag == -1 || this.isDrawing) {
+			return;
+		}
+
+		int vertices = this.vertices;
+		int drawMode = this.drawMode;
+		int flags = this.lastFlag;
+		int offset = this.offset;
+
+		this.vertices = 0;
+		this.offset = 0;
+		this.lastFlag = -1;
+
+		int packedData = this.getVertexArray(flags);
+		int vertexArray = packedData & 0xFFFFF;
 
 		GlVertexArrayObject.bindVertexArray(vertexArray);
 		this.vertexBuffer.bufferData(this.vertexPtrNio, offset);
-
-		int vertices = this.vertices;
 		this.vertexBuffer.draw(drawMode, vertices, 0);
-		this.drawInd++;
-		this.isDrawing = false;
-
-		return offset;
-	}
-
-	public int drawWithoutUpload() {
-		int drawMode = this.drawMode;
-		int flags = this.flags;
-		int offset = this.offset;
-		int stride = this.formatFlag;
-
-		int vertexArray = this.getVertexArray(flags, stride);
-
-		GlVertexArrayObject.bindVertexArray(vertexArray);
-
-		int vertices = this.vertices;
-		this.vertexBuffer.draw(drawMode, vertices, 0);
-
-		return offset;
 	}
 
 	public void resize() {
@@ -158,7 +176,6 @@ public class ImprovedTessellator extends Tessellator {
 		long newVertexPtr = NativeBuffer.nmemAlloc(newCapacity);
 
 		this.vertexBuffer.allocate(UnsafeUtil.NULL, newCapacity);
-		this.drawInd = -1;
 
 		UnsafeUtil.memCopy(this.vertexPtr, newVertexPtr, this.offset);
 		UnsafeUtil.nmemFree(this.vertexPtr);
@@ -179,12 +196,13 @@ public class ImprovedTessellator extends Tessellator {
 			throw new IllegalStateException("Already tesselating!");
 		}
 
+		if (this.drawMode != drawMode) {
+			flushState();
+		}
+
 		this.drawMode = drawMode;
-		this.formatFlag = UNDEFINED_FORMAT;
 		this.isDrawing = true;
 		this.flags = 0;
-		this.offset = 0;
-		this.vertices = 0;
 	}
 
 	@Override
@@ -242,10 +260,10 @@ public class ImprovedTessellator extends Tessellator {
 
 		this.flags |= VERTEX_COLOR;
 
-		r &= 255;
-		g &= 255;
-		b &= 255;
-		a &= 255;
+		r &= 0xFF;
+		g &= 0xFF;
+		b &= 0xFF;
+		a &= 0xFF;
 
 		if (ByteOrder.nativeOrder() == ByteOrder.LITTLE_ENDIAN) {
 			this.color = a << 24 | b << 16 | g << 8 | r;
@@ -265,9 +283,13 @@ public class ImprovedTessellator extends Tessellator {
 			this.resize();
 		}
 
-		long ptr = this.vertexPtr + this.offset;
-
 		this.flags |= VERTEX_UV;
+
+		if (this.lastFlag != this.flags && this.lastFlag != -1) {
+			flushState();
+		}
+
+		long ptr = this.vertexPtr + this.offset;
 		int flags = this.flags;
 
 		float xP = (float) x + this.xOff;
@@ -281,26 +303,22 @@ public class ImprovedTessellator extends Tessellator {
 		UnsafeUtil.memPutFloat(ptr + 12, (float) u);
 		UnsafeUtil.memPutFloat(ptr + 16, (float) v);
 
-		byte formatFlag = 20;
+		long writePtr = ptr + 20;
 
 		if ((flags & VERTEX_COLOR) != 0) {
-			this.colorOff = formatFlag;
-			UnsafeUtil.memPutInt(ptr + this.colorOff, this.color);
-			formatFlag += 4;
+			UnsafeUtil.memPutInt(writePtr, this.color);
+			writePtr += 4;
 		}
 		if ((flags & VERTEX_NORMAL) != 0) {
-			this.normalOff = formatFlag;
-			UnsafeUtil.memPutInt(ptr + this.normalOff, this.normal);
-			formatFlag += 4;
+			UnsafeUtil.memPutInt(writePtr, this.normal);
+			writePtr += 4;
 		}
 		if ((flags & VERTEX_LIGHT) != 0) {
-			this.lightOff = formatFlag;
-			UnsafeUtil.memPutInt(ptr + this.lightOff, this.light);
-			formatFlag += 4;
+			UnsafeUtil.memPutInt(writePtr, this.light);
+			writePtr += 4;
 		}
 
-		this.formatFlag = formatFlag;
-		this.offset += formatFlag;
+		this.offset += (int) (writePtr - ptr);
 		this.vertices++;
 	}
 
@@ -317,6 +335,10 @@ public class ImprovedTessellator extends Tessellator {
 			this.resize();
 		}
 
+		if (this.lastFlag != this.flags && this.lastFlag != -1) {
+			flushState();
+		}
+
 		long ptr = this.vertexPtr + this.offset;
 		int flags = this.flags;
 
@@ -328,26 +350,22 @@ public class ImprovedTessellator extends Tessellator {
 		UnsafeUtil.memPutFloat(ptr + 4, yP);
 		UnsafeUtil.memPutFloat(ptr + 8, zP);
 
-		byte formatFlag = (byte) (UNDEFINED_FORMAT + ((flags & VERTEX_UV) << 3));
+		long writePtr = ptr + UNDEFINED_FORMAT + (flags & VERTEX_UV);
 
 		if ((flags & VERTEX_COLOR) != 0) {
-			this.colorOff = formatFlag;
-			UnsafeUtil.memPutInt(ptr + this.colorOff, this.color);
-			formatFlag += 4;
+			UnsafeUtil.memPutInt(writePtr, this.color);
+			writePtr += 4;
 		}
 		if ((flags & VERTEX_NORMAL) != 0) {
-			this.normalOff = formatFlag;
-			UnsafeUtil.memPutInt(ptr + this.normalOff, this.normal);
-			formatFlag += 4;
+			UnsafeUtil.memPutInt(writePtr, this.normal);
+			writePtr += 4;
 		}
 		if ((flags & VERTEX_LIGHT) != 0) {
-			this.lightOff = formatFlag;
-			UnsafeUtil.memPutInt(ptr + this.lightOff, this.light);
-			formatFlag += 4;
+			UnsafeUtil.memPutInt(writePtr, this.light);
+			writePtr += 4;
 		}
 
-		this.formatFlag = formatFlag;
-		this.offset += formatFlag;
+		this.offset += writePtr - ptr;
 		this.vertices++;
 	}
 

@@ -86,6 +86,14 @@ public class MathExt {
 		return (nX & 0xFF) << 0 | (nY & 0xFF) << 8 | (nZ & 0xFF) << 16;
 	}
 
+	public static int byteToUnsignedInt(byte x) {
+		return x & 0xFF;
+	}
+
+	public static int byteToUnsignedInt(int x) {
+		return (byte) x & 0xFF;
+	}
+
 	public static double smoothStep(double t) {
 		return t * t * (3.0f - 2.0f * t);
 	}

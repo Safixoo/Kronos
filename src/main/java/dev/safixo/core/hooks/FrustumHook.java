@@ -1,11 +1,13 @@
 package dev.safixo.core.hooks;
 
+import dev.safixo.client.render.pipelines.terrain.SectionManager;
 import dev.safixo.client.render.pipelines.terrain.cull.FrustumCuller;
 import dev.safixo.core.HookUtils;
 import net.minecraft.client.renderer.ActiveRenderInfo;
 import net.minecraft.client.renderer.culling.ClippingHelper;
 import net.minecraft.client.renderer.culling.ClippingHelperImpl;
 import org.joml.Matrix4f;
+import org.lwjgl.opengl.GL11;
 
 import java.nio.Buffer;
 import java.nio.FloatBuffer;

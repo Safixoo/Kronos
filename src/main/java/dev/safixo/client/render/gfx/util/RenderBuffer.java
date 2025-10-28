@@ -47,7 +47,7 @@ public class RenderBuffer {
 	}
 
 	public void upload(long data, int offset, int size) {
-		this.vertexBuffer.upload(data, offset, size);
+		this.vertexBuffer.bufferSubData(data, offset, size);
 	}
 
 	public GlVertexBuffer getVertexBuffer() {

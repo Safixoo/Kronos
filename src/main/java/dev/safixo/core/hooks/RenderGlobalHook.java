@@ -11,6 +11,7 @@ import net.minecraft.client.renderer.RenderGlobal;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.culling.ICamera;
 import net.minecraft.entity.EntityLivingBase;
+import org.joml.Math;
 import org.lwjgl.opengl.GL11;
 
 import java.util.List;
@@ -106,20 +107,7 @@ public class RenderGlobalHook {
 	static long time;
 
 	public static void renderCloudsFancy(RenderGlobal renderGlobal, float partialTick) {
-		long startTime = System.nanoTime();
-
 		CloudRenderer.renderCloudsFancy(partialTick);
-
-		long endTime = System.nanoTime() - startTime;
-
-		samples++;
-		time += endTime;
-
-		if (samples > 8000) {
-			System.out.println("Average time : " + ((time / 1E-6D) / 8000.0D) + "ms");
-			samples = 0;
-			time = 0;
-		}
 	}
 
 	public static void sortAndRender(RenderGlobal global, EntityLivingBase player, int renderPass, double partialTick) {

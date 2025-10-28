@@ -47,9 +47,9 @@ public class GlVertexBuffer {
 		this.unbind();
 	}
 
-	public void upload(long vertexData, int offset, int size) {
+	public void bufferSubData(long vertexData, int offset, int size) {
 		ByteBuffer vertexDataBuffer = NativeBuffer.wrap(vertexData);
-		this.upload(vertexDataBuffer, offset, size);
+		this.bufferSubData(vertexDataBuffer, offset, size);
 	}
 
 	public void bufferData(ByteBuffer buffer, int size) {
@@ -58,21 +58,13 @@ public class GlVertexBuffer {
 		if (GpuFlags.EXT_DSA) {
 			EXTDirectStateAccess.glNamedBufferDataEXT(this.id, buffer, this.hint);
 		} else {
+			this.bind();
 			GL15.glBufferData(GL15.GL_ARRAY_BUFFER, buffer, this.hint);
+			this.unbind();
 		}
 	}
 
 	public void bufferSubData(ByteBuffer buffer, int offset, int size) {
-		((Buffer) buffer).limit(size);
-
-		if (GpuFlags.EXT_DSA) {
-			EXTDirectStateAccess.glNamedBufferSubDataEXT(this.id, offset, buffer);
-		} else {
-			GL15.glBufferSubData(GL15.GL_ARRAY_BUFFER, offset, buffer);
-		}
-	}
-
-	public void upload(ByteBuffer buffer, int offset, int size) {
 		((Buffer) buffer).limit(size);
 
 		if (GpuFlags.EXT_DSA) {

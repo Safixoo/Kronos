@@ -58,6 +58,10 @@ public class UnsafeUtil {
 		UNSAFE.putInt(ptr, value);
 	}
 
+	public static void memPutShort(long ptr, short value) {
+		UNSAFE.putShort(ptr, value);
+	}
+
 	public static void memPutByte(long ptr, byte value) {
 		UNSAFE.putByte(ptr, value);
 	}

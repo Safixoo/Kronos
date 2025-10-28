@@ -8,12 +8,14 @@ varying float v_Distance;
 varying vec2 v_Uv;
 
 uniform vec3 u_CloudColor;
+uniform vec3 u_CloudOff;
 
 #define CLOUD_WIDTH 12.0
 #define CLOUD_ALPHA 0.8
+#define CLOUD_SCALE vec3(CLOUD_WIDTH, 1.0, CLOUD_WIDTH)
 
 void main() {
-    vec4 position = gl_ModelViewMatrix * vec4(a_Position * vec3(CLOUD_WIDTH, 1.0, CLOUD_WIDTH), 1.0);
+    vec4 position = gl_ModelViewMatrix * vec4((a_Position + u_CloudOff) * CLOUD_SCALE, 1.0);
     gl_Position = gl_ProjectionMatrix * position;
 
     v_Distance = length(position);

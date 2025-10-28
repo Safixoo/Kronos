@@ -1,6 +1,7 @@
 package dev.safixo.client.render.vertex.writers;
 
 import com.google.common.collect.ImmutableList;
+import dev.safixo.client.util.MathExt;
 import dev.safixo.client.util.memory.UnsafeUtil;
 import dev.safixo.client.render.vertex.VertexWriterManager;
 import dev.safixo.client.render.gfx.vertex.GlVertexFormat;
@@ -25,11 +26,13 @@ public class CloudFormat extends GlVertexFormat {
 		UnsafeUtil.memPutInt(ptr + 20, manager.color);
 	}
 
-	public static void writeCloudVertex(long ptr, float x, float y, float z, int color) {
-		UnsafeUtil.memPutFloat(ptr + 0, x);
-		UnsafeUtil.memPutFloat(ptr + 4, y);
-		UnsafeUtil.memPutFloat(ptr + 8, z);
+	public static void writeCloudVertex(long ptr, int x, int y, int z, int color) {
+		long pos = (byte) x & 0xFFL;
+		pos |= ((byte) y & 0xFFL) << 8;
+		pos |= ((byte) z & 0xFFL) << 16;
+		pos |= (color & 0xFF_FF_FF_FFL) << 24;
 
-		UnsafeUtil.memPutInt(ptr + 12, color);
+		UnsafeUtil.memPutLong(ptr + 0, pos);
+		UnsafeUtil.memPutInt(ptr + 3, color);
 	}
 }

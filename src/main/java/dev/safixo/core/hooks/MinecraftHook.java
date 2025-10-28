@@ -28,22 +28,10 @@ public class MinecraftHook {
 	private static final int RIGHT_NORMAL = MathExt.packedNormal(1.0F, 0.0F, 0.0F);
 	private static final int LEFT_NORMAL = MathExt.packedNormal(-1.0F, 0.0F, 0.0F);
 
-	private static float MIN_U, MIN_V, MAX_U, MAX_V;
-	private static int WIDTH, HEIGHT;
-	private static float SCALE;
-
-	private static int DRAW_IND;
-
 	public static void renderItemIn2D(Tessellator tes, float minU, float maxV, float maxU, float minV, int width, int height, float scale) {
 		ImprovedTessellator ver = (ImprovedTessellator) tes;
 
-		if (isStateSame(ver, minU, maxV, width, height, scale)) {
-			ver.drawWithoutUpload();
-			return;
-		}
-
 		ver.startDrawingQuads();
-		ver.formatFlag = ITEM_STRIDE;
 
 		long ptr = ver.vertexPtr + ver.offset;
 
@@ -119,23 +107,6 @@ public class MinecraftHook {
 		ver.vertices = ver.offset / ITEM_STRIDE;
 		ver.flags = ImprovedTessellator.VERTEX_UV | ImprovedTessellator.VERTEX_NORMAL;
 		ver.draw();
-
-		saveState(minU, maxV, width, height, scale, ver.drawInd);
-	}
-
-	private static void saveState(float minU, float minV, int width, int height, float scale, int drawInd) {
-		MIN_U = minU;
-		MIN_V = minV;
-
-		WIDTH = width;
-		HEIGHT = height;
-
-		SCALE = scale;
-		DRAW_IND = drawInd;
-	}
-
-	private static boolean isStateSame(ImprovedTessellator tes, float minU, float minV, int width, int height, float scale) {
-		return DRAW_IND == tes.drawInd && minU == MIN_U && minV == MIN_V && width == WIDTH && height == HEIGHT && scale == SCALE;
 	}
 
 	private static long addVertex(long ptr, float x, float y, float z, float u, float v, int normal) {

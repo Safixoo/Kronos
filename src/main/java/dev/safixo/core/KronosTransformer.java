@@ -1,5 +1,6 @@
 package dev.safixo.core;
 
+import dev.safixo.client.util.data.BlocksFlags;
 import dev.safixo.core.hooks.LongHashMapHook;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.ClassWriter;
@@ -12,8 +13,8 @@ import java.util.HashSet;
 import static org.objectweb.asm.Opcodes.*;
 
 public class KronosTransformer implements IClassTransformer {
+	public static final boolean GL_STATE_MANAGER = true;
 	static final boolean DISABLE_INJECTION = false;
-	static final boolean GL_STATE_MANAGER = true;
 
 	static final String RENDER_GLOBAL_HOOK = "dev/safixo/core/hooks/RenderGlobalHook";
 	static final String DEBUG_SCREEN_HOOK = "dev/safixo/core/hooks/DebugScreenHook";
@@ -38,24 +39,15 @@ public class KronosTransformer implements IClassTransformer {
 		byte[][] reference = new byte[1][];
 		reference[0] = basicClass;
 
-		if (DISABLE_INJECTION && !GL_STATE_MANAGER) {
-			return basicClass;
-		}
-
-		if (GL_STATE_MANAGER && !name.contains("GlStateManager")) {
-			fillStateMachineFunctions();
-			redirectGlCalls(reference);
-		}
-
-		if (DISABLE_INJECTION && GL_STATE_MANAGER) {
-			return basicClass;
+		if (DISABLE_INJECTION) {
+			transformedName = "";
 		}
 
 		// Overwrites classes methods completely with a function call with the same
 		// args and with the instance of the original class.
 		switch (transformedName) {
 			case LONG_HASH_MAP:
-				 return LongHashMapHook.rewriteHashMapClass();
+				return LongHashMapHook.rewriteHashMapClass();
 			case RENDER_GLOBAL:
 				// Redirect terrain rendering calls.
 				replaceClassMethod(RENDER_GLOBAL_HOOK, "loadRenderers", "a", "()V", reference, true);
@@ -73,7 +65,7 @@ public class KronosTransformer implements IClassTransformer {
 				replaceClassMethod(RENDER_GLOBAL_HOOK, "markBlocksForUpdate", "b", "(IIIIII)V", reference, true);
 
 				// Improved clouds.
-				replaceClassMethod(RENDER_GLOBAL_HOOK, "renderCloudsFancy", "b", "(IIIIII)V", reference, true);
+				replaceClassMethod(RENDER_GLOBAL_HOOK, "renderCloudsFancy", "c", "(F)V", reference, true);
 				break;
 			case ITEM_RENDERER:
 				// Batches all Tessellator calls to item renderer.
@@ -83,7 +75,7 @@ public class KronosTransformer implements IClassTransformer {
 				replaceClassMethod(DEBUG_SCREEN_HOOK, "drawStringWithShadow", "a", "(Ljava/lang/String;III)I", reference, false);
 
 				// Redirect improved font-renderer draw loop.
-				replaceClassMethod(FONT_RENDERER_HOOK, "renderString", "a", "(Ljava/lang/String;III)I", reference, false);
+				replaceClassMethod(FONT_RENDERER_HOOK, "renderString", "b", "(Ljava/lang/String;IIIZ)I", reference, false);
 				break;
 			case CLIPPING_HELPER_IMPL:
 				// Redirect frustum setup to a more optimized and used one.
@@ -105,6 +97,16 @@ public class KronosTransformer implements IClassTransformer {
 				//  Angelica's ASM GlStateManager or hooking to the matrices setup which is ugly.
 		}
 
+		fillStateMachineFunctions();
+
+		if (!transformedName.equals("dev.safixo.core.hooks.GlStateManager")) {
+			redirectGlCalls(reference);
+		}
+
+		if (transformedName.equals("net.minecraft.client.renderer.EntityRenderer")) {
+			avoidDoublePassBullshit(reference);
+		}
+
 		return reference[0];
 	}
 
@@ -119,6 +121,8 @@ public class KronosTransformer implements IClassTransformer {
 		FUNCTION_NAMES.add("glGetFloat");
 		FUNCTION_NAMES.add("glLoadIdentity");
 		FUNCTION_NAMES.add("glLoadMatrix");
+		FUNCTION_NAMES.add("glPopMatrix");
+		FUNCTION_NAMES.add("glPushMatrix");
 		FUNCTION_NAMES.add("glMultMatrix");
 		FUNCTION_NAMES.add("glScalef");
 		FUNCTION_NAMES.add("glScaled");
@@ -127,6 +131,95 @@ public class KronosTransformer implements IClassTransformer {
 		FUNCTION_NAMES.add("glTranslatef");
 		FUNCTION_NAMES.add("glBindFramebuffer");
 		FUNCTION_NAMES.add("glFlush");
+		FUNCTION_NAMES.add("glBindTexture");
+		FUNCTION_NAMES.add("glColorMaterial");
+		FUNCTION_NAMES.add("glViewport");
+		FUNCTION_NAMES.add("glGetInteger");
+		FUNCTION_NAMES.add("glColor4f");
+		FUNCTION_NAMES.add("glColor3f");
+		FUNCTION_NAMES.add("glDepthFunc");
+		FUNCTION_NAMES.add("glClear");
+		FUNCTION_NAMES.add("glBindBuffer");
+		FUNCTION_NAMES.add("glBegin");
+		FUNCTION_NAMES.add("glBlendFunc");
+		FUNCTION_NAMES.add("glDepthMask");
+
+		FUNCTION_NAMES.add("glEnableClientState");
+		FUNCTION_NAMES.add("glDisableClientState");
+
+		FUNCTION_NAMES.add("glNewList");
+		FUNCTION_NAMES.add("glEndList");
+		FUNCTION_NAMES.add("glCallList");
+	}
+
+	static void avoidDoublePassBullshit(byte[][] basicClass) {
+		ClassReader reader = new ClassReader(basicClass[0]);
+		ClassNode classNode = new ClassNode();
+		reader.accept(classNode, 0);
+
+		String renderWorld = BlocksFlags.DEV_ENVIRONMENT ? "renderWorld" : "a";
+
+		for (int i = 0; i < classNode.methods.size(); i++) {
+			MethodNode node = (MethodNode) classNode.methods.get(i);
+
+			if (!node.name.equals(renderWorld) ) {
+				continue;
+			}
+
+			InsnList inns = node.instructions;
+			AbstractInsnNode insn = inns.getFirst();
+
+			boolean skip = false;
+
+			while (insn != null && !skip) {
+				if (insn.getType() == AbstractInsnNode.INSN) {
+					InsnNode m = (InsnNode) insn;
+
+					if (m.getOpcode() == ICONST_2) {
+						node.instructions.set(m, new InsnNode(ICONST_1));
+						skip = true;
+					}
+				}
+				insn = insn.getNext();
+			}
+		}
+
+		ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+		classNode.accept(writer);
+		basicClass[0] = writer.toByteArray();
+	}
+
+	static void redirectGlCalls(byte[][] basicClass) {
+		ClassReader reader = new ClassReader(basicClass[0]);
+		ClassNode classNode = new ClassNode();
+		reader.accept(classNode, 0);
+
+		boolean shouldReplace = false;
+
+		for (int i = 0; i < classNode.methods.size(); i++) {
+			InsnList inns = ((MethodNode) classNode.methods.get(i)).instructions;
+			AbstractInsnNode insn = inns.getFirst();
+
+			while (insn != null) {
+				if (insn.getType() == AbstractInsnNode.METHOD_INSN) {
+					MethodInsnNode m = (MethodInsnNode) insn;
+
+					if (m.owner.contains("lwjgl")) {
+						if (FUNCTION_NAMES.contains(m.name)) {
+							m.owner = "dev/safixo/core/hooks/GlStateManager";
+							shouldReplace = true;
+						}
+					}
+				}
+				insn = insn.getNext();
+			}
+		}
+
+		if (shouldReplace) {
+			ClassWriter writer = new ClassWriter(0);
+			classNode.accept(writer);
+			basicClass[0] = writer.toByteArray();
+		}
 	}
 
 	static void replaceClassMethod(String hookPath, String methodName, String runtimeName, String descriptor, byte[][] basicClass, boolean voidRet) {
@@ -207,71 +300,6 @@ public class KronosTransformer implements IClassTransformer {
 		classNode.accept(writer);
 
 		basicClass[0] = writer.toByteArray();
-	}
-
-	// Some drivers (mine) seems to struggle to get the render matrices data with glGetFloat,
-	// it doesn't help the fact that Minecraft uses double pass rendering for everything and
-	// even for things and when it doesn't need it, this method is a victim for example.
-	private static void prePassBullShit(byte[][] basicClass) {
-		ClassReader reader = new ClassReader(basicClass[0]);
-		ClassNode classNode = new ClassNode();
-		reader.accept(classNode, 0);
-
-		for (int i = 0; i < classNode.methods.size(); i++) {
-			MethodNode method = (MethodNode) classNode.methods.get(i);
-
-			// Clear methods data and replace it with a direct call to the new function.
-			if ((method.name.equals("updateRenderInfo") || (method.name.equals("a")) && method.desc.contains("Luf;Z"))) {
-				InsnList inject = new InsnList();
-				LabelNode continueLabel = new LabelNode();
-
-				inject.add(new FieldInsnNode(GETSTATIC, RENDER_GLOBAL_HOOK, "PROCESS_RENDER_INFO", "Z"));
-				inject.add(new JumpInsnNode(IFNE, continueLabel));
-				inject.add(new InsnNode(RETURN));
-				inject.add(continueLabel);
-
-				method.instructions.add(inject);
-			}
-		}
-	}
-
-	static void redirectGlCalls(byte[][] basicClass) {
-		ClassReader reader = new ClassReader(basicClass[0]);
-		ClassNode classNode = new ClassNode();
-		reader.accept(classNode, 0);
-
-		boolean shouldReplace = false;
-
-		for (int i = 0; i < classNode.methods.size(); i++) {
-			InsnList inns = ((MethodNode) classNode.methods.get(i)).instructions;
-			AbstractInsnNode insn = inns.getFirst();
-
-			while (insn != null) {
-				if (insn.getType() == AbstractInsnNode.METHOD_INSN) {
-					MethodInsnNode m = (MethodInsnNode) insn;
-
-					if (m.owner.contains("org/lwjgl/")) {
-						if (FUNCTION_NAMES.contains(m.name)) {
-							inns.insertBefore(m, new MethodInsnNode(INVOKESTATIC,
-								"dev/safixo/core/hooks/GlStateManager",
-								m.name,
-								m.desc
-							));
-							inns.remove(m);
-
-							shouldReplace = true;
-						}
-					}
-				}
-				insn = insn.getNext();
-			}
-		}
-
-		if (shouldReplace) {
-			ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
-			classNode.accept(writer);
-			basicClass[0] = writer.toByteArray();
-		}
 	}
 
 	static int processType(StringBuilder newDesc, Type type, InsnList inject, int offset) {

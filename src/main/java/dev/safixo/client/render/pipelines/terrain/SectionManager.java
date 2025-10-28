@@ -76,6 +76,10 @@ public class SectionManager {
 		return getCurrentInstance().regionManager;
 	}
 
+	public int getLastFrame() {
+		return this.bfsCuller.getActiveFrame();
+	}
+
 	public RegionRender getRegion(int sectionX, int sectionY, int sectionZ) {
 		return this.regionManager.getRegion(sectionX, sectionY, sectionZ);
 	}

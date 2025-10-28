@@ -7,6 +7,7 @@ import java.util.Map;
 
 @IFMLLoadingPlugin.Name("kronos")
 @IFMLLoadingPlugin.MCVersion("1.6.4")
+@IFMLLoadingPlugin.SortingIndex(200)
 public class KronosCoreMod implements IFMLLoadingPlugin {
 	@Override
 	public String[] getLibraryRequestClass() {
