@@ -1,5 +1,6 @@
 package dev.safixo.client.render.pipelines.terrain;
 
+import dev.safixo.client.util.MathExt;
 import net.minecraft.block.Block;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderBlocks;
@@ -9,14 +10,14 @@ import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
 import dev.safixo.client.util.MeshDirection;
 import dev.safixo.client.util.data.CameraData;
 import dev.safixo.client.render.vertex.VertexWriterManager;
-import dev.safixo.client.render.pipelines.terrain.meshing.SectionCache;
+import dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache;
 import dev.safixo.client.util.data.BlocksFlags;
 import dev.safixo.client.util.Direction;
 import dev.safixo.client.render.vertex.DefaultVertexFormats;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
 
-import static dev.safixo.client.render.pipelines.terrain.meshing.SectionCache.makeBlockIndex;
+import static dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache.makeBlockIndex;
 import static dev.safixo.client.util.Direction.*;
 import static dev.safixo.client.util.Direction.EAST;
 
@@ -24,7 +25,7 @@ import static dev.safixo.client.util.Direction.EAST;
 // meshing, rendering is almost only managed in the RegionRender in an objectless fashion.
 public class SectionRender {
 	// Most of the section data, flags is a bit-mask from SectionFlag encoding.
-	public int currentFrame, flags = SectionFlags.setDirty(0, true);
+	public int currentFrame, flags = SectionFlags.setDirty(0b0, true);
 
 	// Section position relative to blocks.
 	public int blockX, blockY, blockZ;
@@ -47,7 +48,7 @@ public class SectionRender {
 		this.blockY = blockY;
 		this.blockZ = blockZ;
 
-		this.sectionPos = SectionManager.asLong(blockX >> 4, blockY >> 4, blockZ >> 4);
+		this.sectionPos = MathExt.asLong(blockX >> 4, blockY >> 4, blockZ >> 4);
 		this.regionIndex = RegionRender.regionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
 	}
 

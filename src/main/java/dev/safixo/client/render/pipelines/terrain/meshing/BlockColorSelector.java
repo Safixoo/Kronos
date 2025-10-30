@@ -1,5 +1,6 @@
 package dev.safixo.client.render.pipelines.terrain.meshing;
 
+import dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache;
 import dev.safixo.client.util.MathExt;
 import net.minecraft.world.ColorizerFoliage;
 import net.minecraft.world.ColorizerGrass;

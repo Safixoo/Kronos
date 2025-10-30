@@ -1,4 +1,4 @@
-package dev.safixo.client.render.pipelines.terrain.meshing;
+package dev.safixo.client.render.pipelines.terrain.meshing.data;
 
 import dev.safixo.client.util.MathExt;
 import net.minecraft.block.Block;
@@ -42,6 +42,13 @@ public class SectionCache implements IBlockAccess {
 	private static byte[] CENTER_DATA;
 
 	private boolean centerSectEmpty;
+
+	static {
+		Arrays.fill(SECTION_BLOCKS, DEFAULT_BYTE_ARRAY);
+		Arrays.fill(SECTION_DATA, DEFAULT_BYTE_ARRAY);
+		Arrays.fill(SKY_LIGHT, DEFAULT_FULL_BYTE_ARRAY);
+		Arrays.fill(BLOCK_LIGHT, DEFAULT_BYTE_ARRAY);
+	}
 
 	public SectionCache(World world, int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
 		this.worldObj = world;
@@ -101,7 +108,17 @@ public class SectionCache implements IBlockAccess {
 							SECTION_DATA[sectionIndex] = DEFAULT_BYTE_ARRAY;
 						}
 
-						SKY_LIGHT[sectionIndex] = section.getSkylightArray().data != null ? section.getSkylightArray().data : DEFAULT_FULL_BYTE_ARRAY;
+						if (section.getSkylightArray() == null) {
+							// Case where dimension doesn't support lighting (nether for example).
+							SKY_LIGHT[sectionIndex] = DEFAULT_BYTE_ARRAY;
+						} else if (section.getSkylightArray().data == null) {
+							// Case where the lighting is the default of the type (for the sky light-type is 15).
+							SKY_LIGHT[sectionIndex] = DEFAULT_FULL_BYTE_ARRAY;
+						} else {
+							// Base case, there is lighting and everybody is happy :).
+							SKY_LIGHT[sectionIndex] = section.getSkylightArray().data;
+						}
+
 						BLOCK_LIGHT[sectionIndex] = section.getBlocklightArray().data != null ? section.getBlocklightArray().data : DEFAULT_BYTE_ARRAY;
 					} else {
 						SECTION_BLOCKS[sectionIndex] = DEFAULT_BYTE_ARRAY;

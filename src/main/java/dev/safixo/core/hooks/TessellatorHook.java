@@ -2,13 +2,8 @@ package dev.safixo.core.hooks;
 
 import dev.safixo.client.util.ColorBGRManager;
 import dev.safixo.client.render.vertex.VertexWriterManager;
-import org.objectweb.asm.Type;
-import org.objectweb.asm.ClassReader;
-import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.tree.*;
 
-import static org.objectweb.asm.Opcodes.*;
-
+@SuppressWarnings("unused")
 public class TessellatorHook {
 	public static void setTextureUV(double u, double v) {
 		VertexWriterManager current = VertexWriterManager.getCurrentInstance();

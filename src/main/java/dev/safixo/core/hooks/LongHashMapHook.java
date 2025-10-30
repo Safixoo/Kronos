@@ -4,6 +4,7 @@ import dev.safixo.client.util.data.BlocksFlags;
 import org.objectweb.asm.*;
 import static org.objectweb.asm.Opcodes.*;
 
+@SuppressWarnings("unused")
 public class LongHashMapHook {
 	public static byte[] rewriteHashMapClass() {
 		boolean inDev = BlocksFlags.DEV_ENVIRONMENT;

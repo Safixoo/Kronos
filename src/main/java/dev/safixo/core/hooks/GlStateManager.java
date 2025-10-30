@@ -2,7 +2,6 @@ package dev.safixo.core.hooks;
 
 import dev.safixo.client.render.ImprovedTessellator;
 import dev.safixo.client.render.gfx.util.GpuFlags;
-import dev.safixo.client.render.gfx.vertex.GlVertexArrayObject;
 import dev.safixo.client.util.ColorBGRManager;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.Tessellator;
@@ -13,6 +12,7 @@ import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.util.Arrays;
 
+@SuppressWarnings("unused")
 public class GlStateManager {
 	public static boolean SKIP_CACHE = false;
 

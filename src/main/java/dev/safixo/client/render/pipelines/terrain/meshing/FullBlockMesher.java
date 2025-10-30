@@ -1,5 +1,7 @@
 package dev.safixo.client.render.pipelines.terrain.meshing;
 
+import dev.safixo.client.render.pipelines.terrain.meshing.data.FacingRender;
+import dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache;
 import dev.safixo.client.util.MathExt;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockGrass;
@@ -13,15 +15,14 @@ import dev.safixo.client.render.vertex.writers.TerrainFormat;
 import org.joml.Vector2i;
 import org.joml.Vector3i;
 
-import static dev.safixo.client.render.pipelines.terrain.meshing.SectionCache.makeBlockIndex;
-import static dev.safixo.client.render.pipelines.terrain.meshing.SectionCache.byteToUnsigned;
+import static dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache.makeBlockIndex;
+import static dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache.byteToUnsigned;
 import static dev.safixo.client.util.Direction.*;
 
 public class FullBlockMesher {
 	private static final int[] SHADE_FULL_COLOR = new int[Direction.COUNT];
 	private static final int[] SHADE_FULL_FACTOR = new int[Direction.COUNT];
 	private static final float[] VERT_UVS = new float[4];
-	private static final float[] OVERLAY_UVS = new float[4];
 
 	private static final Icon SIDE_GRASS_NON_OVERLAY = Block.grass.getIcon(5, 5);
 	private static final Vector2i[] MAP_ID_TO_UV = new Vector2i[4];

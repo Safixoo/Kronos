@@ -5,12 +5,26 @@ import dev.safixo.client.util.data.CameraData;
 import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
 
 public class MathExt {
-	public static float squaredDistance(SectionRender render, CameraData cameraData) {
+	public static float squaredDistanceXYZ(SectionRender render, CameraData cameraData) {
 		float distX = (render.blockX - cameraData.intX + 8) - cameraData.fractX;
 		float distY = (render.blockY - cameraData.intY + 8) - cameraData.fractY;
 		float distZ = (render.blockZ - cameraData.intZ + 8) - cameraData.fractZ;
 
 		return MathExt.square(distX) + MathExt.square(distY) + MathExt.square(distZ);
+	}
+
+	public static float squaredDistanceXZ(SectionRender render, CameraData cameraData) {
+		float distX = (render.blockX - cameraData.intX + 8) - cameraData.fractX;
+		float distZ = (render.blockZ - cameraData.intZ + 8) - cameraData.fractZ;
+
+		return MathExt.square(distX) + MathExt.square(distZ);
+	}
+
+	public static float squaredDistanceXZ(int posX, int posZ, CameraData cameraData) {
+		float distX = (posX - cameraData.intX + 8) - cameraData.fractX;
+		float distZ = (posZ - cameraData.intZ + 8) - cameraData.fractZ;
+
+		return MathExt.square(distX) + MathExt.square(distZ);
 	}
 
 	public static int getLightmapCoord(int skyLight, int blockLight) {
@@ -34,6 +48,26 @@ public class MathExt {
 		}
 
 		return MathExt.square(distX) + MathExt.square(distZ);
+	}
+
+	public static int sectionX(long position) {
+		return (int) ((position >>> 12) & 0x3FFFFFF);
+	}
+
+	public static int sectionY(long position) {
+		return (int) (position & 0xFFFL);
+	}
+
+	public static int sectionZ(long position) {
+		return (int) ((position >>> 38) & 0x3FFFFFF);
+	}
+
+	public static long asLong(int x, int y, int z) {
+		return (x & 0x3FFFFFL) << 34 | (z & 0x3FFFFFL) << 12 | (y & 0xFFFL);
+	}
+
+	public static long asLong(int x, int z) {
+		return (x & 0xFFFFFFFFL) | (z & 0xFFFFFFFFL) << 32L;
 	}
 
 	public static double square(double num) {
@@ -93,6 +127,16 @@ public class MathExt {
 	public static int byteToUnsignedInt(int x) {
 		return (byte) x & 0xFF;
 	}
+
+
+	public static int posToSectionIntegral(double position) {
+		return MathExt.floor(position) >> 4;
+	}
+
+	public static int posToSectionIntegral(int position) {
+		return position >> 4;
+	}
+
 
 	public static double smoothStep(double t) {
 		return t * t * (3.0f - 2.0f * t);

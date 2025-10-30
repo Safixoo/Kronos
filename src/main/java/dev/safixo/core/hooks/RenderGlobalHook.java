@@ -11,16 +11,19 @@ import net.minecraft.client.renderer.RenderGlobal;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.culling.ICamera;
 import net.minecraft.entity.EntityLivingBase;
-import org.joml.Math;
 import org.lwjgl.opengl.GL11;
 
 import java.util.List;
 
 // The way it works is kind of hacky, it tries to work around the two pass
-// EntityRenderer.renderWorld system by using some trivial global state, it sucks
+// EntityRenderer.renderWorld system by using some trivial global state, it sucks,
 // but it is worth it.
-public class RenderGlobalHook {
+
+// TODO: Replace the current system now by a simpler one, now that the two pass has been patched.
+@SuppressWarnings("unused")
+public  class RenderGlobalHook {
 	public static SectionManager MANAGER;
+
 	public static boolean SHOULD_RELOAD;
 
 	public static boolean OPTIFINE_CHECKED = false;
@@ -28,8 +31,6 @@ public class RenderGlobalHook {
 
 	static float PARTIAL_TICK;
 	static boolean FIRST_PASS;
-
-	public static boolean PROCESS_RENDER_INFO = true;
 
 	public static void loadRenderers(RenderGlobal renderGlobal) {
 		if (!OPTIFINE_CHECKED) {
@@ -44,11 +45,10 @@ public class RenderGlobalHook {
 			Tessellator.instance = new ImprovedTessellator();
 		}
 
+		MANAGER = SectionManager.getCurrentInstance();
+
 		Block.leaves.setGraphicsLevel(Minecraft.getMinecraft().gameSettings.fancyGraphics);
 		int renderDistance = Minecraft.getMinecraft().gameSettings.renderDistance;
-
-		MANAGER = SectionManager.getCurrentInstance();
-		MANAGER.setWorld(Minecraft.getMinecraft().theWorld);
 
 		((List<?>) HookUtils.getFieldObj(renderGlobal, "tileEntities", "field_72762_a")).clear();
 
@@ -88,12 +88,11 @@ public class RenderGlobalHook {
 			realRenderDistance = (Integer) HookUtils.getFieldObj(minecraft.gameSettings, "ofRenderDistanceFine", "ofRenderDistanceFine") >> 4;
 		}
 
-		SectionManager.getCurrentInstance().update(realRenderDistance, cameraX, cameraY, cameraZ, SHOULD_RELOAD, PARTIAL_TICK);
+		MANAGER.update(Minecraft.getMinecraft().theWorld, realRenderDistance, cameraX, cameraY, cameraZ, SHOULD_RELOAD, PARTIAL_TICK);
 
 		{
 			FIRST_PASS = true;
 			SHOULD_RELOAD = false;
-			PROCESS_RENDER_INFO = false;
 		}
 
 		return true;
@@ -114,11 +113,8 @@ public class RenderGlobalHook {
 		Minecraft minecraft = Minecraft.getMinecraft();
 
 		if (!FIRST_PASS) {
-			PROCESS_RENDER_INFO = true;
 			return;
 		}
-
-		PROCESS_RENDER_INFO = false;
 
 		// Enable lightmap.
 		minecraft.entityRenderer.enableLightmap(partialTick);
@@ -151,22 +147,6 @@ public class RenderGlobalHook {
 
 		// Disable lightmap.
 		minecraft.entityRenderer.disableLightmap(partialTick);
-	}
-
-	public static void markBlockForUpdate(RenderGlobal renderGlobal, int minX, int minY, int minZ) {
-		SectionManager.getCurrentInstance().blockUpdate(minX - 1, minY - 1, minZ - 1, minX + 1, minY + 1, minZ + 1);
-	}
-
-	public static void markBlockForRenderUpdate(RenderGlobal renderGlobal, int minX, int minY, int minZ) {
-		SectionManager.getCurrentInstance().blockUpdate(minX - 1, minY - 1, minZ - 1, minX + 1, minY + 1, minZ + 1);
-	}
-
-	public static void markBlockRangeForRenderUpdate(RenderGlobal renderGlobal, int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
-		SectionManager.getCurrentInstance().blockUpdate(minX - 1, minY - 1, minZ - 1,  maxX + 1, maxY + 1, maxZ + 1);
-	}
-
-	public static void markBlocksForUpdate(RenderGlobal renderGlobal, int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
-		SectionManager.getCurrentInstance().blockUpdate(minX - 1, minY - 1, minZ - 1,  maxX + 1, maxY + 1, maxZ + 1);
 	}
 
 	public static void renderAllSortedRenderers(RenderGlobal renderGlobal, int pass, double tick) {

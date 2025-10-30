@@ -24,6 +24,7 @@ import org.lwjgl.opengl.GL15;
 import java.util.Map;
 import java.util.Random;
 
+@SuppressWarnings("unused")
 public class FontRendererHook {
 	public static final float FONT_HEIGHT = 9, FONT_WIDTH = 8;
 	private static final int[] ALLOWED_CHARACTERS_INDEX = new int[256];

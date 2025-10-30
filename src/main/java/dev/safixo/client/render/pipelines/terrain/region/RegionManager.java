@@ -21,7 +21,7 @@ public class RegionManager {
 		int regionY = sectionY >> (RegionRender.BLOCK_SHIFT_Y - 4);
 		int regionZ = sectionZ >> (RegionRender.BLOCK_SHIFT_Z - 4);
 
-		long position = SectionManager.asLong(regionX, regionY, regionZ);
+		long position = MathExt.asLong(regionX, regionY, regionZ);
 		RegionRender region = this.regionMap.get(position);
 
 		if (region == null) {
@@ -71,7 +71,7 @@ public class RegionManager {
 
 		for (RegionRender region : regions) {
 			if (MathExt.manhattanDistance(region, camera) > MathExt.square(renderDistanceBlocks)) {
-				long regionPos = SectionManager.asLong(region.regionX, region.regionY, region.regionZ);
+				long regionPos = MathExt.asLong(region.regionX, region.regionY, region.regionZ);
 
 				removedList.add(regionPos);
 				region.clear();

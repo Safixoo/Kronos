@@ -7,6 +7,7 @@ import dev.safixo.client.util.memory.UnsafeUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.Tessellator;
 
+@SuppressWarnings("unused")
 public class MinecraftHook {
 	private static final int ITEM_STRIDE = 24;
 
@@ -53,11 +54,8 @@ public class MinecraftHook {
 		ptr = addVertex(ptr, 1.0F, 0.0F, -scale, maxU, minV, BEHIND_NORMAL);
 		ptr = addVertex(ptr, 0.0F, 0.0F, -scale, minU, minV, BEHIND_NORMAL);
 
-		float invWidth = 1.0f / width;
-		float invHeight = 1.0f / height;
-
-		float halfTexelU = 0.5F * (minU - maxU) * invWidth;
-		float haltTexelV = 0.5F * (minV - maxV) * invHeight;
+		float halfTexelU = 0.5F * (minU - maxU) / width;
+		float haltTexelV = 0.5F * (minV - maxV) / height;
 
 		ver.offset = (int) (ptr - ver.vertexPtr);
 		if (ver.offset + ITEM_STRIDE * 8L * width >= ver.capacity) {
@@ -65,9 +63,10 @@ public class MinecraftHook {
 		}
 
 		for (int i = 0; i < width; i++) {
-			float relW = i * invWidth;
-			float nextRelW = relW + invWidth;
+			float relW = i / (float) width;
+			float nextRelW = (i + 1) / (float) width;
 			float u = minU + (maxU - minU) * relW - halfTexelU;
+
 			// -X
 			ptr = addVertex(ptr, relW, 0.0F, -scale, u, minV, LEFT_NORMAL);
 			ptr = addVertex(ptr, relW, 0.0F, 0.0F, u, minV, LEFT_NORMAL);
@@ -87,8 +86,8 @@ public class MinecraftHook {
 		}
 
 		for (int i = 0; i < height; i++) {
-			float relW = i * invHeight;
-			float nextRelW = relW + invHeight;
+			float relW = i / (float) height;
+			float nextRelW = (i + 1) / (float) height;
 			float v = minV + (maxV - minV) * relW - haltTexelV;
 			// +Y
 			ptr = addVertex(ptr, 0.0F, nextRelW, 0.0F, minU, v, TOP_NORMAL);

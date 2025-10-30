@@ -12,6 +12,7 @@ import org.lwjgl.opengl.GL11;
 import java.nio.Buffer;
 import java.nio.FloatBuffer;
 
+@SuppressWarnings("unused")
 public class FrustumHook {
 	public static void init(ClippingHelperImpl clipper) {
 		FrustumCuller.modelViewBuff = (FloatBuffer) HookUtils.getFieldStatic(ActiveRenderInfo.class, "modelview", "field_74594_j");

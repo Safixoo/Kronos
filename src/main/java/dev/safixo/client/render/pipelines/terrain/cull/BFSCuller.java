@@ -1,5 +1,6 @@
 package dev.safixo.client.render.pipelines.terrain.cull;
 
+import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
 import dev.safixo.client.render.pipelines.terrain.SectionFlags;
 import dev.safixo.client.render.pipelines.terrain.SectionManager;
@@ -75,12 +76,12 @@ public class BFSCuller {
 		return false;
 	}
 
-	public void updateRenderList(Long2ReferenceOpenHashMap<SectionRender> sectionMap, CameraData camera) {
+	public void updateRenderList(Long2ObjectOpenHashMap<SectionRender> sectionMap, CameraData camera) {
 		int chunkX = MathExt.floor(camera.intX);
 		int chunkY = MathExt.clamp(MathExt.floor(camera.intY), 0, 255);
 		int chunkZ = MathExt.floor(camera.intZ);
 
-		SectionRender spawn = sectionMap.get(SectionManager.asLong(chunkX >> 4, chunkY >> 4, chunkZ >> 4));
+		SectionRender spawn = sectionMap.get(MathExt.asLong(chunkX >> 4, chunkY >> 4, chunkZ >> 4));
 
 		if (spawn != null) {
 			int flags = spawn.flags;

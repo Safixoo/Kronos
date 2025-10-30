@@ -2,6 +2,7 @@ package dev.safixo.core;
 
 import dev.safixo.client.util.data.BlocksFlags;
 import dev.safixo.core.hooks.LongHashMapHook;
+import net.minecraft.client.renderer.RenderGlobal;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.ClassWriter;
 import net.minecraft.launchwrapper.IClassTransformer;
@@ -21,6 +22,8 @@ public class KronosTransformer implements IClassTransformer {
 	static final String FONT_RENDERER_HOOK = "dev/safixo/core/hooks/FontRendererHook";
 	static final String FRUSTUM_HOOK = "dev/safixo/core/hooks/FrustumHook";
 	static final String MINECRAFT_HOOK = "dev/safixo/core/hooks/MinecraftHook";
+
+	static final String CHUNK_LISTENER = "dev/safixo/client/render/pipelines/terrain/meshing/ChunkListener";
 
 	static final String RENDER_GLOBAL = "net.minecraft.client.renderer.RenderGlobal";
 	static final String ITEM_RENDERER = "net.minecraft.client.renderer.ItemRenderer";
@@ -59,10 +62,10 @@ public class KronosTransformer implements IClassTransformer {
 				replaceClassMethod(RENDER_GLOBAL_HOOK, "renderAllSortedRenderers", "", "", reference, true);
 
 				// Redirect most renderer updates.
-				replaceClassMethod(RENDER_GLOBAL_HOOK, "markBlockForUpdate", "a", "(III)V", reference, true);
-				replaceClassMethod(RENDER_GLOBAL_HOOK, "markBlockForRenderUpdate", "b", "(III)V", reference, true);
-				replaceClassMethod(RENDER_GLOBAL_HOOK, "markBlockRangeForRenderUpdate", "a", "(IIIIII)V", reference, true);
-				replaceClassMethod(RENDER_GLOBAL_HOOK, "markBlocksForUpdate", "b", "(IIIIII)V", reference, true);
+				replaceClassMethod(CHUNK_LISTENER, "markBlockForUpdate", "a", "(III)V", reference, true);
+				replaceClassMethod(CHUNK_LISTENER, "markBlockForRenderUpdate", "b", "(III)V", reference, true);
+				replaceClassMethod(CHUNK_LISTENER, "markBlockRangeForRenderUpdate", "a", "(IIIIII)V", reference, true);
+				replaceClassMethod(CHUNK_LISTENER, "markBlocksForUpdate", "b", "(IIIIII)V", reference, true);
 
 				// Improved clouds.
 				replaceClassMethod(RENDER_GLOBAL_HOOK, "renderCloudsFancy", "c", "(F)V", reference, true);

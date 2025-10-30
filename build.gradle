@@ -40,6 +40,8 @@ dependencies {
     implementation("it.unimi.dsi:fastutil:7.2.1")
     // https://mvnrepository.com/artifact/org.joml/joml
     implementation("org.joml:joml:1.9.20")
+//    // https://mvnrepository.com/artifact/org.lwjgl.lwjgl/lwjgl
+//    implementation("org.lwjgl.lwjgl:lwjgl:2.9.1")
 }
 
 jar {
@@ -55,6 +57,16 @@ jar {
 
 tasks.named("runClient") {
     jvmArgs += ["-Dfml.coreMods.load=dev.safixo.KronosCoreMod"]
+
+    args = [
+            "--username", "\${auth_player_name}",
+            "--session", "\${auth_session}",
+            "--version", "1.6.4",
+            "--gameDir", "\${game_directory}",
+            "--assetsDir", "\${game_assets}",
+            "--tweakClass", "cpw.mods.fml.common.launcher.FMLTweaker",
+            "--tweakClass", "dev.safixo.core.LWJGLTweak"
+    ]
 }
 
 tasks.withType(JavaExec).configureEach {

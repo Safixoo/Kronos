@@ -3,9 +3,10 @@ package dev.safixo.core.hooks;
 import dev.safixo.client.render.pipelines.terrain.SectionManager;
 import net.minecraft.client.gui.FontRenderer;
 
+@SuppressWarnings("unused")
 public class DebugScreenHook {
 	public static int drawStringWithShadow(FontRenderer fontRenderer, String text, int x, int y, int color) {
-		if (text.contains("Allocated")) {
+		if (text.contains("Alloc")) {
 			SectionManager manager = SectionManager.getCurrentInstance();
 
 			int charWidth = fontRenderer.getStringWidth(text);

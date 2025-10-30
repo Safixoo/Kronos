@@ -11,6 +11,11 @@ public class UpdateQueue {
 			return;
 		}
 
+		// Try to at least minimize duplicated queued sections.
+		if (render == UPDATE_QUEUE[UPDATE_POSITION]) {
+			return;
+		}
+
 		UPDATE_QUEUE[UPDATE_POSITION++] = render;
 	}
 
