@@ -14,12 +14,11 @@ import java.util.Arrays;
 
 @SuppressWarnings("unused")
 public class GlStateManager {
-	public static boolean SKIP_CACHE = false;
-
+	public static final boolean SKIP_CACHE = true;
 	private static final byte[] CAP_BITS = new byte[32827];
 
-	private static final byte UNDEFINED = 0b00;
-	private static final byte DEFINED_DISABLED = 0b01;
+	private static final byte UNDEFINED = 0b01;
+	private static final byte DEFINED_DISABLED = 0b00;
 	private static final byte DEFINED_ENABLED = 0b11;
 
 	public static long LAST_COLOR_MATERIAL = -1;
@@ -27,40 +26,56 @@ public class GlStateManager {
 	public static int LAST_ACTIVE_TEXTURE = -1;
 	public static int LAST_TEXTURE = -1;
 	public static int LAST_COLOR = -1;
-	public static int MAT_MODE = GL11.GL_PROJECTION;
+	public static int LAST_DEPTH_FUNC = -1;
+
+	public static int FOG_MODE;
+	public static float FOG_START, FOG_END;
+	public static float FOG_COLOR_R, FOG_COLOR_G, FOG_COLOR_B;
+
+	public static int MAT_MODE = GL11.GL_MODELVIEW;
+
+	static {
+		Arrays.fill(CAP_BITS, UNDEFINED);
+	}
 
 	public static void glEnable(int cap) {
-		if (SKIP_CACHE) {
-			flushDrawState();
-			GL11.glEnable(cap);
-			return;
-		}
-
-		if (CAP_BITS[cap] <= DEFINED_DISABLED) {
-			CAP_BITS[cap] = DEFINED_ENABLED;
+		if (CAP_BITS[cap] <= UNDEFINED) {
+			if (!SKIP_CACHE) {
+				CAP_BITS[cap] = DEFINED_ENABLED;
+			}
 			flushDrawState();
 			GL11.glEnable(cap);
 		}
 	}
 
-	public static void glDisable(int cap) {
-		if (SKIP_CACHE) {
-			flushDrawState();
-			GL11.glDisable(cap);
-			return;
-		}
+	public static void update(boolean processMessages) {
+		flushDrawState();
+		Display.update(processMessages);
+		reset();
+	}
 
-		if (CAP_BITS[cap] == UNDEFINED || CAP_BITS[cap] == DEFINED_ENABLED) {
-			CAP_BITS[cap] = DEFINED_DISABLED;
+	public static void update() {
+		flushDrawState();
+		Display.update();
+		reset();
+	}
+
+	public static void glDisable(int cap) {
+		if (CAP_BITS[cap] >= UNDEFINED) {
+			if (!SKIP_CACHE) {
+				CAP_BITS[cap] = DEFINED_DISABLED;
+			}
 			flushDrawState();
 			GL11.glDisable(cap);
 		}
 	}
 
 	public static void glDepthFunc(int mask) {
-		flushDrawState();
-
-		GL11.glDepthFunc(mask);
+		if (mask != LAST_DEPTH_FUNC) {
+			LAST_DEPTH_FUNC = mask;
+			flushDrawState();
+			GL11.glDepthFunc(mask);
+		}
 	}
 
 	public static void glColor3f(float red, float green, float blue) {
@@ -97,8 +112,6 @@ public class GlStateManager {
 	public static int LAST_VBO_ID = -1;
 
 	public static void glBindBuffer(int target, int id) {
-		flushDrawState();
-
 		if (target == GL15.GL_ARRAY_BUFFER) {
 			if (id == LAST_VBO_ID) {
 				return;
@@ -107,6 +120,7 @@ public class GlStateManager {
 			LAST_VBO_ID = id;
 		}
 
+		flushDrawState();
 		GL15.glBindBuffer(target, id);
 	}
 
@@ -124,14 +138,15 @@ public class GlStateManager {
 		flushDrawState();
 
 		GL11.glClear(mask);
+		LAST_TEXTURE = -1;
 	}
 
 	public static void reset() {
-		flushDrawState();
-		Arrays.fill(CAP_BITS, (byte) 0);
+		Arrays.fill(CAP_BITS, UNDEFINED);
 
-		MAT_MODE = GL11.GL_PROJECTION;
+		MAT_MODE = GL11.GL_MODELVIEW;
 		LAST_COLOR = -1;
+		LAST_DEPTH_FUNC = -1;
 		LAST_ACTIVE_TEXTURE = -1;
 		LAST_COLOR_MATERIAL = -1;
 		LAST_TEXTURE = -1;
@@ -174,18 +189,16 @@ public class GlStateManager {
 	}
 
 	public static void glFrustum(double left, double right, double bottom, double top, double zNear, double zFar) {
-		if (GpuFlags.EXT_DSA) {
-
-		} else {
-			GL11.glFrustum(left, right, bottom, top, zNear, zFar);
-		}
+		GL11.glFrustum(left, right, bottom, top, zNear, zFar);
 	}
 
 	public static void glMatrixMode(int mode) {
-		flushDrawState();
-		MAT_MODE = mode;
+		if (MAT_MODE != mode) {
+			flushDrawState();
 
-		GL11.glMatrixMode(mode);
+			MAT_MODE = mode;
+			GL11.glMatrixMode(mode);
+		}
 	}
 
 	public static float glGetFloat(int name) {
@@ -196,9 +209,6 @@ public class GlStateManager {
 		flushDrawState();
 		GL30.glBindFramebuffer(target, frameBuffer);
 
-		CAP_BITS[GL11.GL_DEPTH_TEST] = UNDEFINED;
-		CAP_BITS[GL11.GL_BLEND] = UNDEFINED;
-		CAP_BITS[GL11.GL_ALPHA_TEST] = UNDEFINED;
 		LAST_TEXTURE = -1;
 	}
 
@@ -220,8 +230,8 @@ public class GlStateManager {
 	}
 
 	public static void glActiveTexture(int activeTex) {
-		flushDrawState();
 		if (activeTex != LAST_ACTIVE_TEXTURE) {
+			flushDrawState();
 			GL13.glActiveTexture(activeTex);
 			LAST_ACTIVE_TEXTURE = activeTex;
 		}
@@ -285,10 +295,11 @@ public class GlStateManager {
 	}
 
 	public static void glColorMaterial(int face, int mode) {
-		flushDrawState();
 		long mask = (face & 0xFFFFFFFFL) << 32L | (mode & 0xFFFFFFFFL);
 
 		if (LAST_COLOR_MATERIAL != mask) {
+			flushDrawState();
+
 			GL11.glColorMaterial(face, mode);
 			LAST_COLOR_MATERIAL = mask;
 		}
@@ -362,10 +373,42 @@ public class GlStateManager {
 		GL11.glBlendFunc(a, b);
 	}
 
+	public static void glFogi(int mode, int value) {
+		if (mode == GL11.GL_FOG_MODE) {
+			FOG_MODE = value;
+		}
+
+		GL11.glFogi(mode, value);
+	}
+
+	public static void glFogf(int mode, float value) {
+		if (mode == GL11.GL_FOG_START) {
+			FOG_START = value;
+		} else if (mode == GL11.GL_FOG_END) {
+			FOG_END = value;
+		}
+
+		GL11.glFogf(mode, value);
+	}
+
+	public static void glFog(int mode, IntBuffer value) {
+		GL11.glFog(mode, value);
+	}
+
+	public static void glFog(int mode, FloatBuffer value) {
+		if (mode == GL11.GL_FOG_COLOR) {
+			FOG_COLOR_R = value.get(0);
+			FOG_COLOR_G = value.get(1);
+			FOG_COLOR_B = value.get(2);
+		}
+
+		GL11.glFog(mode, value);
+	}
+
+	@SuppressWarnings("ConstantValue")
 	public static void flushDrawState() {
-		if (Tessellator.instance.getClass() == ImprovedTessellator.class) {
-			ImprovedTessellator tes = (ImprovedTessellator) Tessellator.instance;
-			tes.flushState();
+		if (ImprovedTessellator.TESSELLATOR != null) {
+			ImprovedTessellator.TESSELLATOR.flushState();
 		}
 	}
 }

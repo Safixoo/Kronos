@@ -34,6 +34,7 @@ public class KronosTransformer implements IClassTransformer {
 	static final String ACTIVE_RENDER_INFO = "net.minecraft.client.renderer.ActiveRenderInfo";
 	static final String BIOME_GEN_BASE = "net.minecraft.world.biome.BiomeGenBase";
 	static final String LONG_HASH_MAP = "net.minecraft.util.LongHashMap";
+	static final String WORLD = "net.minecraft.world.World";
 
 	static HashSet<String> FUNCTION_NAMES;
 
@@ -51,6 +52,9 @@ public class KronosTransformer implements IClassTransformer {
 		switch (transformedName) {
 			case LONG_HASH_MAP:
 				return LongHashMapHook.rewriteHashMapClass();
+			case WORLD:
+				replaceClassMethod(MINECRAFT_HOOK, "getLightBrightnessForSkyBlocks", "a", "()V", reference, false);
+				break;
 			case RENDER_GLOBAL:
 				// Redirect terrain rendering calls.
 				replaceClassMethod(RENDER_GLOBAL_HOOK, "loadRenderers", "a", "()V", reference, true);
@@ -153,6 +157,12 @@ public class KronosTransformer implements IClassTransformer {
 		FUNCTION_NAMES.add("glNewList");
 		FUNCTION_NAMES.add("glEndList");
 		FUNCTION_NAMES.add("glCallList");
+
+		FUNCTION_NAMES.add("glFog");
+		FUNCTION_NAMES.add("glFogf");
+		FUNCTION_NAMES.add("glFogi");
+
+		FUNCTION_NAMES.add("update");
 	}
 
 	static void avoidDoublePassBullshit(byte[][] basicClass) {

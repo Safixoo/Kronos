@@ -29,7 +29,7 @@ public class FullBlockMesher {
 
 	public static final float[] SIDE_LIGHT_MULTIPLIER = new float[] { 0.5F, 1.0F, 0.8F, 0.8F, 0.6F, 0.6F };
 
-	public static void renderFaces(Block block, SectionCache cache, int x, int y, int z, boolean ambient, int drawSet, int blockId) {
+	public static void renderSolidCube(Block block, SectionCache cache, int x, int y, int z, boolean ambient, int drawSet, int blockId) {
 		if (drawSet == 0) {
 			return;
 		}
@@ -218,10 +218,10 @@ public class FullBlockMesher {
 		int blockZ = z - cache.blockZ;
 
 		int sectionIndex = SectionCache.sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
-		boolean solidBlock = BlocksFlags.SOLID[byteToUnsigned(SectionCache.SECTION_BLOCKS[sectionIndex][blockIndex])];
+		int solidBlock = BlocksFlags.SOLID_LIGHT_MASK[byteToUnsigned(SectionCache.SECTION_BLOCKS[sectionIndex][blockIndex])];
 
-		if (solidBlock) {
-			return 1;
+		if (solidBlock == 1) {
+			return solidBlock;
 		}
 
 		return ~1;
@@ -235,10 +235,10 @@ public class FullBlockMesher {
 		int blockZ = z - cache.blockZ;
 
 		int sectionIndex = SectionCache.sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
-		boolean solidBlock = BlocksFlags.SOLID[byteToUnsigned(SectionCache.SECTION_BLOCKS[sectionIndex][blockIndex])];
+		int solidBlock = BlocksFlags.SOLID_LIGHT_MASK[byteToUnsigned(SectionCache.SECTION_BLOCKS[sectionIndex][blockIndex])];
 
-		if (solidBlock) {
-			return (0 << 4) | 1;
+		if (solidBlock == 1) {
+			return (0 << 4) | solidBlock;
 		}
 
 		int skyLight = SectionCache.getNibble(SectionCache.SKY_LIGHT[sectionIndex], blockIndex);

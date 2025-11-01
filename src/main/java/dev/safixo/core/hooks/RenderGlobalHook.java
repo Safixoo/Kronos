@@ -4,12 +4,14 @@ import dev.safixo.client.render.ImprovedTessellator;
 import dev.safixo.client.render.pipelines.cloud.CloudRenderer;
 import dev.safixo.client.render.pipelines.terrain.SectionManager;
 import dev.safixo.client.render.vertex.VertexWriterManager;
+import dev.safixo.client.util.data.BlocksFlags;
 import dev.safixo.core.HookUtils;
 import net.minecraft.block.Block;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderGlobal;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.culling.ICamera;
+import net.minecraft.client.settings.GameSettings;
 import net.minecraft.entity.EntityLivingBase;
 import org.lwjgl.opengl.GL11;
 
@@ -25,12 +27,10 @@ public  class RenderGlobalHook {
 	public static SectionManager MANAGER;
 
 	public static boolean SHOULD_RELOAD;
-
 	public static boolean OPTIFINE_CHECKED = false;
 	public static boolean OPTIFINE_ACTIVE = false;
 
 	static float PARTIAL_TICK;
-	static boolean FIRST_PASS;
 
 	public static void loadRenderers(RenderGlobal renderGlobal) {
 		if (!OPTIFINE_CHECKED) {
@@ -42,13 +42,14 @@ public  class RenderGlobalHook {
 			SectionManager.destroyInstance();
 			clearBuffers();
 		} else {
-			Tessellator.instance = new ImprovedTessellator();
+			Tessellator.instance = ImprovedTessellator.TESSELLATOR;
 		}
 
 		MANAGER = SectionManager.getCurrentInstance();
+		GameSettings gameSettings = Minecraft.getMinecraft().gameSettings;
 
-		Block.leaves.setGraphicsLevel(Minecraft.getMinecraft().gameSettings.fancyGraphics);
-		int renderDistance = Minecraft.getMinecraft().gameSettings.renderDistance;
+		Block.leaves.setGraphicsLevel(gameSettings.fancyGraphics);
+		int renderDistance = gameSettings.renderDistance;
 
 		((List<?>) HookUtils.getFieldObj(renderGlobal, "tileEntities", "field_72762_a")).clear();
 
@@ -88,12 +89,12 @@ public  class RenderGlobalHook {
 			realRenderDistance = (Integer) HookUtils.getFieldObj(minecraft.gameSettings, "ofRenderDistanceFine", "ofRenderDistanceFine") >> 4;
 		}
 
-		MANAGER.update(Minecraft.getMinecraft().theWorld, realRenderDistance, cameraX, cameraY, cameraZ, SHOULD_RELOAD, PARTIAL_TICK);
-
-		{
-			FIRST_PASS = true;
-			SHOULD_RELOAD = false;
+		if (BlocksFlags.DEV_ENVIRONMENT) {
+			Minecraft.getMinecraft().thePlayer.capabilities.setFlySpeed(0.25f);
 		}
+
+		MANAGER.update(Minecraft.getMinecraft().theWorld, realRenderDistance, cameraX, cameraY, cameraZ, SHOULD_RELOAD, PARTIAL_TICK);
+		SHOULD_RELOAD = false;
 
 		return true;
 	}
@@ -112,41 +113,25 @@ public  class RenderGlobalHook {
 	public static void sortAndRender(RenderGlobal global, EntityLivingBase player, int renderPass, double partialTick) {
 		Minecraft minecraft = Minecraft.getMinecraft();
 
-		if (!FIRST_PASS) {
-			return;
-		}
-
 		// Enable lightmap.
 		minecraft.entityRenderer.enableLightmap(partialTick);
-
 		GL11.glEnable(GL11.GL_CULL_FACE);
 
 		if (renderPass == 0) {
 			// Render solid pass.
-			MANAGER.drawRenderPass(0);
+			MANAGER.drawRenderPass(renderPass);
 			HookUtils.setField(global, "renderersBeingRendered", "field_72746_N", MANAGER.drawnSolidRenderers);
 			MANAGER.drawnSolidRenderers = 0;
 		} else {
 			GL11.glDisable(GL11.GL_ALPHA_TEST);
-
-			FIRST_PASS = false;
-
-			// Render translucent passes.
-			if (minecraft.gameSettings.fancyGraphics) {
-				// Pre-pass, replace with correct sorting.
-				MANAGER.drawRenderPass(1);
-			}
-
 			GL11.glColorMask(true, true, true, true);
-			MANAGER.drawRenderPass(1);
-
+			MANAGER.drawRenderPass(renderPass);
 			GL11.glEnable(GL11.GL_ALPHA_TEST);
 		}
 
-		GL11.glDisable(GL11.GL_CULL_FACE);
-
 		// Disable lightmap.
 		minecraft.entityRenderer.disableLightmap(partialTick);
+		GL11.glDisable(GL11.GL_CULL_FACE);
 	}
 
 	public static void renderAllSortedRenderers(RenderGlobal renderGlobal, int pass, double tick) {

@@ -8,7 +8,9 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.EntityClientPlayerMP;
 import net.minecraft.client.multiplayer.WorldClient;
 import net.minecraft.entity.player.InventoryPlayer;
+import net.minecraft.item.Item;
 import net.minecraft.item.ItemEgg;
+import net.minecraft.item.ItemStack;
 import net.minecraft.profiler.Profiler;
 import net.minecraft.world.World;
 import org.lwjgl.input.Keyboard;
@@ -24,14 +26,10 @@ import dev.safixo.client.util.Direction;
 import dev.safixo.client.util.MathExt;
 
 public class SectionManager {
-	private static final boolean GENERATE_SECTIONS_MANUALLY = false;
 	private static final int MAX_UPDATE_QUEUES = 30;
+	private static final Item DEBUG_ITEM = null;
 
-	private final Long2ObjectOpenHashMap<SectionRender> sectionMap = new Long2ObjectOpenHashMap<>(4096);
-
-	// Basically if there is a lot of queued sections and the player is not even active yet,
-	// instead of discarding sections save them in an array to check later.
-	private final LongArrayFIFOQueue queuedSections = new LongArrayFIFOQueue();
+	private final Long2ReferenceOpenHashMap<SectionRender> sectionMap = new Long2ReferenceOpenHashMap<>(4096);
 
 	// The generation logic is fucked up so is simply complemented with some extra structures.
 	private final LongOpenHashSet chunkExistence = new LongOpenHashSet();
@@ -46,8 +44,7 @@ public class SectionManager {
 	private double lastRemoveX, lastRemoveZ;
 	private int renderDistance;
 
-	private long vramUsed;
-	private long vramAllocated;
+	private long vramUsed, vramAllocated;
 	public int drawnSolidRenderers;
 
 	private final long[] lastFrameSamples = new long[32];
@@ -100,7 +97,7 @@ public class SectionManager {
 	public void removeRender(int posX, int posY, int posZ) {
 		long position = MathExt.asLong(posX, posY, posZ);
 
-		SectionRender sectionRender = this.sectionMap.containsKey(position) ? this.sectionMap.remove(position) : null;
+		SectionRender sectionRender = this.sectionMap.remove(position);
 
 		if (sectionRender != null) {
 			sectionRender.clearAllocations();
@@ -132,26 +129,8 @@ public class SectionManager {
 		return (this.vramAllocated / 1024L) / 1024L;
 	}
 
-	public void prepareRender(int posX, int posY, int posZ) {
-		this.prepareRender(posX, posY, posZ, false);
-	}
-
 	public void markDirty(int posX, int posY, int posZ) {
-		this.prepareRender(posX, posY, posZ, true);
-	}
-
-	public void prepareRender(int posX, int posY, int posZ, boolean markDirty) {
 		long position = MathExt.asLong(posX, posY, posZ);
-
-		if (this.camera == null) {
-			return;
-		}
-
-		CameraData camera = this.camera;
-
-		if (MathExt.squaredDistanceXZ(posX * 16, posZ * 16, camera) > MathExt.square(camera.renderDistance * 16)) {
-			return;
-		}
 
 		SectionRender sectionRender = this.sectionMap.get(position);
 
@@ -159,13 +138,10 @@ public class SectionManager {
 			sectionRender = new SectionRender(posX * 16, posY * 16, posZ * 16);
 
 			this.sectionMap.put(position, sectionRender);
-			this.chunkExistence.add(MathExt.asLong(posX, posZ));
 			this.connectNeighbors(sectionRender);
 		}
 
-		if (markDirty) {
-			sectionRender.flags = SectionFlags.setDirty(sectionRender.flags, true);
-		}
+		sectionRender.flags = SectionFlags.setDirty(sectionRender.flags, true);
 
 		if (this.camera != null && MathExt.squaredDistanceXZ(sectionRender, this.camera) < MathExt.square(24.0f)) {
 			UpdateQueue.addToQueue(sectionRender);
@@ -190,6 +166,7 @@ public class SectionManager {
 		this.regionManager.update(this.camera, renderDistance, worldChanged);
 
 		FrustumCuller.addFractToCamera(this.camera.fractX, this.camera.fractY, this.camera.fractZ);
+		Profiler profiler = Minecraft.getMinecraft().mcProfiler;
 
 		if (this.renderDistance != renderDistance || worldChanged) {
 			this.renderDistance = renderDistance;
@@ -201,12 +178,16 @@ public class SectionManager {
 
 			this.worldObj = world;
 
-			this.clearRenderer();
-			this.generateWholeVolume(cameraX, cameraZ);
+			if (!this.sectionMap.isEmpty()) {
+				this.clearRenderer();
+				this.generateWholeVolume(cameraX, cameraZ);
+			}
 		}
 
 		double diffX = MathExt.square(cameraX - this.lastUpdateX);
 		double diffZ = MathExt.square(cameraZ - this.lastUpdateZ);
+
+		profiler.endStartSection("compiling");
 
 		if (diffX + diffZ >= MathExt.square(4.0)) {
 			this.generateSections();
@@ -214,13 +195,18 @@ public class SectionManager {
 
 		EntityClientPlayerMP playerLocal = Minecraft.getMinecraft().thePlayer;
 		InventoryPlayer inventory = playerLocal.inventory;
-		Profiler profiler = Minecraft.getMinecraft().mcProfiler;
 
 		profiler.endStartSection("culling");
 
-		if (inventory == null || inventory.getCurrentItem() == null || !(inventory.getCurrentItem().getItem() instanceof ItemEgg)) {
-			extractFogData();
+		Item playerItem = null;
 
+		if (inventory != null && inventory.getCurrentItem() != null) {
+			playerItem = inventory.getCurrentItem().getItem();
+		}
+
+		// For debugging occ culling.
+		//noinspection ConstantValue
+		if (playerItem != DEBUG_ITEM || DEBUG_ITEM == null) {
 			this.bfsCuller.init(this.regionManager, this.camera.intX, this.camera.intZ, renderDistance);
 			this.bfsCuller.updateRenderList(this.sectionMap, this.camera);
 		}
@@ -228,21 +214,6 @@ public class SectionManager {
 		profiler.endStartSection("updatechunks");
 
 		this.queueRebuilds(partialTick);
-	}
-
-	// This is done as injecting with ASM to get fog properties is harder and a
-	// trivial way to get fog parameters without affecting *too* much performance
-	// is simply using glGetFloat.
-	private static void extractFogData() {
-		FogData.FOG_END = GL11.glGetFloat(GL11.GL_FOG_END);
-		FogData.FOG_START = GL11.glGetFloat(GL11.GL_FOG_START);
-
-		Minecraft minecraft = Minecraft.getMinecraft();
-
-		FogData.FOG_COLOR[0] = (Float) HookUtils.getFieldObj(minecraft.entityRenderer, "fogColorRed", "field_78518_n");
-		FogData.FOG_COLOR[1] = (Float) HookUtils.getFieldObj(minecraft.entityRenderer, "fogColorGreen", "field_78519_o");
-		FogData.FOG_COLOR[2] = (Float) HookUtils.getFieldObj(minecraft.entityRenderer, "fogColorBlue", "field_78533_p");
-		FogData.FOG_COLOR[3] = 1.0f;
 	}
 
 	private static CameraData extractCameraData(double cameraX, double cameraY, double cameraZ, int renderDistance) {
@@ -338,6 +309,8 @@ public class SectionManager {
 			return;
 		}
 
+		LongOpenHashSet forRemoval = new LongOpenHashSet();
+
 		// We scan all the render distance volume and if the diff between the last camera pos summed the xz
 		// pos index of the render distance volume goes out of bounds from the xz min-max index it means
 		// that it's a new or old section.
@@ -355,41 +328,40 @@ public class SectionManager {
 				int safeDistanceCheck = Math.max(0, renderDistance - 5);
 				long position = MathExt.asLong(chunkX, chunkZ);
 
-				if (GENERATE_SECTIONS_MANUALLY) {
-					// Add new sections in distance.
-					if (newX >= safeDistanceCheck) {
-						this.lastUpdateX = this.camera.cameraXD();
+				// Add new sections in distance.
+				if (newX >= safeDistanceCheck) {
+					this.lastUpdateX = this.camera.cameraXD();
 
-						if (!this.chunkExistence.contains(position)) {
-							for (int y = 0; y < 16; y++) {
-								this.prepareRender(chunkX, y, chunkZ);
-							}
-
-							this.chunkExistence.add(position);
+					if (!this.chunkExistence.contains(position)) {
+						for (int y = 0; y < 16; y++) {
+							this.markDirty(chunkX, y, chunkZ);
 						}
+
+						this.chunkExistence.add(position);
 					}
-					if (newZ >= safeDistanceCheck) {
-						if (!this.chunkExistence.contains(position)) {
-							this.lastUpdateZ = this.camera.cameraZD();
+				}
+				if (newZ >= safeDistanceCheck) {
+					if (!this.chunkExistence.contains(position)) {
+						this.lastUpdateZ = this.camera.cameraZD();
 
-							for (int y = 0; y < 16; y++) {
-								this.prepareRender(chunkX, y, chunkZ);
-							}
-
-							this.chunkExistence.add(position);
+						for (int y = 0; y < 16; y++) {
+							this.markDirty(chunkX, y, chunkZ);
 						}
+
+						this.chunkExistence.add(position);
 					}
 				}
 
+
 				// Remove distant sections.
-				if (oldX >= renderDistance && !ChunkListener.canLoadChunk(chunkX, chunkZ)) {
+				if (oldX >= renderDistance) {
 					this.lastRemoveX = this.camera.cameraXD();
 
 					for (int y = 0; y < 16; y++) {
 						this.removeRender(chunkX, y, chunkZ);
 					}
 					this.chunkExistence.remove(position);
-				} else if (oldZ >= renderDistance && !ChunkListener.canLoadChunk(chunkX, chunkZ)) {
+				} else if (oldZ >= renderDistance) {
 					this.lastRemoveZ = this.camera.cameraZD();
 
 					for (int y = 0; y < 16; y++) {
@@ -402,15 +374,18 @@ public class SectionManager {
 	}
 
 	private void generateWholeVolume(double cameraX, double cameraZ) {
-		int cameraChunkX = (int) cameraX >> 4;
-		int cameraChunkZ = (int) cameraZ >> 4;
+		int cameraChunkX = MathExt.posToSectionIntegral(cameraX);
+		int cameraChunkZ = MathExt.posToSectionIntegral(cameraZ);
 
-		int renderDistance = this.renderDistance;
+		int renderDistance = this.renderDistance + 2;
+		LongOpenHashSet chunkExistence = this.chunkExistence;
 
 		for (int x = -renderDistance; x <= renderDistance; x++) {
 			for (int z = -renderDistance; z <= renderDistance; z++) {
+				chunkExistence.add(MathExt.asLong(x, z));
+
 				for (int y = 0; y < 16; y++) {
-					this.prepareRender(cameraChunkX + x , y, cameraChunkZ + z);
+					this.markDirty(cameraChunkX + x , y, cameraChunkZ + z);
 				}
 			}
 		}
@@ -418,6 +393,7 @@ public class SectionManager {
 
 	private void clearRenderer() {
 		this.sectionMap.clear();
+		this.chunkExistence.clear();
 	}
 
 	public void drawRenderPass(int renderPass) {

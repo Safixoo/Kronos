@@ -76,7 +76,7 @@ public class BFSCuller {
 		return false;
 	}
 
-	public void updateRenderList(Long2ObjectOpenHashMap<SectionRender> sectionMap, CameraData camera) {
+	public void updateRenderList(Long2ReferenceOpenHashMap<SectionRender> sectionMap, CameraData camera) {
 		int chunkX = MathExt.floor(camera.intX);
 		int chunkY = MathExt.clamp(MathExt.floor(camera.intY), 0, 255);
 		int chunkZ = MathExt.floor(camera.intZ);

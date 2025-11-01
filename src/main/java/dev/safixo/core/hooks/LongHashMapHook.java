@@ -33,7 +33,7 @@ public class LongHashMapHook {
 		mv.visitFieldInsn(PUTFIELD, "net/minecraft/util/LongHashMap", "map",
 			"Lit/unimi/dsi/fastutil/longs/Long2ReferenceMap;");
 		mv.visitInsn(RETURN);
-		mv.visitMaxs(3, 1);
+		mv.visitMaxs(0, 0);
 		mv.visitEnd();
 
 		// public int getNumHashElements() { return this.map.size(); }
@@ -46,7 +46,7 @@ public class LongHashMapHook {
 		mv.visitMethodInsn(INVOKEINTERFACE, "it/unimi/dsi/fastutil/longs/Long2ReferenceMap",
 			"size", "()I");
 		mv.visitInsn(IRETURN);
-		mv.visitMaxs(1, 1);
+		mv.visitMaxs(0, 0);
 		mv.visitEnd();
 
 		// public Object getValueByKey(long key) { return this.map.get(key); }
@@ -60,7 +60,7 @@ public class LongHashMapHook {
 		mv.visitMethodInsn(INVOKEINTERFACE, "it/unimi/dsi/fastutil/longs/Long2ReferenceMap",
 			"get", "(J)Ljava/lang/Object;");
 		mv.visitInsn(ARETURN);
-		mv.visitMaxs(3, 3);
+		mv.visitMaxs(0, 0);
 		mv.visitEnd();
 
 		// public boolean containsItem(long key) { return this.map.containsKey(key); }
@@ -74,7 +74,7 @@ public class LongHashMapHook {
 		mv.visitMethodInsn(INVOKEINTERFACE, "it/unimi/dsi/fastutil/longs/Long2ReferenceMap",
 			"containsKey", "(J)Z");
 		mv.visitInsn(IRETURN);
-		mv.visitMaxs(3, 3);
+		mv.visitMaxs(0, 0);
 		mv.visitEnd();
 
 		// public void add(long key, Object obj) { this.map.put(key, obj); }
@@ -90,7 +90,7 @@ public class LongHashMapHook {
 			"put", "(JLjava/lang/Object;)Ljava/lang/Object;");
 		mv.visitInsn(POP);
 		mv.visitInsn(RETURN);
-		mv.visitMaxs(4, 4);
+		mv.visitMaxs(0, 0);
 		mv.visitEnd();
 
 		// public Object remove(long key) { return this.map.remove(key); }
@@ -104,7 +104,7 @@ public class LongHashMapHook {
 		mv.visitMethodInsn(INVOKEINTERFACE, "it/unimi/dsi/fastutil/longs/Long2ReferenceMap",
 			"remove", "(J)Ljava/lang/Object;");
 		mv.visitInsn(ARETURN);
-		mv.visitMaxs(3, 3);
+		mv.visitMaxs(0, 0);
 		mv.visitEnd();
 
 		cw.visitEnd();

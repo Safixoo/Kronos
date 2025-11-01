@@ -3,118 +3,112 @@ package dev.safixo.client.render.pipelines.terrain.meshing;
 import dev.safixo.client.render.pipelines.terrain.SectionManager;
 import dev.safixo.client.util.MathExt;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.WorldClient;
 import net.minecraft.client.renderer.RenderGlobal;
+import net.minecraft.world.chunk.Chunk;
+import net.minecraft.world.chunk.EmptyChunk;
 
 public class ChunkListener {
-	// Available sections.
-	private static final LongOpenHashSet AVAILABLE_SECTIONS = new LongOpenHashSet();
+	// Loaded chunks.
+	private static final LongOpenHashSet LOADED_CHUNKS = new LongOpenHashSet(2048, 0.5F);
 
-	// Available sections with all neighbors.
-	private static final LongOpenHashSet LOADABLE_SECTIONS = new LongOpenHashSet();
+	// Loaded chunks with neighbors.
+	private static final LongOpenHashSet READY_CHUNKS = new LongOpenHashSet(2048, 0.5F);
 
-	private static long LAST_REQUEST;
-	private static boolean LAST_RESULT;
+	public static boolean canUnloadChunk(int chunkX, int chunkZ) {
+		long position = MathExt.asLong(chunkX, chunkZ);
 
-	public static void unloadRenderChunk(int chunkX, int chunkZ) {
-
-	}
-
-	public static boolean canLoadChunk(int sectionX, int sectionZ) {
-		long position = MathExt.asLong(sectionX, sectionZ);
-		boolean result;
-
-		if (position != LAST_REQUEST) {
-			LAST_REQUEST = position;
-			result = LAST_RESULT = LOADABLE_SECTIONS.contains(MathExt.asLong(sectionX, sectionZ));
-		} else {
-			result = LAST_RESULT;
+		if (!READY_CHUNKS.contains(position)) {
+			return true;
 		}
 
-		return result;
-	}
+		WorldClient world = Minecraft.getMinecraft().theWorld;
 
-	private static void checkChunkSurrounding(int chunkX, int chunkZ, boolean loadNeighbors) {
-		int minChunkX = chunkX - 1;
-		int minChunkZ = chunkZ - 1;
+		for (int x = chunkX - 1; x <= chunkX + 1; x++) {
+			for (int z = chunkZ - 1; z <= chunkZ + 1; z++) {
+				boolean chunkLoaded = LOADED_CHUNKS.contains(position);
 
-		int maxChunkX = chunkX + 1;
-		int maxChunkZ = chunkZ + 1;
+				if (chunkLoaded) {
+					Chunk chunk = world.getChunkFromChunkCoords(x, z);
 
-		boolean canLoad = true;
+					if (chunk.getClass() != EmptyChunk.class && chunk.isChunkLoaded) {
+						return false;
+					}
 
-		for (int chunkOffX = minChunkX; chunkOffX <= maxChunkX; chunkOffX++) {
-			for (int chunkOffZ = minChunkZ; chunkOffZ <= maxChunkZ; chunkOffZ++) {
-				long position = MathExt.asLong(chunkOffX, chunkOffZ);
-
-				if (!AVAILABLE_SECTIONS.contains(position)) {
-					canLoad = false;
-				}
-
-				if (loadNeighbors) {
-					checkChunkSurrounding(chunkOffX, chunkOffZ, false);
+					LOADED_CHUNKS.remove(position);
 				}
 			}
 		}
 
-		SectionManager manager = SectionManager.getCurrentInstance();
-		long position = MathExt.asLong(chunkX, chunkZ);
-
-		if (canLoad && !LOADABLE_SECTIONS.contains(position)) {
-			for (int y = 0; y < 16; y++) {
-				manager.markDirty(chunkX, y, chunkZ);
-			}
-			LOADABLE_SECTIONS.add(position);
-		}
+		READY_CHUNKS.remove(position);
+		return true;
 	}
 
-	// For each chunk ingest check surrounding,
-	public static void loadRenderChunk(int chunkX, int chunkZ) {
+	public static boolean canLoadChunk(int chunkX, int chunkZ) {
 		long position = MathExt.asLong(chunkX, chunkZ);
 
-		if (!LOADABLE_SECTIONS.contains(position)) {
-			AVAILABLE_SECTIONS.add(position);
-			checkChunkSurrounding(chunkX, chunkZ, true);
+		if (READY_CHUNKS.contains(position)) {
+			return true;
 		}
+
+		WorldClient world = Minecraft.getMinecraft().theWorld;
+
+		for (int x = chunkX - 1; x <= chunkX + 1; x++) {
+			for (int z = chunkZ - 1; z <= chunkZ + 1; z++) {
+				boolean chunkLoaded = LOADED_CHUNKS.contains(position);
+
+				if (!chunkLoaded) {
+					Chunk chunk = world.getChunkFromChunkCoords(x, z);
+
+					if (!chunk.isChunkLoaded) {
+						return false;
+					}
+
+					LOADED_CHUNKS.add(position);
+				}
+			}
+		}
+
+		READY_CHUNKS.add(position);
+		return true;
 	}
 
 	public static void clearData() {
-		AVAILABLE_SECTIONS.clear();
-		LOADABLE_SECTIONS.clear();
+		LOADED_CHUNKS.clear();
+		READY_CHUNKS.clear();
 	}
 
 	public static void notifyBlockUpdateRange(int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
 		minY = MathExt.clamp(minY, 0, 255);
 		maxY = MathExt.clamp(maxY, 0, 255);
 
-		minX = MathExt.posToSectionIntegral(minX >> 4);
-		minY = MathExt.posToSectionIntegral(minY >> 4);
-		minZ = MathExt.posToSectionIntegral(minZ >> 4);
-
-		maxX = MathExt.posToSectionIntegral(maxX >> 4);
-		maxY = MathExt.posToSectionIntegral(maxY >> 4);
-		maxZ = MathExt.posToSectionIntegral(maxZ >> 4);
+		minX >>= 4; maxX >>= 4;
+		minY >>= 4; maxY >>= 4;
+		minZ >>= 4; maxZ >>= 4;
 
 		SectionManager manager = SectionManager.getCurrentInstance();
 
 		for (int x = minX; x <= maxX; x++) {
 			for (int z = minZ; z <= maxZ; z++) {
-				for (int y = minY; y <= maxY; y++) {
-					if (LOADABLE_SECTIONS.contains(MathExt.asLong(x >> 4, z >> 4))) {
-						continue;
-					}
 
+				if (!ChunkListener.canLoadChunk(x, z)) {
+					continue;
+				}
+
+				for (int y = minY; y <= maxY; y++) {
 					manager.markDirty(x, y, z);
 				}
 			}
 		}
 	}
 
-	public static void markBlockForUpdate(RenderGlobal renderGlobal, int minX, int minY, int minZ) {
-		notifyBlockUpdateRange(minX - 1, minY - 1, minZ - 1, minX + 1, minY + 1, minZ + 1);
+	public static void markBlockForUpdate(RenderGlobal renderGlobal, int x, int y, int z) {
+		notifyBlockUpdateRange(x - 1, y - 1, z - 1, x + 1, y + 1, z + 1);
 	}
 
-	public static void markBlockForRenderUpdate(RenderGlobal renderGlobal, int minX, int minY, int minZ) {
-		notifyBlockUpdateRange(minX - 1, minY - 1, minZ - 1, minX + 1, minY + 1, minZ + 1);
+	public static void markBlockForRenderUpdate(RenderGlobal renderGlobal, int x, int y, int z) {
+		notifyBlockUpdateRange(x - 1, y - 1, z - 1, x + 1, y + 1, z + 1);
 	}
 
 	public static void markBlockRangeForRenderUpdate(RenderGlobal renderGlobal, int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {

@@ -10,7 +10,6 @@ public class RegionBuffer extends RenderBuffer {
 
 	@Override
 	public void clear() {
-		SectionManager.getCurrentInstance().removeMemory(this.getCapacity());
 		super.clear();
 	}
 

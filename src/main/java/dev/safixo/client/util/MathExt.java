@@ -50,6 +50,14 @@ public class MathExt {
 		return MathExt.square(distX) + MathExt.square(distZ);
 	}
 
+	public static int chunkX(long position) {
+		return (int) (position & 0xFFFFFFFFL);
+	}
+
+	public static int chunkZ(long position) {
+		return (int) (position >>> 32L);
+	}
+
 	public static int sectionX(long position) {
 		return (int) ((position >>> 12) & 0x3FFFFFF);
 	}
@@ -67,7 +75,7 @@ public class MathExt {
 	}
 
 	public static long asLong(int x, int z) {
-		return (x & 0xFFFFFFFFL) | (z & 0xFFFFFFFFL) << 32L;
+		return (x & 0xFFFFFFFFL) << 0L | (z & 0xFFFFFFFFL) << 32L;
 	}
 
 	public static double square(double num) {
@@ -132,11 +140,6 @@ public class MathExt {
 	public static int posToSectionIntegral(double position) {
 		return MathExt.floor(position) >> 4;
 	}
-
-	public static int posToSectionIntegral(int position) {
-		return position >> 4;
-	}
-
 
 	public static double smoothStep(double t) {
 		return t * t * (3.0f - 2.0f * t);

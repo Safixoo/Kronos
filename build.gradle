@@ -58,15 +58,15 @@ jar {
 tasks.named("runClient") {
     jvmArgs += ["-Dfml.coreMods.load=dev.safixo.KronosCoreMod"]
 
-    args = [
-            "--username", "\${auth_player_name}",
-            "--session", "\${auth_session}",
-            "--version", "1.6.4",
-            "--gameDir", "\${game_directory}",
-            "--assetsDir", "\${game_assets}",
-            "--tweakClass", "cpw.mods.fml.common.launcher.FMLTweaker",
-            "--tweakClass", "dev.safixo.core.LWJGLTweak"
-    ]
+//    args = [
+//            "--username", "\${auth_player_name}",
+//            "--session", "\${auth_session}",
+//            "--version", "1.6.4",
+//            "--gameDir", "\${game_directory}",
+//            "--assetsDir", "\${game_assets}",
+//            "--tweakClass", "cpw.mods.fml.common.launcher.FMLTweaker",
+//            "--tweakClass", "dev.safixo.core.LWJGLTweak"
+//    ]
 }
 
 tasks.withType(JavaExec).configureEach {

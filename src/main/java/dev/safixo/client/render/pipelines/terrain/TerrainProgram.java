@@ -1,19 +1,26 @@
 package dev.safixo.client.render.pipelines.terrain;
 
 import dev.safixo.client.render.gfx.shader.GlProgram;
+import dev.safixo.client.util.memory.NativeBuffer;
+import dev.safixo.core.hooks.GlStateManager;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiNewChat;
+import org.lwjgl.Sys;
+import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL20;
 import dev.safixo.client.render.pipelines.terrain.cull.FrustumCuller;
 import dev.safixo.client.util.data.CameraData;
 import dev.safixo.client.util.data.FogData;
 import dev.safixo.client.render.vertex.writers.TerrainFormat;
 
+import java.nio.Buffer;
+import java.nio.FloatBuffer;
+
 public class TerrainProgram extends GlProgram {
 	private int u_RegionPos;
 	private int u_TexId, u_LightTex;
 	private int u_ProjMat, u_ModelViewMat;
-	private int u_FogEnd, u_FogStart, u_FogColor;
+	private int u_FogNegInvRadius, u_FogEndInvRad, u_FogColor;
 
 	public TerrainProgram() {
 		super("terrain/terrain_vertex.glsl", "terrain/terrain_fragment.glsl");
@@ -28,13 +35,15 @@ public class TerrainProgram extends GlProgram {
 		this.u_TexId = GL20.glGetUniformLocation(this.getHandle(), "u_TexId");
 		this.u_LightTex = GL20.glGetUniformLocation(this.getHandle(), "u_LightTex");
 
-		this.u_FogEnd = GL20.glGetUniformLocation(this.getHandle(), "u_FogEnd");
-		this.u_FogStart = GL20.glGetUniformLocation(this.getHandle(), "u_FogStart");
+		this.u_FogEndInvRad = GL20.glGetUniformLocation(this.getHandle(), "u_FogEndInvRad");
+		this.u_FogNegInvRadius = GL20.glGetUniformLocation(this.getHandle(), "u_FogNegInvRadius");
 		this.u_FogColor = GL20.glGetUniformLocation(this.getHandle(), "u_FogColor");
 
 		this.u_ProjMat = GL20.glGetUniformLocation(this.getHandle(), "u_ProjMat");
 		this.u_ModelViewMat = GL20.glGetUniformLocation(this.getHandle(), "u_ModelViewMat");
 	}
+
+	private static final FloatBuffer TEMP_BUFFER = NativeBuffer.memAllocFloat(16);
 
 	public void setupUniforms(boolean noFog) {
 		GL20.glUniformMatrix4(this.u_ProjMat, false, FrustumCuller.projectionBuff);
@@ -43,12 +52,23 @@ public class TerrainProgram extends GlProgram {
 		GL20.glUniform1i(this.u_TexId, 0);
 		GL20.glUniform1i(this.u_LightTex, 1);
 
-		GL20.glUniform1f(this.u_FogEnd, noFog ? 1E+12F : FogData.FOG_END);
-		GL20.glUniform1f(this.u_FogStart, noFog ? 1E+12F : FogData.FOG_START);
+		// (u_FogEnd - v_Distance) / (u_FogEnd - u_FogStart)
+		// (u_FogNegInvRadius * v_Distance) + u_FogEndNegInvRadius;
 
-		float[] fogColor = FogData.FOG_COLOR;
+		float start = GlStateManager.FOG_START;
+		float end = GlStateManager.FOG_END;
 
-		GL20.glUniform4f(this.u_FogColor, fogColor[0], fogColor[1], fogColor[2], fogColor[3]);
+		float radius = end - start;
+		float fogNegInvRadius = 1.0F / radius;
+		float fogEndInvRad = end * fogNegInvRadius;
+
+		GL20.glUniform1f(this.u_FogEndInvRad, noFog ? 1E+12F : fogEndInvRad);
+		GL20.glUniform1f(this.u_FogNegInvRadius, noFog ? 1E+12F : -fogNegInvRadius);
+
+		GL11.glGetFloat(GL11.GL_FOG_COLOR, TEMP_BUFFER);
+		((Buffer)TEMP_BUFFER).rewind();
+
+		GL20.glUniform3f(this.u_FogColor, GlStateManager.FOG_COLOR_R, GlStateManager.FOG_COLOR_G, GlStateManager.FOG_COLOR_B);
 	}
 
 	public void setupRegionOffset(CameraData camera, int regionX, int regionY, int regionZ) {

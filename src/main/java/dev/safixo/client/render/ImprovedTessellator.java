@@ -23,6 +23,8 @@ import java.util.Arrays;
 // - Compacts vertex format based in the used attributes (vanilla uses 32-byte at all times).
 // - Overall more optimized and clean code.
 public class ImprovedTessellator extends Tessellator {
+	public static final ImprovedTessellator TESSELLATOR = new ImprovedTessellator();
+
 	private static final int UNDEFINED_FORMAT = 12; // start position after position attribute.
 	private static final int UNDEFINED_VERTEX_ARRAY = -1;
 
@@ -33,7 +35,7 @@ public class ImprovedTessellator extends Tessellator {
 
 	private static final int MIN_ALLOC = 1024 * 128;
 
-	private GlVertexBuffer vertexBuffer = new GlVertexBuffer(MIN_ALLOC, GL15.GL_STATIC_DRAW);
+	private final GlVertexBuffer vertexBuffer = new GlVertexBuffer(MIN_ALLOC, GL15.GL_STREAM_DRAW);
 
 	private boolean disabledColor;
 	public int drawMode, flags, capacity = MIN_ALLOC;
@@ -167,6 +169,7 @@ public class ImprovedTessellator extends Tessellator {
 		int vertexArray = packedData & 0xFFFFF;
 
 		GlVertexArrayObject.bindVertexArray(vertexArray);
+
 		this.vertexBuffer.bufferData(this.vertexPtrNio, offset);
 		this.vertexBuffer.draw(drawMode, vertices, 0);
 	}

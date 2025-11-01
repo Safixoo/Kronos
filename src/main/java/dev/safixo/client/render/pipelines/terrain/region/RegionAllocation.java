@@ -11,7 +11,7 @@ import dev.safixo.client.render.vertex.writers.TerrainFormat;
 
 public class RegionAllocation {
 	private static final int SPARE_BUFFER_ALLOC = 1024 * 1024 * 64;
-	private static final int MIN_ALLOC = 1024 * 256;
+	private static final int MIN_ALLOC = 1024 * 1024;
 	private static final int STRIDE = TerrainFormat.STRIDE;
 
 	public RegionBuffer vertexBuffer;
@@ -32,7 +32,7 @@ public class RegionAllocation {
 		int newCapacity = Math.max(MIN_ALLOC, size);
 
 		if (SPARE_BUFFER == null) {
-			SPARE_BUFFER = new RenderBuffer(SPARE_BUFFER_ALLOC, GL15.GL_DYNAMIC_COPY);
+			SPARE_BUFFER = new RenderBuffer(SPARE_BUFFER_ALLOC, GL15.GL_STREAM_COPY);
 		}
 
 		this.vertexBuffer = new RegionBuffer(newCapacity, GL15.GL_STATIC_DRAW);
@@ -41,7 +41,7 @@ public class RegionAllocation {
 	}
 
 	public long getAmplification(long size) {
-		return (size * 3) >>> 1;
+		return (size << 1);
 	}
 
 	public void resize(long size) {
@@ -143,6 +143,7 @@ public class RegionAllocation {
 
 	// Returns first << 32 | count.
 	public long allocate(SectionRender render, long vertexData, int size, int side) {
+		SectionManager.getCurrentInstance().addUsedMemory(size * STRIDE);
 		Allocation alloc = this.fitInFree(size);
 
 		if (alloc == null) {
@@ -159,8 +160,6 @@ public class RegionAllocation {
 	private Allocation allocateNew(SectionRender render, int size, int side) {
 		long maxOffset = this.offset / STRIDE;
 		int sizeInBytes = size * STRIDE;
-
-		SectionManager.getCurrentInstance().addUsedMemory(size * TerrainFormat.STRIDE);
 
 		if (this.offset + sizeInBytes > this.capacity) {
 			this.resize(this.offset + sizeInBytes);
@@ -191,6 +190,7 @@ public class RegionAllocation {
 			drawData = packDrawData(size, (int) alloc.offset);
 		} else {
 			if (alloc != null) {
+				SectionManager.getCurrentInstance().removeUsedMemory((long) alloc.size * STRIDE);
 				this.remove(render, side);
 			}
 			drawData = this.allocate(render, data, size, side);

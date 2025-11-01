@@ -203,7 +203,7 @@ public class SectionRender {
 			drawBitSet |= cache.isBlockOpaqueCubeCenter(blockIndex - makeBlockIndex(1,0,0)) << WEST;
 			drawBitSet |= cache.isBlockOpaqueCubeCenter(blockIndex + makeBlockIndex(1,0,0)) << EAST;
 
-			FullBlockMesher.renderFaces(block, cache, blockX, blockY, blockZ, ambient, ~drawBitSet, blockId);
+			FullBlockMesher.renderSolidCube(block, cache, blockX, blockY, blockZ, ambient, ~drawBitSet, blockId);
 		} else {
 			if (blockRenderPass != 0) {
 				VertexWriterManager.setCurrentInstance(VertexWriterManager.TRANSLUCENT);
@@ -258,7 +258,7 @@ public class SectionRender {
 			drawBitSet |= cache.isBlockOpaqueCubeRel(rX - 1, rY, rZ) << WEST;
 			drawBitSet |= cache.isBlockOpaqueCubeRel(rX + 1, rY, rZ) << EAST;
 
-			FullBlockMesher.renderFaces(block, cache, blockX, blockY, blockZ, ambient, ~drawBitSet, blockId);
+			FullBlockMesher.renderSolidCube(block, cache, blockX, blockY, blockZ, ambient, ~drawBitSet, blockId);
 		} else {
 			if (blockRenderPass != 0) {
 				VertexWriterManager.setCurrentInstance(VertexWriterManager.TRANSLUCENT);
@@ -269,10 +269,6 @@ public class SectionRender {
 			renderBlocks.renderBlockByRenderType(block, blockX, blockY, blockZ);
 		}
 	}
-
-
-	static long samples = 0;
-	static long timePassed = 0;
 
 	private void uploadMeshesToRegion(SectionManager sectionManager, VertexWriterManager translucentWriter, int sumVertices, int meshDrawOrder) {
 		if (sumVertices > 0) {
