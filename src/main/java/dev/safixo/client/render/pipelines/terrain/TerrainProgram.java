@@ -19,8 +19,9 @@ import java.nio.FloatBuffer;
 public class TerrainProgram extends GlProgram {
 	private int u_RegionPos;
 	private int u_TexId, u_LightTex;
-	private int u_ProjMat, u_ModelViewMat;
+	private int u_ProjMat, u_ModelViewMat, u_SunPos;
 	private int u_FogNegInvRadius, u_FogEndInvRad, u_FogColor;
+	private int u_Time, u_Pass;
 
 	public TerrainProgram() {
 		super("terrain/terrain_vertex.glsl", "terrain/terrain_fragment.glsl");
@@ -34,10 +35,13 @@ public class TerrainProgram extends GlProgram {
 		this.u_RegionPos = GL20.glGetUniformLocation(this.getHandle(), "u_RegionPos");
 		this.u_TexId = GL20.glGetUniformLocation(this.getHandle(), "u_TexId");
 		this.u_LightTex = GL20.glGetUniformLocation(this.getHandle(), "u_LightTex");
+		this.u_Time = GL20.glGetUniformLocation(this.getHandle(), "u_Time");
+		this.u_Pass = GL20.glGetUniformLocation(this.getHandle(), "u_Pass");
 
 		this.u_FogEndInvRad = GL20.glGetUniformLocation(this.getHandle(), "u_FogEndInvRad");
 		this.u_FogNegInvRadius = GL20.glGetUniformLocation(this.getHandle(), "u_FogNegInvRadius");
 		this.u_FogColor = GL20.glGetUniformLocation(this.getHandle(), "u_FogColor");
+		this.u_SunPos = GL20.glGetUniformLocation(this.getHandle(), "u_SunPos");
 
 		this.u_ProjMat = GL20.glGetUniformLocation(this.getHandle(), "u_ProjMat");
 		this.u_ModelViewMat = GL20.glGetUniformLocation(this.getHandle(), "u_ModelViewMat");
@@ -45,7 +49,7 @@ public class TerrainProgram extends GlProgram {
 
 	private static final FloatBuffer TEMP_BUFFER = NativeBuffer.memAllocFloat(16);
 
-	public void setupUniforms(boolean noFog) {
+	public void setupUniforms(int pass, boolean noFog) {
 		GL20.glUniformMatrix4(this.u_ProjMat, false, FrustumCuller.projectionBuff);
 		GL20.glUniformMatrix4(this.u_ModelViewMat, false, FrustumCuller.modelViewBuff);
 
@@ -69,6 +73,27 @@ public class TerrainProgram extends GlProgram {
 		((Buffer)TEMP_BUFFER).rewind();
 
 		GL20.glUniform3f(this.u_FogColor, GlStateManager.FOG_COLOR_R, GlStateManager.FOG_COLOR_G, GlStateManager.FOG_COLOR_B);
+
+		Minecraft mc = Minecraft.getMinecraft();
+
+		long worldTimeDay = mc.theWorld.getWorldInfo().getWorldTime() % 24_000;
+		long worldTime = worldTimeDay % 12_000;
+
+		if (worldTimeDay >= 12_000) {
+			worldTime = 12000 - worldTime;
+		}
+
+		float x = -(worldTime / 12.000f) * 2.0f - 1.0f;
+		float y = (float) Math.sqrt(square(6000) - square(Math.abs(worldTime) - 6000)) / 6000.0f;
+		float z = 0.5f;
+
+		GL20.glUniform3f(this.u_SunPos, x, y * 1.2f, z);
+		GL20.glUniform1f(this.u_Time, (System.nanoTime() / 2000.0f) % Integer.MAX_VALUE);
+		GL20.glUniform1i(this.u_Pass, pass);
+	}
+
+	private static float square(float a) {
+		return a * a;
 	}
 
 	public void setupRegionOffset(CameraData camera, int regionX, int regionY, int regionZ) {

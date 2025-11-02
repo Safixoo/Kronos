@@ -5,6 +5,7 @@ import dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache;
 import dev.safixo.client.util.MathExt;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockGrass;
+import net.minecraft.block.BlockLeaves;
 import net.minecraft.util.Icon;
 import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
 import dev.safixo.client.util.data.BlocksFlags;
@@ -24,6 +25,8 @@ public class FullBlockMesher {
 	private static final int[] SHADE_FULL_FACTOR = new int[Direction.COUNT];
 	private static final float[] VERT_UVS = new float[4];
 
+	public static boolean MESHING_LEAVES;
+
 	private static final Icon SIDE_GRASS_NON_OVERLAY = Block.grass.getIcon(5, 5);
 	private static final Vector2i[] MAP_ID_TO_UV = new Vector2i[4];
 
@@ -33,6 +36,8 @@ public class FullBlockMesher {
 		if (drawSet == 0) {
 			return;
 		}
+
+		MESHING_LEAVES = block instanceof BlockLeaves;
 
 		if (!BlocksFlags.DIRECT_CULL[blockId]) {
 			drawSet |= block.shouldSideBeRendered(cache, x, y - 1, z, 0) ? 1 << DOWN : 0;
@@ -58,7 +63,7 @@ public class FullBlockMesher {
 
 			boolean shouldColor = modelColor != 0xFFFFFF && blockId != Block.grass.blockID || dir == UP;
 
-			int blockColor = shouldColor ? ColorBGRManager.multiplyColor(modelColor, SHADE_FULL_FACTOR[dir]) : SHADE_FULL_COLOR[dir];
+			int blockColor = shouldColor ? modelColor : 0xFFFFFF;
 			int overlayColor = tex == SIDE_GRASS_NON_OVERLAY && !shouldColor ? ColorBGRManager.multiplyColorByColor(modelColor, blockColor) : blockColor;
 
 			final float[] uvs = VERT_UVS;
@@ -433,7 +438,7 @@ public class FullBlockMesher {
 
 		for (int i = 0; i < Direction.COUNT; i++) {
 			SHADE_FULL_COLOR[i] = ColorBGRManager.multiplyColor(0xFF_FF_FF, SIDE_LIGHT_MULTIPLIER[i]);
-			SHADE_FULL_FACTOR[i] = ColorBGRManager.normToFactor(SIDE_LIGHT_MULTIPLIER[i]);
+			SHADE_FULL_FACTOR[i] = ColorBGRManager.normToFactor(1.0f);
 		}
 	}
 }

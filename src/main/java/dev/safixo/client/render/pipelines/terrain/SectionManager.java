@@ -162,6 +162,8 @@ public class SectionManager {
 	}
 
 	public void update(WorldClient world, int renderDistance, double cameraX, double cameraY, double cameraZ, boolean worldChanged, float partialTick) {
+		boolean nullCamera = this.camera == null;
+
 		this.camera = extractCameraData(cameraX, cameraY, cameraZ, renderDistance);
 		this.regionManager.update(this.camera, renderDistance, worldChanged);
 
@@ -178,7 +180,7 @@ public class SectionManager {
 
 			this.worldObj = world;
 
-			if (!this.sectionMap.isEmpty()) {
+			if (nullCamera) {
 				this.clearRenderer();
 				this.generateWholeVolume(cameraX, cameraZ);
 			}
@@ -411,7 +413,7 @@ public class SectionManager {
 		this.lastEvent = Keyboard.getEventKey() == Keyboard.KEY_ADD;
 
 		this.terrainShader.useProgram();
-		this.terrainShader.setupUniforms(noFog);
+		this.terrainShader.setupUniforms(renderPass, noFog);
 
 		this.regionManager.drawAllRegions(this.terrainShader, this.bfsCuller.bfsQueue, this.camera, renderPass);
 		this.terrainShader.disableProgram();

@@ -1,6 +1,7 @@
 package dev.safixo.client.render.vertex.writers;
 
 import com.google.common.collect.ImmutableList;
+import dev.safixo.client.render.pipelines.terrain.meshing.FullBlockMesher;
 import dev.safixo.client.util.MathExt;
 import dev.safixo.client.util.memory.UnsafeUtil;
 import dev.safixo.client.render.vertex.VertexWriterManager;
@@ -77,7 +78,7 @@ public class TerrainFormat extends GlVertexFormat {
 		int intY = extractPos(y, FACT_Y);
 		int intZ = extractPos(z, FACT_Z);
 
-		long position = processPosition(intX, intY, intZ);
+		long position = processPosition(intX, intY, intZ) | (FullBlockMesher.MESHING_LEAVES ? 1L : 0L) << 63L;
 
 		UnsafeUtil.memPutLong(ptr, position);
 		UnsafeUtil.memPutInt(ptr + 8, processUv(u, v));

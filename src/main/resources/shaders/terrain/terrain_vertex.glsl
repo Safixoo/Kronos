@@ -8,7 +8,10 @@ in uint a_Lightmap;
 
 out vec3 v_Color;
 out vec2 v_TextureUv;
-out float v_Distance;
+out vec3 v_VertPos;
+
+uniform float u_Time;
+uniform int u_Pass;
 
 uniform vec3 u_RegionPos;
 uniform mat4 u_ProjMat;
@@ -45,13 +48,21 @@ vec2 lightmapUv(uint lightmap) {
     return max(vec2(1.0), uv - 0.5) * (1.0 / 15.0);
 }
 
+#define u_wave_speed 0.000003
+#define u_wave_amplitude 0.11
+#define u_wave_frequency 3.5
+
 void main() {
     vec3 blockPosition = extractBlockPos(a_Position);
-    vec4 position = u_ModelViewMat * vec4(blockPosition, 1.0);
 
-    gl_Position = u_ProjMat * position;
+    vec4 modeLViewPosition = u_ModelViewMat * vec4(blockPosition, 1.0);
 
-    v_Distance = length(position);
+    vec2 sineWave = sin(blockPosition.xz * u_wave_frequency + (vec2(u_Time) * u_wave_speed));
+    float extraY = u_Pass * sineWave.x * sineWave.y * u_wave_amplitude;
+
+    gl_Position = u_ProjMat * (modeLViewPosition + vec4(0, extraY, 0, 0));
+
+    v_VertPos = modeLViewPosition.xyz;
     v_Color = a_Color * texture(u_LightTex, lightmapUv(a_Lightmap)).rgb;
     v_TextureUv = a_Uv * (1.0 / 65536.0);
 }

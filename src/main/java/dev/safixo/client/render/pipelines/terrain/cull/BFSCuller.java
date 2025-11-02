@@ -69,7 +69,7 @@ public class BFSCuller {
 			return true;
 		}
 
-		if (distance >= MathExt.square(128) && SectionFlags.hasDrawableFaces(flags)) {
+		if (distance >= MathExt.square(64) && SectionFlags.hasDrawableFaces(flags)) {
 			return !visibleByRayCast(node.blockX + 8, node.blockY + 8, node.blockZ + 8, -distX, -distY, -distZ);
 		}
 
@@ -186,50 +186,25 @@ public class BFSCuller {
 		dy -= 8;
 		dz -= 8;
 
-		int voxelX = x1 >> 4;
-		int voxelY = y1 >> 4;
-		int voxelZ = z1 >> 4;
+		float length = (float) (1.0f / Math.sqrt(dx * dx + dy * dy + dz * dz));
+		float distX = (dx * length) * 10;
+		float distY = (dy * length) * 10;
+		float distZ = (dz * length) * 10;
 
-		int stepX = sign(dx);
-		int stepY = sign(dy);
-		int stepZ = sign(dz);
-
-		int invDx = MAX_PRECISION / (Math.abs(dx) + 1);
-		int invDy = MAX_PRECISION / (Math.abs(dy) + 1);
-		int invDz = MAX_PRECISION / (Math.abs(dz) + 1);
-
-		int tDeltaX = invDx << 4;
-		int tDeltaY = invDy << 4;
-		int tDeltaZ = invDz << 4;
-
-		int originOffsetX = (x1 & 15);
-		int originOffsetY = (y1 & 15);
-		int originOffsetZ = (z1 & 15);
-
-		int tMaxX = (stepX > 0 ? (16 - originOffsetX) : originOffsetX + 1) * invDx;
-		int tMaxY = (stepY > 0 ? (16 - originOffsetY) : originOffsetY + 1) * invDy;
-		int tMaxZ = (stepZ > 0 ? (16 - originOffsetZ) : originOffsetZ + 1) * invDz;
+		float posX = x1;
+		float posY = y1;
+		float posZ = z1;
 
 		int invalid = 0;
 
-		for (int i = 0; i < 5; i++) {
-			if (tMaxX < tMaxY) {
-				if (tMaxX < tMaxZ) {
-					voxelX += stepX;
-					tMaxX += tDeltaX;
-				} else {
-					voxelZ += stepZ;
-					tMaxZ += tDeltaZ;
-				}
-			} else {
-				if (tMaxY < tMaxZ) {
-					voxelY += stepY;
-					tMaxY += tDeltaY;
-				} else {
-					voxelZ += stepZ;
-					tMaxZ += tDeltaZ;
-				}
-			}
+		for (int i = 0; i < 4; i++) {
+			posX += distX;
+			posY += distY;
+			posZ += distZ;
+
+			int voxelX = (int) posX >> 4;
+			int voxelY = (int) posY >> 4;
+			int voxelZ = (int) posZ >> 4;
 
 			if (BFSVisArray.notVisible(voxelX, voxelY, voxelZ)) {
 				if (invalid++ > 2) break;
