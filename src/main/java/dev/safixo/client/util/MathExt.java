@@ -13,6 +13,14 @@ public class MathExt {
 		return MathExt.square(distX) + MathExt.square(distY) + MathExt.square(distZ);
 	}
 
+	public static int manhattanDistanceXYZFast(SectionRender render, int pX, int pY, int pZ) {
+		int distX = Math.abs(render.blockX - pX);
+		int distY = Math.abs(render.blockY - pY);
+		int distZ = Math.abs(render.blockZ - pZ);
+
+		return distX + distY + distZ;
+	}
+
 	public static float squaredDistanceXZ(SectionRender render, CameraData cameraData) {
 		float distX = (render.blockX - cameraData.intX + 8) - cameraData.fractX;
 		float distZ = (render.blockZ - cameraData.intZ + 8) - cameraData.fractZ;

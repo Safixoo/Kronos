@@ -14,7 +14,7 @@ import net.minecraft.world.World;
 import org.lwjgl.input.Keyboard;
 import dev.safixo.client.render.pipelines.terrain.cull.BFSCuller;
 import dev.safixo.client.render.pipelines.terrain.cull.FrustumCuller;
-import dev.safixo.client.render.pipelines.terrain.cull.UpdateQueue;
+import dev.safixo.client.render.pipelines.terrain.cull.RebuildList;
 import dev.safixo.client.util.data.BlocksFlags;
 import dev.safixo.client.util.data.CameraData;
 import dev.safixo.client.render.pipelines.terrain.region.RegionManager;
@@ -140,7 +140,7 @@ public class SectionManager {
 		sectionRender.flags = SectionFlags.setDirty(sectionRender.flags, true);
 
 		if (this.camera != null && MathExt.squaredDistanceXZ(sectionRender, this.camera) < MathExt.square(24.0f)) {
-			UpdateQueue.addToQueue(sectionRender);
+			RebuildList.addToList(sectionRender);
 		}
 	}
 
@@ -230,26 +230,33 @@ public class SectionManager {
 		this.lastFrameBudget = lerpedBudget;
 		this.lastFrameTime = currentTime;
 
-		int maxSize = Math.min(MAX_UPDATE_QUEUES, UpdateQueue.size());
+		int rebuildSize = RebuildList.size();
+		int maxSize = Math.min(MAX_UPDATE_QUEUES, rebuildSize);
+
+		if (rebuildSize == 0) {
+			return;
+		}
+
 		int i = 0;
 
 		int samples = 0;
 		long timePassed = 0L;
 		long estimatedTime = 0L;
 
-		SectionRender render = UpdateQueue.get(i++);
+		SectionRender[] backedArr = RebuildList.getBackedArray(this.camera);
+		SectionRender render = backedArr[i++];
 
 		BlocksFlags.processLeavesSolid();
 
 		while (i < maxSize && SectionFlags.isDirty(render.flags) && MathExt.squaredDistanceXZ(render, this.camera) < MathExt.square(24.0f)) {
 			render.rebuild(this.camera, this, this.worldObj, tileSet);
-			render = UpdateQueue.get(i++);
+			render = backedArr[i++];
 		}
 
 		while (i < maxSize && timePassed < lerpedBudget && estimatedTime < lerpedBudget) {
 			currentTime = System.nanoTime();
 
-			render = UpdateQueue.get(i++);
+			render = backedArr[i++];
 
 			if (SectionFlags.isDirty(render.flags) && render.currentFrame == this.bfsCuller.getActiveFrame()) {
 				render.rebuild(this.camera, this, this.worldObj, tileSet);
@@ -259,7 +266,7 @@ public class SectionManager {
 			}
 		}
 
-		UpdateQueue.clear();
+		RebuildList.clear();
 	}
 
 	public void addFrameSample(long currentDiff) {

@@ -57,7 +57,7 @@ public class BFSCuller {
 			origin.currentFrame = this.activeFrame;
 
 			if (SectionFlags.isDirty(flags)) {
-				UpdateQueue.addToQueue(origin);
+				RebuildList.addToList(origin);
 			}
 
 			queueRegionNode(this.bfsQueue, origin, flags);
@@ -92,7 +92,7 @@ public class BFSCuller {
 			}
 
 			if (SectionFlags.isDirty(flags)) {
-				UpdateQueue.addToQueue(node);
+				RebuildList.addToList(node);
 			}
 
 			queueRegionNode(bfsQueue, node, flags);
