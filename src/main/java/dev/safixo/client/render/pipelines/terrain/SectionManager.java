@@ -2,12 +2,14 @@ package dev.safixo.client.render.pipelines.terrain;
 
 import dev.safixo.client.render.pipelines.terrain.meshing.ChunkListener;
 import it.unimi.dsi.fastutil.longs.*;
+import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.EntityClientPlayerMP;
 import net.minecraft.client.multiplayer.WorldClient;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.item.Item;
 import net.minecraft.profiler.Profiler;
+import net.minecraft.tileentity.TileEntity;
 import net.minecraft.world.World;
 import org.lwjgl.input.Keyboard;
 import dev.safixo.client.render.pipelines.terrain.cull.BFSCuller;
@@ -20,28 +22,32 @@ import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
 import dev.safixo.client.util.Direction;
 import dev.safixo.client.util.MathExt;
 
+import java.util.List;
+import java.util.Set;
+
 public class SectionManager {
 	private static final int MAX_UPDATE_QUEUES = 30;
 	private static final Item DEBUG_ITEM = null;
 
 	private final Long2ReferenceOpenHashMap<SectionRender> sectionMap = new Long2ReferenceOpenHashMap<>(4096);
 
+	private static SectionManager INSTANCE;
+
+	private TerrainProgram terrainShader;
 	private final BFSCuller bfsCuller = new BFSCuller();
 	private final RegionManager regionManager = new RegionManager();
-	private static SectionManager INSTANCE;
 	private World worldObj;
 	private CameraData camera;
 
-	private int renderDistance;
-
 	private long vramUsed, vramAllocated;
+	private int renderDistance;
 	public int drawnSolidRenderers;
 
 	private final long[] lastFrameSamples = new long[32];
 	private long lastFrameTime, lastFrameBudget;
 	private int frameSampleInd;
 
-	private TerrainProgram terrainShader;
+	private final ReferenceOpenHashSet<TileEntity> tileEntitiesSet = new ReferenceOpenHashSet<>();
 
 	public SectionManager(WorldClient world) {
 		INSTANCE = this;
@@ -78,10 +84,6 @@ public class SectionManager {
 
 	public int allocatedSections() {
 		return this.sectionMap.size();
-	}
-
-	public void setWorld(World world) {
-		this.worldObj = world;
 	}
 
 	public void removeRender(int posX, int posY, int posZ) {
@@ -156,8 +158,6 @@ public class SectionManager {
 	}
 
 	public void update(WorldClient world, int renderDistance, double cameraX, double cameraY, double cameraZ, boolean worldChanged, float partialTick) {
-		boolean cameraNull = this.camera == null;
-
 		this.camera = extractCameraData(cameraX, cameraY, cameraZ, renderDistance);
 		this.regionManager.update(this.camera, renderDistance, worldChanged);
 
@@ -167,6 +167,8 @@ public class SectionManager {
 		if (this.renderDistance != renderDistance || worldChanged) {
 			this.renderDistance = renderDistance;
 			this.worldObj = world;
+
+			this.tileEntitiesSet.clear();
 
 			this.dirtyAllSections();
 			this.generateWholeVolume(cameraX, cameraZ);
@@ -192,7 +194,16 @@ public class SectionManager {
 
 		profiler.endStartSection("updatechunks");
 
-		this.queueRebuilds(partialTick);
+		this.queueRebuilds(this.tileEntitiesSet, partialTick);
+
+		profiler.endStartSection("ticking");
+
+		List<TileEntity> tileEntities = (List<TileEntity>) Minecraft.getMinecraft().renderGlobal.tileEntities;
+
+		tileEntities.clear();
+		tileEntities.addAll(this.tileEntitiesSet);
+
+		profiler.endStartSection("updatechunks");
 	}
 
 	private static CameraData extractCameraData(double cameraX, double cameraY, double cameraZ, int renderDistance) {
@@ -207,7 +218,7 @@ public class SectionManager {
 		return new CameraData(fractX, fractY, fractZ, playerX, playerY, playerZ, renderDistance);
 	}
 
-	private void queueRebuilds(float partialTick) {
+	private void queueRebuilds(Set<TileEntity> tileSet, float partialTick) {
 		long currentTime = System.nanoTime();
 		long currentDiff = this.lastFrameTime == 0 ? 200_000_000 : currentTime - this.lastFrameTime;
 
@@ -231,7 +242,7 @@ public class SectionManager {
 		BlocksFlags.processLeavesSolid();
 
 		while (i < maxSize && SectionFlags.isDirty(render.flags) && MathExt.squaredDistanceXZ(render, this.camera) < MathExt.square(24.0f)) {
-			render.rebuild(this.camera, this, this.worldObj);
+			render.rebuild(this.camera, this, this.worldObj, tileSet);
 			render = UpdateQueue.get(i++);
 		}
 
@@ -241,7 +252,7 @@ public class SectionManager {
 			render = UpdateQueue.get(i++);
 
 			if (SectionFlags.isDirty(render.flags) && render.currentFrame == this.bfsCuller.getActiveFrame()) {
-				render.rebuild(this.camera, this, this.worldObj);
+				render.rebuild(this.camera, this, this.worldObj, tileSet);
 				samples++;
 				timePassed += System.nanoTime() - currentTime;
 				estimatedTime = (timePassed / samples) * (MAX_UPDATE_QUEUES - i);
@@ -286,6 +297,7 @@ public class SectionManager {
 
 	private void clearRenderer() {
 		this.sectionMap.clear();
+		this.tileEntitiesSet.clear();
 	}
 
 	public void drawRenderPass(int renderPass) {

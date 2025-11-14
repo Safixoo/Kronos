@@ -1,6 +1,8 @@
 package dev.safixo.client.render.pipelines.terrain;
 
 import dev.safixo.client.util.MathExt;
+import it.unimi.dsi.fastutil.objects.ReferenceArrayList;
+import it.unimi.dsi.fastutil.objects.ReferenceList;
 import net.minecraft.block.Block;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderBlocks;
@@ -14,8 +16,12 @@ import dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache;
 import dev.safixo.client.util.data.BlocksFlags;
 import dev.safixo.client.util.Direction;
 import dev.safixo.client.render.vertex.DefaultVertexFormats;
+import net.minecraft.client.renderer.tileentity.TileEntityRenderer;
+import net.minecraft.tileentity.TileEntity;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
+
+import java.util.Set;
 
 import static dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache.makeBlockIndex;
 import static dev.safixo.client.util.Direction.*;
@@ -46,6 +52,9 @@ public class SectionRender {
 	// Used in BFS for the grid based visibility technique.
 	public float gridInd = 1.0f;
 
+	// Tile entities from the section.
+	private final ReferenceList<TileEntity> tileEntities = new ReferenceArrayList<>();
+
 	public SectionRender(int blockX, int blockY, int blockZ) {
 		this.blockX = blockX;
 		this.blockY = blockY;
@@ -55,7 +64,7 @@ public class SectionRender {
 		this.regionIndex = RegionRender.regionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
 	}
 
-	public void rebuild(CameraData camera, SectionManager sectionManager, World world) {
+	public void rebuild(CameraData camera, SectionManager sectionManager, World world, Set<TileEntity> tileSet) {
 		WorldRenderer.chunksUpdated++;
 		Chunk.isLit = false;
 
@@ -80,6 +89,9 @@ public class SectionRender {
 
 		int[] solidFaces = new int[Direction.COUNT + 1];
 		boolean ambient = Minecraft.getMinecraft().gameSettings.ambientOcclusion != 0;
+
+		tileSet.removeAll(this.tileEntities);
+		this.tileEntities.clear();
 
 		if (!sectionCache.extendedLevelsInChunkCache()) {
 			// 15x15x15 center blocks.
@@ -126,6 +138,8 @@ public class SectionRender {
 					this.meshBlock(renderBlocks, sectionCache, x, y, 0, solidFaces, ambient);
 				}
 			}
+
+			tileSet.addAll(this.tileEntities);
 		}
 
 		this.processCullFaces(solidFaces);
@@ -208,6 +222,14 @@ public class SectionRender {
 
 			FullBlockMesher.renderSolidCube(block, cache, blockX, blockY, blockZ, ambient, ~drawBitSet, blockId);
 		} else {
+			if (block.hasTileEntity(cache.getBlockMetadata(blockX, blockY, blockZ))) {
+				TileEntity tileEntity = cache.getBlockTileEntity(blockX, blockY, blockZ);
+
+				if (TileEntityRenderer.instance.hasSpecialRenderer(tileEntity)) {
+					this.tileEntities.add(tileEntity);
+				}
+			}
+
 			if (blockRenderPass != 0) {
 				VertexWriterManager.setCurrentInstance(VertexWriterManager.TRANSLUCENT);
 			} else {
@@ -263,6 +285,14 @@ public class SectionRender {
 
 			FullBlockMesher.renderSolidCube(block, cache, blockX, blockY, blockZ, ambient, ~drawBitSet, blockId);
 		} else {
+			if (block.hasTileEntity(cache.getBlockMetadata(blockX, blockY, blockZ))) {
+				TileEntity tileEntity = cache.getBlockTileEntity(blockX, blockY, blockZ);
+
+				if (TileEntityRenderer.instance.hasSpecialRenderer(tileEntity)) {
+					this.tileEntities.add(tileEntity);
+				}
+			}
+
 			if (blockRenderPass != 0) {
 				VertexWriterManager.setCurrentInstance(VertexWriterManager.TRANSLUCENT);
 			} else {

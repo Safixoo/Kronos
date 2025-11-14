@@ -199,8 +199,11 @@ public class SectionCache implements IBlockAccess {
 	}
 
 	@Override
-	public TileEntity getBlockTileEntity(int par1, int par2, int par3) {
-		return null;
+	public TileEntity getBlockTileEntity(int x, int y, int z) {
+		int chunkX = (x >> 4) - (this.blockX >> 4);
+		int chunkZ = (z >> 4) - (this.blockZ >> 4);
+
+		return CHUNKS[sectionIndex(chunkX, 0, chunkZ)].getChunkBlockTileEntity(x & 15, y, z & 15);
 	}
 
 	@Override
