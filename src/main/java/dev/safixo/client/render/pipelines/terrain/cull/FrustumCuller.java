@@ -119,7 +119,7 @@ public class FrustumCuller {
 	 * Simple JOML testAbb, based on sign of each component pick a corner of the AABB to check, is less precise
 	 * as it takes into account in the wrong way the fract camera position, but should work regardless.
 	 */
-	public static boolean testAab(float minX, float minY, float minZ, float maxX, float maxY, float maxZ) {
+	public static boolean withinFrustumBounds(float minX, float minY, float minZ, float maxX, float maxY, float maxZ) {
 		return nxX * (nxX < 0.0F ? minX : maxX) + nxY * (nxY < 0.0F ? minY : maxY) + nxZ * (nxZ < 0.0F ? minZ : maxZ) > nxWG
 			&& pxX * (pxX < 0.0F ? minX : maxX) + pxY * (pxY < 0.0F ? minY : maxY) + pxZ * (pxZ < 0.0F ? minZ : maxZ) > pxWG
 			&& nyX * (nyX < 0.0F ? minX : maxX) + nyY * (nyY < 0.0F ? minY : maxY) + nyZ * (nyZ < 0.0F ? minZ : maxZ) > nyWG
@@ -131,7 +131,7 @@ public class FrustumCuller {
 	 * to every w component based on the size of the section, the advantage
 	 * is that the size of a section is always the same so it is a powerful optimization.
 	 */
-	public static boolean testAab(float blockX, float blockY, float blockZ) {
+	public static boolean withinFrustumBounds(float blockX, float blockY, float blockZ) {
 		return  nxX * blockX + nxY * blockY + nxZ * blockZ > nxW &&
 				pxX * blockX + pxY * blockY + pxZ * blockZ > pxW &&
 				nyX * blockX + nyY * blockY + nyZ * blockZ > nyW &&

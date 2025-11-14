@@ -1,9 +1,7 @@
 package dev.safixo.client.render.pipelines.terrain.cull;
 
-import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
 import dev.safixo.client.render.pipelines.terrain.SectionFlags;
-import dev.safixo.client.render.pipelines.terrain.SectionManager;
 import dev.safixo.client.render.pipelines.terrain.SectionRender;
 import dev.safixo.client.util.data.CameraData;
 import dev.safixo.client.util.data.FogData;
@@ -17,6 +15,16 @@ public class BFSCuller {
 	public final BFSQueue bfsQueue = new BFSQueue();
 	private int activeFrame;
 
+	// The max denominator would always be a renderDistance * 3 worst case, and should always
+	// be used in a consequential way, so it shouldn't mean a problem to the cache.
+	private static final float[] INV_DIVS = new float[512];
+
+	static {
+		for (int i = 0; i < 512; i++) {
+			INV_DIVS[i] = (1 / (float) i);
+		}
+	}
+
 	public void init(RegionManager regionManager, int cameraX, int cameraZ, int renderDistance) {
 		BFSVisArray.start(cameraX >> 4, cameraZ >> 4, renderDistance);
 
@@ -29,15 +37,57 @@ public class BFSCuller {
 		this.activeFrame++;
 	}
 
-	private static void bfsSearch(BFSQueue bfsQueue, int playerX, int playerY, int playerZ,
-								  int renderDistance, int activeFrame) {
+	/**
+	 * Gets the first sections of the search, prepares the graph-search max distance and queues the first couple
+	 * of sections to start the search afterward.
+	 */
+	public void updateRenderList(Long2ReferenceOpenHashMap<SectionRender> sectionMap, CameraData camera) {
+		int chunkX = MathExt.floor(camera.intX);
+		int chunkY = MathExt.clamp(MathExt.floor(camera.intY), 0, 255);
+		int chunkZ = MathExt.floor(camera.intZ);
+
+		SectionRender origin = sectionMap.get(MathExt.asLong(chunkX >> 4, chunkY >> 4, chunkZ >> 4));
+
+		if (origin != null) {
+			int flags = origin.flags;
+
+			BFSVisArray.setVisible(origin.blockX >> 4, origin.blockY >> 4, origin.blockZ >> 4);
+			exploreNodes(this.bfsQueue, origin, SectionFlags.getAdjacentMask(flags), this.activeFrame);
+
+			origin.currentFrame = this.activeFrame;
+
+			if (SectionFlags.isDirty(flags)) {
+				UpdateQueue.addToQueue(origin);
+			}
+
+			queueRegionNode(this.bfsQueue, origin, flags);
+		}
+
+		float realRenderDistance = Math.min(FogData.FOG_END / 16.0f, camera.renderDistance);
+
+		double magicOffset = MathHelper.clamp_float(0, realRenderDistance * -8.0f + 80.0f, 32.0f) - realRenderDistance;
+		double maxDistance = Math.min(FogData.FOG_END, camera.renderDistance << 4) + magicOffset;
+
+		search(this.bfsQueue, camera.intX, camera.intY, camera.intZ, (int) MathExt.square(maxDistance), this.activeFrame);
+	}
+
+	/**
+	 * Does a BFS search based in the <a href="https://tomcc.github.io/2014/08/31/visibility-1.html">Advanced Cave Culling</a>
+	 * by tomcc, with many differences, as it doesn't try to find connectivity 100% and uses some more ideas to avoid section
+	 * queueing during the search.
+	 */
+	private static void search(BFSQueue bfsQueue, int playerX, int playerY, int playerZ,
+							   int renderDistance, int activeFrame) {
 		int bfsIndex = 1;
 		SectionRender node;
 
 		while ((node = bfsQueue.get(bfsIndex++)) != null) {
 			int flags = node.flags;
+			node.gridInd = 1.0f;
 
-			if (isSectionInvisible(node, flags, playerX, playerY, playerZ, renderDistance)) {
+			int outwardDirections = getOutwardDirections(playerX, playerY, playerZ, node);
+
+			if (isSectionInvisible(node, flags, playerX, playerY, playerZ, renderDistance, outwardDirections, activeFrame)) {
 				continue;
 			}
 
@@ -47,8 +97,6 @@ public class BFSCuller {
 
 			queueRegionNode(bfsQueue, node, flags);
 
-			int outwardDirections = getOutwardDirections(playerX, playerY, playerZ, node);
-
 			outwardDirections &= SectionFlags.getAdjacentMask(flags);
 			outwardDirections &= ~SectionFlags.getCullFaces(flags);
 
@@ -56,56 +104,38 @@ public class BFSCuller {
 		}
 	}
 
-	public static boolean isSectionInvisible(SectionRender node, int flags, int playerX, int playerY, int playerZ, int fogEnd) {
-		int distX = node.blockX - playerX;
-		int distY = node.blockY - playerY;
-		int distZ = node.blockZ - playerZ;
+	/**
+	 * The original method comes from the Sodium way of doing BFS culling, only changed to be branch-less,
+	 * (removing the branches is only an optimization in Java because it refuses to generate branch-less code)
+	 * which helps by avoiding back-tracking and doesn't de-reference already visited sections.
+	 */
+	private static int getOutwardDirections(int playerX, int playerY, int playerZ, SectionRender render) {
+		int planes = 0;
 
-		BFSVisArray.setVisible(node.blockX >> 4, node.blockY >> 4, node.blockZ >> 4);
+		int diffChunkX = (render.blockX >> 4) - (playerX >> 4);
 
-		int distance = withinRenderDistance(distX, distY, distZ);
+		planes |= ( diffChunkX >> 31) & Direction.EAST_BIT;
+		planes |= (-diffChunkX >> 31) & Direction.WEST_BIT;
 
-		if (distance >= fogEnd || !(FrustumCuller.testAab(distX, distY, distZ))) {
-			return true;
-		}
+		int diffChunkY = (render.blockY >> 4) - (playerY >> 4);
 
-		if (distance >= MathExt.square(128) && SectionFlags.hasDrawableFaces(flags)) {
-			return !visibleByRayCast(node.blockX + 8, node.blockY + 8, node.blockZ + 8, -distX, -distY, -distZ);
-		}
+		planes |= ( diffChunkY >> 31) & Direction.UP_BIT;
+		planes |= (-diffChunkY >> 31) & Direction.DOWN_BIT;
 
-		return false;
+		int diffChunkZ = (render.blockZ >> 4) - (playerZ >> 4);
+
+		planes |= ( diffChunkZ >> 31) & Direction.SOUTH_BIT;
+		planes |= (-diffChunkZ >> 31) & Direction.NORTH_BIT;
+
+		return ~planes;
 	}
 
-	public void updateRenderList(Long2ReferenceOpenHashMap<SectionRender> sectionMap, CameraData camera) {
-		int chunkX = MathExt.floor(camera.intX);
-		int chunkY = MathExt.clamp(MathExt.floor(camera.intY), 0, 255);
-		int chunkZ = MathExt.floor(camera.intZ);
-
-		SectionRender spawn = sectionMap.get(MathExt.asLong(chunkX >> 4, chunkY >> 4, chunkZ >> 4));
-
-		if (spawn != null) {
-			int flags = spawn.flags;
-
-			BFSVisArray.setVisible(spawn.blockX >> 4, spawn.blockY >> 4, spawn.blockZ >> 4);
-			exploreNodes(this.bfsQueue, spawn, SectionFlags.getAdjacentMask(flags), this.activeFrame);
-
-			spawn.currentFrame = this.activeFrame;
-
-			if (SectionFlags.isDirty(flags)) {
-				UpdateQueue.addToQueue(spawn);
-			}
-
-			queueRegionNode(this.bfsQueue, spawn, flags);
-		}
-
-		float realRenderDistance = Math.min(FogData.FOG_END / 16.0f, camera.renderDistance);
-
-		double magicOffset = MathHelper.clamp_float(0, realRenderDistance * -8.0f + 80.0f, 32.0f) - realRenderDistance;
-		double maxDistance = Math.min(FogData.FOG_END, camera.renderDistance << 4) + magicOffset;
-
-		bfsSearch(this.bfsQueue, camera.intX, camera.intY, camera.intZ, (int) MathExt.square(maxDistance), this.activeFrame);
-	}
-
+	/**
+	 * For drawable section that has been visited by the graph, their indices are saved in their respective
+	 * region, and their region are saved based in the BFS order. In a future should be more favorable save only
+	 * the index of section in a branch less manner, and later sort enqueued regions to minimize the work of the BFS
+	 * for node.
+	 */
 	private static void queueRegionNode(BFSQueue bfsQueue, SectionRender section, int flags) {
 		if (SectionFlags.hasPassesNonEmpty(flags)) {
 			RegionRender region = section.region;
@@ -118,6 +148,10 @@ public class BFSCuller {
 		}
 	}
 
+	/**
+	 * Searches outwards from the player possible visitable sections, based in solidness in the section and faces,
+	 * also avoids visiting sections if they were already visited in the current frame.
+	 */
 	private static void exploreNodes(BFSQueue queue, SectionRender fatherNode, int directions, int activeFrame) {
 		if (directions == 0) {
 			return;
@@ -158,29 +192,107 @@ public class BFSCuller {
 		}
 	}
 
-	private static int getOutwardDirections(int playerX, int playerY, int playerZ, SectionRender render) {
-		int planes = 0;
+	/**
+	 * First check if the section is within the fog circle, then if it's outside the camera frustum, after
+	 * use grid based visibility technique to determine a threshold of visibility for the section, and in cases
+	 * where the sections are not empty check whether tracing a ray from the section to the camera finds obstruction
+	 * in the process.
+	 */
+	public static boolean isSectionInvisible(SectionRender node, int flags, int playerX, int playerY, int playerZ, int fogEnd,
+											 int outwardDirections, int frame) {
+		int distX = node.blockX - playerX;
+		int distY = node.blockY - playerY;
+		int distZ = node.blockZ - playerZ;
 
-		int diffChunkX = (render.blockX >> 4) - (playerX >> 4);
+		int distance = withinRenderDistance(distX, distY, distZ);
 
-		planes |= (~ diffChunkX >> 31) & Direction.set(Direction.EAST);
-		planes |= (~-diffChunkX >> 31) & Direction.set(Direction.WEST);
+		if (distance >= fogEnd) {
+			return true;
+		}
 
-		int diffChunkY = (render.blockY >> 4) - (playerY >> 4);
+		if (!FrustumCuller.withinFrustumBounds(distX, distY, distZ)) {
+			BFSVisArray.setVisible(node.blockX >> 4, node.blockY >> 4, node.blockZ >> 4);
+			return true;
+		}
 
-		planes |= (~ diffChunkY >> 31) & Direction.set(Direction.UP);
-		planes |= (~-diffChunkY >> 31) & Direction.set(Direction.DOWN);
+		float gridInd = processGridIndex(node, playerX, playerY, playerZ, outwardDirections, frame);
+		node.gridInd = gridInd;
 
-		int diffChunkZ = (render.blockZ >> 4) - (playerZ >> 4);
+		if (gridInd < 0.1f) {
+			BFSVisArray.setVisible(node.blockX >> 4, node.blockY >> 4, node.blockZ >> 4);
+			return true;
+		}
 
-		planes |= (~ diffChunkZ >> 31) & Direction.set(Direction.SOUTH);
-		planes |= (~-diffChunkZ >> 31) & Direction.set(Direction.NORTH);
+		if (distance >= MathExt.square(128) && SectionFlags.hasDrawableFaces(flags)) {
+			return !visibleByRayCast(node.blockX + 8, node.blockY + 8, node.blockZ + 8, -distX, -distY, -distZ);
+		}
 
-		return planes;
+		return false;
+	}
+
+	private static boolean renderThisFrame(SectionRender section, int dirSet, int direction, int frame) {
+		return (dirSet & (1 << direction)) != 0 && section.currentFrame == frame;
+	}
+
+	/**
+	 * Uses the key idea from the article of <a href ="https://towardsdatascience.com/a-quick-and-clear-look-at-grid-based-visibility-bf63769fbc78">Grid Based Visibility</a>
+	 * to determine the factor of grid visibility in 3D for the current visited section of the graph.
+	 * As it stands right now is poorly optimized, but it rewards in all the works it skips are sections that it avoids.
+	 * @return Grid visibility factor
+	 */
+	private static float processGridIndex(SectionRender section, int playerX, int playerY, int playerZ, int outwardDir, int frame) {
+		int diffX = Math.abs((section.blockX >> 4) - (playerX >> 4));
+		int diffY = Math.abs((section.blockY >> 4) - (playerY >> 4));
+		int diffZ = Math.abs((section.blockZ >> 4) - (playerZ >> 4));
+
+		if (diffX == 0 || diffY == 0 || diffZ == 0) {
+			return 1.0f;
+		}
+
+		int dirSet = ~outwardDir & SectionFlags.getAdjacentMask(section.flags);
+		float gradInd = 0.0F;
+
+		// Y
+		if (renderThisFrame(section.adjacentDown, dirSet, Direction.DOWN, frame)) {
+			gradInd += diffY * section.adjacentDown.gridInd;
+		} else if (renderThisFrame(section.adjacentUp, dirSet, Direction.UP, frame)) {
+			gradInd += diffY * section.adjacentUp.gridInd;
+		}
+
+		// Z
+		if (renderThisFrame(section.adjacentNorth, dirSet, Direction.NORTH, frame)) {
+			gradInd += diffZ * section.adjacentNorth.gridInd;
+		} else if (renderThisFrame(section.adjacentSouth, dirSet, Direction.SOUTH, frame)) {
+			gradInd += diffZ * section.adjacentSouth.gridInd;
+		}
+
+		// X
+		if (renderThisFrame(section.adjacentWest, dirSet, Direction.WEST, frame)) {
+			gradInd += diffX * section.adjacentWest.gridInd;
+		} else if (renderThisFrame(section.adjacentEast, dirSet, Direction.EAST, frame)) {
+			gradInd += diffX * section.adjacentEast.gridInd;
+		}
+
+		return gradInd * INV_DIVS[diffX + diffY + diffZ];
+	}
+
+	/**
+	 * Squared sphere distance from the center of section to the player.
+	 */
+	private static int withinRenderDistance(int distX, int distY, int distZ) {
+		distX += 8;
+		distY += 8;
+		distZ += 8;
+
+		return (distX * distX) + (distY * distY) + (distZ * distZ);
 	}
 
 	private static final int MAX_PRECISION = 1 << 25;
 
+	/**
+	 * Traces a ray from the section to the camera and tries to find obstruction in the way using the visited
+	 * sections info saved in {@link dev.safixo.client.render.pipelines.terrain.cull.BFSVisArray}
+	 */
 	private static boolean visibleByRayCast(int x1, int y1, int z1, int dx, int dy, int dz) {
 		dx -= 8;
 		dy -= 8;
@@ -231,8 +343,8 @@ public class BFSCuller {
 				}
 			}
 
-			if (BFSVisArray.notVisible(voxelX, voxelY, voxelZ)) {
-				if (invalid++ > 2) break;
+			if (BFSVisArray.notVisible(voxelX, voxelY, voxelZ) && invalid++ > 2) {
+				break;
 			}
 		}
 
@@ -245,13 +357,5 @@ public class BFSCuller {
 
 	private static int sign(int num) {
 		return (num >> 31) | 1;
-	}
-
-	private static int withinRenderDistance(int x, int y, int z) {
-		x += 8;
-		y += 8;
-		z += 8;
-
-		return (x * x) + (y * y) + (z * z);
 	}
 }

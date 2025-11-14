@@ -6,6 +6,10 @@ public class BFSVisArray {
 	private static final int MAX_DISTANCE = 32;
 	private static final int HOR_SHIFT = Integer.bitCount(MAX_DISTANCE - 1);
 
+	public static final int Y_SHIFT = (HOR_SHIFT * 0);
+	public static final int Z_SHIFT = (HOR_SHIFT * 1);
+	public static final int X_SHIFT = (HOR_SHIFT * 2);
+
 	private static int OFFSET_X;
 	private static int OFFSET_Z;
 	private static final short[] FRAME_ARRAY = new short[MathExt.square((MAX_DISTANCE * 2 + 1) * 16) / 2];
@@ -17,6 +21,20 @@ public class BFSVisArray {
 		OFFSET_Z = cameraZ - powRenderDistance;
 	}
 
+	public static int getInd(int sectionX, int sectionY, int sectionZ) {
+		int relX = sectionX - OFFSET_X;
+		int relZ = sectionZ - OFFSET_Z;
+
+		return  (relX << HOR_SHIFT | relZ) << HOR_SHIFT | sectionY;
+	}
+
+	public static boolean notVisible(int realInd) {
+		int bitInd = realInd & 0xF;
+		int arrInd = realInd >> 4;
+
+		return (FRAME_ARRAY[arrInd] & (1 << bitInd)) == 0;
+	}
+
 	public static boolean notVisible(int sectionX, int sectionY, int sectionZ) {
 		int relX = sectionX - OFFSET_X;
 		int relZ = sectionZ - OFFSET_Z;
@@ -24,11 +42,6 @@ public class BFSVisArray {
 		int realInd = (relX << HOR_SHIFT | relZ) << HOR_SHIFT | sectionY;
 		int bitInd = realInd & 0xF;
 		int arrInd = realInd >> 4;
-
-		if (arrInd < 0) {
-			return false;
-		}
-
 		return (FRAME_ARRAY[arrInd] & (1 << bitInd)) == 0;
 	}
 

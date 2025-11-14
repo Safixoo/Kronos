@@ -24,6 +24,8 @@ import static dev.safixo.client.util.Direction.EAST;
 // Saves basic info for each section from the world, is used mostly for culling and
 // meshing, rendering is almost only managed in the RegionRender in an objectless fashion.
 public class SectionRender {
+	private static final int AIR_ID = 0;
+
 	// Most of the section data, flags is a bit-mask from SectionFlag encoding.
 	public int currentFrame, flags = SectionFlags.setDirty(0b0, true);
 
@@ -41,7 +43,8 @@ public class SectionRender {
 	// Section main data structures.
 	public RegionRender region = RegionRender.NULL;
 
-	private static final int AIR_ID = 0;
+	// Used in BFS for the grid based visibility technique.
+	public float gridInd = 1.0f;
 
 	public SectionRender(int blockX, int blockY, int blockZ) {
 		this.blockX = blockX;

@@ -28,6 +28,6 @@ public class FrustumHook {
 	}
 
 	public static boolean isBoxInFrustum(ClippingHelper clipper, double minX, double minY, double minZ, double maxX, double maxY, double maxZ) {
-		return FrustumCuller.testAab((float) minX, (float) minY, (float) minZ, (float) maxX, (float) maxY, (float) maxZ);
+		return FrustumCuller.withinFrustumBounds((float) minX, (float) minY, (float) minZ, (float) maxX, (float) maxY, (float) maxZ);
 	}
 }

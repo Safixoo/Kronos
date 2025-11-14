@@ -11,6 +11,13 @@ public class Direction {
 	public static final int WEST    = 4;
 	public static final int EAST    = 5;
 
+	public static final int DOWN_BIT   = 1 << 0;
+	public static final int UP_BIT     = 1 << 1;
+	public static final int NORTH_BIT  = 1 << 2;
+	public static final int SOUTH_BIT  = 1 << 3;
+	public static final int WEST_BIT   = 1 << 4;
+	public static final int EAST_BIT   = 1 << 5;
+
 	public static final int COUNT   = 6;
 
 	private static final ForgeDirection[] ENUMS;

@@ -1,20 +1,15 @@
 package dev.safixo.client.render.pipelines.terrain;
 
 import dev.safixo.client.render.pipelines.terrain.meshing.ChunkListener;
-import dev.safixo.client.util.data.FogData;
-import dev.safixo.core.HookUtils;
 import it.unimi.dsi.fastutil.longs.*;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.EntityClientPlayerMP;
 import net.minecraft.client.multiplayer.WorldClient;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.item.Item;
-import net.minecraft.item.ItemEgg;
-import net.minecraft.item.ItemStack;
 import net.minecraft.profiler.Profiler;
 import net.minecraft.world.World;
 import org.lwjgl.input.Keyboard;
-import org.lwjgl.opengl.GL11;
 import dev.safixo.client.render.pipelines.terrain.cull.BFSCuller;
 import dev.safixo.client.render.pipelines.terrain.cull.FrustumCuller;
 import dev.safixo.client.render.pipelines.terrain.cull.UpdateQueue;
@@ -31,17 +26,12 @@ public class SectionManager {
 
 	private final Long2ReferenceOpenHashMap<SectionRender> sectionMap = new Long2ReferenceOpenHashMap<>(4096);
 
-	// The generation logic is fucked up so is simply complemented with some extra structures.
-	private final LongOpenHashSet chunkExistence = new LongOpenHashSet();
-
 	private final BFSCuller bfsCuller = new BFSCuller();
 	private final RegionManager regionManager = new RegionManager();
 	private static SectionManager INSTANCE;
 	private World worldObj;
 	private CameraData camera;
 
-	private double lastUpdateX, lastUpdateZ;
-	private double lastRemoveX, lastRemoveZ;
 	private int renderDistance;
 
 	private long vramUsed, vramAllocated;
@@ -141,6 +131,10 @@ public class SectionManager {
 			this.connectNeighbors(sectionRender);
 		}
 
+		if (!ChunkListener.canLoadChunk(posX, posZ)) {
+			return;
+		}
+
 		sectionRender.flags = SectionFlags.setDirty(sectionRender.flags, true);
 
 		if (this.camera != null && MathExt.squaredDistanceXZ(sectionRender, this.camera) < MathExt.square(24.0f)) {
@@ -162,6 +156,8 @@ public class SectionManager {
 	}
 
 	public void update(WorldClient world, int renderDistance, double cameraX, double cameraY, double cameraZ, boolean worldChanged, float partialTick) {
+		boolean cameraNull = this.camera == null;
+
 		this.camera = extractCameraData(cameraX, cameraY, cameraZ, renderDistance);
 		this.regionManager.update(this.camera, renderDistance, worldChanged);
 
@@ -170,27 +166,10 @@ public class SectionManager {
 
 		if (this.renderDistance != renderDistance || worldChanged) {
 			this.renderDistance = renderDistance;
-			this.lastUpdateX = cameraX;
-			this.lastUpdateZ = cameraZ;
-
-			this.lastRemoveX = cameraX;
-			this.lastRemoveZ = cameraZ;
-
 			this.worldObj = world;
 
-			if (!this.sectionMap.isEmpty()) {
-				this.clearRenderer();
-				this.generateWholeVolume(cameraX, cameraZ);
-			}
-		}
-
-		double diffX = MathExt.square(cameraX - this.lastUpdateX);
-		double diffZ = MathExt.square(cameraZ - this.lastUpdateZ);
-
-		profiler.endStartSection("compiling");
-
-		if (diffX + diffZ >= MathExt.square(4.0)) {
-			this.generateSections();
+			this.dirtyAllSections();
+			this.generateWholeVolume(cameraX, cameraZ);
 		}
 
 		EntityClientPlayerMP playerLocal = Minecraft.getMinecraft().thePlayer;
@@ -284,92 +263,9 @@ public class SectionManager {
 		return this.lastFrameSamples[16];
 	}
 
-	private void generateSections() {
-		int lastChunkCameraX = MathExt.posToSectionIntegral(this.lastUpdateX);
-		int lastChunkCameraZ = MathExt.posToSectionIntegral(this.lastUpdateZ);
-
-		int lastChunkRemoveX = MathExt.posToSectionIntegral(this.lastRemoveX);
-		int lastChunkRemoveZ = MathExt.posToSectionIntegral(this.lastRemoveZ);
-
-		int currentCameraX = MathExt.posToSectionIntegral(this.camera.intX);
-		int currentCameraZ = MathExt.posToSectionIntegral(this.camera.intZ);
-
-		int renderDistance = this.renderDistance;
-
-		// Doing currentCamera - lastChunkCamera is like generating a vector
-		// from the last camera check pos to the current.
-		int offsetX = (currentCameraX - lastChunkCameraX);
-		int offsetZ = (currentCameraZ - lastChunkCameraZ);
-
-		int removalX = (currentCameraX - lastChunkRemoveX);
-		int removalZ = (currentCameraZ - lastChunkRemoveZ);
-
-		// Nothing has changed.
-		if ((offsetX == 0 && offsetZ == 0) && (removalX == 0 && removalZ == 0)) {
-			return;
-		}
-
-		LongOpenHashSet forRemoval = new LongOpenHashSet();
-
-		// We scan all the render distance volume and if the diff between the last camera pos summed the xz
-		// pos index of the render distance volume goes out of bounds from the xz min-max index it means
-		// that it's a new or old section.
-		for (int x = -renderDistance; x <= renderDistance; x++) {
-			for (int z = -renderDistance; z <= renderDistance; z++) {
-				int newX = Math.abs(x + offsetX);
-				int newZ = Math.abs(z + offsetZ);
-
-				int oldX = Math.abs(x - removalX);
-				int oldZ = Math.abs(z - removalZ);
-
-				int chunkX = currentCameraX + x;
-				int chunkZ = currentCameraZ + z;
-
-				int safeDistanceCheck = Math.max(0, renderDistance - 5);
-				long position = MathExt.asLong(chunkX, chunkZ);
-
-				// Add new sections in distance.
-				if (newX >= safeDistanceCheck) {
-					this.lastUpdateX = this.camera.cameraXD();
-
-					if (!this.chunkExistence.contains(position)) {
-						for (int y = 0; y < 16; y++) {
-							this.markDirty(chunkX, y, chunkZ);
-						}
-
-						this.chunkExistence.add(position);
-					}
-				}
-				if (newZ >= safeDistanceCheck) {
-					if (!this.chunkExistence.contains(position)) {
-						this.lastUpdateZ = this.camera.cameraZD();
-
-						for (int y = 0; y < 16; y++) {
-							this.markDirty(chunkX, y, chunkZ);
-						}
-
-						this.chunkExistence.add(position);
-					}
-				}
-
-
-				// Remove distant sections.
-				if (oldX >= renderDistance) {
-					this.lastRemoveX = this.camera.cameraXD();
-
-					for (int y = 0; y < 16; y++) {
-						this.removeRender(chunkX, y, chunkZ);
-					}
-					this.chunkExistence.remove(position);
-				} else if (oldZ >= renderDistance) {
-					this.lastRemoveZ = this.camera.cameraZD();
-
-					for (int y = 0; y < 16; y++) {
-						this.removeRender(chunkX, y, chunkZ);
-					}
-					this.chunkExistence.remove(position);
-				}
-			}
+	private void dirtyAllSections() {
+		for (SectionRender section : this.sectionMap.values()) {
+			section.flags = SectionFlags.setDirty(section.flags, true);
 		}
 	}
 
@@ -378,12 +274,9 @@ public class SectionManager {
 		int cameraChunkZ = MathExt.posToSectionIntegral(cameraZ);
 
 		int renderDistance = this.renderDistance + 2;
-		LongOpenHashSet chunkExistence = this.chunkExistence;
 
 		for (int x = -renderDistance; x <= renderDistance; x++) {
 			for (int z = -renderDistance; z <= renderDistance; z++) {
-				chunkExistence.add(MathExt.asLong(x, z));
-
 				for (int y = 0; y < 16; y++) {
 					this.markDirty(cameraChunkX + x , y, cameraChunkZ + z);
 				}
@@ -393,7 +286,6 @@ public class SectionManager {
 
 	private void clearRenderer() {
 		this.sectionMap.clear();
-		this.chunkExistence.clear();
 	}
 
 	public void drawRenderPass(int renderPass) {
