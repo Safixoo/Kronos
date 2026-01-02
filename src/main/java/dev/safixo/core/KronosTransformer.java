@@ -52,7 +52,7 @@ public class KronosTransformer implements IClassTransformer {
 			case LONG_HASH_MAP:
 				return LongHashMapHook.rewriteHashMapClass();
 			case WORLD:
-				replaceClassMethod(MINECRAFT_HOOK, "getLightBrightnessForSkyBlocks", "a", "()V", reference, false);
+				replaceClassMethod(MINECRAFT_HOOK, "getLightBrightnessForSkyBlocks", "h", "(IIII)I", reference, false);
 				break;
 			case RENDER_GLOBAL:
 				// Redirect terrain rendering calls.

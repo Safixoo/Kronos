@@ -19,7 +19,7 @@ import static dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCac
 import static dev.safixo.client.util.Direction.*;
 
 public class FullBlockMesher {
-	private static final ModelColorizer MODEL_COLORIZER = new ModelColorizer();
+	public static final ModelColorizer MODEL_COLORIZER = new ModelColorizer();
 	private static final int[] SHADE_FULL_COLOR = new int[Direction.COUNT];
 	private static final int[] SHADE_FULL_FACTOR = new int[Direction.COUNT];
 	private static final float[] VERT_UVS = new float[4];

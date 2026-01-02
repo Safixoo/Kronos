@@ -1,12 +1,7 @@
 package dev.safixo.core.hooks;
 
 import dev.safixo.client.render.ImprovedTessellator;
-import dev.safixo.client.render.gfx.buffer.GlVertexBuffer;
-import dev.safixo.client.render.gfx.vertex.GlVertexArrayObject;
-import dev.safixo.client.util.memory.NativeBuffer;
 import dev.safixo.client.util.memory.UnsafeUtil;
-import dev.safixo.client.render.vertex.DefaultVertexFormats;
-import dev.safixo.client.render.vertex.VertexWriterManager;
 import dev.safixo.core.HookUtils;
 import it.unimi.dsi.fastutil.objects.ObjectArrayFIFOQueue;
 import it.unimi.dsi.fastutil.objects.Reference2ReferenceOpenHashMap;
@@ -19,7 +14,6 @@ import net.minecraft.client.resources.ResourcePackRepository;
 import net.minecraft.util.ChatAllowedCharacters;
 import net.minecraft.util.ResourceLocation;
 import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL15;
 
 import java.util.Map;
 import java.util.Random;
@@ -38,7 +32,7 @@ public class FontRendererHook {
 
 	private boolean randomStyle, boldStyle, italicStyle, underlineStyle, strikethroughStyle, unicodeText;
 
-	private int[] charWidth;
+	private float[] charWidth;
 	public Random fontRandom;
 	private byte[] glyphWidth;
 	private int[] colorCode;
@@ -52,13 +46,38 @@ public class FontRendererHook {
 
 	private static final Reference2ReferenceOpenHashMap<FontRenderer, FontRendererHook> HOOKS = new Reference2ReferenceOpenHashMap<>();
 
+	// OptiFine apart from rewriting the field original names, it changes the format of charWidth from int[] to float[].
+	private float[] copyCharWidth(int[] from) {
+		float[] charWidth = new float[256];
+
+		for (int i = 0; i < from.length; i++) {
+			charWidth[i] = from[i];
+		}
+
+		return charWidth;
+	}
+
 	private void copyFontRendererData(FontRenderer renderer) {
-		this.charWidth = (int[]) HookUtils.getFieldObj(renderer, "charWidth", "field_78286_d");
-		this.fontRandom = (Random) HookUtils.getFieldObj(renderer, "fontRandom", "field_78289_c");
-		this.glyphWidth = (byte[]) HookUtils.getFieldObj(renderer, "glyphWidth", "field_78287_e");
-		this.colorCode = (int[]) HookUtils.getFieldObj(renderer, "colorCode", "field_78285_g");
-		this.textureManager = Minecraft.getMinecraft().getTextureManager();
-		this.unicodeText = (Boolean) HookUtils.getFieldObj(renderer, "unicodeFlag", "field_78293_l");
+		// This is some of the reasons optimizations mods doesn't exist in these versions.
+		try {
+			if (RenderGlobalHook.OPTIFINE_ACTIVE) {
+				throw new RuntimeException("OptiFine active...");
+			}
+
+			this.charWidth = this.copyCharWidth((int[]) HookUtils.getFieldObj(renderer, "charWidth", "field_78286_d"));
+			this.fontRandom = (Random) HookUtils.getFieldObj(renderer, "fontRandom", "field_78289_c");
+			this.glyphWidth = (byte[]) HookUtils.getFieldObj(renderer, "glyphWidth", "field_78287_e");
+			this.colorCode = (int[]) HookUtils.getFieldObj(renderer, "colorCode", "field_78285_g");
+			this.textureManager = Minecraft.getMinecraft().getTextureManager();
+			this.unicodeText = (Boolean) HookUtils.getFieldObj(renderer, "unicodeFlag", "field_78293_l");
+		} catch (Exception ignored) {
+			this.charWidth = (float[]) HookUtils.getFieldObj(renderer, "d", "d");
+			this.fontRandom = (Random) HookUtils.getFieldObj(renderer, "fontRandom", "field_78289_c");
+			this.glyphWidth = (byte[]) HookUtils.getFieldObj(renderer, "glyphWidth", "field_78287_e");
+			this.colorCode = (int[]) HookUtils.getFieldObj(renderer, "colorCode", "field_78285_g");
+			this.textureManager = Minecraft.getMinecraft().getTextureManager();
+			this.unicodeText = (Boolean) HookUtils.getFieldObj(renderer, "unicodeFlag", "field_78293_l");
+		}
 
 		for (char i = 0; i < 256; i++) {
 			ALLOWED_CHARACTERS_INDEX[i] = ChatAllowedCharacters.allowedCharacters.indexOf(i);

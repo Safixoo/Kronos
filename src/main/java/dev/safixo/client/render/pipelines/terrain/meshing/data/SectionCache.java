@@ -1,5 +1,6 @@
 package dev.safixo.client.render.pipelines.terrain.meshing.data;
 
+import dev.safixo.client.render.pipelines.terrain.meshing.ModelColorizer;
 import dev.safixo.client.util.MathExt;
 import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;
@@ -17,6 +18,9 @@ import dev.safixo.client.util.data.PrimitivesFlags;
 import java.util.Arrays;
 
 public class SectionCache implements IBlockAccess {
+	private static final Chunk[] CHUNKS = new Chunk[3 * 3];
+	private static final ModelColorizer COLORIZER = new ModelColorizer();
+
 	private static final byte[] DEFAULT_BYTE_ARRAY = new byte[16 * 16 * 16];
 	private static final byte[] DEFAULT_FULL_BYTE_ARRAY = new byte[16 * 16 * 16];
 
@@ -26,8 +30,9 @@ public class SectionCache implements IBlockAccess {
 
 	private final World worldObj;
 	public final int blockX, blockY, blockZ;
+	private boolean uniformBiome;
 
-	private static final int BIOME_RADIUS = 1;
+	public static final int BIOME_RADIUS = 1;
 	private static final int BIOME_CHUNK_WIDTH = 16 + (BIOME_RADIUS * 2);
 	private static final byte[] BIOMES = new byte[BIOME_CHUNK_WIDTH * BIOME_CHUNK_WIDTH];
 
@@ -36,12 +41,14 @@ public class SectionCache implements IBlockAccess {
 	public static final byte[][] SKY_LIGHT = new byte[3 * 3 * 3][];
 	public static final byte[][] BLOCK_LIGHT = new byte[3 * 3 * 3][];
 
-	private static final Chunk[] CHUNKS = new Chunk[3 * 3];
-
 	private static byte[] CENTER_BLOCKS;
 	private static byte[] CENTER_DATA;
 
 	private boolean centerSectEmpty;
+
+	public int waterColor;
+	public int foliageColor;
+	public int grassColor;
 
 	static {
 		Arrays.fill(SECTION_BLOCKS, DEFAULT_BYTE_ARRAY);
@@ -133,6 +140,8 @@ public class SectionCache implements IBlockAccess {
 
 			int centerBlockX = this.blockX + 16;
 			int centerBlockZ = this.blockZ + 16;
+			BiomeGenBase biome = null;
+			boolean uniformed = true;
 
 			for (int blockX = centerBlockX - BIOME_RADIUS; blockX < centerBlockX + 16 + BIOME_RADIUS; blockX++) {
 				for (int blockZ = centerBlockZ - BIOME_RADIUS; blockZ < centerBlockZ + 16 + BIOME_RADIUS; blockZ++) {
@@ -151,8 +160,21 @@ public class SectionCache implements IBlockAccess {
 						biomeGenBase = chunk.getBiomeGenForWorldCoords(blockX & 15, blockZ & 15, manager);
 					}
 
+					if (biome == null || biome != biomeGenBase) {
+						uniformed = false;
+					}
+
+					biome = biomeGenBase;
 					BIOMES[relBiomeX + relBiomeZ * BIOME_CHUNK_WIDTH] = (byte) biomeGenBase.biomeID;
 				}
+			}
+
+			this.uniformBiome = uniformed;
+
+			if (uniformed) {
+				this.grassColor = COLORIZER.getBlockGrassColor(this, this.blockX + 16, this.blockY + 16, this.blockZ + 16);
+				this.foliageColor = COLORIZER.getBlockLeavesColor(this, this.blockX + 16, this.blockY + 16, this.blockZ + 16);
+				this.waterColor = COLORIZER.getBlockWaterColor(this, this.blockX + 16, this.blockY + 16, this.blockZ + 16);
 			}
 		}
 
@@ -196,6 +218,10 @@ public class SectionCache implements IBlockAccess {
 		int blockInd = makeBlockIndex(blockX & 15, blockY & 15, blockZ & 15);
 
 		return MathExt.byteToUnsigned(SECTION_BLOCKS[sectInd][blockInd]);
+	}
+
+	public boolean isBiomeUniform() {
+		return this.uniformBiome;
 	}
 
 	@Override

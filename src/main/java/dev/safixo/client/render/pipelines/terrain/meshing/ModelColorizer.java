@@ -7,6 +7,7 @@ import net.minecraft.block.Block;
 import net.minecraft.world.ColorizerFoliage;
 import net.minecraft.world.ColorizerGrass;
 import net.minecraft.world.biome.BiomeGenBase;
+import net.minecraft.world.biome.BiomeGenSwamp;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.terraingen.BiomeEvent;
 
@@ -16,6 +17,8 @@ public class ModelColorizer {
 	public static final int WATER_COLOR = 3;
 	public static final int DEFAULT_COLOR = 4;
 
+	private static final int SAMPLE_SIZE = MathExt.square(SectionCache.BIOME_RADIUS * 2 + 1);
+
 	private BiomeEvent.GetGrassColor grassEvent;
 	private BiomeEvent.GetWaterColor waterEvent;
 	private BiomeEvent.GetFoliageColor foliageEvent;
@@ -23,12 +26,22 @@ public class ModelColorizer {
 	public int getColor(SectionCache cache, int x, int y, int z, Block block) {
 		int colorizeType = PrimitivesFlags.COLOR_MODULATOR[block.blockID];
 
-		switch (colorizeType) {
-			case DEFAULT_COLOR: return 0xFF_FF_FF_FF;
-			case GRASS_COLOR: return this.getBlockGrassColor(cache, x, y, z);
-			case LEAVES_COLOR: return this.getBlockLeavesColor(cache, x, y, z);
-			case WATER_COLOR: return this.getBlockWaterColor(cache, x, y, z);
-			default: return block.colorMultiplier(cache, x, y, z); // slow path.
+		if (cache.isBiomeUniform()) {
+			switch (colorizeType) {
+				case DEFAULT_COLOR: return 0xFF_FF_FF_FF;
+				case GRASS_COLOR: return cache.grassColor;
+				case LEAVES_COLOR: return cache.foliageColor;
+				case WATER_COLOR: return cache.waterColor;
+				default: return block.colorMultiplier(cache, x, y, z); // slow path.
+			}
+		} else {
+			switch (colorizeType) {
+				case DEFAULT_COLOR: return 0xFF_FF_FF_FF;
+				case GRASS_COLOR: return this.getBlockGrassColor(cache, x, y, z);
+				case LEAVES_COLOR: return this.getBlockLeavesColor(cache, x, y, z);
+				case WATER_COLOR: return this.getBlockWaterColor(cache, x, y, z);
+				default: return block.colorMultiplier(cache, x, y, z); // slow path.
+			}
 		}
 	}
 
@@ -46,8 +59,8 @@ public class ModelColorizer {
 		int g = 0;
 		int r = 0;
 
-		for (int relZ = -1; relZ <= 1; relZ++) {
-			for (int relX = -1; relX <= 1; relX++) {
+		for (int relZ = -SectionCache.BIOME_RADIUS; relZ <= SectionCache.BIOME_RADIUS; relZ++) {
+			for (int relX = -SectionCache.BIOME_RADIUS; relX <= SectionCache.BIOME_RADIUS; relX++) {
 				BiomeGenBase biome = cache.getBiomeGenForCoords(x + relX, z + relZ);
 				int color = this.getBiomeFoliageColor(biome);
 
@@ -58,9 +71,9 @@ public class ModelColorizer {
 		}
 
 		// presumably jit-optimized into a couple of multiplications and shifts.
-		r /= 9;
-		g /= 9;
-		b /= 9;
+		r /= SAMPLE_SIZE;
+		g /= SAMPLE_SIZE;
+		b /= SAMPLE_SIZE;
 		return (b & 0xFF) << 16 | (g & 0xFF) << 8 | (r & 0xFF);
 	}
 
@@ -69,8 +82,8 @@ public class ModelColorizer {
 		int g = 0;
 		int r = 0;
 
-		for (int relZ = -1; relZ <= 1; relZ++) {
-			for (int relX = -1; relX <= 1; relX++) {
+		for (int relZ = -SectionCache.BIOME_RADIUS; relZ <= SectionCache.BIOME_RADIUS; relZ++) {
+			for (int relX = -SectionCache.BIOME_RADIUS; relX <= SectionCache.BIOME_RADIUS; relX++) {
 				BiomeGenBase biome = cache.getBiomeGenForCoords(x + relX, z + relZ);
 				int color = this.getBiomeGrassColor(biome);
 
@@ -80,9 +93,9 @@ public class ModelColorizer {
 			}
 		}
 
-		r /= 9;
-		g /= 9;
-		b /= 9;
+		r /= SAMPLE_SIZE;
+		g /= SAMPLE_SIZE;
+		b /= SAMPLE_SIZE;
 		return (b & 0xFF) << 16 | (g & 0xFF) << 8 | (r & 0xFF);
 	}
 
@@ -91,8 +104,8 @@ public class ModelColorizer {
 		int g = 0;
 		int r = 0;
 
-		for (int relZ = -1; relZ <= 1; relZ++) {
-			for (int relX = -1; relX <= 1; relX++) {
+		for (int relZ = -SectionCache.BIOME_RADIUS; relZ <= SectionCache.BIOME_RADIUS; relZ++) {
+			for (int relX = -SectionCache.BIOME_RADIUS; relX <= SectionCache.BIOME_RADIUS; relX++) {
 				BiomeGenBase biome = cache.getBiomeGenForCoords(x + relX, z + relZ);
 				int color = this.getWaterColorEvent(biome);
 
@@ -102,30 +115,44 @@ public class ModelColorizer {
 			}
 		}
 
-		r /= 9;
-		g /= 9;
-		b /= 9;
+		r /= SAMPLE_SIZE;
+		g /= SAMPLE_SIZE;
+		b /= SAMPLE_SIZE;
 		return (b & 0xFF) << 16 | (g & 0xFF) << 8 | (r & 0xFF);
 	}
 
 	private int getBiomeGrassColor(BiomeGenBase biome) {
 		double temp = MathExt.clamp(biome.getFloatTemperature(), 0.0F, 1.0F);
 		double rainFall = MathExt.clamp(biome.getFloatRainfall(), 0.0F, 1.0F);
+		int color;
 
-		return getGrassColorEvent(biome, ColorizerGrass.getGrassColor(temp, rainFall));
+		if (biome.getClass() == BiomeGenSwamp.class) {
+			color = ((ColorizerGrass.getGrassColor(temp, rainFall) & 0xFEFEFE) + 0x4E0E4E) >> 1;
+		} else {
+			color = ColorizerGrass.getGrassColor(temp, rainFall);
+		}
+
+		return this.getGrassColorEvent(biome, color);
 	}
 
 	private int getBiomeFoliageColor(BiomeGenBase biome) {
 		double temp = MathExt.clamp(biome.getFloatTemperature(), 0.0F, 1.0F);
 		double rainFall = MathExt.clamp(biome.getFloatRainfall(), 0.0F, 1.0F);
+		int color;
 
-		return getFoliageColorEvent(biome, ColorizerFoliage.getFoliageColor(temp, rainFall));
+		if (biome.getClass() == BiomeGenSwamp.class) {
+			color = ((ColorizerFoliage.getFoliageColor(temp, rainFall) & 0xFEFEFE) + 0x4E0E4E) >> 1;
+		} else {
+			color = ColorizerFoliage.getFoliageColor(temp, rainFall);
+		}
+
+		return this.getFoliageColorEvent(biome, color);
 	}
 
 	private int getWaterColorEvent(BiomeGenBase biome) {
 		BiomeEvent.GetWaterColor event;
 
-		if (this.foliageEvent == null || this.foliageEvent.biome != biome) {
+		if (this.waterEvent == null || this.waterEvent.biome != biome) {
 			event = this.waterEvent = new BiomeEvent.GetWaterColor(biome, biome.waterColorMultiplier);
 		} else {
 			event = this.waterEvent;
@@ -138,7 +165,7 @@ public class ModelColorizer {
 	private int getGrassColorEvent(BiomeGenBase biome, int original) {
 		BiomeEvent.GetGrassColor event;
 
-		if (this.foliageEvent == null || this.foliageEvent.biome != biome || this.foliageEvent.originalColor != original) {
+		if (this.grassEvent == null || this.grassEvent.biome != biome || this.grassEvent.originalColor != original) {
 			event = this.grassEvent = new BiomeEvent.GetGrassColor(biome, original);
 		} else {
 			event = this.grassEvent;

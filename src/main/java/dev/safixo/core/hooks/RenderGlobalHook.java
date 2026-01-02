@@ -117,16 +117,35 @@ public  class RenderGlobalHook {
 		minecraft.entityRenderer.enableLightmap(partialTick);
 		GL11.glEnable(GL11.GL_CULL_FACE);
 
-		if (renderPass == 0) {
+		if (!OPTIFINE_ACTIVE) {
+			if (renderPass == 0) {
+				// Render solid pass.
+				MANAGER.drawRenderPass(0);
+				HookUtils.setField(global, "renderersBeingRendered", "field_72746_N", MANAGER.drawnSolidRenderers);
+				MANAGER.drawnSolidRenderers = 0;
+			} else {
+				// Render translucent pass.
+				GL11.glDisable(GL11.GL_ALPHA_TEST);
+				GL11.glColorMask(true, true, true, true);
+				MANAGER.drawRenderPass(1);
+				GL11.glEnable(GL11.GL_ALPHA_TEST);
+			}
+		} else {
 			// Render solid pass.
-			MANAGER.drawRenderPass(renderPass);
+			MANAGER.drawRenderPass(0);
 			HookUtils.setField(global, "renderersBeingRendered", "field_72746_N", MANAGER.drawnSolidRenderers);
 			MANAGER.drawnSolidRenderers = 0;
-		} else {
+
+			// Render translucent pass.
+			GL11.glEnable(GL11.GL_BLEND);
+			GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
 			GL11.glDisable(GL11.GL_ALPHA_TEST);
+
 			GL11.glColorMask(true, true, true, true);
-			MANAGER.drawRenderPass(renderPass);
+			MANAGER.drawRenderPass(1);
+
 			GL11.glEnable(GL11.GL_ALPHA_TEST);
+			GL11.glDisable(GL11.GL_BLEND);
 		}
 
 		// Disable lightmap.
