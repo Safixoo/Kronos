@@ -36,7 +36,7 @@ public class RegionRender {
 	public int regionX, regionY, regionZ;
 
 	public static final int BLOCK_SHIFT_X = 7;
-	public static final int BLOCK_SHIFT_Y = 6;
+	public static final int BLOCK_SHIFT_Y = 7;
 	public static final int BLOCK_SHIFT_Z = 7;
 
 	public static final int BLOCK_BITS_X = (1 << BLOCK_SHIFT_X) - 1;
@@ -74,19 +74,19 @@ public class RegionRender {
 
 	// Each time a section is queued for rendering, its region index is saved
 	// in the drawIndex position of renderIndices, the top is signaled by drawInd.
-	public final byte[] renderIndices = new byte[REGION_SECTION_SIZE];
+	public final short[] renderIndices = new short[REGION_SECTION_SIZE];
 
 	// If nothing has changed since the last draw, including the visible bit-set,
 	// section count and render-indices try to re-use last draw command setup.
 	private final int[] lastDrawCount = new int[RENDER_PASSES];
-	private final byte[] lastRenderIndices = new byte[RENDER_PASSES * REGION_SECTION_SIZE];
+	private final short[] lastRenderIndices = new short[RENDER_PASSES * REGION_SECTION_SIZE];
 
 	// This is important as the direction enum, is ordered in a way that fundamentally
 	// makes impossible batching draw without meshes being meshed in very specific
 	// conditions/ways, also makes batching generally much more effective.
 	private final int[] meshDirectionsOrdered = new int[REGION_SECTION_SIZE];
 
-	private boolean[] shouldCachePass = new boolean[RENDER_PASSES];
+	private final boolean[] shouldCachePass = new boolean[RENDER_PASSES];
 	private int lastVisibleSet = -1, lastVisibleCount;
 
 	// Number of sections queued for draw in the current frame.
@@ -237,7 +237,7 @@ public class RegionRender {
 			return;
 		}
 
-		final byte[] renderIndices = this.renderIndices;
+		final short[] renderIndices = this.renderIndices;
 		final byte[] drawDataMask = this.drawDataMask;
 
 		int index;
@@ -258,7 +258,7 @@ public class RegionRender {
 		int drawCount = 0;
 
 		while (index != end) {
-			int regionIndex = renderIndices[index] & 0xFF;
+			int regionIndex = renderIndices[index];
 			int drawMask = drawDataMask[regionIndex];
 
 			drawCount = pass == 0
@@ -316,8 +316,8 @@ public class RegionRender {
 		}
 
 		final int offset = pass == 1 ? REGION_SECTION_SIZE : 0;
-		final byte[] lastRenderIndices = this.lastRenderIndices;
-		final byte[] renderIndices = this.renderIndices;
+		final short[] lastRenderIndices = this.lastRenderIndices;
+		final short[] renderIndices = this.renderIndices;
 		final int maxIndex = this.sectionsToRender;
 
 		int index = 0;
@@ -457,7 +457,7 @@ public class RegionRender {
 		int bitsY = sectionY & (BLOCK_BITS_Y >> 4);
 		int bitsZ = sectionZ & (BLOCK_BITS_Z >> 4);
 
-		return (bitsX << 0) | (bitsY << 3) | (bitsZ << 5);
+		return (bitsX << 0) | (bitsY << 3) | (bitsZ << 6);
 	}
 
 	// Generates an order of drawing of directions that makes draw-batching more favorable.
@@ -481,15 +481,15 @@ public class RegionRender {
 	}
 
 	public static int sectionX(int regionIndex) {
- 		return (regionIndex & 0b000_00_111) >>> 0;
+ 		return (regionIndex & 0b000_000_111) >>> 0;
 	}
 
 	public static int sectionY(int regionIndex) {
-		return (regionIndex & 0b000_11_000) >>> 3;
+		return (regionIndex & 0b000_111_000) >>> 3;
 	}
 
 	public static int sectionZ(int regionIndex) {
-		return (regionIndex & 0b111_00_000) >>> 5;
+		return (regionIndex & 0b111_000_000) >>> 6;
 	}
 
 	public int centerBlockX() {

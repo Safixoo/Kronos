@@ -20,7 +20,7 @@ const float POSITION_SCALE = 1u << 20u;
 const float RADIUS = 0.1;
 
 const float REGION_SIZE_X = 128u + RADIUS * 2;
-const float REGION_SIZE_Y = 64u  + RADIUS * 2;
+const float REGION_SIZE_Y = 128u + RADIUS * 2;
 const float REGION_SIZE_Z = 128u + RADIUS * 2;
 
 const float REGION_SCALE_X = REGION_SIZE_X / POSITION_SCALE;
