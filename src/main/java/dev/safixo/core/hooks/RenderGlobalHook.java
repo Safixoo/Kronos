@@ -4,7 +4,7 @@ import dev.safixo.client.render.ImprovedTessellator;
 import dev.safixo.client.render.pipelines.cloud.CloudRenderer;
 import dev.safixo.client.render.pipelines.terrain.SectionManager;
 import dev.safixo.client.render.vertex.VertexWriterManager;
-import dev.safixo.client.util.data.BlocksFlags;
+import dev.safixo.client.util.data.PrimitivesFlags;
 import dev.safixo.core.HookUtils;
 import net.minecraft.block.Block;
 import net.minecraft.client.Minecraft;
@@ -89,7 +89,7 @@ public  class RenderGlobalHook {
 			realRenderDistance = (Integer) HookUtils.getFieldObj(minecraft.gameSettings, "ofRenderDistanceFine", "ofRenderDistanceFine") >> 4;
 		}
 
-		if (BlocksFlags.DEV_ENVIRONMENT) {
+		if (PrimitivesFlags.DEV_ENVIRONMENT) {
 			Minecraft.getMinecraft().thePlayer.capabilities.setFlySpeed(0.25f);
 		}
 

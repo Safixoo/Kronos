@@ -71,9 +71,9 @@ public class RegionAllocation {
 					int flags = alloc.render.flags;
 
 					flags = SectionFlags.setPassesNonEmpty(flags, 0b00);
-					flags = SectionFlags.setDirty(flags, true);
 
 					alloc.render.flags = flags;
+					alloc.render.markDirty(true);
 					alloc = alloc.next;
 				}
 
@@ -124,9 +124,9 @@ public class RegionAllocation {
 
 			flags = SectionFlags.setPassesNonEmpty(flags, 0b00);
 			flags = SectionFlags.setDrawableFaces(flags, 0b0);
-			flags = SectionFlags.setDirty(flags, true);
 
 			alloc.render.flags = flags;
+			alloc.render.markDirty(true);
 			alloc.render.clearAllocations();
 			alloc.render = null;
 

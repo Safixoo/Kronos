@@ -13,7 +13,7 @@ import dev.safixo.client.util.MeshDirection;
 import dev.safixo.client.util.data.CameraData;
 import dev.safixo.client.render.vertex.VertexWriterManager;
 import dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache;
-import dev.safixo.client.util.data.BlocksFlags;
+import dev.safixo.client.util.data.PrimitivesFlags;
 import dev.safixo.client.util.Direction;
 import dev.safixo.client.render.vertex.DefaultVertexFormats;
 import net.minecraft.client.renderer.tileentity.TileEntityRenderer;
@@ -181,6 +181,18 @@ public class SectionRender {
 		translucentWriter.stopDrawing();
 	}
 
+	public void markDirty(boolean state) {
+		if (state) {
+			this.currentFrame = Integer.MIN_VALUE;
+		}
+
+		this.flags = SectionFlags.setDirty(this.flags, state);
+	}
+
+	public boolean isDirty() {
+		return SectionFlags.isDirty(this.flags);
+	}
+
 	private void meshBlockCenter(RenderBlocks renderBlocks, SectionCache cache, int x, int y, int z, int[] solidBlocks, boolean ambient) {
 		int blockId = cache.getBlockIdCenter(x, y, z);
 
@@ -198,7 +210,7 @@ public class SectionRender {
 
 		int blockX = x + this.blockX, blockY = y + this.blockY, blockZ = z + this.blockZ;
 
-		if (BlocksFlags.SOLID[blockId]) {
+		if (PrimitivesFlags.SOLID[blockId]) {
 			if (y == 0 || y == 15) {
 				solidBlocks[Direction.DOWN + (y & 1)]++;
 			}
@@ -259,7 +271,7 @@ public class SectionRender {
 		int blockY = y + this.blockY;
 		int blockZ = z + this.blockZ;
 
-		if (BlocksFlags.SOLID[blockId]) {
+		if (PrimitivesFlags.SOLID[blockId]) {
 			if (y == 0 || y == 15) {
 				solidBlocks[Direction.DOWN + (y & 1)]++;
 			}

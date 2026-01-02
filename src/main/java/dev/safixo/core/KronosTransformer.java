@@ -1,8 +1,7 @@
 package dev.safixo.core;
 
-import dev.safixo.client.util.data.BlocksFlags;
+import dev.safixo.client.util.data.PrimitivesFlags;
 import dev.safixo.core.hooks.LongHashMapHook;
-import net.minecraft.client.renderer.RenderGlobal;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.ClassWriter;
 import net.minecraft.launchwrapper.IClassTransformer;
@@ -141,15 +140,16 @@ public class KronosTransformer implements IClassTransformer {
 		FUNCTION_NAMES.add("glBindTexture");
 		FUNCTION_NAMES.add("glColorMaterial");
 		FUNCTION_NAMES.add("glViewport");
-		FUNCTION_NAMES.add("glGetInteger");
 		FUNCTION_NAMES.add("glColor4f");
 		FUNCTION_NAMES.add("glColor3f");
 		FUNCTION_NAMES.add("glDepthFunc");
 		FUNCTION_NAMES.add("glClear");
-		FUNCTION_NAMES.add("glBindBuffer");
-		FUNCTION_NAMES.add("glBegin");
 		FUNCTION_NAMES.add("glBlendFunc");
 		FUNCTION_NAMES.add("glDepthMask");
+
+		FUNCTION_NAMES.add("glGetInteger");
+		FUNCTION_NAMES.add("glBindBuffer");
+		FUNCTION_NAMES.add("glBegin");
 
 		FUNCTION_NAMES.add("glEnableClientState");
 		FUNCTION_NAMES.add("glDisableClientState");
@@ -162,6 +162,11 @@ public class KronosTransformer implements IClassTransformer {
 		FUNCTION_NAMES.add("glFogf");
 		FUNCTION_NAMES.add("glFogi");
 
+		FUNCTION_NAMES.add("glFrustum");
+		FUNCTION_NAMES.add("glOrtho");
+
+		FUNCTION_NAMES.add("gluPerspective");
+
 		FUNCTION_NAMES.add("update");
 	}
 
@@ -170,7 +175,7 @@ public class KronosTransformer implements IClassTransformer {
 		ClassNode classNode = new ClassNode();
 		reader.accept(classNode, 0);
 
-		String renderWorld = BlocksFlags.DEV_ENVIRONMENT ? "renderWorld" : "a";
+		String renderWorld = PrimitivesFlags.DEV_ENVIRONMENT ? "renderWorld" : "a";
 
 		for (int i = 0; i < classNode.methods.size(); i++) {
 			MethodNode node = (MethodNode) classNode.methods.get(i);

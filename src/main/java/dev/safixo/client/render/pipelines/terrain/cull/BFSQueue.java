@@ -3,6 +3,8 @@ package dev.safixo.client.render.pipelines.terrain.cull;
 import dev.safixo.client.render.pipelines.terrain.SectionRender;
 import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
 
+import java.util.Arrays;
+
 public class BFSQueue {
 	public SectionRender[] sectionRenders;
 	public RegionRender[] regionRenders;
@@ -41,11 +43,8 @@ public class BFSQueue {
 	}
 
 	public void clear() {
-		for (int i = 0; i < this.position; i++) {
-			this.sectionRenders[i] = null;
-		}
-
-		this.position = 1;
+		Arrays.fill(this.sectionRenders, null);
+		this.position = 0;
 	}
 
 	public SectionRender get(int position) {

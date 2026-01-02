@@ -15,7 +15,7 @@ import org.lwjgl.input.Keyboard;
 import dev.safixo.client.render.pipelines.terrain.cull.BFSCuller;
 import dev.safixo.client.render.pipelines.terrain.cull.FrustumCuller;
 import dev.safixo.client.render.pipelines.terrain.cull.RebuildList;
-import dev.safixo.client.util.data.BlocksFlags;
+import dev.safixo.client.util.data.PrimitivesFlags;
 import dev.safixo.client.util.data.CameraData;
 import dev.safixo.client.render.pipelines.terrain.region.RegionManager;
 import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
@@ -26,7 +26,7 @@ import java.util.List;
 import java.util.Set;
 
 public class SectionManager {
-	private static final int MAX_UPDATE_QUEUES = 30;
+	public static final int MAX_UPDATE_QUEUES = 16;
 	private static final Item DEBUG_ITEM = null;
 
 	private final Long2ReferenceOpenHashMap<SectionRender> sectionMap = new Long2ReferenceOpenHashMap<>(4096);
@@ -42,10 +42,6 @@ public class SectionManager {
 	private long vramUsed, vramAllocated;
 	private int renderDistance;
 	public int drawnSolidRenderers;
-
-	private final long[] lastFrameSamples = new long[32];
-	private long lastFrameTime, lastFrameBudget;
-	private int frameSampleInd;
 
 	private final ReferenceOpenHashSet<TileEntity> tileEntitiesSet = new ReferenceOpenHashSet<>();
 
@@ -137,11 +133,7 @@ public class SectionManager {
 			return;
 		}
 
-		sectionRender.flags = SectionFlags.setDirty(sectionRender.flags, true);
-
-		if (this.camera != null && MathExt.squaredDistanceXZ(sectionRender, this.camera) < MathExt.square(24.0f)) {
-			RebuildList.addToList(sectionRender);
-		}
+		sectionRender.markDirty(true);
 	}
 
 	public static void destroyInstance() {
@@ -194,7 +186,7 @@ public class SectionManager {
 
 		profiler.endStartSection("updatechunks");
 
-		this.queueRebuilds(this.tileEntitiesSet, partialTick);
+		this.queueRebuilds(this.tileEntitiesSet);
 
 		profiler.endStartSection("ticking");
 
@@ -218,72 +210,27 @@ public class SectionManager {
 		return new CameraData(fractX, fractY, fractZ, playerX, playerY, playerZ, renderDistance);
 	}
 
-	private void queueRebuilds(Set<TileEntity> tileSet, float partialTick) {
-		long currentTime = System.nanoTime();
-		long currentDiff = this.lastFrameTime == 0 ? 200_000_000 : currentTime - this.lastFrameTime;
-
-		this.addFrameSample(currentDiff);
-
-		long maxBudget = Math.min(this.getFrameMedian() >>> 1, 550_000_000);
-		long lerpedBudget = MathExt.lerp(this.lastFrameBudget, maxBudget, (double) partialTick);
-
-		this.lastFrameBudget = lerpedBudget;
-		this.lastFrameTime = currentTime;
-
+	private void queueRebuilds(Set<TileEntity> tileSet) {
 		int rebuildSize = RebuildList.size();
 		int maxSize = Math.min(MAX_UPDATE_QUEUES, rebuildSize);
 
-		if (rebuildSize == 0) {
-			return;
-		}
+		SectionRender[] updateArray = RebuildList.getBackedArray();
+		PrimitivesFlags.processLeavesSolid();
 
-		int i = 0;
+		for (int i = 0; i < maxSize; i++) {
+			SectionRender section = updateArray[i];
 
-		int samples = 0;
-		long timePassed = 0L;
-		long estimatedTime = 0L;
-
-		SectionRender[] backedArr = RebuildList.getBackedArray(this.camera);
-		SectionRender render = backedArr[i++];
-
-		BlocksFlags.processLeavesSolid();
-
-		while (i < maxSize && SectionFlags.isDirty(render.flags) && MathExt.squaredDistanceXZ(render, this.camera) < MathExt.square(24.0f)) {
-			render.rebuild(this.camera, this, this.worldObj, tileSet);
-			render = backedArr[i++];
-		}
-
-		while (i < maxSize && timePassed < lerpedBudget && estimatedTime < lerpedBudget) {
-			currentTime = System.nanoTime();
-
-			render = backedArr[i++];
-
-			if (SectionFlags.isDirty(render.flags) && render.currentFrame == this.bfsCuller.getActiveFrame()) {
-				render.rebuild(this.camera, this, this.worldObj, tileSet);
-				samples++;
-				timePassed += System.nanoTime() - currentTime;
-				estimatedTime = (timePassed / samples) * (MAX_UPDATE_QUEUES - i);
+			if (section.currentFrame == this.bfsCuller.getActiveFrame() && section.isDirty()) {
+				section.rebuild(this.camera, this, this.worldObj, tileSet);
 			}
 		}
 
 		RebuildList.clear();
 	}
 
-	public void addFrameSample(long currentDiff) {
-		this.lastFrameSamples[this.frameSampleInd++] = currentDiff;
-		this.frameSampleInd &= 31;
-	}
-
-	// Median should give a better result than prom for
-	// avoiding lag spikes it seems.
-	public long getFrameMedian() {
-		LongArrays.radixSort(this.lastFrameSamples);
-		return this.lastFrameSamples[16];
-	}
-
 	private void dirtyAllSections() {
 		for (SectionRender section : this.sectionMap.values()) {
-			section.flags = SectionFlags.setDirty(section.flags, true);
+			section.markDirty(true);
 		}
 	}
 

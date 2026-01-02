@@ -1,15 +1,15 @@
 package dev.safixo.core;
 
-import dev.safixo.client.util.data.BlocksFlags;
+import dev.safixo.client.util.data.PrimitivesFlags;
 import java.lang.reflect.Field;
 
 public class HookUtils {
 	public static Object getFieldObj(Object instance, String fieldName, String fieldNotch) {
-		if (!BlocksFlags.DETECTED) {
-			BlocksFlags.processDevInfo();
+		if (!PrimitivesFlags.DETECTED) {
+			PrimitivesFlags.processDevInfo();
 		}
 
-		if (!BlocksFlags.DEV_ENVIRONMENT) {
+		if (!PrimitivesFlags.DEV_ENVIRONMENT) {
 			fieldName = fieldNotch;
 		}
 
@@ -26,11 +26,11 @@ public class HookUtils {
 	}
 
 	public static void setField(Object instance, String fieldName, String fieldNotch, Object value) {
-		if (!BlocksFlags.DETECTED) {
-			BlocksFlags.processDevInfo();
+		if (!PrimitivesFlags.DETECTED) {
+			PrimitivesFlags.processDevInfo();
 		}
 
-		if (!BlocksFlags.DEV_ENVIRONMENT) {
+		if (!PrimitivesFlags.DEV_ENVIRONMENT) {
 			fieldName = fieldNotch;
 		}
 
@@ -44,11 +44,11 @@ public class HookUtils {
 	}
 
 	public static Object getFieldStatic(Class<?> clazz, String fieldName, String fieldNotch) {
-		if (!BlocksFlags.DETECTED) {
-			BlocksFlags.processDevInfo();
+		if (!PrimitivesFlags.DETECTED) {
+			PrimitivesFlags.processDevInfo();
 		}
 
-		if (!BlocksFlags.DEV_ENVIRONMENT) {
+		if (!PrimitivesFlags.DEV_ENVIRONMENT) {
 			fieldName = fieldNotch;
 		}
 
@@ -77,11 +77,11 @@ public class HookUtils {
 	}
 
 	public static Field getField(Class<?> clazz, String fieldName, String fieldNotch) {
-		if (!BlocksFlags.DETECTED) {
-			BlocksFlags.processDevInfo();
+		if (!PrimitivesFlags.DETECTED) {
+			PrimitivesFlags.processDevInfo();
 		}
 
-		if (!BlocksFlags.DEV_ENVIRONMENT) {
+		if (!PrimitivesFlags.DEV_ENVIRONMENT) {
 			fieldName = fieldNotch;
 		}
 
@@ -98,11 +98,11 @@ public class HookUtils {
 	}
 
 	public static Field getField(Object instance, String fieldName, String fieldNotch) {
-		if (!BlocksFlags.DETECTED) {
-			BlocksFlags.processDevInfo();
+		if (!PrimitivesFlags.DETECTED) {
+			PrimitivesFlags.processDevInfo();
 		}
 
-		if (!BlocksFlags.DEV_ENVIRONMENT) {
+		if (!PrimitivesFlags.DEV_ENVIRONMENT) {
 			fieldName = fieldNotch;
 		}
 

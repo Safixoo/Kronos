@@ -42,9 +42,9 @@ public class BFSCuller {
 	 * of sections to start the search afterward.
 	 */
 	public void updateRenderList(Long2ReferenceOpenHashMap<SectionRender> sectionMap, CameraData camera) {
-		int chunkX = MathExt.floor(camera.intX);
-		int chunkY = MathExt.clamp(MathExt.floor(camera.intY), 0, 255);
-		int chunkZ = MathExt.floor(camera.intZ);
+		int chunkX = camera.intX;
+		int chunkY = MathExt.clamp(camera.intY, 0, 255);
+		int chunkZ = camera.intZ;
 
 		SectionRender origin = sectionMap.get(MathExt.asLong(chunkX >> 4, chunkY >> 4, chunkZ >> 4));
 
@@ -78,7 +78,7 @@ public class BFSCuller {
 	 */
 	private static void search(BFSQueue bfsQueue, int playerX, int playerY, int playerZ,
 							   int renderDistance, int activeFrame) {
-		int bfsIndex = 1;
+		int bfsIndex = 0;
 		SectionRender node;
 
 		while ((node = bfsQueue.get(bfsIndex++)) != null) {
@@ -144,7 +144,7 @@ public class BFSCuller {
 				bfsQueue.regionRenders[bfsQueue.regionPos++] = region;
 			}
 
-			region.renderIndices[region.sectionsToRender++] = (byte) section.regionIndex;
+			region.renderIndices[region.sectionsToRender++ & 0xFF] = (byte) section.regionIndex;
 		}
 	}
 
@@ -210,8 +210,9 @@ public class BFSCuller {
 			return true;
 		}
 
+		BFSVisArray.setVisible(node.blockX >> 4, node.blockY >> 4, node.blockZ >> 4);
+
 		if (!FrustumCuller.withinFrustumBounds(distX, distY, distZ)) {
-			BFSVisArray.setVisible(node.blockX >> 4, node.blockY >> 4, node.blockZ >> 4);
 			return true;
 		}
 
@@ -219,7 +220,6 @@ public class BFSCuller {
 		node.gridInd = gridInd;
 
 		if (gridInd < 0.1f) {
-			BFSVisArray.setVisible(node.blockX >> 4, node.blockY >> 4, node.blockZ >> 4);
 			return true;
 		}
 

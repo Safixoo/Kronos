@@ -7,6 +7,7 @@ import dev.safixo.client.util.memory.NativeBuffer;
 import dev.safixo.client.util.memory.UnsafeUtil;
 import dev.safixo.core.hooks.GlStateManager;
 import dev.safixo.core.hooks.TessellatorHook;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.Tessellator;
 import org.lwjgl.opengl.*;
@@ -148,7 +149,14 @@ public class ImprovedTessellator extends Tessellator {
 		this.flags = 0;
 
 		this.isDrawing = false;
-		return this.offset;
+		int offset = this.offset;
+
+		// workaround for being stupid.
+		if (Minecraft.getMinecraft().theWorld == null) {
+			this.flushState();
+		}
+
+		return offset;
 	}
 
 	public void flushState() {

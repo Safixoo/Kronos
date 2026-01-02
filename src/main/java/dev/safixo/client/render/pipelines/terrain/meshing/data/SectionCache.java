@@ -12,7 +12,7 @@ import net.minecraft.world.biome.WorldChunkManager;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.storage.ExtendedBlockStorage;
 import net.minecraftforge.common.ForgeDirection;
-import dev.safixo.client.util.data.BlocksFlags;
+import dev.safixo.client.util.data.PrimitivesFlags;
 
 import java.util.Arrays;
 
@@ -195,7 +195,7 @@ public class SectionCache implements IBlockAccess {
 		int sectInd = sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
 		int blockInd = makeBlockIndex(blockX & 15, blockY & 15, blockZ & 15);
 
-		return byteToUnsigned(SECTION_BLOCKS[sectInd][blockInd]);
+		return MathExt.byteToUnsigned(SECTION_BLOCKS[sectInd][blockInd]);
 	}
 
 	@Override
@@ -215,9 +215,9 @@ public class SectionCache implements IBlockAccess {
 		int blockZ = z - this.blockZ;
 
 		int sectionIndex = sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
-		int blockId = byteToUnsigned(SECTION_BLOCKS[sectionIndex][blockIndex]);
+		int blockId = MathExt.byteToUnsigned(SECTION_BLOCKS[sectionIndex][blockIndex]);
 
-		if (blockId != 0 && BlocksFlags.SOLID[blockId]) {
+		if (blockId != 0 && PrimitivesFlags.SOLID[blockId]) {
 			return 0;
 		}
 
@@ -228,7 +228,7 @@ public class SectionCache implements IBlockAccess {
 	}
 
 	public int getBlockIdCenter(int x, int y, int z) {
-		return byteToUnsigned(CENTER_BLOCKS[makeBlockIndex(x & 15, y & 15, z & 15)]);
+		return MathExt.byteToUnsigned(CENTER_BLOCKS[makeBlockIndex(x & 15, y & 15, z & 15)]);
 	}
 
 	public int getBlockIdCenter(int blockIndex) {
@@ -270,7 +270,7 @@ public class SectionCache implements IBlockAccess {
 	public Material getBlockMaterial(int x, int y, int z) {
 		int blockId = this.getBlockId(x, y, z);
 
-		return BlocksFlags.MATERIAL[blockId];
+		return PrimitivesFlags.MATERIAL[blockId];
 	}
 
 	public int isBlockOpaqueCubeInt(int x, int y, int z) {
@@ -282,14 +282,14 @@ public class SectionCache implements IBlockAccess {
 
 		int sectionIndex = sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
 
-		return BlocksFlags.SOLID_LIGHT_MASK[byteToUnsigned(SECTION_BLOCKS[sectionIndex][blockIndex])];
+		return PrimitivesFlags.SOLID_CULL_MASK[MathExt.byteToUnsigned(SECTION_BLOCKS[sectionIndex][blockIndex])];
 	}
 
 	public int isBlockOpaqueCubeRel(int x, int y, int z) {
 		int sectionIndex = sectionIndex(x >> 4, y >> 4, z >> 4);
 		int blockInd = makeBlockIndex(x & 15, y & 15, z & 15);
 
-		return BlocksFlags.SOLID_LIGHT_MASK[byteToUnsigned(SECTION_BLOCKS[sectionIndex][blockInd])];
+		return PrimitivesFlags.SOLID_CULL_MASK[MathExt.byteToUnsigned(SECTION_BLOCKS[sectionIndex][blockInd])];
 	}
 
 	@Override
@@ -298,16 +298,12 @@ public class SectionCache implements IBlockAccess {
 	}
 
 	public int isBlockOpaqueCubeCenter(int blockIndex) {
-		return BlocksFlags.SOLID_LIGHT_MASK[byteToUnsigned(CENTER_BLOCKS[blockIndex])];
-	}
-
-	public static int byteToUnsigned(byte id) {
-		return id & 0xFF;
+		return PrimitivesFlags.SOLID_CULL_MASK[MathExt.byteToUnsigned(CENTER_BLOCKS[blockIndex])];
 	}
 
 	@Override
 	public boolean isBlockNormalCube(int x, int y, int z) {
-		return BlocksFlags.NORMAL_BLOCK[this.getBlockId(x, y, z)];
+		return PrimitivesFlags.NORMAL_BLOCK[this.getBlockId(x, y, z)];
 	}
 
 	@Override
@@ -320,7 +316,7 @@ public class SectionCache implements IBlockAccess {
 		int biomeX = x - (this.blockX + 16 - BIOME_RADIUS);
 		int biomeZ = z - (this.blockZ + 16 - BIOME_RADIUS);
 
-		return BiomeGenBase.biomeList[byteToUnsigned(BIOMES[biomeX + biomeZ * BIOME_CHUNK_WIDTH])];
+		return BiomeGenBase.biomeList[MathExt.byteToUnsigned(BIOMES[biomeX + biomeZ * BIOME_CHUNK_WIDTH])];
 	}
 
 	public int getColorMultiplier(Block block, int x, int y, int z) {

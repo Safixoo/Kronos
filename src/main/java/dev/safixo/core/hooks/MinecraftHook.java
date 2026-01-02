@@ -2,23 +2,21 @@ package dev.safixo.core.hooks;
 
 import dev.safixo.client.render.ImprovedTessellator;
 import dev.safixo.client.util.MathExt;
-import dev.safixo.client.util.data.BlocksFlags;
+import dev.safixo.client.util.data.PrimitivesFlags;
 import dev.safixo.client.util.memory.UnsafeUtil;
-import net.minecraft.block.Block;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.world.EnumSkyBlock;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
-import net.minecraft.world.chunk.EmptyChunk;
 
 @SuppressWarnings("unused")
 public class MinecraftHook {
 	private static final int ITEM_STRIDE = 24;
 
 	public static void checkGLError(Minecraft minecraft, String str) {
-		if (!BlocksFlags.DETECTED) {
-			BlocksFlags.processDevInfo();
+		if (!PrimitivesFlags.DETECTED) {
+			PrimitivesFlags.processDevInfo();
 		}
 
 		// NO-OP
@@ -157,7 +155,7 @@ public class MinecraftHook {
 
 		int blockId = chunk.getBlockID(x & 15, y, z & 15);
 
-		if (BlocksFlags.SOLID[blockId]) {
+		if (PrimitivesFlags.SOLID[blockId]) {
 			return 0;
 		}
 

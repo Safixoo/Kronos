@@ -26,7 +26,7 @@ public class RegionRender {
 	private static final int SOLID_PASS = 0, TRANSLUCENT_PASS = 1;
 
 	// Region total volume area in SectionRenders.
-	public static final int REGION_SECTION_SIZE = 256; // 8 * 4 * 8
+	public static final int REGION_SECTION_SIZE = 512; // 8 * 8 * 8
 
 	public static final int TRANSLUCENT_DRAWS = 1;
 	public static final int SOLID_DRAWS = MeshDirection.COUNT;
@@ -79,7 +79,7 @@ public class RegionRender {
 	// If nothing has changed since the last draw, including the visible bit-set,
 	// section count and render-indices try to re-use last draw command setup.
 	private final int[] lastDrawCount = new int[RENDER_PASSES];
-	private final byte[] lastRenderIndices = new byte[REGION_SECTION_SIZE];
+	private final byte[] lastRenderIndices = new byte[RENDER_PASSES * REGION_SECTION_SIZE];
 
 	// This is important as the direction enum, is ordered in a way that fundamentally
 	// makes impossible batching draw without meshes being meshed in very specific
@@ -227,7 +227,7 @@ public class RegionRender {
 		}
 
 		// Try to re-use the last draw command setup.
-		if (this.shouldCachePass[pass] && this.shouldUseCachedDraw(camera)) {
+		if (this.shouldCachePass[pass] && this.shouldUseCachedDraw(camera, pass)) {
 			int drawCount = this.lastDrawCount[pass];
 
 			if (drawCount != 0) {
@@ -304,7 +304,7 @@ public class RegionRender {
 		GL14.glMultiDrawArrays(GL11.GL_QUADS, firstBuff, countBuff);
 	}
 
-	private boolean shouldUseCachedDraw(CameraData camera) {
+	private boolean shouldUseCachedDraw(CameraData camera, int pass) {
 		int regionVis = getRegionVisibleFaces(camera.intX, camera.intY, camera.intZ, this.centerBlockX(), this.centerBlockY(), this.centerBlockZ());
 		int oldRegionVis = this.lastVisibleSet;
 
@@ -315,6 +315,7 @@ public class RegionRender {
 			return false;
 		}
 
+		final int offset = pass == 1 ? REGION_SECTION_SIZE : 0;
 		final byte[] lastRenderIndices = this.lastRenderIndices;
 		final byte[] renderIndices = this.renderIndices;
 		final int maxIndex = this.sectionsToRender;
@@ -322,7 +323,7 @@ public class RegionRender {
 		int index = 0;
 
 		// Mismatch of section indices.
-		while (index < maxIndex && lastRenderIndices[index] == renderIndices[index]) {
+		while (index < maxIndex && lastRenderIndices[index + offset] == renderIndices[index]) {
 			index++;
 		}
 
@@ -330,7 +331,7 @@ public class RegionRender {
 
 		// A mismatch was found, copy the indices from the mismatch index.
 		while (index < maxIndex) {
-			lastRenderIndices[index] = renderIndices[index++];
+			lastRenderIndices[index + offset] = renderIndices[index++];
 		}
 
 		return canBeCached;
@@ -480,7 +481,7 @@ public class RegionRender {
 	}
 
 	public static int sectionX(int regionIndex) {
-		return (regionIndex & 0b000_00_111) >>> 0;
+ 		return (regionIndex & 0b000_00_111) >>> 0;
 	}
 
 	public static int sectionY(int regionIndex) {

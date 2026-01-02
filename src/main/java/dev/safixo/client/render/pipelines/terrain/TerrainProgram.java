@@ -43,8 +43,6 @@ public class TerrainProgram extends GlProgram {
 		this.u_ModelViewMat = GL20.glGetUniformLocation(this.getHandle(), "u_ModelViewMat");
 	}
 
-	private static final FloatBuffer TEMP_BUFFER = NativeBuffer.memAllocFloat(16);
-
 	public void setupUniforms(boolean noFog) {
 		GL20.glUniformMatrix4(this.u_ProjMat, false, FrustumCuller.projectionBuff);
 		GL20.glUniformMatrix4(this.u_ModelViewMat, false, FrustumCuller.modelViewBuff);
@@ -64,9 +62,6 @@ public class TerrainProgram extends GlProgram {
 
 		GL20.glUniform1f(this.u_FogEndInvRad, noFog ? 1E+12F : fogEndInvRad);
 		GL20.glUniform1f(this.u_FogNegInvRadius, noFog ? 1E+12F : -fogNegInvRadius);
-
-		GL11.glGetFloat(GL11.GL_FOG_COLOR, TEMP_BUFFER);
-		((Buffer)TEMP_BUFFER).rewind();
 
 		GL20.glUniform3f(this.u_FogColor, GlStateManager.FOG_COLOR_R, GlStateManager.FOG_COLOR_G, GlStateManager.FOG_COLOR_B);
 	}

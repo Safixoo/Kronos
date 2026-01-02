@@ -7,7 +7,7 @@ import net.minecraft.block.Block;
 import net.minecraft.block.BlockGrass;
 import net.minecraft.util.Icon;
 import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
-import dev.safixo.client.util.data.BlocksFlags;
+import dev.safixo.client.util.data.PrimitivesFlags;
 import dev.safixo.client.util.ColorBGRManager;
 import dev.safixo.client.util.Direction;
 import dev.safixo.client.render.vertex.VertexWriterManager;
@@ -16,10 +16,10 @@ import org.joml.Vector2i;
 import org.joml.Vector3i;
 
 import static dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache.makeBlockIndex;
-import static dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache.byteToUnsigned;
 import static dev.safixo.client.util.Direction.*;
 
 public class FullBlockMesher {
+	private static final ModelColorizer MODEL_COLORIZER = new ModelColorizer();
 	private static final int[] SHADE_FULL_COLOR = new int[Direction.COUNT];
 	private static final int[] SHADE_FULL_FACTOR = new int[Direction.COUNT];
 	private static final float[] VERT_UVS = new float[4];
@@ -34,7 +34,7 @@ public class FullBlockMesher {
 			return;
 		}
 
-		if (!BlocksFlags.DIRECT_CULL[blockId]) {
+		if (!PrimitivesFlags.DIRECT_CULL[blockId]) {
 			drawSet |= block.shouldSideBeRendered(cache, x, y - 1, z, 0) ? 1 << DOWN : 0;
 			drawSet |= block.shouldSideBeRendered(cache, x, y + 1, z, 1) ? 1 << UP : 0;
 			drawSet |= block.shouldSideBeRendered(cache, x, y, z - 1, 2) ? 1 << NORTH : 0;
@@ -44,7 +44,7 @@ public class FullBlockMesher {
 			drawSet |= block.shouldSideBeRendered(cache, x + 1, y, z, 5) ? 1 << EAST : 0;
 		}
 
-		int modelColor = ColorBGRManager.rgbToBgr(block.colorMultiplier(cache, x, y, z));
+		int modelColor = ColorBGRManager.rgbToBgr(MODEL_COLORIZER.getColor(cache, x, y, z, block));
 
 		for (int dir = 0; dir < Direction.COUNT; dir++) {
 			if ((drawSet & (1 << dir)) == 0) {
@@ -218,7 +218,7 @@ public class FullBlockMesher {
 		int blockZ = z - cache.blockZ;
 
 		int sectionIndex = SectionCache.sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
-		int solidBlock = BlocksFlags.SOLID_LIGHT_MASK[byteToUnsigned(SectionCache.SECTION_BLOCKS[sectionIndex][blockIndex])];
+		int solidBlock = PrimitivesFlags.SOLID_LIGHT_MASK[MathExt.byteToUnsigned(SectionCache.SECTION_BLOCKS[sectionIndex][blockIndex])];
 
 		if (solidBlock == 1) {
 			return solidBlock;
@@ -235,7 +235,7 @@ public class FullBlockMesher {
 		int blockZ = z - cache.blockZ;
 
 		int sectionIndex = SectionCache.sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
-		int solidBlock = BlocksFlags.SOLID_LIGHT_MASK[byteToUnsigned(SectionCache.SECTION_BLOCKS[sectionIndex][blockIndex])];
+		int solidBlock = PrimitivesFlags.SOLID_LIGHT_MASK[MathExt.byteToUnsigned(SectionCache.SECTION_BLOCKS[sectionIndex][blockIndex])];
 
 		if (solidBlock == 1) {
 			return (0 << 4) | solidBlock;
@@ -302,10 +302,6 @@ public class FullBlockMesher {
 
 	public static int br(int full) {
 		return -full & LIGHT_REDUCE;
-	}
-
-	public static int full(int blockId) {
-		return BlocksFlags.SOLID_LIGHT_MASK[blockId];
 	}
 
 	public static final int LIGHT_REDUCE = 70;

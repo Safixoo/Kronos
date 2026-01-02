@@ -95,6 +95,10 @@ public class MathExt {
 		return num < 0 ? integral - 1 : integral;
 	}
 
+	public static int byteToUnsigned(byte id) {
+		return id & 0xFF;
+	}
+
 	public static int floor(double num) {
 		int integral = (int) num;
 		return num < 0 ? integral - 1 : integral;

@@ -1,13 +1,13 @@
 package dev.safixo.core.hooks;
 
-import dev.safixo.client.util.data.BlocksFlags;
+import dev.safixo.client.util.data.PrimitivesFlags;
 import org.objectweb.asm.*;
 import static org.objectweb.asm.Opcodes.*;
 
 @SuppressWarnings("unused")
 public class LongHashMapHook {
 	public static byte[] rewriteHashMapClass() {
-		boolean inDev = BlocksFlags.DEV_ENVIRONMENT;
+		boolean inDev = PrimitivesFlags.DEV_ENVIRONMENT;
 
 		ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
 
