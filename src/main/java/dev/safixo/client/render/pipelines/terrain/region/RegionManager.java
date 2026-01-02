@@ -11,10 +11,18 @@ import dev.safixo.client.util.data.CameraData;
 import dev.safixo.client.util.MathExt;
 
 public class RegionManager {
-	public final Long2ReferenceOpenHashMap<RegionRender> regionMap = new Long2ReferenceOpenHashMap<>();
+	public static boolean SUPPORT_INDIRECT = true;
 
+	public final Long2ReferenceOpenHashMap<RegionRender> regionMap = new Long2ReferenceOpenHashMap<>();
 	private double lastUpdateX;
 	private double lastUpdateZ;
+
+	public RegionManager() {
+		// TODO: Disable indirect drawing in Intel if it destroys performance, with my draw batching approach
+		//  it shouldn't suffer so much in theory.
+		// String vendor = GL11.glGetString(GL11.GL_VENDOR);
+		SUPPORT_INDIRECT = GLContext.getCapabilities().GL_ARB_multi_draw_indirect; // && !vendor.contains("Intel");
+	}
 
 	public RegionRender getRegion(int sectionX, int sectionY, int sectionZ) {
 		int regionX = sectionX >> (RegionRender.BLOCK_SHIFT_X - 4);

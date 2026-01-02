@@ -13,6 +13,7 @@ import dev.safixo.client.render.vertex.VertexWriterManager;
 import dev.safixo.client.render.vertex.writers.TerrainFormat;
 
 import java.nio.Buffer;
+import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 import java.util.Arrays;
 
@@ -94,10 +95,19 @@ public class RegionRender {
 
 	public static final RegionRender NULL = new RegionRender(0, Integer.MIN_VALUE, 0);
 
+	private long solidIndirectPtr;
+	private long translucentIndirectPtr;
+
 	public RegionRender(int sectionX, int sectionY, int sectionZ) {
 		this.regionX = sectionX >> (RegionRender.BLOCK_SHIFT_X - 4);
 		this.regionY = sectionY >> (RegionRender.BLOCK_SHIFT_Y - 4);
 		this.regionZ = sectionZ >> (RegionRender.BLOCK_SHIFT_Z - 4);
+
+		if (RegionManager.SUPPORT_INDIRECT) {
+			int structSize = 16;
+			this.solidIndirectPtr = NativeBuffer.nmemAlloc(SOLID_DRAWS * REGION_SECTION_SIZE * structSize);
+			this.translucentIndirectPtr = NativeBuffer.nmemAlloc(TRANSLUCENT_DRAWS * REGION_SECTION_SIZE * structSize);
+		}
 	}
 
 	private void prepareSolidPtr() {
@@ -293,15 +303,22 @@ public class RegionRender {
 		// Setup camera and region offset.
 		shader.setupRegionOffset(camera, blockRegionX, blockRegionY, blockRegionZ);
 
-		// As of now count and first use the pointer but with some offset, so simply offset
-		// count itself to make the same effect.
-		IntBuffer firstBuff = NativeBuffer.wrap(first).asIntBuffer();
-		IntBuffer countBuff = NativeBuffer.wrap(count).asIntBuffer();
+		if (!RegionManager.SUPPORT_INDIRECT) {
+			// As of now count and first use the pointer but with some offset, so simply offset
+			// count itself to make the same effect.
+			IntBuffer firstBuff = NativeBuffer.wrap(first).asIntBuffer();
+			IntBuffer countBuff = NativeBuffer.wrap(count).asIntBuffer();
 
-		((Buffer) firstBuff).limit(drawCount);
-		((Buffer) countBuff).limit(drawCount);
+			((Buffer) firstBuff).limit(drawCount);
+			((Buffer) countBuff).limit(drawCount);
 
-		GL14.glMultiDrawArrays(GL11.GL_QUADS, firstBuff, countBuff);
+			GL14.glMultiDrawArrays(GL11.GL_QUADS, firstBuff, countBuff);
+		} else {
+			ByteBuffer indirectBuff = NativeBuffer.wrap(pass == 0 ? this.solidIndirectPtr : this.translucentIndirectPtr);
+			((Buffer) indirectBuff).limit(drawCount * 16);
+
+			GL43.glMultiDrawArraysIndirect(GL11.GL_QUADS, indirectBuff, drawCount, 0);
+		}
 	}
 
 	private boolean shouldUseCachedDraw(CameraData camera, int pass) {
@@ -376,8 +393,11 @@ public class RegionRender {
 			// caching technique combined with the batching here, is a nice improvement.
 			if ((first + count) != meshFirst) {
 				if (meshRemaining) {
-					UnsafeUtil.memPutInt((drawCount << 2) + this.solidFirst, first);
-					UnsafeUtil.memPutInt((drawCount << 2) + this.solidCount, count);
+					if (RegionManager.SUPPORT_INDIRECT) {
+						addIndirectCommand(this.solidIndirectPtr, drawCount, first, count);
+					} else {
+						addDirectCommand(this.solidFirst, this.solidCount, drawCount, first, count);
+					}
 					drawCount++;
 				}
 
@@ -391,12 +411,37 @@ public class RegionRender {
 		}
 
 		if (meshRemaining) {
-			UnsafeUtil.memPutInt((drawCount << 2) + this.solidFirst, first);
-			UnsafeUtil.memPutInt((drawCount << 2) + this.solidCount, count);
+			if (RegionManager.SUPPORT_INDIRECT) {
+				addIndirectCommand(this.solidIndirectPtr, drawCount, first, count);
+			} else {
+				addDirectCommand(this.solidFirst, this.solidCount, drawCount, first, count);
+			}
 			drawCount++;
 		}
 
 		return drawCount;
+	}
+
+	@SuppressWarnings("IntegerMultiplicationImplicitCastToLong")
+	public static void addDirectCommand(long firstPtr, long countPtr, int drawCount, int first, int count) {
+		UnsafeUtil.memPutInt(firstPtr + (drawCount << 2), first);
+		UnsafeUtil.memPutInt(countPtr + (drawCount << 2), count);
+	}
+
+	//	typedef  struct {
+	//		uint  count;
+	//		uint  instanceCount;
+	//		uint  first;
+	//		uint  baseInstance;
+	//	} DrawArraysIndirectCommand;
+	@SuppressWarnings("IntegerMultiplicationImplicitCastToLong")
+	public static void addIndirectCommand(long indirectPtr, int drawCount, int first, int count) {
+		long ptr = indirectPtr + (drawCount << 4);
+
+		UnsafeUtil.memPutInt(ptr + 0, count);
+		UnsafeUtil.memPutInt(ptr + 4, 1);
+		UnsafeUtil.memPutInt(ptr + 8, first);
+		UnsafeUtil.memPutInt(ptr + 12, 0);
 	}
 
 	private int prepareTranslucentBatch(int regionIndex, int translucentBit, int drawCount) {
@@ -405,9 +450,14 @@ public class RegionRender {
 		}
 
 		long drawData = this.regionDrawData[regionIndex * TOTAL_DRAWS + SOLID_DRAWS];
+		int first = RegionAllocation.unpackFirst(drawData);
+		int count = RegionAllocation.unpackCount(drawData);
 
-		UnsafeUtil.memPutInt((drawCount << 2) + this.translucentFirst, RegionAllocation.unpackFirst(drawData));
-		UnsafeUtil.memPutInt((drawCount << 2) + this.translucentCount, RegionAllocation.unpackCount(drawData));
+		if (RegionManager.SUPPORT_INDIRECT) {
+			addIndirectCommand(this.translucentIndirectPtr, drawCount, first, count);
+		} else {
+			addDirectCommand(this.translucentFirst, this.translucentCount, drawCount, first, count);
+		}
 
 		return ++drawCount;
 	}
