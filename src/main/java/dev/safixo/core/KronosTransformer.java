@@ -146,6 +146,7 @@ public class KronosTransformer implements IClassTransformer {
 		FUNCTION_NAMES.add("glClear");
 		FUNCTION_NAMES.add("glBlendFunc");
 		FUNCTION_NAMES.add("glDepthMask");
+		FUNCTION_NAMES.add("glShadeModel");
 
 		FUNCTION_NAMES.add("glGetInteger");
 		FUNCTION_NAMES.add("glBindBuffer");

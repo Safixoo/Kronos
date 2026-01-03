@@ -1,5 +1,6 @@
 package dev.safixo.client.render.pipelines.terrain.meshing.data;
 
+import dev.safixo.client.render.pipelines.terrain.meshing.FakeBiome;
 import dev.safixo.client.render.pipelines.terrain.meshing.ModelColorizer;
 import dev.safixo.client.util.MathExt;
 import net.minecraft.block.Block;
@@ -18,6 +19,7 @@ import dev.safixo.client.util.data.PrimitivesFlags;
 import java.util.Arrays;
 
 public class SectionCache implements IBlockAccess {
+	private static final FakeBiome FAKE_BIOME = new FakeBiome(Integer.MAX_VALUE);
 	private static final Chunk[] CHUNKS = new Chunk[3 * 3];
 	private static final ModelColorizer COLORIZER = new ModelColorizer();
 
@@ -34,7 +36,7 @@ public class SectionCache implements IBlockAccess {
 
 	public static final int BIOME_RADIUS = 1;
 	private static final int BIOME_CHUNK_WIDTH = 16 + (BIOME_RADIUS * 2);
-	private static final byte[] BIOMES = new byte[BIOME_CHUNK_WIDTH * BIOME_CHUNK_WIDTH];
+	private static final BiomeGenBase[] BIOMES = new BiomeGenBase[BIOME_CHUNK_WIDTH * BIOME_CHUNK_WIDTH];
 
 	public static final byte[][] SECTION_BLOCKS = new byte[3 * 3 * 3][];
 	public static final byte[][] SECTION_DATA = new byte[3 * 3 * 3][];
@@ -165,7 +167,7 @@ public class SectionCache implements IBlockAccess {
 					}
 
 					biome = biomeGenBase;
-					BIOMES[relBiomeX + relBiomeZ * BIOME_CHUNK_WIDTH] = (byte) biomeGenBase.biomeID;
+					BIOMES[relBiomeX + relBiomeZ * BIOME_CHUNK_WIDTH] = biomeGenBase;
 				}
 			}
 
@@ -175,6 +177,9 @@ public class SectionCache implements IBlockAccess {
 				this.grassColor = COLORIZER.getBlockGrassColor(this, this.blockX + 16, this.blockY + 16, this.blockZ + 16);
 				this.foliageColor = COLORIZER.getBlockLeavesColor(this, this.blockX + 16, this.blockY + 16, this.blockZ + 16);
 				this.waterColor = COLORIZER.getBlockWaterColor(this, this.blockX + 16, this.blockY + 16, this.blockZ + 16);
+
+				FAKE_BIOME.setColors(this.waterColor, this.foliageColor, this.grassColor);
+				Arrays.fill(BIOMES, FAKE_BIOME);
 			}
 		}
 
@@ -342,7 +347,7 @@ public class SectionCache implements IBlockAccess {
 		int biomeX = x - (this.blockX + 16 - BIOME_RADIUS);
 		int biomeZ = z - (this.blockZ + 16 - BIOME_RADIUS);
 
-		return BiomeGenBase.biomeList[MathExt.byteToUnsigned(BIOMES[biomeX + biomeZ * BIOME_CHUNK_WIDTH])];
+		return BIOMES[biomeX + biomeZ * BIOME_CHUNK_WIDTH];
 	}
 
 	public int getColorMultiplier(Block block, int x, int y, int z) {

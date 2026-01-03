@@ -3,7 +3,6 @@ package dev.safixo.core.hooks;
 import dev.safixo.client.render.ImprovedTessellator;
 import dev.safixo.client.render.gfx.util.GpuFlags;
 import dev.safixo.client.util.ColorBGRManager;
-import dev.safixo.client.util.memory.NativeBuffer;
 import net.minecraft.client.Minecraft;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fStack;
@@ -14,6 +13,7 @@ import java.nio.Buffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.util.Arrays;
+import java.util.HashSet;
 
 @SuppressWarnings("unused")
 public class GlStateManager {
@@ -24,7 +24,7 @@ public class GlStateManager {
 	private static final byte DEFINED_DISABLED = 0b00;
 	private static final byte DEFINED_ENABLED = 0b11;
 
-	public static long LAST_COLOR_MATERIAL = -1;
+	public static long LAST_COLOR_MATERIAL = -31;
 	public static int LAST_VIEWPORT_WH = -1;
 	public static int LAST_ACTIVE_TEXTURE = -1;
 	public static int LAST_TEXTURE = -1;
@@ -47,8 +47,12 @@ public class GlStateManager {
 		Arrays.fill(CAP_BITS, UNDEFINED);
 	}
 
+	static HashSet<Integer> ints = new HashSet<>();
+
 	public static void glEnable(int cap) {
-		if (CAP_BITS[cap] <= UNDEFINED) {
+		// Skips GL_TEXTURE_2D caching as it depends on the current tex unit,
+		// and it isn't worth the trouble.
+		if (CAP_BITS[cap] <= UNDEFINED || cap == GL11.GL_TEXTURE_2D) {
 			if (!SKIP_CACHE) {
 				CAP_BITS[cap] = DEFINED_ENABLED;
 			}
@@ -73,7 +77,9 @@ public class GlStateManager {
 	}
 
 	public static void glDisable(int cap) {
-		if (CAP_BITS[cap] >= UNDEFINED) {
+		// Skips GL_TEXTURE_2D caching as it depends on the current tex unit,
+		// and it isn't worth the trouble.
+		if (CAP_BITS[cap] >= UNDEFINED || cap == GL11.GL_TEXTURE_2D) {
 			if (!SKIP_CACHE) {
 				CAP_BITS[cap] = DEFINED_DISABLED;
 			}
@@ -205,11 +211,14 @@ public class GlStateManager {
 	}
 
 	public static void glOrtho(double left, double right, double bottom, double top, double zNear, double zFar) {
+		flushDrawState();
+
 		CURRENT_STACK.ortho((float) left, (float) right, (float) bottom, (float) top, (float) zNear, (float) zFar);
 		GL11.glOrtho(left, right, bottom, top, zNear, zFar);
 	}
 
 	public static void glFrustum(double left, double right, double bottom, double top, double zNear, double zFar) {
+		flushDrawState();
 		CURRENT_STACK.frustum((float) left, (float) right, (float) bottom, (float) top, (float) zNear, (float) zFar);
 		GL11.glFrustum(left, right, bottom, top, zNear, zFar);
 	}
@@ -308,13 +317,11 @@ public class GlStateManager {
 
 	public static void glBegin(int mode) {
 		flushDrawState();
-
 		GL11.glBegin(mode);
 	}
 
 	public static void glEndList() {
 		flushDrawState();
-
 		GL11.glEndList();
 	}
 
@@ -377,6 +384,11 @@ public class GlStateManager {
 		} else {
 			GL11.glScalef(x, y, z);
 		}
+	}
+
+	public static void glShadeModel(int mode) {
+		flushDrawState();
+		GL11.glShadeModel(mode);
 	}
 
 	public static void glScaled(double x, double y, double z) {

@@ -41,7 +41,6 @@ public class ImprovedTessellator extends Tessellator {
 	private boolean disabledColor;
 	public int drawMode, flags, capacity = MIN_ALLOC;
 
-	public boolean isDrawing;
 	public int vertices, offset;
 
 	public float xOff, yOff, zOff;
@@ -141,26 +140,21 @@ public class ImprovedTessellator extends Tessellator {
 
 	@Override
 	public int draw() {
-		if (!this.isDrawing) {
-			throw new IllegalStateException("Not tesselating!");
-		}
-
 		this.lastFlag = this.flags;
 		this.flags = 0;
 
-		this.isDrawing = false;
 		int offset = this.offset;
 
-		// workaround for being stupid.
-		if (Minecraft.getMinecraft().theWorld == null) {
+		if (this.disabledColor) {
 			this.flushState();
 		}
 
+		this.disabledColor = false;
 		return offset;
 	}
 
 	public void flushState() {
-		if (this.vertices == 0 || this.lastFlag == -1 || this.isDrawing) {
+		if (this.vertices == 0 || this.lastFlag == -1) {
 			return;
 		}
 
@@ -203,16 +197,11 @@ public class ImprovedTessellator extends Tessellator {
 
 	@Override
 	public void startDrawing(int drawMode) {
-		if (this.isDrawing) {
-			throw new IllegalStateException("Already tesselating!");
-		}
-
 		if (this.drawMode != drawMode) {
 			flushState();
 		}
 
 		this.drawMode = drawMode;
-		this.isDrawing = true;
 		this.flags = 0;
 	}
 

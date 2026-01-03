@@ -26,7 +26,7 @@ import java.util.List;
 import java.util.Set;
 
 public class SectionManager {
-	public static final int MAX_UPDATE_QUEUES = 16;
+	public static final int MAX_UPDATE_QUEUES = 6;
 	private static final Item DEBUG_ITEM = null;
 
 	private final Long2ReferenceOpenHashMap<SectionRender> sectionMap = new Long2ReferenceOpenHashMap<>(4096);
@@ -291,7 +291,7 @@ public class SectionManager {
 
 	public void disconnectNeighbors(SectionRender render) {
 		for (int dir = 0; dir < Direction.COUNT; dir++) {
-			SectionRender renderer = render.getAdjacent(dir);
+			SectionRender renderer = this.getSection(render, dir);
 
 			if (renderer != null) {
 				renderer.setAdjacentNeighbor(null, Direction.opposite(dir));
