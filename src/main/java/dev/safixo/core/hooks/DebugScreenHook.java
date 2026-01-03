@@ -15,7 +15,7 @@ public class DebugScreenHook {
 
 			int effect = (int) (((Math.sin(System.nanoTime() / 5E+8D) + 1) * 128) % 256);
 
-			renderDebugOption(fontRenderer, "Safixo Renderer: v0.0", x, offY, 0x1F00F1 | Math.max(120, effect) << 8);
+			renderDebugOption(fontRenderer, "Kronos Renderer: v0.0", x, offY, 0x1F00F1 | Math.max(120, effect) << 8);
 			offY += 10;
 			renderDebugOption(fontRenderer, "Sections: " + manager.allocatedSections(), x, offY, color);
 			offY += 10;

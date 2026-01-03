@@ -3,6 +3,7 @@ package dev.safixo.client.render;
 import dev.safixo.client.render.gfx.buffer.GlVertexBuffer;
 import dev.safixo.client.render.gfx.vertex.GlVertexArrayObject;
 import dev.safixo.client.render.vertex.VertexWriterManager;
+import dev.safixo.client.util.data.PrimitivesFlags;
 import dev.safixo.client.util.memory.NativeBuffer;
 import dev.safixo.client.util.memory.UnsafeUtil;
 import dev.safixo.core.hooks.GlStateManager;
@@ -274,7 +275,7 @@ public class ImprovedTessellator extends Tessellator {
 
 	@Override
 	public void addVertexWithUV(double x, double y, double z, double u, double v) {
-		if (VertexWriterManager.isCurrentDrawing()) {
+		if (PrimitivesFlags.MESHING) {
 			TessellatorHook.addVertexWithUV(x + this.xOff, y + this.yOff, z + this.zOff, u, v);
 			return;
 		}

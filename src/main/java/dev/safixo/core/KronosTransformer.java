@@ -22,7 +22,7 @@ public class KronosTransformer implements IClassTransformer {
 	static final String FRUSTUM_HOOK = "dev/safixo/core/hooks/FrustumHook";
 	static final String MINECRAFT_HOOK = "dev/safixo/core/hooks/MinecraftHook";
 
-	static final String CHUNK_LISTENER = "dev/safixo/client/render/pipelines/terrain/meshing/ChunkListener";
+	static final String REBUILD_LISTENER = "dev/safixo/client/render/pipelines/terrain/meshing/RebuildListener";
 
 	static final String RENDER_GLOBAL = "net.minecraft.client.renderer.RenderGlobal";
 	static final String ITEM_RENDERER = "net.minecraft.client.renderer.ItemRenderer";
@@ -33,6 +33,7 @@ public class KronosTransformer implements IClassTransformer {
 	static final String ACTIVE_RENDER_INFO = "net.minecraft.client.renderer.ActiveRenderInfo";
 	static final String BIOME_GEN_BASE = "net.minecraft.world.biome.BiomeGenBase";
 	static final String LONG_HASH_MAP = "net.minecraft.util.LongHashMap";
+	static final String WORLD_CLIENT = "net.minecraft.client.multiplayer.WorldClient";
 	static final String WORLD = "net.minecraft.world.World";
 
 	static HashSet<String> FUNCTION_NAMES;
@@ -49,6 +50,9 @@ public class KronosTransformer implements IClassTransformer {
 		// Overwrites classes methods completely with a function call with the same
 		// args and with the instance of the original class.
 		switch (transformedName) {
+			case WORLD_CLIENT:
+				replaceClassMethod(MINECRAFT_HOOK, "createChunkProvider", "j", "()Lado", reference, false);
+				break;
 			case LONG_HASH_MAP:
 				return LongHashMapHook.rewriteHashMapClass();
 			case WORLD:
@@ -65,10 +69,10 @@ public class KronosTransformer implements IClassTransformer {
 				replaceClassMethod(RENDER_GLOBAL_HOOK, "renderAllSortedRenderers", "", "", reference, true);
 
 				// Redirect most renderer updates.
-				replaceClassMethod(CHUNK_LISTENER, "markBlockForUpdate", "a", "(III)V", reference, true);
-				replaceClassMethod(CHUNK_LISTENER, "markBlockForRenderUpdate", "b", "(III)V", reference, true);
-				replaceClassMethod(CHUNK_LISTENER, "markBlockRangeForRenderUpdate", "a", "(IIIIII)V", reference, true);
-				replaceClassMethod(CHUNK_LISTENER, "markBlocksForUpdate", "b", "(IIIIII)V", reference, true);
+				replaceClassMethod(REBUILD_LISTENER, "markBlockForUpdate", "a", "(III)V", reference, true);
+				replaceClassMethod(REBUILD_LISTENER, "markBlockForRenderUpdate", "b", "(III)V", reference, true);
+				replaceClassMethod(REBUILD_LISTENER, "markBlockRangeForRenderUpdate", "a", "(IIIIII)V", reference, true);
+				replaceClassMethod(REBUILD_LISTENER, "markBlocksForUpdate", "b", "(IIIIII)V", reference, true);
 
 				// Improved clouds.
 				replaceClassMethod(RENDER_GLOBAL_HOOK, "renderCloudsFancy", "c", "(F)V", reference, true);

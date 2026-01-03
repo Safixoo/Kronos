@@ -1,14 +1,18 @@
 package dev.safixo.core.hooks;
 
 import dev.safixo.client.render.ImprovedTessellator;
+import dev.safixo.client.util.ClientChunkListener;
 import dev.safixo.client.util.MathExt;
 import dev.safixo.client.util.data.PrimitivesFlags;
 import dev.safixo.client.util.memory.UnsafeUtil;
+import dev.safixo.core.HookUtils;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.WorldClient;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.world.EnumSkyBlock;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
+import net.minecraft.world.chunk.IChunkProvider;
 
 @SuppressWarnings("unused")
 public class MinecraftHook {
@@ -177,5 +181,12 @@ public class MinecraftHook {
 		}
 
 		return chunk;
+	}
+
+	public static IChunkProvider createChunkProvider(WorldClient worldClient) {
+		ClientChunkListener listener = new ClientChunkListener(worldClient);
+		HookUtils.setField(worldClient, "clientChunkProvider", "field_73033_b", listener);
+
+		return listener;
 	}
 }

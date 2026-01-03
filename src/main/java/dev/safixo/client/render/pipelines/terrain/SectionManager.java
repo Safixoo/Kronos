@@ -1,6 +1,6 @@
 package dev.safixo.client.render.pipelines.terrain;
 
-import dev.safixo.client.render.pipelines.terrain.meshing.ChunkListener;
+import dev.safixo.client.util.ClientChunkListener;
 import it.unimi.dsi.fastutil.longs.*;
 import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
 import net.minecraft.client.Minecraft;
@@ -11,6 +11,7 @@ import net.minecraft.item.Item;
 import net.minecraft.profiler.Profiler;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.world.World;
+import net.minecraft.world.chunk.IChunkProvider;
 import org.lwjgl.input.Keyboard;
 import dev.safixo.client.render.pipelines.terrain.cull.BFSCuller;
 import dev.safixo.client.render.pipelines.terrain.cull.FrustumCuller;
@@ -129,10 +130,6 @@ public class SectionManager {
 			this.connectNeighbors(sectionRender);
 		}
 
-		if (!ChunkListener.canLoadChunk(posX, posZ)) {
-			return;
-		}
-
 		sectionRender.markDirty(true);
 	}
 
@@ -161,9 +158,13 @@ public class SectionManager {
 			this.worldObj = world;
 
 			this.tileEntitiesSet.clear();
-
-			this.dirtyAllSections();
 			this.generateWholeVolume(cameraX, cameraZ);
+		}
+
+		IChunkProvider provider = world.getChunkProvider();
+
+		if (provider.getClass() == ClientChunkListener.class) {
+			((ClientChunkListener)provider).processAllQueuedSections();
 		}
 
 		EntityClientPlayerMP playerLocal = Minecraft.getMinecraft().thePlayer;
@@ -216,6 +217,7 @@ public class SectionManager {
 
 		SectionRender[] updateArray = RebuildList.getBackedArray();
 		PrimitivesFlags.processLeavesSolid();
+		PrimitivesFlags.MESHING = true;
 
 		for (int i = 0; i < maxSize; i++) {
 			SectionRender section = updateArray[i];
@@ -225,25 +227,24 @@ public class SectionManager {
 			}
 		}
 
+		PrimitivesFlags.MESHING = false;
 		RebuildList.clear();
 	}
-
-	private void dirtyAllSections() {
-		for (SectionRender section : this.sectionMap.values()) {
-			section.markDirty(true);
-		}
-	}
-
 	private void generateWholeVolume(double cameraX, double cameraZ) {
 		int cameraChunkX = MathExt.posToSectionIntegral(cameraX);
 		int cameraChunkZ = MathExt.posToSectionIntegral(cameraZ);
 
 		int renderDistance = this.renderDistance + 2;
+		ClientChunkListener provider = (ClientChunkListener) this.worldObj.getChunkProvider();
 
 		for (int x = -renderDistance; x <= renderDistance; x++) {
 			for (int z = -renderDistance; z <= renderDistance; z++) {
+				if (!provider.shouldLoadChunk(cameraChunkX + x, cameraChunkZ + z)) {
+					continue;
+				}
+
 				for (int y = 0; y < 16; y++) {
-					this.markDirty(cameraChunkX + x , y, cameraChunkZ + z);
+					this.markDirty(cameraChunkX + x, y, cameraChunkZ + z);
 				}
 			}
 		}
