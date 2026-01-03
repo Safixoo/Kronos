@@ -42,6 +42,10 @@ public class UnsafeUtil {
 		}
 	}
 
+	public static long getFieldOffset(Field field) {
+		return UNSAFE.objectFieldOffset(field);
+	}
+
 	public static void nmemFree(long ptr) {
 		UNSAFE.freeMemory(ptr);
 	}
@@ -72,6 +76,10 @@ public class UnsafeUtil {
 
 	public static float memGetFloat(long ptr) {
 		return UNSAFE.getFloat(ptr);
+	}
+
+	public static long memGetLong(long ptr) {
+		return UNSAFE.getLong(ptr);
 	}
 
 	public static int memGetInt(long ptr) {

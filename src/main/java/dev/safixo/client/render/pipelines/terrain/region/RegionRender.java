@@ -9,7 +9,7 @@ import dev.safixo.client.render.pipelines.terrain.SectionRender;
 import dev.safixo.client.util.MeshDirection;
 import dev.safixo.client.util.data.CameraData;
 import dev.safixo.client.util.Direction;
-import dev.safixo.client.render.vertex.VertexWriterManager;
+import dev.safixo.client.render.vertex.VertexWriter;
 import dev.safixo.client.render.vertex.writers.TerrainFormat;
 
 import java.nio.Buffer;
@@ -168,7 +168,7 @@ public class RegionRender {
 		}
 	}
 
-	public void addSolidMesh(SectionRender render, VertexWriterManager manager, int side) {
+	public void addSolidMesh(SectionRender render, VertexWriter manager, int side) {
 		this.shouldCachePass[SOLID_PASS] = false;
 
 		if (this.solidBuffer == null) {
@@ -189,7 +189,7 @@ public class RegionRender {
 		this.regionDrawData[index] = this.solidBuffer.renewAllocation(render, manager.getVertexData(), manager.getVertices(), side);
 	}
 
-	public void addTranslucentMesh(SectionRender render, VertexWriterManager manager) {
+	public void addTranslucentMesh(SectionRender render, VertexWriter manager) {
 		this.shouldCachePass[TRANSLUCENT_PASS] = false;
 
 		if (this.translucentBuffer == null) {

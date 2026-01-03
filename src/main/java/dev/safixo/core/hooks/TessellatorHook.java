@@ -1,19 +1,19 @@
 package dev.safixo.core.hooks;
 
 import dev.safixo.client.util.ColorBGRManager;
-import dev.safixo.client.render.vertex.VertexWriterManager;
+import dev.safixo.client.render.vertex.VertexWriter;
 
 @SuppressWarnings("unused")
 public class TessellatorHook {
 	public static void setTextureUV(double u, double v) {
-		VertexWriterManager current = VertexWriterManager.getCurrentInstance();
+		VertexWriter current = VertexWriter.getCurrentInstance();
 
 		current.u = u;
 		current.v = v;
 	}
 
 	public static void addVertexWithUV(double x, double y, double z, double u, double v) {
-		VertexWriterManager current = VertexWriterManager.getCurrentInstance();
+		VertexWriter current = VertexWriter.getCurrentInstance();
 
 		current.x = x;
 		current.y = y;
@@ -24,7 +24,7 @@ public class TessellatorHook {
 	}
 
 	public static void addVertex(double x, double y, double z) {
-		VertexWriterManager current = VertexWriterManager.getCurrentInstance();
+		VertexWriter current = VertexWriter.getCurrentInstance();
 
 		current.x = x;
 		current.y = y;
@@ -34,7 +34,7 @@ public class TessellatorHook {
 	}
 
 	public static void setColorRGBA(int r, int g, int b, int a) {
-		VertexWriterManager current = VertexWriterManager.getCurrentInstance();
+		VertexWriter current = VertexWriter.getCurrentInstance();
 
 		if (current.disableColor) {
 			return;
@@ -44,13 +44,19 @@ public class TessellatorHook {
 	}
 
 	public static void setBrightness(int lightmap) {
-		VertexWriterManager current = VertexWriterManager.getCurrentInstance();
+		VertexWriter current = VertexWriter.getCurrentInstance();
 
 		current.lightMap = lightmap;
 	}
 
+	public static void setNormal(int normal) {
+		VertexWriter current = VertexWriter.getCurrentInstance();
+
+		current.normal = normal;
+	}
+
 	public static void setTranslation(double x, double y, double z) {
-		VertexWriterManager current = VertexWriterManager.getCurrentInstance();
+		VertexWriter current = VertexWriter.getCurrentInstance();
 
 		current.trasX = x;
 		current.trasY = y;
@@ -58,7 +64,7 @@ public class TessellatorHook {
 	}
 
 	public static void addTranslation(float x, float y, float z) {
-		VertexWriterManager current = VertexWriterManager.getCurrentInstance();
+		VertexWriter current = VertexWriter.getCurrentInstance();
 
 		current.trasX += x;
 		current.trasY += y;
@@ -66,7 +72,7 @@ public class TessellatorHook {
 	}
 
 	public static void disableColor() {
-		VertexWriterManager current = VertexWriterManager.getCurrentInstance();
+		VertexWriter current = VertexWriter.getCurrentInstance();
 
 		current.disableColor = true;
 	}

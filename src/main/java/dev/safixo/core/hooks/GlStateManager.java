@@ -3,9 +3,9 @@ package dev.safixo.core.hooks;
 import dev.safixo.client.render.ImprovedTessellator;
 import dev.safixo.client.render.gfx.util.GpuFlags;
 import dev.safixo.client.util.ColorBGRManager;
+import dev.safixo.client.util.Matrix4Stack;
 import net.minecraft.client.Minecraft;
 import org.joml.Matrix4f;
-import org.joml.Matrix4fStack;
 import org.lwjgl.opengl.*;
 import org.lwjgl.util.glu.Project;
 
@@ -35,12 +35,12 @@ public class GlStateManager {
 	public static float FOG_START, FOG_END;
 	public static float FOG_COLOR_R, FOG_COLOR_G, FOG_COLOR_B;
 
-	private static final Matrix4fStack MODEL_VIEW_STACK = new Matrix4fStack(256);
-	private static final Matrix4fStack PROJECTION_STACK = new Matrix4fStack(256);
-	private static final Matrix4fStack TEXTURE_STACK = new Matrix4fStack(8);
-	private static final Matrix4fStack NULL_STACK = new Matrix4fStack(256);
+	private static final Matrix4Stack MODEL_VIEW_STACK = new Matrix4Stack(256);
+	private static final Matrix4Stack PROJECTION_STACK = new Matrix4Stack(256);
+	private static final Matrix4Stack TEXTURE_STACK = new Matrix4Stack(8);
+	private static final Matrix4Stack NULL_STACK = new Matrix4Stack(256);
 
-	private static Matrix4fStack CURRENT_STACK = PROJECTION_STACK;
+	public static Matrix4Stack CURRENT_STACK = PROJECTION_STACK;
 	public static int MAT_MODE = GL11.GL_PROJECTION;
 
 	static {
@@ -62,7 +62,7 @@ public class GlStateManager {
 	}
 
 	public static void gluPerspective(float fovy, float aspect, float zNear, float zFar) {
-		CURRENT_STACK.mul(new Matrix4f().setPerspective((float) Math.toRadians(fovy), aspect, zNear, zFar));
+		CURRENT_STACK.top().mul(new Matrix4f().setPerspective((float) Math.toRadians(fovy), aspect, zNear, zFar));
 		Project.gluPerspective(fovy, aspect, zNear, zFar);
 	}
 
@@ -189,7 +189,7 @@ public class GlStateManager {
 	public static void glPushMatrix() {
 		flushDrawState();
 
-		CURRENT_STACK.pushMatrix();
+		CURRENT_STACK.push();
 
 		if (GpuFlags.EXT_DSA) {
 			EXTDirectStateAccess.glMatrixPushEXT(MAT_MODE);
@@ -201,7 +201,7 @@ public class GlStateManager {
 	public static void glPopMatrix() {
 		flushDrawState();
 
-		CURRENT_STACK.popMatrix();
+		CURRENT_STACK.pop();
 
 		if (GpuFlags.EXT_DSA) {
 			EXTDirectStateAccess.glMatrixPopEXT(MAT_MODE);
@@ -213,13 +213,13 @@ public class GlStateManager {
 	public static void glOrtho(double left, double right, double bottom, double top, double zNear, double zFar) {
 		flushDrawState();
 
-		CURRENT_STACK.ortho((float) left, (float) right, (float) bottom, (float) top, (float) zNear, (float) zFar);
+		CURRENT_STACK.top().ortho((float) left, (float) right, (float) bottom, (float) top, (float) zNear, (float) zFar);
 		GL11.glOrtho(left, right, bottom, top, zNear, zFar);
 	}
 
 	public static void glFrustum(double left, double right, double bottom, double top, double zNear, double zFar) {
 		flushDrawState();
-		CURRENT_STACK.frustum((float) left, (float) right, (float) bottom, (float) top, (float) zNear, (float) zFar);
+		CURRENT_STACK.top().frustum((float) left, (float) right, (float) bottom, (float) top, (float) zNear, (float) zFar);
 		GL11.glFrustum(left, right, bottom, top, zNear, zFar);
 	}
 
@@ -258,11 +258,11 @@ public class GlStateManager {
 
 	public static void glGetFloat(int name, FloatBuffer params) {
 		if (name == GL11.GL_MODELVIEW_MATRIX) {
-			MODEL_VIEW_STACK.get(params);
+			MODEL_VIEW_STACK.top().get(params);
 			return;
 		}
 		else if (name == GL11.GL_PROJECTION_MATRIX) {
-			PROJECTION_STACK.get(params);
+			PROJECTION_STACK.top().get(params);
 			return;
 		}
 
@@ -328,7 +328,7 @@ public class GlStateManager {
 	public static void glLoadIdentity() {
 		flushDrawState();
 
-		CURRENT_STACK.identity();
+		CURRENT_STACK.top().identity();
 
 		if (GpuFlags.EXT_DSA) {
 			EXTDirectStateAccess.glMatrixLoadIdentityEXT(MAT_MODE);
@@ -340,7 +340,7 @@ public class GlStateManager {
 	public static void glLoadMatrix(FloatBuffer matrix) {
 		flushDrawState();
 
-		CURRENT_STACK.set(matrix);
+		CURRENT_STACK.top().set(matrix);
 
 		if (GpuFlags.EXT_DSA) {
 			EXTDirectStateAccess.glMatrixLoadEXT(MAT_MODE, matrix);
@@ -365,7 +365,7 @@ public class GlStateManager {
 	public static void glMultMatrix(FloatBuffer matrix) {
 		flushDrawState();
 
-		CURRENT_STACK.mul(MATRIX.set(matrix));
+		CURRENT_STACK.top().mul(MATRIX.set(matrix));
 
 		if (GpuFlags.EXT_DSA) {
 			EXTDirectStateAccess.glMatrixMultEXT(MAT_MODE, matrix);
@@ -377,7 +377,7 @@ public class GlStateManager {
 	public static void glScalef(float x, float y, float z) {
 		flushDrawState();
 
-		CURRENT_STACK.scale(x, y, z);
+		CURRENT_STACK.top().scale(x, y, z);
 
 		if (GpuFlags.EXT_DSA) {
 			EXTDirectStateAccess.glMatrixScalefEXT(MAT_MODE, x, y, z);
@@ -403,7 +403,7 @@ public class GlStateManager {
 		flushDrawState();
 
 		// the angle passed in glRotatef is in degrees but JOML accepts in radians.
-		CURRENT_STACK.rotate(angle * 3.14159265358979f / 180.0f, x, y, z);
+		CURRENT_STACK.top().rotate(angle * 3.14159265358979f / 180.0f, x, y, z);
 
 		if (GpuFlags.EXT_DSA) {
 			EXTDirectStateAccess.glMatrixRotatefEXT(MAT_MODE, angle, x, y, z);
@@ -415,7 +415,7 @@ public class GlStateManager {
 	public static void glTranslatef(float x, float y, float z) {
 		flushDrawState();
 
-		CURRENT_STACK.translate(x, y, z);
+		CURRENT_STACK.top().translate(x, y, z);
 
 		if (GpuFlags.EXT_DSA) {
 			EXTDirectStateAccess.glMatrixTranslatefEXT(MAT_MODE, x, y, z);

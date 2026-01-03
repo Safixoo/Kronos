@@ -5,6 +5,7 @@ import dev.safixo.client.render.gfx.vertex.GlVertexFormat;
 import dev.safixo.client.render.gfx.vertex.attribute.GlVertexAttribute;
 import dev.safixo.client.render.gfx.vertex.attribute.GlVertexAttributeType;
 import dev.safixo.client.render.vertex.writers.CloudFormat;
+import dev.safixo.client.render.vertex.writers.EntityFormat;
 import dev.safixo.client.render.vertex.writers.TerrainFormat;
 
 public class DefaultVertexFormats {
@@ -25,6 +26,14 @@ public class DefaultVertexFormats {
 			.add(TEXTURE_2US)
 			.add(COLOR)
 			.add(LIGHTMAP)
+			.build()
+	);
+
+	public static final GlVertexFormat ENTITY_FORMAT = new EntityFormat(
+		new ImmutableList.Builder<GlVertexAttribute>()
+			.add(POSITION_3F)
+			.add(TEXTURE_2F)
+			.add(NORMAL)
 			.build()
 	);
 

@@ -2,13 +2,12 @@ package dev.safixo.client.render;
 
 import dev.safixo.client.render.gfx.buffer.GlVertexBuffer;
 import dev.safixo.client.render.gfx.vertex.GlVertexArrayObject;
-import dev.safixo.client.render.vertex.VertexWriterManager;
+import dev.safixo.client.render.vertex.VertexWriter;
 import dev.safixo.client.util.data.PrimitivesFlags;
 import dev.safixo.client.util.memory.NativeBuffer;
 import dev.safixo.client.util.memory.UnsafeUtil;
 import dev.safixo.core.hooks.GlStateManager;
 import dev.safixo.core.hooks.TessellatorHook;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.Tessellator;
 import org.lwjgl.opengl.*;
@@ -210,7 +209,7 @@ public class ImprovedTessellator extends Tessellator {
 	public void setTextureUV(double u, double v) {
 		this.flags |= VERTEX_UV;
 
-		if (VertexWriterManager.isCurrentDrawing()) {
+		if (VertexWriter.isCurrentDrawing()) {
 			TessellatorHook.setTextureUV(u, v);
 			return;
 		}
@@ -225,7 +224,7 @@ public class ImprovedTessellator extends Tessellator {
 	public void setBrightness(int light) {
 		this.flags |= VERTEX_LIGHT;
 
-		if (VertexWriterManager.isCurrentDrawing()) {
+		if (VertexWriter.isCurrentDrawing()) {
 			TessellatorHook.setBrightness(light);
 			return;
 		}
@@ -254,7 +253,7 @@ public class ImprovedTessellator extends Tessellator {
 			return;
 		}
 
-		if (VertexWriterManager.isCurrentDrawing()) {
+		if (VertexWriter.isCurrentDrawing()) {
 			TessellatorHook.setColorRGBA(r, g, b, a);
 			return;
 		}
@@ -275,7 +274,7 @@ public class ImprovedTessellator extends Tessellator {
 
 	@Override
 	public void addVertexWithUV(double x, double y, double z, double u, double v) {
-		if (PrimitivesFlags.MESHING) {
+		if (PrimitivesFlags.REDIRECT_DRAWING) {
 			TessellatorHook.addVertexWithUV(x + this.xOff, y + this.yOff, z + this.zOff, u, v);
 			return;
 		}
@@ -325,9 +324,7 @@ public class ImprovedTessellator extends Tessellator {
 
 	@Override
 	public void addVertex(double x, double y, double z) {
-		VertexWriterManager writer = VertexWriterManager.getCurrentInstance();
-
-		if (writer.isDrawing) {
+		if (PrimitivesFlags.REDIRECT_DRAWING) {
 			TessellatorHook.addVertex(x + this.xOff, y + this.yOff, z + this.zOff);
 			return;
 		}
@@ -402,6 +399,10 @@ public class ImprovedTessellator extends Tessellator {
 		int nZ = (byte) (normalZ * 0x7F);
 
 		this.normal = (nX & 0xFF) << 0 | (nY & 0xFF) << 8 | (nZ & 0xFF) << 16;
+
+		if (PrimitivesFlags.REDIRECT_DRAWING) {
+			TessellatorHook.setNormal(this.normal);
+		}
 	}
 
 	@Override

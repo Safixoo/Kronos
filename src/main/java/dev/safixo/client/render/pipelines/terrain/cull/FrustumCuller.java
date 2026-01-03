@@ -33,36 +33,36 @@ public class FrustumCuller {
 		nxX *= invl; nxY *= invl; nxZ *= invl; nxW *= invl;
 
 		nxWG = (float) -nxW;
-		if (nxX >= 0) nxW += 16.0;
-		if (nxY >= 0) nxW += 16.0;
-		if (nxZ >= 0) nxW += 16.0;
+		if (nxX >= 0) nxW += 16.0 * nxX;
+		if (nxY >= 0) nxW += 16.0 * nxY;
+		if (nxZ >= 0) nxW += 16.0 * nxZ;
 
 		pxX = (double) m.m03() - (double) m.m00(); pxY = (double) m.m13() - (double) m.m10(); pxZ = (double) m.m23() - (double) m.m20(); pxW = (double) m.m33() - (double) m.m30();
 		invl = invSqrt(pxX * pxX + pxY * pxY + pxZ * pxZ);
 		pxX *= invl; pxY *= invl; pxZ *= invl; pxW *= invl;
 
 		pxWG = (float) -pxW;
-		if (pxX > 0) pxW += 16.0;
-		if (pxY > 0) pxW += 16.0;
-		if (pxZ > 0) pxW += 16.0;
+		if (pxX > 0) pxW += 16.0 * pxX;
+		if (pxY > 0) pxW += 16.0 * pxY;
+		if (pxZ > 0) pxW += 16.0 * pxZ;
 
 		nyX = (double) m.m03() + (double) m.m01(); nyY = (double) m.m13() + (double) m.m11(); nyZ = (double) m.m23() + (double) m.m21(); nyW = (double) m.m33() + (double) m.m31();
 		invl = invSqrt(nyX * nyX + nyY * nyY + nyZ * nyZ);
 		nyX *= invl; nyY *= invl; nyZ *= invl; nyW *= invl;
 
 		nyWG = (float) -nyW;
-		if (nyX > 0) nyW += 16.0;
-		if (nyY > 0) nyW += 16.0;
-		if (nyZ > 0) nyW += 16.0;
+		if (nyX > 0) nyW += 16.0 * nyX;
+		if (nyY > 0) nyW += 16.0 * nyY;
+		if (nyZ > 0) nyW += 16.0 * nyZ;
 
 		pyX = (double) m.m03() - (double) m.m01(); pyY = (double) m.m13() - (double) m.m11(); pyZ = (double) m.m23() - (double) m.m21(); pyW = (double) m.m33() - (double) m.m31();
 		invl = invSqrt(pyX * pyX + pyY * pyY + pyZ * pyZ);
 		pyX *= invl; pyY *= invl; pyZ *= invl; pyW *= invl;
 
 		pyWG = (float) -pyW;
-		if (pyX > 0) pyW += 16.0;
-		if (pyY > 0) pyW += 16.0;
-		if (pyZ > 0) pyW += 16.0;
+		if (pyX > 0) pyW += 16.0 * pyX;
+		if (pyY > 0) pyW += 16.0 * pyY;
+		if (pyZ > 0) pyW += 16.0 * pyZ;
 
 		FrustumCuller.nxX = (float) nxX;
 		FrustumCuller.nxY = (float) nxY;

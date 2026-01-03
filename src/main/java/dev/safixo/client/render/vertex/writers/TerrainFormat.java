@@ -3,7 +3,7 @@ package dev.safixo.client.render.vertex.writers;
 import com.google.common.collect.ImmutableList;
 import dev.safixo.client.util.MathExt;
 import dev.safixo.client.util.memory.UnsafeUtil;
-import dev.safixo.client.render.vertex.VertexWriterManager;
+import dev.safixo.client.render.vertex.VertexWriter;
 import dev.safixo.client.render.gfx.vertex.GlVertexFormat;
 import dev.safixo.client.render.gfx.vertex.attribute.GlVertexAttribute;
 
@@ -29,7 +29,7 @@ public class TerrainFormat extends GlVertexFormat {
 
 	@Override
 	public void writeVertex(long ptr, int offset) {
-		VertexWriterManager man = VertexWriterManager.getCurrentInstance();
+		VertexWriter man = VertexWriter.getCurrentInstance();
 
 		double posX = MathExt.clamp(man.x + man.trasX, 0.0f, RADIUS_X << 1);
 		double posY = MathExt.clamp(man.y + man.trasY, 0.0f, RADIUS_Y << 1);

@@ -1,9 +1,8 @@
 package dev.safixo.client.render.vertex.writers;
 
 import com.google.common.collect.ImmutableList;
-import dev.safixo.client.util.MathExt;
 import dev.safixo.client.util.memory.UnsafeUtil;
-import dev.safixo.client.render.vertex.VertexWriterManager;
+import dev.safixo.client.render.vertex.VertexWriter;
 import dev.safixo.client.render.gfx.vertex.GlVertexFormat;
 import dev.safixo.client.render.gfx.vertex.attribute.GlVertexAttribute;
 
@@ -14,7 +13,7 @@ public class CloudFormat extends GlVertexFormat {
 
 	@Override
 	public void writeVertex(long ptr, int offset) {
-		VertexWriterManager manager = VertexWriterManager.getCurrentInstance();
+		VertexWriter manager = VertexWriter.getCurrentInstance();
 
 		UnsafeUtil.memPutFloat(ptr + 0, (float) manager.x);
 		UnsafeUtil.memPutFloat(ptr + 4, (float) manager.y);

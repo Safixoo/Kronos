@@ -3,7 +3,7 @@ package dev.safixo.core.hooks;
 import dev.safixo.client.render.ImprovedTessellator;
 import dev.safixo.client.render.pipelines.cloud.CloudRenderer;
 import dev.safixo.client.render.pipelines.terrain.SectionManager;
-import dev.safixo.client.render.vertex.VertexWriterManager;
+import dev.safixo.client.render.vertex.VertexWriter;
 import dev.safixo.client.util.data.PrimitivesFlags;
 import dev.safixo.core.HookUtils;
 import net.minecraft.block.Block;
@@ -53,7 +53,7 @@ public  class RenderGlobalHook {
 
 		((List<?>) HookUtils.getFieldObj(renderGlobal, "tileEntities", "field_72762_a")).clear();
 
-		VertexWriterManager.startDefaults();
+		VertexWriter.startDefaults();
 
 		HookUtils.setField(renderGlobal, "renderEntitiesStartupCounter", "field_72740_G", 2);
 		HookUtils.setField(renderGlobal, "renderDistance", "field_72739_F", renderDistance);
@@ -66,7 +66,7 @@ public  class RenderGlobalHook {
 	}
 
 	private static void clearBuffers() {
-		VertexWriterManager.clearBuffers();
+		VertexWriter.clearBuffers();
 	}
 
 	// Executed only in the first pass of renderWorld.

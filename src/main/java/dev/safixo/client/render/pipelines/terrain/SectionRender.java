@@ -11,7 +11,7 @@ import dev.safixo.client.render.pipelines.terrain.meshing.FullBlockMesher;
 import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
 import dev.safixo.client.util.MeshDirection;
 import dev.safixo.client.util.data.CameraData;
-import dev.safixo.client.render.vertex.VertexWriterManager;
+import dev.safixo.client.render.vertex.VertexWriter;
 import dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache;
 import dev.safixo.client.util.data.PrimitivesFlags;
 import dev.safixo.client.util.Direction;
@@ -79,10 +79,10 @@ public class SectionRender {
 		SectionCache sectionCache = new SectionCache(world, minX - 1, minY - 1, minZ - 1, maxX + 1, maxY + 1, maxZ + 1);
 		RenderBlocks renderBlocks = new RenderBlocks(sectionCache);
 
-		VertexWriterManager translucentWriter = VertexWriterManager.TRANSLUCENT;
+		VertexWriter translucentWriter = VertexWriter.TRANSLUCENT;
 
 		for (int dir = 0; dir < MeshDirection.COUNT; dir++) {
-			this.prepareWriterForTerrain(VertexWriterManager.SOLID[dir]);
+			this.prepareWriterForTerrain(VertexWriter.SOLID[dir]);
 		}
 
 		this.prepareWriterForTerrain(translucentWriter);
@@ -174,10 +174,10 @@ public class SectionRender {
 		}
 
 		for (int dir = 0; dir < MeshDirection.COUNT; dir++) {
-			VertexWriterManager.SOLID[dir].stopDrawing();
+			VertexWriter.SOLID[dir].stopDrawing();
 		}
 
-		VertexWriterManager.DEFAULT_INSTANCE.stopDrawing();
+		VertexWriter.DEFAULT_INSTANCE.stopDrawing();
 		translucentWriter.stopDrawing();
 	}
 
@@ -243,9 +243,9 @@ public class SectionRender {
 			}
 
 			if (blockRenderPass != 0) {
-				VertexWriterManager.setCurrentInstance(VertexWriterManager.TRANSLUCENT);
+				VertexWriter.setCurrentInstance(VertexWriter.TRANSLUCENT);
 			} else {
-				VertexWriterManager.setCurrentInstance(VertexWriterManager.SOLID[MeshDirection.GENERIC]);
+				VertexWriter.setCurrentInstance(VertexWriter.SOLID[MeshDirection.GENERIC]);
 			}
 
 			renderBlocks.renderBlockByRenderType(block, blockX, blockY, blockZ);
@@ -306,16 +306,16 @@ public class SectionRender {
 			}
 
 			if (blockRenderPass != 0) {
-				VertexWriterManager.setCurrentInstance(VertexWriterManager.TRANSLUCENT);
+				VertexWriter.setCurrentInstance(VertexWriter.TRANSLUCENT);
 			} else {
-				VertexWriterManager.setCurrentInstance(VertexWriterManager.SOLID[MeshDirection.GENERIC]);
+				VertexWriter.setCurrentInstance(VertexWriter.SOLID[MeshDirection.GENERIC]);
 			}
 
 			renderBlocks.renderBlockByRenderType(block, blockX, blockY, blockZ);
 		}
 	}
 
-	private void uploadMeshesToRegion(SectionManager sectionManager, VertexWriterManager translucentWriter, int sumVertices, int meshDrawOrder) {
+	private void uploadMeshesToRegion(SectionManager sectionManager, VertexWriter translucentWriter, int sumVertices, int meshDrawOrder) {
 		if (sumVertices > 0) {
 			if (this.region == RegionRender.NULL) {
 				this.region = sectionManager.getRegion(this.blockX >> 4, this.blockY >> 4, this.blockZ >> 4);
@@ -327,8 +327,8 @@ public class SectionRender {
 				int realMeshDir = meshDrawOrder & 0xF;
 				meshDrawOrder >>= 4;
 
-				if (VertexWriterManager.SOLID[realMeshDir].getVertices() != 0) {
-					this.region.addSolidMesh(this, VertexWriterManager.SOLID[realMeshDir], realMeshDir);
+				if (VertexWriter.SOLID[realMeshDir].getVertices() != 0) {
+					this.region.addSolidMesh(this, VertexWriter.SOLID[realMeshDir], realMeshDir);
 				}
 			}
 		}
@@ -359,7 +359,7 @@ public class SectionRender {
 		int sumVertices = 0;
 
 		for (int dir = 0; dir < MeshDirection.COUNT; dir++) {
-			sumVertices += VertexWriterManager.SOLID[dir].getVertices();
+			sumVertices += VertexWriter.SOLID[dir].getVertices();
 		}
 
 		return sumVertices;
@@ -369,7 +369,7 @@ public class SectionRender {
 		int mask = 0;
 
 		for (int dir = 0; dir < MeshDirection.COUNT; dir++) {
-			if (VertexWriterManager.SOLID[dir].getVertices() != 0) {
+			if (VertexWriter.SOLID[dir].getVertices() != 0) {
 				mask |= 1 << dir;
 			}
 		}
@@ -377,7 +377,7 @@ public class SectionRender {
 		return mask;
 	}
 
-	private void prepareWriterForTerrain(VertexWriterManager writerManager) {
+	private void prepareWriterForTerrain(VertexWriter writerManager) {
 		writerManager.startDrawing();
 
 		// Region translation-offset.

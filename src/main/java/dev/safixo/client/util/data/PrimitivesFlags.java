@@ -14,7 +14,7 @@ import java.lang.reflect.Method;
  * possible.
  */
 public class PrimitivesFlags {
-	public static boolean MESHING;
+	public static boolean REDIRECT_DRAWING;
 
 	public static boolean DEV_ENVIRONMENT;
 	public static boolean DETECTED = false;

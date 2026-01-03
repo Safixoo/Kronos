@@ -5,8 +5,7 @@ import dev.safixo.client.render.gfx.util.RenderBuffer;
 import dev.safixo.client.util.ColorBGRManager;
 import dev.safixo.client.util.Direction;
 import dev.safixo.client.util.MathExt;
-import dev.safixo.client.util.memory.NativeBuffer;
-import dev.safixo.client.render.vertex.VertexWriterManager;
+import dev.safixo.client.render.vertex.VertexWriter;
 import dev.safixo.client.render.vertex.DefaultVertexFormats;
 import dev.safixo.client.render.vertex.writers.CloudFormat;
 import dev.safixo.core.HookUtils;
@@ -60,8 +59,8 @@ public class CloudRenderer {
 		float g = (float) cloudColor.yCoord;
 		float b = (float) cloudColor.zCoord;
 
-		VertexWriterManager.setCurrentInstance(VertexWriterManager.DEFAULT_INSTANCE);
-		VertexWriterManager writer = VertexWriterManager.getCurrentInstance();
+		VertexWriter.setCurrentInstance(VertexWriter.DEFAULT_INSTANCE);
+		VertexWriter writer = VertexWriter.getCurrentInstance();
 
 		writer.startDrawing();
 		writer.setVertexFormat(DefaultVertexFormats.CLOUD_FORMAT);
@@ -81,7 +80,7 @@ public class CloudRenderer {
 		CLOUD_SHADER.uploadUniforms(distance, r, g, b);
 	}
 
-	private static void clearState(VertexWriterManager writer) {
+	private static void clearState(VertexWriter writer) {
 		writer.stopDrawing();
 		CLOUD_SHADER.disableProgram();
 	}
@@ -128,7 +127,7 @@ public class CloudRenderer {
 		float worldFracX = (float) (worldX - worldFloorX);
 		float worldFracZ = (float) (worldZ - worldFloorZ);
 
-		VertexWriterManager writer = VertexWriterManager.getCurrentInstance();
+		VertexWriter writer = VertexWriter.getCurrentInstance();
 		RenderBuffer buffer = VERTEX_BUFFER;
 
 		buffer.bindBuffer(true);
@@ -181,7 +180,7 @@ public class CloudRenderer {
 		}
 	}
 
-	private static void buildPXPZ(VertexWriterManager writer, int cloudX, int cloudZ, int color, int visibleMask) {
+	private static void buildPXPZ(VertexWriter writer, int cloudX, int cloudZ, int color, int visibleMask) {
 		// -X Face
 		if ((visibleMask & (1 << XN)) != 0) {
 			int usedColor = ColorBGRManager.multiplyColor(color, CLOUD_X_FACTOR);
@@ -201,7 +200,7 @@ public class CloudRenderer {
 		}
 	}
 
-	private static void buildNXNZ(VertexWriterManager writer, int cloudX, int cloudZ, int color, int visibleMask) {
+	private static void buildNXNZ(VertexWriter writer, int cloudX, int cloudZ, int color, int visibleMask) {
 		// +X Face
 		if ((visibleMask & (1 << XP)) != 0) {
 			int usedColor = ColorBGRManager.multiplyColor(color, CLOUD_X_FACTOR);
@@ -221,7 +220,7 @@ public class CloudRenderer {
 		}
 	}
 
-	private static void buildNXPZ(VertexWriterManager writer, int cloudX, int cloudZ, int color, int visibleMask) {
+	private static void buildNXPZ(VertexWriter writer, int cloudX, int cloudZ, int color, int visibleMask) {
 		// -X Face
 		if ((visibleMask & (1 << XN)) != 0) {
 			int usedColor = ColorBGRManager.multiplyColor(color, CLOUD_X_FACTOR);
@@ -241,7 +240,7 @@ public class CloudRenderer {
 		}
 	}
 
-	private static void buildPXNZ(VertexWriterManager writer, int cloudX, int cloudZ, int color, int visibleMask) {
+	private static void buildPXNZ(VertexWriter writer, int cloudX, int cloudZ, int color, int visibleMask) {
 		// +X Face
 		if ((visibleMask & (1 << XP)) != 0) {
 			int usedColor = ColorBGRManager.multiplyColor(color, CLOUD_X_FACTOR);
@@ -261,7 +260,7 @@ public class CloudRenderer {
 		}
 	}
 
-	private static void buildNPY(VertexWriterManager writer, int cloudX, float cloudY, int cloudZ, int color) {
+	private static void buildNPY(VertexWriter writer, int cloudX, float cloudY, int cloudZ, int color) {
 		// +Y Face
 		if (cloudY < -1) {
 			addVertex(writer, cloudX, CLOUD_HEIGHT, cloudZ + 1, color);
@@ -277,7 +276,7 @@ public class CloudRenderer {
 		}
 	}
 
-	private static void buildYInverted(VertexWriterManager writer, int cloudX, float cloudY, int cloudZ, int color) {
+	private static void buildYInverted(VertexWriter writer, int cloudX, float cloudY, int cloudZ, int color) {
 		// -Y Face
 		if (cloudY < -1) {
 			int usedColor = ColorBGRManager.multiplyColor(color, CLOUD_BOTTOM_FACTOR);
@@ -293,7 +292,7 @@ public class CloudRenderer {
 		}
 	}
 
-	private static void buildGeometry(VertexWriterManager writer, int cellDistance, int worldFloorX, int worldFloorZ, float viewY) {
+	private static void buildGeometry(VertexWriter writer, int cellDistance, int worldFloorX, int worldFloorZ, float viewY) {
 		int maxDistance = (cellDistance * 3) >>> 1;
 		writer.ensureCapacity(CLOUD_STRIDE * 16384 * 4);
 
@@ -408,7 +407,7 @@ public class CloudRenderer {
 		}
 	}
 
-	private static void buildCenterCells(VertexWriterManager writer, int worldFloorX, float viewY, int worldFloorZ) {
+	private static void buildCenterCells(VertexWriter writer, int worldFloorX, float viewY, int worldFloorZ) {
 		for (int cellZ = -1; cellZ <= 1; cellZ++) {
 			for (int cellX = -1; cellX <= 1; cellX++) {
 				int height = (cellZ + worldFloorZ) & 0xFF;
@@ -492,7 +491,7 @@ public class CloudRenderer {
 		}
 	}
 
-	private static void addVertex(VertexWriterManager writer, int x, int y, int z, int color) {
+	private static void addVertex(VertexWriter writer, int x, int y, int z, int color) {
 		CloudFormat.writeCloudVertex(writer.getTotalOffset(), x, y, z, color);
 		writer.addVertexCounter(CLOUD_STRIDE);
 	}

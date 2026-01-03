@@ -10,7 +10,7 @@ import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
 import dev.safixo.client.util.data.PrimitivesFlags;
 import dev.safixo.client.util.ColorBGRManager;
 import dev.safixo.client.util.Direction;
-import dev.safixo.client.render.vertex.VertexWriterManager;
+import dev.safixo.client.render.vertex.VertexWriter;
 import dev.safixo.client.render.vertex.writers.TerrainFormat;
 import org.joml.Vector2i;
 import org.joml.Vector3i;
@@ -51,7 +51,7 @@ public class FullBlockMesher {
 				continue;
 			}
 
-			VertexWriterManager.setCurrentInstance(VertexWriterManager.SOLID[dir]);
+			VertexWriter.setCurrentInstance(VertexWriter.SOLID[dir]);
 
 			Icon tex = block.getBlockTexture(cache, x, y, z, dir);
 			FacingRender render = FACE_RENDER[dir];
@@ -130,7 +130,7 @@ public class FullBlockMesher {
 		int light2 = avg(avg(lightNN, lightMap), avg(lightNZ, lightNX)); // 2 vertex
 		int light3 = avg(avg(lightNP, lightMap), avg(lightNX, lightPZ)); // 3 vertex
 
-		VertexWriterManager.getCurrentInstance().ensureCapacity(TerrainFormat.STRIDE * 4);
+		VertexWriter.getCurrentInstance().ensureCapacity(TerrainFormat.STRIDE * 4);
 
 		final float[] uvs = VERT_UVS;
 		Vector2i uv0 = MAP_ID_TO_UV[facing.uvData[0]];
@@ -252,7 +252,7 @@ public class FullBlockMesher {
 
 		int lightMap = cache.getLightBrightnessForSkyBlocks(x + dirVec.x, y + dirVec.y, z + dirVec.z, 0);
 
-		VertexWriterManager.getCurrentInstance().ensureCapacity(TerrainFormat.STRIDE * 4);
+		VertexWriter.getCurrentInstance().ensureCapacity(TerrainFormat.STRIDE * 4);
 
 		final float[] uvs = VERT_UVS;
 		Vector2i uv0 = MAP_ID_TO_UV[facing.uvData[0]];
@@ -293,7 +293,7 @@ public class FullBlockMesher {
 		int relY = y + vertOff.y;
 		int relZ = z + vertOff.z;
 
-		VertexWriterManager manager = VertexWriterManager.getCurrentInstance();
+		VertexWriter manager = VertexWriter.getCurrentInstance();
 		long ptr = manager.getTotalOffset();
 
 		TerrainFormat.writeTerrainVertex(ptr, relX, relY, relZ, u, v, color, lightMap);

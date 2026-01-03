@@ -217,7 +217,7 @@ public class SectionManager {
 
 		SectionRender[] updateArray = RebuildList.getBackedArray();
 		PrimitivesFlags.processLeavesSolid();
-		PrimitivesFlags.MESHING = true;
+		PrimitivesFlags.REDIRECT_DRAWING = true;
 
 		for (int i = 0; i < maxSize; i++) {
 			SectionRender section = updateArray[i];
@@ -227,7 +227,7 @@ public class SectionManager {
 			}
 		}
 
-		PrimitivesFlags.MESHING = false;
+		PrimitivesFlags.REDIRECT_DRAWING = false;
 		RebuildList.clear();
 	}
 	private void generateWholeVolume(double cameraX, double cameraZ) {

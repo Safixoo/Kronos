@@ -15,6 +15,9 @@ public class ClientChunkListener extends ChunkProviderClient {
 	private final Long2ReferenceOpenHashMap<ChunkMetadata> chunkMap = new Long2ReferenceOpenHashMap<>(512, 0.5f);
 	private final LongArrayList chunksToSend = new LongArrayList();
 
+	private Chunk lastChunk;
+	private long lastPosition = -1;
+
 	private final World world;
 	private final EmptyChunk blankChunk;
 
@@ -22,6 +25,7 @@ public class ClientChunkListener extends ChunkProviderClient {
 		super(world);
 		this.world = world;
 		this.blankChunk = new EmptyChunk(world, 0, 0);
+		this.lastChunk = this.blankChunk;
 	}
 
 	@Override
@@ -70,8 +74,18 @@ public class ClientChunkListener extends ChunkProviderClient {
 
 	@Override
 	public Chunk provideChunk(int x, int z) {
-		ChunkMetadata chunk = this.chunkMap.get(MathExt.asLong(x, z));
-		return chunk == null ? this.blankChunk : chunk.chunk;
+		long position = MathExt.asLong(x, z);
+		Chunk chunk;
+
+		if (position == this.lastPosition && this.lastChunk.getClass() != EmptyChunk.class) {
+			chunk = this.lastChunk;
+		} else {
+			ChunkMetadata meta = this.chunkMap.get(position);
+			chunk = this.lastChunk = meta == null ? this.blankChunk : meta.chunk;
+			this.lastPosition = position;
+		}
+
+		return chunk;
 	}
 
 	public void processAllQueuedSections() {

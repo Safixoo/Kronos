@@ -21,6 +21,7 @@ public class KronosTransformer implements IClassTransformer {
 	static final String FONT_RENDERER_HOOK = "dev/safixo/core/hooks/FontRendererHook";
 	static final String FRUSTUM_HOOK = "dev/safixo/core/hooks/FrustumHook";
 	static final String MINECRAFT_HOOK = "dev/safixo/core/hooks/MinecraftHook";
+	static final String ADV_MODEL_RENDERER = "dev/safixo/client/render/pipelines/entity_model/AdvModelRenderer";
 
 	static final String REBUILD_LISTENER = "dev/safixo/client/render/pipelines/terrain/meshing/RebuildListener";
 
@@ -34,6 +35,7 @@ public class KronosTransformer implements IClassTransformer {
 	static final String BIOME_GEN_BASE = "net.minecraft.world.biome.BiomeGenBase";
 	static final String LONG_HASH_MAP = "net.minecraft.util.LongHashMap";
 	static final String WORLD_CLIENT = "net.minecraft.client.multiplayer.WorldClient";
+	static final String MODEL_RENDERER = "net.minecraft.client.model.ModelRenderer";
 	static final String WORLD = "net.minecraft.world.World";
 
 	static HashSet<String> FUNCTION_NAMES;
@@ -50,6 +52,10 @@ public class KronosTransformer implements IClassTransformer {
 		// Overwrites classes methods completely with a function call with the same
 		// args and with the instance of the original class.
 		switch (transformedName) {
+			case MODEL_RENDERER:
+				replaceClassMethod(ADV_MODEL_RENDERER, "render", "func_78785_a", "(F)V", reference, false);
+				replaceClassMethod(ADV_MODEL_RENDERER, "renderWithRotation", "func_78791_b", "(F)V", reference, false);
+				replaceClassMethod(ADV_MODEL_RENDERER, "postRender", "func_78794_c", "(F)V", reference, false);
 			case WORLD_CLIENT:
 				replaceClassMethod(MINECRAFT_HOOK, "createChunkProvider", "j", "()Lado", reference, false);
 				break;
@@ -109,7 +115,7 @@ public class KronosTransformer implements IClassTransformer {
 
 		fillStateMachineFunctions();
 
-		if (!transformedName.equals("dev.safixo.core.hooks.GlStateManager")) {
+		if (!transformedName.equals("dev.safixo.core.hooks.GlStateManager") && !transformedName.equals("dev.safixo.core.hooks.GLFunctions")) {
 			redirectGlCalls(reference);
 		}
 

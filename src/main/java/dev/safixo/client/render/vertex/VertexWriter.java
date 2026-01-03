@@ -9,13 +9,13 @@ import dev.safixo.client.util.MeshDirection;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
-public class VertexWriterManager {
-	public static final VertexWriterManager DEFAULT_INSTANCE = new VertexWriterManager(false);
+public class VertexWriter {
+	public static final VertexWriter DEFAULT_INSTANCE = new VertexWriter(false);
 	private static final int DEFAULT_CAPACITY = (1 << 16);
 
-	public static final ObjectArrayList<VertexWriterManager> VERTEX_WRITERS = new ObjectArrayList<>();
-	public static final VertexWriterManager[] SOLID = new VertexWriterManager[MeshDirection.COUNT];
-	public static VertexWriterManager TRANSLUCENT = new VertexWriterManager();
+	public static final ObjectArrayList<VertexWriter> VERTEX_WRITERS = new ObjectArrayList<>();
+	public static final VertexWriter[] SOLID = new VertexWriter[MeshDirection.COUNT];
+	public static VertexWriter TRANSLUCENT = new VertexWriter();
 
 	public double x, y, z;
 	public double trasX, trasY, trasZ;
@@ -32,17 +32,17 @@ public class VertexWriterManager {
 	private int offset, vertices;
 	public boolean isDrawing = false;
 
-	private static VertexWriterManager CURRENT_INSTANCE = DEFAULT_INSTANCE;
+	private static VertexWriter CURRENT_INSTANCE = DEFAULT_INSTANCE;
 
-	public VertexWriterManager(int capacity) {
+	public VertexWriter(int capacity) {
 		this(capacity, true);
 	}
 
-	public VertexWriterManager(boolean tracked) {
+	public VertexWriter(boolean tracked) {
 		this(DEFAULT_CAPACITY, tracked);
 	}
 
-	public VertexWriterManager(int capacity, boolean tracked) {
+	public VertexWriter(int capacity, boolean tracked) {
 		if (tracked) {
 			VERTEX_WRITERS.add(this);
 		}
@@ -52,11 +52,11 @@ public class VertexWriterManager {
 		this.vertexPtrNio = NativeBuffer.wrap(this.vertexPtr);
 	}
 
-	public VertexWriterManager() {
+	public VertexWriter() {
 		this(DEFAULT_CAPACITY);
 	}
 
-	public static VertexWriterManager getCurrentInstance() {
+	public static VertexWriter getCurrentInstance() {
 		return CURRENT_INSTANCE;
 	}
 
@@ -66,12 +66,12 @@ public class VertexWriterManager {
 
 	public static void startDefaults() {
 		for (int dir = 0; dir < MeshDirection.COUNT; dir++) {
-			SOLID[dir] = new VertexWriterManager();
+			SOLID[dir] = new VertexWriter();
 		}
-		TRANSLUCENT = new VertexWriterManager();
+		TRANSLUCENT = new VertexWriter();
 	}
 
-	public static void setCurrentInstance(VertexWriterManager manager) {
+	public static void setCurrentInstance(VertexWriter manager) {
 		CURRENT_INSTANCE = manager;
 	}
 
@@ -125,14 +125,14 @@ public class VertexWriterManager {
 	}
 
 	public static void clearBuffers() {
-		for (VertexWriterManager manager : VERTEX_WRITERS) {
+		for (VertexWriter manager : VERTEX_WRITERS) {
 			manager.clear();
 		}
 
 		VERTEX_WRITERS.clear();
 
-		Arrays.fill(VertexWriterManager.SOLID, null);
-		VertexWriterManager.TRANSLUCENT = null;
+		Arrays.fill(VertexWriter.SOLID, null);
+		VertexWriter.TRANSLUCENT = null;
 	}
 
 	private void grow(long minSize) {
