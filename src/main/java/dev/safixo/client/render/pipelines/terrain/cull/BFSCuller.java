@@ -1,15 +1,14 @@
 package dev.safixo.client.render.pipelines.terrain.cull;
 
+import dev.safixo.core.hooks.GlStateManager;
 import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
 import dev.safixo.client.render.pipelines.terrain.SectionFlags;
 import dev.safixo.client.render.pipelines.terrain.SectionRender;
 import dev.safixo.client.util.data.CameraData;
-import dev.safixo.client.util.data.FogData;
 import dev.safixo.client.render.pipelines.terrain.region.RegionManager;
 import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
 import dev.safixo.client.util.Direction;
 import dev.safixo.client.util.MathExt;
-import net.minecraft.util.MathHelper;
 
 public class BFSCuller {
 	public final BFSQueue bfsQueue = new BFSQueue();
@@ -62,11 +61,7 @@ public class BFSCuller {
 			queueRegionNode(this.bfsQueue, origin, flags);
 		}
 
-		float realRenderDistance = Math.min(FogData.FOG_END / 16.0f, camera.renderDistance);
-
-		double magicOffset = MathHelper.clamp_float(0, realRenderDistance * -8.0f + 80.0f, 32.0f) - realRenderDistance;
-		double maxDistance = Math.min(FogData.FOG_END, camera.renderDistance << 4) + magicOffset;
-
+		double maxDistance = Math.min(GlStateManager.FOG_END, camera.renderDistance << 4);
 		search(this.bfsQueue, camera.intX, camera.intY, camera.intZ, (int) MathExt.square(maxDistance), this.activeFrame);
 	}
 
@@ -272,13 +267,13 @@ public class BFSCuller {
 	}
 
 	/**
-	 * Squared sphere distance from the center of section to the player.
+	 * Squared sphere distance from the nearest corner, which almost always returns the nearest point
+	 * in cases where an axis is not intersecting with the player.
 	 */
 	private static int withinRenderDistance(int distX, int distY, int distZ) {
-		distX += 8;
-		distY += 8;
-		distZ += 8;
-
+		distX += (distX >>> 31) << 4;
+		distY += (distY >>> 31) << 4;
+		distZ += (distZ >>> 31) << 4;
 		return (distX * distX) + (distY * distY) + (distZ * distZ);
 	}
 
