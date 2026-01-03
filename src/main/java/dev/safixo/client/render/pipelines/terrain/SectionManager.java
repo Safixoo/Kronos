@@ -181,7 +181,7 @@ public class SectionManager {
 		// For debugging occ culling.
 		//noinspection ConstantValue
 		if (playerItem != DEBUG_ITEM || DEBUG_ITEM == null) {
-			this.bfsCuller.init(this.regionManager, this.camera.intX, this.camera.intZ, renderDistance);
+			this.bfsCuller.init(this.regionManager, renderDistance);
 			this.bfsCuller.updateRenderList(this.sectionMap, this.camera);
 		}
 
@@ -191,6 +191,7 @@ public class SectionManager {
 
 		profiler.endStartSection("ticking");
 
+		@SuppressWarnings("unchecked")
 		List<TileEntity> tileEntities = (List<TileEntity>) Minecraft.getMinecraft().renderGlobal.tileEntities;
 
 		tileEntities.clear();

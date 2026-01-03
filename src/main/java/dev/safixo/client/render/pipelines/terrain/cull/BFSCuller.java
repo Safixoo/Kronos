@@ -17,17 +17,18 @@ public class BFSCuller {
 
 	// The max denominator would always be a renderDistance * 3 worst case, and should always
 	// be used in a consequential way, so it shouldn't mean a problem to the cache.
-	private static final float[] INV_DIVS = new float[512];
+	private static final long[] INV_DIVS = new long[512];
+
+	public static final int PRECISION_BITS = 25;
+	public static final int MAX_PRECISION = 1 << PRECISION_BITS;
 
 	static {
 		for (int i = 0; i < 512; i++) {
-			INV_DIVS[i] = (1 / (float) i);
+			INV_DIVS[i] = (int) Math.ceil(MAX_PRECISION / (double) i);
 		}
 	}
 
-	public void init(RegionManager regionManager, int cameraX, int cameraZ, int renderDistance) {
-		BFSVisArray.start(cameraX >> 4, cameraZ >> 4, renderDistance);
-
+	public void init(RegionManager regionManager, int renderDistance) {
 		for (RegionRender render : regionManager.regionMap.values()) {
 			render.sectionsToRender = 0;
 		}
@@ -50,8 +51,6 @@ public class BFSCuller {
 
 		if (origin != null) {
 			int flags = origin.flags;
-
-			BFSVisArray.setVisible(origin.blockX >> 4, origin.blockY >> 4, origin.blockZ >> 4);
 			exploreNodes(this.bfsQueue, origin, SectionFlags.getAdjacentMask(flags), this.activeFrame);
 
 			origin.currentFrame = this.activeFrame;
@@ -83,7 +82,7 @@ public class BFSCuller {
 
 		while ((node = bfsQueue.get(bfsIndex++)) != null) {
 			int flags = node.flags;
-			node.gridInd = 1.0f;
+			node.gridInd = MAX_PRECISION;
 
 			int outwardDirections = getOutwardDirections(playerX, playerY, playerZ, node);
 
@@ -192,6 +191,8 @@ public class BFSCuller {
 		}
 	}
 
+	private static final int MAX_TOLERANCE = (int) (0.15f * MAX_PRECISION);
+
 	/**
 	 * First check if the section is within the fog circle, then if it's outside the camera frustum, after
 	 * use grid based visibility technique to determine a threshold of visibility for the section, and in cases
@@ -206,25 +207,19 @@ public class BFSCuller {
 
 		int distance = withinRenderDistance(distX, distY, distZ);
 
-		if (distance >= fogEnd) {
+		if (distance >= fogEnd || !FrustumCuller.withinFrustumBounds(distX, distY, distZ)) {
 			return true;
 		}
 
-		BFSVisArray.setVisible(node.blockX >> 4, node.blockY >> 4, node.blockZ >> 4);
-
-		if (!FrustumCuller.withinFrustumBounds(distX, distY, distZ)) {
-			return true;
-		}
-
-		float gridInd = processGridIndex(node, playerX, playerY, playerZ, outwardDirections, frame);
+		int gridInd = processGridIndex(node, playerX, playerY, playerZ, outwardDirections, frame);
 		node.gridInd = gridInd;
 
-		if (gridInd < 0.1f) {
+		if (gridInd < MAX_TOLERANCE) {
 			return true;
 		}
 
-		if (distance >= MathExt.square(128) && SectionFlags.hasDrawableFaces(flags)) {
-			return !visibleByRayCast(node.blockX + 8, node.blockY + 8, node.blockZ + 8, -distX, -distY, -distZ);
+		if (distance >= MathExt.square(112) && SectionFlags.hasDrawableFaces(flags)) {
+			return !visibleByRayCast(node, frame, node.blockX + 8, node.blockY + 8, node.blockZ + 8, -distX, -distY, -distZ);
 		}
 
 		return false;
@@ -240,17 +235,17 @@ public class BFSCuller {
 	 * As it stands right now is poorly optimized, but it rewards in all the works it skips are sections that it avoids.
 	 * @return Grid visibility factor
 	 */
-	private static float processGridIndex(SectionRender section, int playerX, int playerY, int playerZ, int outwardDir, int frame) {
+	private static int processGridIndex(SectionRender section, int playerX, int playerY, int playerZ, int outwardDir, int frame) {
 		int diffX = Math.abs((section.blockX >> 4) - (playerX >> 4));
 		int diffY = Math.abs((section.blockY >> 4) - (playerY >> 4));
 		int diffZ = Math.abs((section.blockZ >> 4) - (playerZ >> 4));
 
 		if (diffX == 0 || diffY == 0 || diffZ == 0) {
-			return 1.0f;
+			return MAX_PRECISION;
 		}
 
 		int dirSet = ~outwardDir & SectionFlags.getAdjacentMask(section.flags);
-		float gradInd = 0.0F;
+		int gradInd = 0;
 
 		// Y
 		if (renderThisFrame(section.adjacentDown, dirSet, Direction.DOWN, frame)) {
@@ -273,7 +268,7 @@ public class BFSCuller {
 			gradInd += diffX * section.adjacentEast.gridInd;
 		}
 
-		return gradInd * INV_DIVS[diffX + diffY + diffZ];
+		return (int) ((gradInd * INV_DIVS[diffX + diffY + diffZ]) >> PRECISION_BITS);
 	}
 
 	/**
@@ -287,24 +282,14 @@ public class BFSCuller {
 		return (distX * distX) + (distY * distY) + (distZ * distZ);
 	}
 
-	private static final int MAX_PRECISION = 1 << 25;
-
 	/**
 	 * Traces a ray from the section to the camera and tries to find obstruction in the way using the visited
-	 * sections info saved in {@link dev.safixo.client.render.pipelines.terrain.cull.BFSVisArray}
+	 * section current frame.
 	 */
-	private static boolean visibleByRayCast(int x1, int y1, int z1, int dx, int dy, int dz) {
+	private static boolean visibleByRayCast(SectionRender node, int frame, int x1, int y1, int z1, int dx, int dy, int dz) {
 		dx -= 8;
 		dy -= 8;
 		dz -= 8;
-
-		int voxelX = x1 >> 4;
-		int voxelY = y1 >> 4;
-		int voxelZ = z1 >> 4;
-
-		int stepX = sign(dx);
-		int stepY = sign(dy);
-		int stepZ = sign(dz);
 
 		int invDx = MAX_PRECISION / (Math.abs(dx) + 1);
 		int invDy = MAX_PRECISION / (Math.abs(dy) + 1);
@@ -318,37 +303,37 @@ public class BFSCuller {
 		int originOffsetY = (y1 & 15);
 		int originOffsetZ = (z1 & 15);
 
-		int tMaxX = (stepX > 0 ? (16 - originOffsetX) : originOffsetX + 1) * invDx;
-		int tMaxY = (stepY > 0 ? (16 - originOffsetY) : originOffsetY + 1) * invDy;
-		int tMaxZ = (stepZ > 0 ? (16 - originOffsetZ) : originOffsetZ + 1) * invDz;
+		int tMaxX = (dx > 0 ? (16 - originOffsetX) : originOffsetX + 1) * invDx;
+		int tMaxY = (dy > 0 ? (16 - originOffsetY) : originOffsetY + 1) * invDy;
+		int tMaxZ = (dz > 0 ? (16 - originOffsetZ) : originOffsetZ + 1) * invDz;
 
-		int invalid = 0;
+		int valid = 0;
 
-		for (int i = 0; i < 5; i++) {
+		for (int i = 0; i < 4; i++) {
 			if (tMaxX < tMaxY) {
 				if (tMaxX < tMaxZ) {
-					voxelX += stepX;
+					node = dx < 0 ? node.adjacentWest : node.adjacentEast;
 					tMaxX += tDeltaX;
 				} else {
-					voxelZ += stepZ;
+					node = dz < 0 ? node.adjacentNorth : node.adjacentSouth;
 					tMaxZ += tDeltaZ;
 				}
 			} else {
 				if (tMaxY < tMaxZ) {
-					voxelY += stepY;
+					node = dy < 0 ? node.adjacentDown : node.adjacentUp;
 					tMaxY += tDeltaY;
 				} else {
-					voxelZ += stepZ;
+					node = dz < 0 ? node.adjacentNorth : node.adjacentSouth;
 					tMaxZ += tDeltaZ;
 				}
 			}
 
-			if (BFSVisArray.notVisible(voxelX, voxelY, voxelZ) && invalid++ > 2) {
+			if (node == null || (node.currentFrame != frame && valid++ > 2)) {
 				break;
 			}
 		}
 
-		return invalid <= 2;
+		return valid <= 2;
 	}
 
 	public int getActiveFrame() {

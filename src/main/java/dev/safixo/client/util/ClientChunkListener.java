@@ -25,7 +25,6 @@ public class ClientChunkListener extends ChunkProviderClient {
 		super(world);
 		this.world = world;
 		this.blankChunk = new EmptyChunk(world, 0, 0);
-		this.lastChunk = this.blankChunk;
 	}
 
 	@Override
@@ -75,17 +74,9 @@ public class ClientChunkListener extends ChunkProviderClient {
 	@Override
 	public Chunk provideChunk(int x, int z) {
 		long position = MathExt.asLong(x, z);
-		Chunk chunk;
+		ChunkMetadata meta = this.chunkMap.get(position);
 
-		if (position == this.lastPosition && this.lastChunk.getClass() != EmptyChunk.class) {
-			chunk = this.lastChunk;
-		} else {
-			ChunkMetadata meta = this.chunkMap.get(position);
-			chunk = this.lastChunk = meta == null ? this.blankChunk : meta.chunk;
-			this.lastPosition = position;
-		}
-
-		return chunk;
+		return meta == null ? this.blankChunk : meta.chunk;
 	}
 
 	public void processAllQueuedSections() {

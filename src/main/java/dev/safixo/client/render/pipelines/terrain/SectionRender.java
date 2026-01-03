@@ -1,5 +1,6 @@
 package dev.safixo.client.render.pipelines.terrain;
 
+import dev.safixo.client.render.pipelines.terrain.cull.BFSCuller;
 import dev.safixo.client.util.MathExt;
 import it.unimi.dsi.fastutil.objects.ReferenceArrayList;
 import it.unimi.dsi.fastutil.objects.ReferenceList;
@@ -50,7 +51,7 @@ public class SectionRender {
 	public RegionRender region = RegionRender.NULL;
 
 	// Used in BFS for the grid based visibility technique.
-	public float gridInd = 1.0f;
+	public int gridInd = BFSCuller.MAX_PRECISION;
 
 	// Tile entities from the section.
 	private final ReferenceList<TileEntity> tileEntities = new ReferenceArrayList<>();
