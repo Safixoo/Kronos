@@ -59,8 +59,6 @@ public class RenderBuffer {
 	}
 
 	public void delete() {
-		this.clear();
-
 		this.vertexBuffer.delete();
 		this.vertexArrayObject.delete();
 

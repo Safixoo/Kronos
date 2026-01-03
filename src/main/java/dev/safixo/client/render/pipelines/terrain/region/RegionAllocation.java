@@ -10,8 +10,8 @@ import dev.safixo.client.render.pipelines.terrain.SectionRender;
 import dev.safixo.client.render.vertex.writers.TerrainFormat;
 
 public class RegionAllocation {
-	private static final int SPARE_BUFFER_ALLOC = 1024 * 1024 * 64;
-	private static final int MIN_ALLOC = 1024 * 1024;
+	private static final int SPARE_BUFFER_ALLOC = 1024 * 1024 * 32;
+	private static final int MIN_ALLOC = 1024 * 1024 * 4;
 	private static final int STRIDE = TerrainFormat.STRIDE;
 
 	public RegionBuffer vertexBuffer;
@@ -22,7 +22,7 @@ public class RegionAllocation {
 	private Allocation firstEntry;
 	private Allocation freeAllocations;
 
-	public static RenderBuffer SPARE_BUFFER;
+	public static GlVertexBuffer SPARE_BUFFER;
 
 	public RegionAllocation() {
 		this(MIN_ALLOC);
@@ -32,11 +32,10 @@ public class RegionAllocation {
 		int newCapacity = Math.max(MIN_ALLOC, size);
 
 		if (SPARE_BUFFER == null) {
-			SPARE_BUFFER = new RenderBuffer(SPARE_BUFFER_ALLOC, GL15.GL_STREAM_COPY);
+			SPARE_BUFFER = new GlVertexBuffer(SPARE_BUFFER_ALLOC, GL15.GL_STREAM_COPY);
 		}
 
 		this.vertexBuffer = new RegionBuffer(newCapacity, GL15.GL_STATIC_DRAW);
-
 		this.capacity = newCapacity;
 	}
 
@@ -62,7 +61,7 @@ public class RegionAllocation {
 
 			// If the region is more than 64MB avoid allocating a temporal buffer as is preferred
 			// to not duplicate that much memory.
-			if (this.offset > (64 << 20)) {
+			if (this.offset > (32 << 20)) {
 				this.vertexBuffer.allocateSpace((int) newSize, GL15.GL_STATIC_DRAW);
 
 				Allocation alloc = this.firstEntry;
@@ -90,7 +89,7 @@ public class RegionAllocation {
 
 				GlBufferUtil.copyBufferToBuffer(spareBuffer, regionBuffer, 0, 0, (int) this.offset);
 
-				tempBuffer.clear();
+				tempBuffer.delete();
 			}
 
 			this.capacity = newSize;
@@ -98,7 +97,7 @@ public class RegionAllocation {
 		}
 
 		GlVertexBuffer regionBuffer = this.vertexBuffer.getVertexBuffer();
-		GlVertexBuffer spareBuffer = SPARE_BUFFER.getVertexBuffer();
+		GlVertexBuffer spareBuffer = SPARE_BUFFER;
 
 		GlBufferUtil.copyBufferToBuffer(regionBuffer, spareBuffer, 0, 0, (int) this.offset);
 
@@ -112,7 +111,7 @@ public class RegionAllocation {
 	// When freeing all the allocations of the region, is also wanted to avoid any interference
 	// with the sections and the invalid region/allocation.
 	public void clear() {
-		this.vertexBuffer.clear();
+		this.vertexBuffer.delete();
 
 		this.capacity = 0;
 		this.offset = 0;
