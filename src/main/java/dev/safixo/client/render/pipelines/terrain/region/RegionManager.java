@@ -40,23 +40,25 @@ public class RegionManager {
 		return region;
 	}
 
-	public void update(CameraData camera, int renderDistance, boolean worldUpdated) {
-		ReferenceCollection<RegionRender> regions = this.regionMap.values();
+	public void clear() {
+		for (RegionRender region : this.regionMap.values()) {
+			region.clear();
+		}
 
+		if (RegionAllocation.SPARE_BUFFER != null) {
+			RegionAllocation.SPARE_BUFFER.delete();
+			RegionAllocation.SPARE_BUFFER = null;
+		}
+
+		this.regionMap.clear();
+	}
+
+	public void update(CameraData camera, int renderDistance, boolean worldUpdated) {
 		if (worldUpdated) {
 			this.lastUpdateX = camera.cameraXD();
 			this.lastUpdateZ = camera.cameraZD();
 
-			for (RegionRender region : regions) {
-				region.clear();
-			}
-
-			if (RegionAllocation.SPARE_BUFFER != null) {
-				RegionAllocation.SPARE_BUFFER.delete();
-				RegionAllocation.SPARE_BUFFER = null;
-			}
-
-			this.regionMap.clear();
+			this.clear();
 			return;
 		}
 

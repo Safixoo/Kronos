@@ -166,6 +166,14 @@ public class RegionRender {
 			this.translucentFirst = UnsafeUtil.NULL;
 			this.translucentCount = UnsafeUtil.NULL;
 		}
+
+		if (this.solidIndirectPtr != UnsafeUtil.NULL) {
+			NativeBuffer.nmemFree(this.solidIndirectPtr);
+		}
+
+		if (this.translucentIndirectPtr != UnsafeUtil.NULL) {
+			NativeBuffer.nmemFree(this.translucentIndirectPtr);
+		}
 	}
 
 	public void addSolidMesh(SectionRender render, VertexWriter manager, int side) {

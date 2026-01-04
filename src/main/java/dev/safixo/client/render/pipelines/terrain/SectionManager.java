@@ -158,6 +158,7 @@ public class SectionManager {
 			this.worldObj = world;
 
 			this.tileEntitiesSet.clear();
+			this.sectionMap.clear();
 			this.generateWholeVolume(cameraX, cameraZ);
 		}
 
@@ -252,6 +253,7 @@ public class SectionManager {
 	}
 
 	private void clearRenderer() {
+		this.regionManager.clear();
 		this.sectionMap.clear();
 		this.tileEntitiesSet.clear();
 	}
