@@ -198,7 +198,7 @@ public class ImprovedTessellator extends Tessellator {
 	@Override
 	public void startDrawing(int drawMode) {
 		if (this.drawMode != drawMode) {
-			flushState();
+			this.flushState();
 		}
 
 		this.drawMode = drawMode;
@@ -285,8 +285,8 @@ public class ImprovedTessellator extends Tessellator {
 
 		this.flags |= VERTEX_UV;
 
-		if (this.lastFlag != this.flags && this.lastFlag != -1) {
-			flushState();
+		if (this.lastFlag != this.flags && (this.vertices & 3) == 0) {
+			this.flushState();
 		}
 
 		long ptr = this.vertexPtr + this.offset;
@@ -333,8 +333,8 @@ public class ImprovedTessellator extends Tessellator {
 			this.resize();
 		}
 
-		if (this.lastFlag != this.flags && this.lastFlag != -1) {
-			flushState();
+		if (this.lastFlag != this.flags && (this.vertices & 3) == 0) {
+			this.flushState();
 		}
 
 		long ptr = this.vertexPtr + this.offset;
@@ -363,7 +363,7 @@ public class ImprovedTessellator extends Tessellator {
 			writePtr += 4;
 		}
 
-		this.offset += writePtr - ptr;
+		this.offset += (int) (writePtr - ptr);
 		this.vertices++;
 	}
 

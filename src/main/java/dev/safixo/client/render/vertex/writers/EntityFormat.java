@@ -3,6 +3,7 @@ package dev.safixo.client.render.vertex.writers;
 import com.google.common.collect.ImmutableList;
 import dev.safixo.client.render.gfx.vertex.GlVertexFormat;
 import dev.safixo.client.render.gfx.vertex.attribute.GlVertexAttribute;
+import dev.safixo.client.render.vertex.DefaultVertexFormats;
 import dev.safixo.client.render.vertex.VertexWriter;
 import dev.safixo.client.util.memory.UnsafeUtil;
 

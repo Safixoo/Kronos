@@ -101,7 +101,7 @@ public class VertexWriter {
 	public void addVertex() {
 		int stride = this.vertexFormat.getStride();
 
-		this.ensureCapacity(stride << 2);
+		this.ensureCapacity(stride);
 		this.vertexFormat.writeVertex(this.vertexPtr + this.offset, this.vertices);
 
 		this.offset += stride;
@@ -136,7 +136,7 @@ public class VertexWriter {
 	}
 
 	private void grow(long minSize) {
-		long newCapacity = Math.max((this.capacity * 3) >> 1, minSize);
+		long newCapacity = Math.max(this.capacity * 2, minSize);
 
 		long newVertexPtr = NativeBuffer.nmemAlloc(newCapacity);
 		UnsafeUtil.memCopy(this.vertexPtr, newVertexPtr, this.offset);

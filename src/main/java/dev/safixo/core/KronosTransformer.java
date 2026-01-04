@@ -53,10 +53,9 @@ public class KronosTransformer implements IClassTransformer {
 		// args and with the instance of the original class.
 		switch (transformedName) {
 			case MODEL_RENDERER:
-				// TODO: Fix crashes and render bugs.
-//				replaceClassMethod(ADV_MODEL_RENDERER, "render", "func_78785_a", "(F)V", reference, false);
-//				replaceClassMethod(ADV_MODEL_RENDERER, "renderWithRotation", "func_78791_b", "(F)V", reference, false);
-//				replaceClassMethod(ADV_MODEL_RENDERER, "postRender", "func_78794_c", "(F)V", reference, false);
+				replaceClassMethod(ADV_MODEL_RENDERER, "render", "func_78785_a", "(F)V", reference, false);
+				replaceClassMethod(ADV_MODEL_RENDERER, "renderWithRotation", "func_78791_b", "(F)V", reference, false);
+				replaceClassMethod(ADV_MODEL_RENDERER, "postRender", "func_78794_c", "(F)V", reference, false);
 				break;
 			case WORLD_CLIENT:
 				replaceClassMethod(MINECRAFT_HOOK, "createChunkProvider", "j", "()Lado", reference, false);

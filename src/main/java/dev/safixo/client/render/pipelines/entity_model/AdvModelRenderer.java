@@ -1,6 +1,7 @@
 package dev.safixo.client.render.pipelines.entity_model;
 
 import dev.safixo.client.render.gfx.buffer.GlVertexBuffer;
+import dev.safixo.client.render.gfx.vertex.GlVertexArrayObject;
 import dev.safixo.client.render.vertex.DefaultVertexFormats;
 import dev.safixo.client.render.vertex.VertexWriter;
 import dev.safixo.client.util.memory.UnsafeUtil;
@@ -17,7 +18,6 @@ import static dev.safixo.client.util.data.PrimitivesFlags.*;
 public class AdvModelRenderer {
 	private static final long DISPLAY_LIST_OFFSET;
 	private static final long COMPILED;
-	private static final VertexWriter WRITER = new VertexWriter(1024);
 
 	static {
 		long offset;
@@ -80,7 +80,7 @@ public class AdvModelRenderer {
 			GLFunctions.glRotatef(model.rotateAngleZ * (180F / (float)Math.PI), 0.0F, 0.0F, 1.0F);
 		}
 
-		GL30.glBindVertexArray(vertexArray);
+		GlVertexArrayObject.bindVertexArray(vertexArray);
 		GL11.glDrawArrays(GL11.GL_QUADS, 0, vertices);
 
 		if (model.childModels != null) {
@@ -117,7 +117,7 @@ public class AdvModelRenderer {
 			GLFunctions.glRotatef(model.rotateAngleZ * (180F / (float)Math.PI), 0.0F, 0.0F, 1.0F);
 		}
 
-		GL30.glBindVertexArray(vertexArray);
+		GlVertexArrayObject.bindVertexArray(vertexArray);
 		GL11.glDrawArrays(GL11.GL_QUADS, 0, vertices);
 
 		GLFunctions.glPopMatrix();
@@ -152,10 +152,12 @@ public class AdvModelRenderer {
 	}
 
 	private static void compileDisplayList(ModelRenderer model, float scale) {
+		VertexWriter writer = new VertexWriter(512);
+
 		REDIRECT_DRAWING = true;
-		WRITER.startDrawing();
-		WRITER.setVertexFormat(DefaultVertexFormats.ENTITY_FORMAT);
-		VertexWriter.setCurrentInstance(WRITER);
+		writer.startDrawing();
+		writer.setVertexFormat(DefaultVertexFormats.ENTITY_FORMAT);
+		VertexWriter.setCurrentInstance(writer);
 
 		Tessellator tessellator = Tessellator.instance;
 
@@ -163,7 +165,7 @@ public class AdvModelRenderer {
 			((ModelBox)model.cubeList.get(i)).render(tessellator, scale);
 		}
 
-		GlVertexBuffer buffer = new GlVertexBuffer(WRITER.getOffset(), GL15.GL_STATIC_DRAW);
+		GlVertexBuffer buffer = new GlVertexBuffer(writer.getOffset(), GL15.GL_STATIC_DRAW);
 		int vertexArray = GL30.glGenVertexArrays();
 
 		GL30.glBindVertexArray(vertexArray);
@@ -181,12 +183,14 @@ public class AdvModelRenderer {
 
 		GL30.glBindVertexArray(0);
 
-		buffer.bufferData(WRITER.getVertexDataNio(), WRITER.getOffset());
-		int drawData = WRITER.getVertices() | vertexArray << 16;
+		buffer.bufferData(writer.getVertexDataNio(), writer.getOffset());
+		int drawData = writer.getVertices() | vertexArray << 16;
 
-		WRITER.stopDrawing();
-		WRITER.setVertexFormat(null);
+		writer.stopDrawing();
+		writer.setVertexFormat(null);
 		REDIRECT_DRAWING = false;
+
+		writer.clear();
 		setCompiled(model, true);
 		setDisplayList(model, drawData);
 	}
