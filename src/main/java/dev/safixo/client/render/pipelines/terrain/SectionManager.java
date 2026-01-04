@@ -119,6 +119,10 @@ public class SectionManager {
 	}
 
 	public void markDirty(int posX, int posY, int posZ) {
+		if (posY < 0 || posY >= 16) {
+			return;
+		}
+
 		long position = MathExt.asLong(posX, posY, posZ);
 
 		SectionRender sectionRender = this.sectionMap.get(position);

@@ -13,7 +13,6 @@ import java.util.HashSet;
 import static org.objectweb.asm.Opcodes.*;
 
 public class KronosTransformer implements IClassTransformer {
-	public static final boolean GL_STATE_MANAGER = true;
 	static final boolean DISABLE_INJECTION = false;
 
 	static final String RENDER_GLOBAL_HOOK = "dev/safixo/core/hooks/RenderGlobalHook";
@@ -144,6 +143,7 @@ public class KronosTransformer implements IClassTransformer {
 		FUNCTION_NAMES.add("glScalef");
 		FUNCTION_NAMES.add("glScaled");
 		FUNCTION_NAMES.add("glRotatef");
+
 		FUNCTION_NAMES.add("glRotated");
 		FUNCTION_NAMES.add("glTranslatef");
 		FUNCTION_NAMES.add("glBindFramebuffer");

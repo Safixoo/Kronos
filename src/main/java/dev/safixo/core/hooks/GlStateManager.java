@@ -4,7 +4,6 @@ import dev.safixo.client.render.ImprovedTessellator;
 import dev.safixo.client.render.gfx.util.GpuFlags;
 import dev.safixo.client.util.ColorBGRManager;
 import dev.safixo.client.util.Matrix4Stack;
-import net.minecraft.client.Minecraft;
 import org.joml.Matrix4f;
 import org.lwjgl.opengl.*;
 import org.lwjgl.util.glu.Project;
@@ -13,11 +12,10 @@ import java.nio.Buffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.util.Arrays;
-import java.util.HashSet;
 
 @SuppressWarnings("unused")
 public class GlStateManager {
-	public static final boolean SKIP_CACHE = false;
+	public static final boolean SKIP_CACHE = true;
 	private static final byte[] CAP_BITS = new byte[32827];
 
 	private static final byte UNDEFINED = 0b01;
@@ -26,8 +24,9 @@ public class GlStateManager {
 
 	public static long LAST_COLOR_MATERIAL = -31;
 	public static int LAST_VIEWPORT_WH = -1;
-	public static int LAST_ACTIVE_TEXTURE = -1;
+	public static int CURRENT_UNIT = -1;
 	public static int LAST_TEXTURE = -1;
+	public static int LAST_UNIT = -1;
 	public static int LAST_COLOR = -1;
 	public static int LAST_DEPTH_FUNC = -1;
 
@@ -41,13 +40,11 @@ public class GlStateManager {
 	private static final Matrix4Stack NULL_STACK = new Matrix4Stack(256);
 
 	public static Matrix4Stack CURRENT_STACK = PROJECTION_STACK;
-	public static int MAT_MODE = GL11.GL_PROJECTION;
+	public static int MAT_MODE = -1;
 
 	static {
 		Arrays.fill(CAP_BITS, UNDEFINED);
 	}
-
-	static HashSet<Integer> ints = new HashSet<>();
 
 	public static void glEnable(int cap) {
 		// Skips GL_TEXTURE_2D caching as it depends on the current tex unit,
@@ -154,9 +151,7 @@ public class GlStateManager {
 
 	public static void glClear(int mask) {
 		flushDrawState();
-
 		GL11.glClear(mask);
-		LAST_TEXTURE = -1;
 	}
 
 	public static void reset() {
@@ -165,7 +160,7 @@ public class GlStateManager {
 		MAT_MODE = GL11.GL_MODELVIEW;
 		LAST_COLOR = -1;
 		LAST_DEPTH_FUNC = -1;
-		LAST_ACTIVE_TEXTURE = -1;
+		CURRENT_UNIT = -1;
 		LAST_COLOR_MATERIAL = -1;
 		LAST_TEXTURE = -1;
 	}
@@ -188,7 +183,6 @@ public class GlStateManager {
 
 	public static void glPushMatrix() {
 		flushDrawState();
-
 		CURRENT_STACK.push();
 
 		if (GpuFlags.EXT_DSA) {
@@ -200,7 +194,6 @@ public class GlStateManager {
 
 	public static void glPopMatrix() {
 		flushDrawState();
-
 		CURRENT_STACK.pop();
 
 		if (GpuFlags.EXT_DSA) {
@@ -212,7 +205,6 @@ public class GlStateManager {
 
 	public static void glOrtho(double left, double right, double bottom, double top, double zNear, double zFar) {
 		flushDrawState();
-
 		CURRENT_STACK.top().ortho((float) left, (float) right, (float) bottom, (float) top, (float) zNear, (float) zFar);
 		GL11.glOrtho(left, right, bottom, top, zNear, zFar);
 	}
@@ -283,21 +275,21 @@ public class GlStateManager {
 	}
 
 	public static void glActiveTexture(int activeTex) {
-		if (activeTex != LAST_ACTIVE_TEXTURE) {
+		if (activeTex != CURRENT_UNIT) {
 			flushDrawState();
 			GL13.glActiveTexture(activeTex);
-			LAST_ACTIVE_TEXTURE = activeTex;
+			LAST_TEXTURE = -1;
+			CURRENT_UNIT = activeTex;
 		}
 	}
 
 	public static void glGetInteger(int name, IntBuffer buffer) {
 		if (name == GL11.GL_VIEWPORT) {
-			Minecraft mc = Minecraft.getMinecraft();
 			int position = buffer.position();
-
-			buffer.put(mc.displayWidth);
-			buffer.put(mc.displayHeight);
-
+			buffer.put(0);
+			buffer.put(0);
+			buffer.put(LAST_VIEWPORT_WH & 0xFFFF);
+			buffer.put(LAST_VIEWPORT_WH >>> 16);
 			((Buffer) buffer).position(position);
 			return;
 		}
@@ -311,7 +303,6 @@ public class GlStateManager {
 
 	public static void glDepthMask(boolean mask) {
 		flushDrawState();
-
 		GL11.glDepthMask(mask);
 	}
 
@@ -327,7 +318,6 @@ public class GlStateManager {
 
 	public static void glLoadIdentity() {
 		flushDrawState();
-
 		CURRENT_STACK.top().identity();
 
 		if (GpuFlags.EXT_DSA) {
@@ -339,7 +329,6 @@ public class GlStateManager {
 
 	public static void glLoadMatrix(FloatBuffer matrix) {
 		flushDrawState();
-
 		CURRENT_STACK.top().set(matrix);
 
 		if (GpuFlags.EXT_DSA) {
@@ -354,7 +343,6 @@ public class GlStateManager {
 
 		if (LAST_COLOR_MATERIAL != mask) {
 			flushDrawState();
-
 			GL11.glColorMaterial(face, mode);
 			LAST_COLOR_MATERIAL = mask;
 		}
@@ -364,7 +352,6 @@ public class GlStateManager {
 
 	public static void glMultMatrix(FloatBuffer matrix) {
 		flushDrawState();
-
 		CURRENT_STACK.top().mul(MATRIX.set(matrix));
 
 		if (GpuFlags.EXT_DSA) {
@@ -375,8 +362,11 @@ public class GlStateManager {
 	}
 
 	public static void glScalef(float x, float y, float z) {
-		flushDrawState();
+		if (CAP_BITS[GL12.GL_RESCALE_NORMAL] == DEFINED_ENABLED) {
+			return;
+		}
 
+		flushDrawState();
 		CURRENT_STACK.top().scale(x, y, z);
 
 		if (GpuFlags.EXT_DSA) {
@@ -401,6 +391,14 @@ public class GlStateManager {
 
 	public static void glRotatef(float angle, float x, float y, float z) {
 		flushDrawState();
+
+		// Normalize the vector for JOML.
+		if (Math.abs((x + y + z) - 1.0f) > 0.0005f) { // dirty check.
+			float norm = 1.0f / (float) Math.sqrt(x * x + y * y + z * z);
+			x *= norm;
+			y *= norm;
+			z *= norm;
+		}
 
 		// the angle passed in glRotatef is in degrees but JOML accepts in radians.
 		CURRENT_STACK.top().rotate(angle * 3.14159265358979f / 180.0f, x, y, z);

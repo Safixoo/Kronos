@@ -1,5 +1,6 @@
 package dev.safixo.client.render.pipelines.terrain.meshing.data;
 
+import dev.safixo.client.render.pipelines.terrain.meshing.FullBlockMesher;
 import dev.safixo.client.util.Direction;
 import org.joml.Vector3i;
 
@@ -28,9 +29,9 @@ public class FacingRender {
 	}
 
 	public void setTexInd(int x, int y, int z, int w) {
-		this.uvData[0] = x;
-		this.uvData[1] = y;
-		this.uvData[2] = z;
-		this.uvData[3] = w;
+		this.uvData[0] = FullBlockMesher.MAP_ID_TO_UV[x];
+		this.uvData[1] = FullBlockMesher.MAP_ID_TO_UV[y];
+		this.uvData[2] = FullBlockMesher.MAP_ID_TO_UV[z];
+		this.uvData[3] = FullBlockMesher.MAP_ID_TO_UV[w];
 	}
 }

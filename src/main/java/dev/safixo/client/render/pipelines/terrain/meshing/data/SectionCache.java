@@ -193,8 +193,8 @@ public class SectionCache implements IBlockAccess {
 
 	public static int getNibble(byte[] nibbleArray, int blockIndex) {
 		int nibbleIndex = blockIndex >> 1;
-		int nibblePart = blockIndex & 1;
-		return nibbleArray[nibbleIndex] >>> (nibblePart << 2) & 15;
+		int nibblePart = (blockIndex << 2) & 0b100;
+		return nibbleArray[nibbleIndex] >>> nibblePart & 15;
 	}
 
 	public static int makeBlockIndex(int x, int y, int z) {
