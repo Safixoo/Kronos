@@ -101,7 +101,7 @@ public class VertexWriter {
 	public void addVertex() {
 		int stride = this.vertexFormat.getStride();
 
-		this.ensureCapacity(stride);
+		this.ensureCapacity(stride << 2);
 		this.vertexFormat.writeVertex(this.vertexPtr + this.offset, this.vertices);
 
 		this.offset += stride;

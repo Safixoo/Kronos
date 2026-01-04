@@ -18,8 +18,10 @@ public class EntityFormat extends GlVertexFormat {
 		UnsafeUtil.memPutFloat(ptr + 0, (float) writer.x);
 		UnsafeUtil.memPutFloat(ptr + 4, (float) writer.y);
 		UnsafeUtil.memPutFloat(ptr + 8, (float) writer.z);
+
 		UnsafeUtil.memPutFloat(ptr + 12, (float) writer.u);
 		UnsafeUtil.memPutFloat(ptr + 16, (float) writer.v);
+
 		UnsafeUtil.memPutInt(ptr + 20, writer.normal);
 	}
 }

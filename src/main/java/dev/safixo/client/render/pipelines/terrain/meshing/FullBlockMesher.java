@@ -101,17 +101,17 @@ public class FullBlockMesher {
 		int pd12Y = p1Y - p2Y;
 		int pd12Z = p1Z - p2Z;
 
-		int cornerPP = getSolidCached(cache, dirX + p12X, dirY + p12Y, dirZ + p12Z);
-		int cornerPN = getSolidCached(cache, dirX + pd12X, dirY + pd12Y, dirZ + pd12Z);
+		int cornerPP = processSolidMask(cache, dirX + p12X, dirY + p12Y, dirZ + p12Z);
+		int cornerPN = processSolidMask(cache, dirX + pd12X, dirY + pd12Y, dirZ + pd12Z);
 
-		int lightPP = fullFace(posZ | posX) != 0 ? light(cache, dirX + p12X, dirY + p12Y, dirZ + p12Z, cornerPP) : 0;
-		int lightPN = fullFace(negZ | posX) != 0 ? light(cache, dirX + pd12X, dirY + pd12Y, dirZ + pd12Z, cornerPN) : 0;
+		int lightPP = fullFace(posZ | posX) == 0 ? light(cache, dirX + p12X, dirY + p12Y, dirZ + p12Z, cornerPP) : 0;
+		int lightPN = fullFace(negZ | posX) == 0 ? light(cache, dirX + pd12X, dirY + pd12Y, dirZ + pd12Z, cornerPN) : 0;
 
-		int cornerNP = getSolidCached(cache, dirX - pd12X, dirY - pd12Y, dirZ - pd12Z);
-		int cornerNN = getSolidCached(cache, dirX - p12X, dirY - p12Y, dirZ - p12Z);
+		int cornerNP = processSolidMask(cache, dirX - pd12X, dirY - pd12Y, dirZ - pd12Z);
+		int cornerNN = processSolidMask(cache, dirX - p12X, dirY - p12Y, dirZ - p12Z);
 
-		int lightNP = fullFace(posZ | negX) != 0 ? light(cache, dirX - pd12X, dirY - pd12Y, dirZ - pd12Z, cornerNP) : 0;
-		int lightNN = fullFace(negZ | negX) != 0 ? light(cache, dirX - p12X, dirY - p12Y, dirZ - p12Z, cornerNN) : 0;
+		int lightNP = fullFace(posZ | negX) == 0 ? light(cache, dirX - pd12X, dirY - pd12Y, dirZ - pd12Z, cornerNP) : 0;
+		int lightNN = fullFace(negZ | negX) == 0 ? light(cache, dirX - p12X, dirY - p12Y, dirZ - p12Z, cornerNN) : 0;
 
 		int shade0 = ao(posZ, posX, cornerPP);
 		int shade1 = ao(negZ, posX, cornerPN);
@@ -122,6 +122,7 @@ public class FullBlockMesher {
 
 		int lightPZ = light(posZ);
 		int lightPX = light(posX);
+
 		int lightNZ = light(negZ);
 		int lightNX = light(negX);
 
@@ -210,7 +211,7 @@ public class FullBlockMesher {
 		return blockCache & 0b1;
 	}
 
-	private static int getSolidCached(SectionCache cache, int x, int y, int z) {
+	private static int processSolidMask(SectionCache cache, int x, int y, int z) {
 		int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
 
 		int blockX = x - cache.blockX;
@@ -270,10 +271,6 @@ public class FullBlockMesher {
 		addVertex(facing, 3, x, y, z, uvs[uv3.x], uvs[uv3.y], blockColor, lightMap);
 	}
 
-	private int getBlockId(SectionCache cache, Vector3i pos, Vector3i off) {
-		return cache.getBlockId(pos.x + off.x, pos.y + off.y, pos.z + off.z);
-	}
-
 	private static int avg(int a, int b) {
 		if (b == 0) {
 			return a;
@@ -300,32 +297,31 @@ public class FullBlockMesher {
 		manager.addVertexCounter(TerrainFormat.STRIDE);
 	}
 
-	public static int br(int full) {
-		return -full & LIGHT_REDUCE;
-	}
+	private static final double SOLID_OCC_FACTOR = 0.2;
 
-	public static final int LIGHT_REDUCE = 70;
-	public static final int CORNER_LIGHT = 256 - LIGHT_REDUCE;
+	private static final int EMPTY_BLOCK_OCC_FACTOR = 255;
+	private static final int FULL_BLOCK_REDUCE = EMPTY_BLOCK_OCC_FACTOR - (int) (SOLID_OCC_FACTOR * EMPTY_BLOCK_OCC_FACTOR);
 
-	public static int ao(int pos1, int pos2, int corner) {
-		pos1 &= 1;
-		pos2 &= 1;
-		corner &= 1;
+	// Naive approximation to Minecraft ambient occlusion, it skips some classifications differences
+	// (normalCube vs opaqueCube, etc.) but for the general case is MUCH faster and more good-looking.
+	public static int ao(int side1, int side2, int corner) {
+		// Pick the solid bit from the masks and neg it. {0, -1} = {no solid, solid}
+		side1 = -fullFace(side1);
+		side2 = -fullFace(side2);
+		corner = -fullFace(corner);
 
-		int fullXorP = pos1 ^ pos2;
+		// If both sides are solid, ignore the corner and treat it as solid.
+		corner |= side1 & side2;
 
-		int factor = 255;
-		int min = 160;
+		// Use more -1 bitwise conditionals to reduce lighting if solid. Mimics Vanilla 0.2 ambient factor
+		// for solid blocks, with the catch that is doesn't distinguish the blocks by #isNormalCube() but by #isOpaqueCube.
+		side1 = EMPTY_BLOCK_OCC_FACTOR - (side1 & FULL_BLOCK_REDUCE);
+		side2 = EMPTY_BLOCK_OCC_FACTOR - (side2 & FULL_BLOCK_REDUCE);
+		corner = EMPTY_BLOCK_OCC_FACTOR - (corner & FULL_BLOCK_REDUCE);
 
-		if (corner == 1 && fullXorP == 0) {
-			factor = CORNER_LIGHT;
-			min = 80;
-		}
-
-		factor -= br(pos1);
-		factor -= br(pos2);
-
-		return Math.min(Math.max(factor, min), 255);
+		// The extra EMPTY_BLOCK_OCC_FACTOR is because the block by the face side of the block is always un-solid
+		// either it would be culled.
+		return (EMPTY_BLOCK_OCC_FACTOR + side1 + side2 + corner) >> 2;
 	}
 
 	private static Vector3i createVec3i(int x, int y, int z) {
@@ -363,8 +359,6 @@ public class FullBlockMesher {
 
 	// minU - 0, minV - 1, maxU - 2, maxV - 3.
     static {
-		final float EPSILON = 0;
-
 		NEG_Y.aoCorner0 = NEG_X_DIR;
 		NEG_Y.aoCorner1 = POS_Z_DIR;
 		NEG_Y.quadVerts[0] = createVec3i(0, 0, 1);

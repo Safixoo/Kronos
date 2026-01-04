@@ -1,20 +1,13 @@
 package dev.safixo.client.render.pipelines.terrain;
 
 import dev.safixo.client.render.gfx.shader.GlProgram;
-import dev.safixo.client.util.memory.NativeBuffer;
 import dev.safixo.core.hooks.GlStateManager;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiNewChat;
-import org.lwjgl.Sys;
-import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL20;
 import dev.safixo.client.render.pipelines.terrain.cull.FrustumCuller;
 import dev.safixo.client.util.data.CameraData;
-import dev.safixo.client.util.data.FogData;
 import dev.safixo.client.render.vertex.writers.TerrainFormat;
-
-import java.nio.Buffer;
-import java.nio.FloatBuffer;
 
 public class TerrainProgram extends GlProgram {
 	private int u_RegionPos;

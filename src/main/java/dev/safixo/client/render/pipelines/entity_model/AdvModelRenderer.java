@@ -17,7 +17,7 @@ import static dev.safixo.client.util.data.PrimitivesFlags.*;
 public class AdvModelRenderer {
 	private static final long DISPLAY_LIST_OFFSET;
 	private static final long COMPILED;
-	private static final VertexWriter WRITER = new VertexWriter();
+	private static final VertexWriter WRITER = new VertexWriter(1024);
 
 	static {
 		long offset;
@@ -182,10 +182,10 @@ public class AdvModelRenderer {
 		GL30.glBindVertexArray(0);
 
 		buffer.bufferData(WRITER.getVertexDataNio(), WRITER.getOffset());
-
 		int drawData = WRITER.getVertices() | vertexArray << 16;
 
 		WRITER.stopDrawing();
+		WRITER.setVertexFormat(null);
 		REDIRECT_DRAWING = false;
 		setCompiled(model, true);
 		setDisplayList(model, drawData);
