@@ -16,6 +16,14 @@ public class GLFunctions {
 		}
 	}
 
+	public static void glMultMatrix(FloatBuffer matrix) {
+		if (GpuFlags.EXT_DSA) {
+			EXTDirectStateAccess.glMatrixMultEXT(GlStateManager.MAT_MODE, matrix);
+		} else {
+			GL11.glMultMatrix(matrix);
+		}
+	}
+
 	public static void glPushMatrix() {
 		if (GpuFlags.EXT_DSA) {
 			EXTDirectStateAccess.glMatrixPushEXT(GlStateManager.MAT_MODE);

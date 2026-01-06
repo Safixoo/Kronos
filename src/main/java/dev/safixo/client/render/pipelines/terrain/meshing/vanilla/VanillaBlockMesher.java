@@ -74,7 +74,7 @@ public class VanillaBlockMesher {
 			}
 
 			FacingRender face = FACE_RENDER[dir];
-			Icon currentTex = block.getBlockTexture(cache, x, y, z, dir);
+			Icon currentTex = blocks.overrideBlockTexture != null ? blocks.overrideBlockTexture : block.getBlockTexture(cache, x, y, z, dir);
 
 			UVS[0] = currentTex.getInterpolatedU(face.minUInd(bounds));
 			UVS[1] = currentTex.getInterpolatedV(face.maxUInd(bounds));

@@ -92,10 +92,11 @@ public class SectionRender {
 		int[] solidFaces = new int[Direction.COUNT + 1];
 		boolean ambient = Minecraft.getMinecraft().gameSettings.ambientOcclusion != 0;
 
-		tileSet.removeAll(this.tileEntities);
+		for (int i = 0; i < this.tileEntities.size(); i++) {
+			tileSet.remove(this.tileEntities.get(i));
+		}
 		this.tileEntities.clear();
 
-		long start = System.nanoTime();
 		boolean empty = sectionCache.extendedLevelsInChunkCache();
 
 		if (!empty) {
@@ -185,20 +186,8 @@ public class SectionRender {
 		VertexWriter.DEFAULT_INSTANCE.stopDrawing();
 		translucentWriter.stopDrawing();
 
-		total += System.nanoTime() - start;
-		times += !empty ? 1 : 0;
-
-		if (times >= 4000) {
-			System.out.println("Time passed: " + ((total / 4000) / 1_000_000d) + "ms");
-			times = 0;
-			total = 0;
-		}
-
 		return !empty;
 	}
-
-	private static long total;
-	private static int times;
 
 	public void markDirty(boolean state) {
 		if (state) {

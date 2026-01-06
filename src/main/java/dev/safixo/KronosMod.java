@@ -22,6 +22,5 @@ public class KronosMod {
 
 	@ForgeSubscribe
 	public void onMainMenu(GuiOpenEvent event) {
-		GpuFlags.checkModSupport();
 	}
 }

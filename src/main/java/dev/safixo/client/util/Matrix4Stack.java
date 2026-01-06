@@ -5,13 +5,14 @@ import org.joml.Matrix4f;
 import sun.misc.Unsafe;
 
 import java.lang.reflect.Field;
+import java.nio.FloatBuffer;
 
 /**
  * JOML already have a very useful Matrix4fStack, the problem is that it can be very performance intensive with its
  * matrix copies when popping and pushing.
  */
 public class Matrix4Stack {
-	private static final long M00_OFFSET;
+	public static final long M00_OFFSET;
 
 	static {
 		Field m00;
@@ -41,28 +42,75 @@ public class Matrix4Stack {
 	public void push() {
 		Matrix4f oldTop = this.top;
 		Matrix4f top = this.mats[++this.curr];
+		copyMat(oldTop, top);
 
+		this.top = top;
+	}
+
+	public static void copyMat(Matrix4f from, Matrix4f to) {
 		Unsafe unsafe = UnsafeUtil.UNSAFE;
 		long offset = M00_OFFSET;
 
-		unsafe.putLong(top, offset, unsafe.getLong(oldTop, offset));
+		unsafe.putLong(to, offset, unsafe.getLong(from, offset));
 		offset += 8;
-		unsafe.putLong(top, offset, unsafe.getLong(oldTop, offset));
+		unsafe.putLong(to, offset, unsafe.getLong(from, offset));
 		offset += 8;
-		unsafe.putLong(top, offset, unsafe.getLong(oldTop, offset));
+		unsafe.putLong(to, offset, unsafe.getLong(from, offset));
 		offset += 8;
-		unsafe.putLong(top, offset, unsafe.getLong(oldTop, offset));
+		unsafe.putLong(to, offset, unsafe.getLong(from, offset));
 		offset += 8;
 
-		unsafe.putLong(top, offset, unsafe.getLong(oldTop, offset));
+		unsafe.putLong(to, offset, unsafe.getLong(from, offset));
 		offset += 8;
-		unsafe.putLong(top, offset, unsafe.getLong(oldTop, offset));
+		unsafe.putLong(to, offset, unsafe.getLong(from, offset));
 		offset += 8;
-		unsafe.putLong(top, offset, unsafe.getLong(oldTop, offset));
+		unsafe.putLong(to, offset, unsafe.getLong(from, offset));
 		offset += 8;
-		unsafe.putLong(top, offset, unsafe.getLong(oldTop, offset));
+		unsafe.putLong(to, offset, unsafe.getLong(from, offset));
+	}
 
-		this.top = top;
+	public static void copyMat(Matrix4f from, FloatBuffer to) {
+		Unsafe unsafe = UnsafeUtil.UNSAFE;
+		long offset = M00_OFFSET;
+
+		unsafe.putLong(to, offset, unsafe.getLong(from, offset));
+		offset += 8;
+		unsafe.putLong(to, offset, unsafe.getLong(from, offset));
+		offset += 8;
+		unsafe.putLong(to, offset, unsafe.getLong(from, offset));
+		offset += 8;
+		unsafe.putLong(to, offset, unsafe.getLong(from, offset));
+		offset += 8;
+
+		unsafe.putLong(to, offset, unsafe.getLong(from, offset));
+		offset += 8;
+		unsafe.putLong(to, offset, unsafe.getLong(from, offset));
+		offset += 8;
+		unsafe.putLong(to, offset, unsafe.getLong(from, offset));
+		offset += 8;
+		unsafe.putLong(to, offset, unsafe.getLong(from, offset));
+	}
+
+	public static void copyMat(Matrix4f from, long to) {
+		Unsafe unsafe = UnsafeUtil.UNSAFE;
+		long offset = M00_OFFSET;
+
+		unsafe.putLong(null, offset + to, unsafe.getLong(from, offset));
+		offset += 8;
+		unsafe.putLong(null, offset + to, unsafe.getLong(from, offset));
+		offset += 8;
+		unsafe.putLong(null, offset + to, unsafe.getLong(from, offset));
+		offset += 8;
+		unsafe.putLong(null, offset + to, unsafe.getLong(from, offset));
+		offset += 8;
+
+		unsafe.putLong(null, offset + to, unsafe.getLong(from, offset));
+		offset += 8;
+		unsafe.putLong(null, offset + to, unsafe.getLong(from, offset));
+		offset += 8;
+		unsafe.putLong(null, offset + to, unsafe.getLong(from, offset));
+		offset += 8;
+		unsafe.putLong(null, offset + to, unsafe.getLong(from, offset));
 	}
 
 	public void pop() {

@@ -16,12 +16,12 @@ public class EntityFormat extends GlVertexFormat {
 	public void writeVertex(long ptr, int offset) {
 		VertexWriter writer = VertexWriter.getCurrentInstance();
 
-		UnsafeUtil.memPutFloat(ptr + 0, (float) writer.x);
-		UnsafeUtil.memPutFloat(ptr + 4, (float) writer.y);
-		UnsafeUtil.memPutFloat(ptr + 8, (float) writer.z);
+		UnsafeUtil.memPutFloat(ptr, writer.x);
+		UnsafeUtil.memPutFloat(ptr + 4, writer.y);
+		UnsafeUtil.memPutFloat(ptr + 8, writer.z);
 
-		UnsafeUtil.memPutFloat(ptr + 12, (float) writer.u);
-		UnsafeUtil.memPutFloat(ptr + 16, (float) writer.v);
+		UnsafeUtil.memPutFloat(ptr + 12, writer.u);
+		UnsafeUtil.memPutFloat(ptr + 16, writer.v);
 
 		UnsafeUtil.memPutInt(ptr + 20, writer.normal);
 	}

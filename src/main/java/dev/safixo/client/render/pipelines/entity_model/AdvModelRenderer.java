@@ -4,14 +4,18 @@ import dev.safixo.client.render.gfx.buffer.GlVertexBuffer;
 import dev.safixo.client.render.gfx.vertex.GlVertexArrayObject;
 import dev.safixo.client.render.vertex.DefaultVertexFormats;
 import dev.safixo.client.render.vertex.VertexWriter;
+import dev.safixo.client.util.Matrix4Stack;
+import dev.safixo.client.util.memory.NativeBuffer;
 import dev.safixo.client.util.memory.UnsafeUtil;
 import dev.safixo.core.hooks.GLFunctions;
+import dev.safixo.core.hooks.GlStateManager;
 import net.minecraft.client.model.ModelBox;
 import net.minecraft.client.model.ModelRenderer;
 import net.minecraft.client.renderer.Tessellator;
-import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL15;
-import org.lwjgl.opengl.GL30;
+import org.joml.Matrix4f;
+import org.lwjgl.opengl.*;
+
+import java.nio.FloatBuffer;
 
 import static dev.safixo.client.util.data.PrimitivesFlags.*;
 
@@ -50,6 +54,10 @@ public class AdvModelRenderer {
 		UnsafeUtil.UNSAFE.putInt(model, DISPLAY_LIST_OFFSET, displayList);
 	}
 
+	private static final long PTR_BUFFER = NativeBuffer.nmemAlloc(16 * 4) - Matrix4Stack.M00_OFFSET;
+	private static final FloatBuffer BUFFER = NativeBuffer.wrap(PTR_BUFFER + Matrix4Stack.M00_OFFSET).asFloatBuffer();
+	private static final Matrix4f MATRIX = new Matrix4f();
+
 	public static void render(ModelRenderer model, float scale) {
 		if (model.isHidden || !model.showModel) {
 			return;
@@ -64,21 +72,25 @@ public class AdvModelRenderer {
 		int vertexArray = displayList >>> 16;
 
 		GLFunctions.glPushMatrix();
-		GLFunctions.glTranslatef(
+
+		Matrix4f modelView = MATRIX.identity();
+		modelView.translate(
 			model.offsetX + model.rotationPointX * scale,
 			model.offsetY + model.rotationPointY * scale,
 			model.offsetZ + model.rotationPointZ * scale
 		);
 
 		if (model.rotateAngleY != 0.0F) {
-			GLFunctions.glRotatef(model.rotateAngleY * (180F / (float)Math.PI), 0.0F, 1.0F, 0.0F);
+			modelView.rotateY(model.rotateAngleY);
 		}
 		if (model.rotateAngleX != 0.0F) {
-			GLFunctions.glRotatef(model.rotateAngleX * (180F / (float)Math.PI), 1.0F, 0.0F, 0.0F);
+			modelView.rotateX(model.rotateAngleX);
 		}
 		if (model.rotateAngleZ != 0.0F) {
-			GLFunctions.glRotatef(model.rotateAngleZ * (180F / (float)Math.PI), 0.0F, 0.0F, 1.0F);
+			modelView.rotateZ(model.rotateAngleZ);
 		}
+		Matrix4Stack.copyMat(modelView, PTR_BUFFER);
+		GLFunctions.glMultMatrix(BUFFER);
 
 		GlVertexArrayObject.bindVertexArray(vertexArray);
 		GL11.glDrawArrays(GL11.GL_QUADS, 0, vertices);

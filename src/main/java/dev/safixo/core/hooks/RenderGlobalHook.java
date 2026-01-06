@@ -1,6 +1,7 @@
 package dev.safixo.core.hooks;
 
 import dev.safixo.client.render.ImprovedTessellator;
+import dev.safixo.client.render.gfx.util.GpuFlags;
 import dev.safixo.client.render.pipelines.cloud.CloudRenderer;
 import dev.safixo.client.render.pipelines.terrain.SectionManager;
 import dev.safixo.client.render.vertex.VertexWriter;
@@ -33,6 +34,9 @@ public  class RenderGlobalHook {
 	static float PARTIAL_TICK;
 
 	public static void loadRenderers(RenderGlobal renderGlobal) {
+		// Check capabilities (TODO: This check is probably implemented too late)
+		GpuFlags.checkModSupport();
+
 		if (!OPTIFINE_CHECKED) {
 			checkOptifineExistence();
 			OPTIFINE_CHECKED = true;

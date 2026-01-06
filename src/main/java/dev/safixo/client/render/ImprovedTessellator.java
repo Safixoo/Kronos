@@ -1,5 +1,6 @@
 package dev.safixo.client.render;
 
+import com.sun.tools.jdi.PrimitiveValueImpl;
 import dev.safixo.client.render.gfx.buffer.GlVertexBuffer;
 import dev.safixo.client.render.gfx.vertex.GlVertexArrayObject;
 import dev.safixo.client.render.vertex.VertexWriter;
@@ -209,7 +210,7 @@ public class ImprovedTessellator extends Tessellator {
 	public void setTextureUV(double u, double v) {
 		this.flags |= VERTEX_UV;
 
-		if (VertexWriter.isCurrentDrawing()) {
+		if (PrimitivesFlags.REDIRECT_DRAWING) {
 			TessellatorHook.setTextureUV(u, v);
 			return;
 		}
@@ -224,7 +225,7 @@ public class ImprovedTessellator extends Tessellator {
 	public void setBrightness(int light) {
 		this.flags |= VERTEX_LIGHT;
 
-		if (VertexWriter.isCurrentDrawing()) {
+		if (PrimitivesFlags.REDIRECT_DRAWING) {
 			TessellatorHook.setBrightness(light);
 			return;
 		}
@@ -253,7 +254,7 @@ public class ImprovedTessellator extends Tessellator {
 			return;
 		}
 
-		if (VertexWriter.isCurrentDrawing()) {
+		if (PrimitivesFlags.REDIRECT_DRAWING) {
 			TessellatorHook.setColorRGBA(r, g, b, a);
 			return;
 		}
@@ -285,7 +286,7 @@ public class ImprovedTessellator extends Tessellator {
 
 		this.flags |= VERTEX_UV;
 
-		if (this.lastFlag != this.flags && (this.vertices & 3) == 0) {
+		if (this.lastFlag != this.flags && ((this.vertices & 3) == 0 || this.drawMode != GL11.GL_QUADS)) {
 			this.flushState();
 		}
 
