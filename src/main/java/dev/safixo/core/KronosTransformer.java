@@ -23,7 +23,9 @@ public class KronosTransformer implements IClassTransformer {
 	static final String ADV_MODEL_RENDERER = "dev/safixo/client/render/pipelines/entity_model/AdvModelRenderer";
 
 	static final String REBUILD_LISTENER = "dev/safixo/client/render/pipelines/terrain/meshing/RebuildListener";
+	static final String VANILLA_MESHER = "dev/safixo/client/render/pipelines/terrain/meshing/vanilla/VanillaBlockMesher";
 
+	static final String RENDER_BLOCKS = "net.minecraft.client.renderer.RenderBlocks";
 	static final String RENDER_GLOBAL = "net.minecraft.client.renderer.RenderGlobal";
 	static final String ITEM_RENDERER = "net.minecraft.client.renderer.ItemRenderer";
 	static final String CLIPPING_HELPER_IMPL = "net.minecraft.client.renderer.culling.ClippingHelperImpl";
@@ -51,10 +53,13 @@ public class KronosTransformer implements IClassTransformer {
 		// Overwrites classes methods completely with a function call with the same
 		// args and with the instance of the original class.
 		switch (transformedName) {
+			case RENDER_BLOCKS:
+				replaceClassMethod(VANILLA_MESHER, "renderStandardBlock", "p", "(Laqz;III)Z", reference, false);
+				break;
 			case MODEL_RENDERER:
-				replaceClassMethod(ADV_MODEL_RENDERER, "render", "func_78785_a", "(F)V", reference, false);
-				replaceClassMethod(ADV_MODEL_RENDERER, "renderWithRotation", "func_78791_b", "(F)V", reference, false);
-				replaceClassMethod(ADV_MODEL_RENDERER, "postRender", "func_78794_c", "(F)V", reference, false);
+				replaceClassMethod(ADV_MODEL_RENDERER, "render", "a", "(F)V", reference, false);
+				replaceClassMethod(ADV_MODEL_RENDERER, "renderWithRotation", "b", "(F)V", reference, false);
+				replaceClassMethod(ADV_MODEL_RENDERER, "postRender", "c", "(F)V", reference, false);
 				break;
 			case WORLD_CLIENT:
 				replaceClassMethod(MINECRAFT_HOOK, "createChunkProvider", "j", "()Lado", reference, false);

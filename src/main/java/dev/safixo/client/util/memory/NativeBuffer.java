@@ -9,7 +9,7 @@ import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 
 public class NativeBuffer {
-	private static final Long2ReferenceMap<ByteBuffer> BUFFER_TO_PTR = new Long2ReferenceOpenHashMap<>();
+	private static final Long2ReferenceMap<ByteBuffer> BUFFER_TO_PTR = new Long2ReferenceOpenHashMap<>(16, 0.5f);
 
 	public static FloatBuffer memAllocFloat(int size) {
 		return memAlloc(size * 4).asFloatBuffer();

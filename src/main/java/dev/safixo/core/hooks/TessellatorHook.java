@@ -8,16 +8,16 @@ public class TessellatorHook {
 	public static void setTextureUV(double u, double v) {
 		VertexWriter current = VertexWriter.getCurrentInstance();
 
-		current.u = u;
-		current.v = v;
+		current.u = (float) u;
+		current.v = (float) v;
 	}
 
 	public static void addVertexWithUV(double x, double y, double z, double u, double v) {
 		VertexWriter current = VertexWriter.getCurrentInstance();
 
-		current.x = x;
-		current.y = y;
-		current.z = z;
+		current.x = (float) x;
+		current.y = (float) y;
+		current.z = (float) z;
 
 		setTextureUV(u, v);
 		current.addVertex();
@@ -26,9 +26,9 @@ public class TessellatorHook {
 	public static void addVertex(double x, double y, double z) {
 		VertexWriter current = VertexWriter.getCurrentInstance();
 
-		current.x = x;
-		current.y = y;
-		current.z = z;
+		current.x = (float) x;
+		current.y = (float) y;
+		current.z = (float) z;
 
 		current.addVertex();
 	}
@@ -58,9 +58,9 @@ public class TessellatorHook {
 	public static void setTranslation(double x, double y, double z) {
 		VertexWriter current = VertexWriter.getCurrentInstance();
 
-		current.trasX = x;
-		current.trasY = y;
-		current.trasZ = z;
+		current.trasX = (float) x;
+		current.trasY = (float) y;
+		current.trasZ = (float) z;
 	}
 
 	public static void addTranslation(float x, float y, float z) {

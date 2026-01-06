@@ -27,6 +27,9 @@ public class PrimitivesFlags {
 	public static final byte[] SOLID_LIGHT_MASK = new byte[2048];
 	public static final boolean[] DIRECT_CULL = new boolean[2048];
 
+	public static final boolean[] TILE_ENTITY = new boolean[2048];
+	public static final short[] RENDER_PASS = new short[2048];
+
 	private static int LEAVES_TOP_INDEX = 0;
 	private static final int[] LEAVES_INDICES = new int[2048];
 	public static final byte[] COLOR_MODULATOR = new byte[2048];
@@ -46,6 +49,8 @@ public class PrimitivesFlags {
 			MATERIAL[i] = (block == null || i == 0) ? Material.air : block.blockMaterial;
 			SOLID_CULL_MASK[i] = (byte) (((block != null && block.isOpaqueCube()) || block instanceof BlockLeaves) ? 1 : 0);
 			SOLID_LIGHT_MASK[i] = (byte) (((block != null && block.isOpaqueCube()) || block instanceof BlockLeaves) ? 1 : 0);
+			TILE_ENTITY[i] = block != null && block.hasTileEntity(0);
+			RENDER_PASS[i] = block == null ? -777 : (short) block.getRenderBlockPass();
 		}
 	}
 
@@ -95,6 +100,10 @@ public class PrimitivesFlags {
 	}
 
 	public static void processLeavesSolid() {
+		// Fixes water lighting issues??
+		Block.canBlockGrass[Block.waterMoving.blockID] = false;
+		Block.canBlockGrass[Block.waterStill.blockID] = false;
+
 		boolean solid = !Minecraft.getMinecraft().gameSettings.fancyGraphics;
 
 		for (int i = 0; i < LEAVES_TOP_INDEX; i++) {

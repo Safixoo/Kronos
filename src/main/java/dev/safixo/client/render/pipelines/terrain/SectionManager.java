@@ -27,7 +27,9 @@ import java.util.List;
 import java.util.Set;
 
 public class SectionManager {
-	public static final int MAX_UPDATE_QUEUES = 6;
+	public static final int MAX_FULL_UPDATES = 5;
+	public static final int MAX_UPDATES_TRIES = 256;
+
 	private static final Item DEBUG_ITEM = null;
 
 	private final Long2ReferenceOpenHashMap<SectionRender> sectionMap = new Long2ReferenceOpenHashMap<>(4096);
@@ -219,17 +221,23 @@ public class SectionManager {
 
 	private void queueRebuilds(Set<TileEntity> tileSet) {
 		int rebuildSize = RebuildList.size();
-		int maxSize = Math.min(MAX_UPDATE_QUEUES, rebuildSize);
+		int maxSize = Math.min(SectionManager.MAX_UPDATES_TRIES, rebuildSize);
 
 		SectionRender[] updateArray = RebuildList.getBackedArray();
 		PrimitivesFlags.processLeavesSolid();
 		PrimitivesFlags.REDIRECT_DRAWING = true;
 
-		for (int i = 0; i < maxSize; i++) {
-			SectionRender section = updateArray[i];
+		int i = 0, j = 0;
+
+		while (i < maxSize && j < SectionManager.MAX_FULL_UPDATES) {
+			SectionRender section = updateArray[i++];
 
 			if (section.currentFrame == this.bfsCuller.getActiveFrame() && section.isDirty()) {
-				section.rebuild(this.camera, this, this.worldObj, tileSet);
+				boolean nonEmpty = section.rebuild(this.camera, this, this.worldObj, tileSet);
+
+				if (nonEmpty) {
+					j++;
+				}
 			}
 		}
 

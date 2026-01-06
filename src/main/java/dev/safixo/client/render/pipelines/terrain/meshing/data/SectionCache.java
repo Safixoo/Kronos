@@ -1,6 +1,6 @@
 package dev.safixo.client.render.pipelines.terrain.meshing.data;
 
-import dev.safixo.client.render.pipelines.terrain.meshing.FakeBiome;
+import dev.safixo.client.render.pipelines.terrain.meshing.UniformFakeBiome;
 import dev.safixo.client.render.pipelines.terrain.meshing.ModelColorizer;
 import dev.safixo.client.util.MathExt;
 import net.minecraft.block.Block;
@@ -19,7 +19,7 @@ import dev.safixo.client.util.data.PrimitivesFlags;
 import java.util.Arrays;
 
 public class SectionCache implements IBlockAccess {
-	private static final FakeBiome FAKE_BIOME = new FakeBiome(Integer.MAX_VALUE);
+	private static final UniformFakeBiome FAKE_BIOME = new UniformFakeBiome(Integer.MAX_VALUE);
 	private static final Chunk[] CHUNKS = new Chunk[3 * 3];
 	private static final ModelColorizer COLORIZER = new ModelColorizer();
 
@@ -201,18 +201,6 @@ public class SectionCache implements IBlockAccess {
 		return y << 8 | z << 4 | x;
 	}
 
-	public static int blockX(int blockIndex) {
-		return (blockIndex >>> 0) & 0xF;
-	}
-
-	public static int blockY(int blockIndex) {
-		return (blockIndex >>> 8) & 0xF;
-	}
-
-	public static int blockZ(int blockIndex) {
-		return (blockIndex >>> 4) & 0xF;
-	}
-
 	@Override
 	public int getBlockId(int x, int y, int z) {
 		int blockX = x - this.blockX;
@@ -262,12 +250,8 @@ public class SectionCache implements IBlockAccess {
 		return MathExt.byteToUnsigned(CENTER_BLOCKS[makeBlockIndex(x & 15, y & 15, z & 15)]);
 	}
 
-	public int getBlockIdCenter(int blockIndex) {
-		return CENTER_BLOCKS[blockIndex];
-	}
-
-	@Override
-	public float getBrightness(int i, int j, int k, int l) {
+	// AFAIK, not used for rendering.
+	public float getBrightness(int x, int y, int z, int min) {
 		return 0;
 	}
 
@@ -348,11 +332,6 @@ public class SectionCache implements IBlockAccess {
 		int biomeZ = z - (this.blockZ + 16 - BIOME_RADIUS);
 
 		return BIOMES[biomeX + biomeZ * BIOME_CHUNK_WIDTH];
-	}
-
-	public int getColorMultiplier(Block block, int x, int y, int z) {
-
-		return 0;
 	}
 
 	@Override

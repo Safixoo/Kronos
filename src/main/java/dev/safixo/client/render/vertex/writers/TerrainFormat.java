@@ -14,14 +14,14 @@ public class TerrainFormat extends GlVertexFormat {
 
 	static final int POSITION_BITS = 20;
 	static final int UV_BITS = 16;
-	static final double UV_PRECISION = (1 << UV_BITS);
+	static final float UV_PRECISION = (1 << UV_BITS);
 
-	public static final double RADIUS = 0.1d;
-	static final double DIAMETER = RADIUS * 2.0d;
+	public static final float RADIUS = 0.5f;
+	static final float DIAMETER = RADIUS * 2.0f;
 
-	static final double FACT_X = (1 << POSITION_BITS) / (DIAMETER_X + DIAMETER);
-	static final double FACT_Y = (1 << POSITION_BITS) / (DIAMETER_Y + DIAMETER);
-	static final double FACT_Z = (1 << POSITION_BITS) / (DIAMETER_Z + DIAMETER);
+	static final float FACT_X = (1 << POSITION_BITS) / (DIAMETER_X + DIAMETER);
+	static final float FACT_Y = (1 << POSITION_BITS) / (DIAMETER_Y + DIAMETER);
+	static final float FACT_Z = (1 << POSITION_BITS) / (DIAMETER_Z + DIAMETER);
 
 	public TerrainFormat(ImmutableList<GlVertexAttribute> vertexProperties) {
 		super(vertexProperties);
@@ -31,9 +31,9 @@ public class TerrainFormat extends GlVertexFormat {
 	public void writeVertex(long ptr, int offset) {
 		VertexWriter man = VertexWriter.getCurrentInstance();
 
-		double posX = MathExt.clamp(man.x + man.trasX, 0.0f, RADIUS_X << 1);
-		double posY = MathExt.clamp(man.y + man.trasY, 0.0f, RADIUS_Y << 1);
-		double posZ = MathExt.clamp(man.z + man.trasZ, 0.0f, RADIUS_Z << 1);
+		float posX = man.x + man.trasX;
+		float posY = man.y + man.trasY;
+		float posZ = man.z + man.trasZ;
 
 		writeTerrainVertex(ptr, posX, posY, posZ, man.u, man.v, man.color, man.lightMap);
 	}
@@ -59,20 +59,20 @@ public class TerrainFormat extends GlVertexFormat {
 	private static long processPosition(int x, int y, int z) {
 		int lowHalf = 0;
 
-		lowHalf |= (x >>> 0 & 0x3FF) << 00;
-		lowHalf |= (y >>> 0 & 0x3FF) << 10;
-		lowHalf |= (z >>> 0 & 0x3FF) << 20;
+		lowHalf |= (x & 0x3FF);
+		lowHalf |= (y & 0x3FF) << 10;
+		lowHalf |= (z & 0x3FF) << 20;
 
 		int topHalf = 0;
 
-		topHalf |= (x >>> 10 & 0x3FF) << 00;
+		topHalf |= (x >>> 10 & 0x3FF);
 		topHalf |= (y >>> 10 & 0x3FF) << 10;
 		topHalf |= (z >>> 10 & 0x3FF) << 20;
 
 		return lowHalf | ((long) topHalf << 32L);
 	}
 
-	public static void writeTerrainVertex(long ptr, double x, double y, double z, double u, double v, int color, int lightMap) {
+	public static void writeTerrainVertex(long ptr, float x, float y, float z, float u, float v, int color, int lightMap) {
 		int intX = extractPos(x, FACT_X);
 		int intY = extractPos(y, FACT_Y);
 		int intZ = extractPos(z, FACT_Z);
@@ -87,10 +87,10 @@ public class TerrainFormat extends GlVertexFormat {
 
 	// skylight << 20 | blocklight << 4
 	private static int compressLightmap(int lightmap) {
-		int skyLight4 = MathExt.clamp((lightmap >>> 20) & 0xF, 0, 0xF);
-		int blockLight4 = MathExt.clamp((lightmap >>> 4) & 0xF, 0, 0xF);
+		int skyLight4 = lightmap >>> 20;
+		int blockLight4 = lightmap & 0xF0;
 
-		return skyLight4 | blockLight4 << 4;
+		return skyLight4 | blockLight4;
 	}
 
 	@Override

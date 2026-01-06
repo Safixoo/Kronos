@@ -5,6 +5,7 @@ import dev.safixo.client.util.MathExt;
 import it.unimi.dsi.fastutil.objects.ReferenceArrayList;
 import it.unimi.dsi.fastutil.objects.ReferenceList;
 import net.minecraft.block.Block;
+import net.minecraft.block.ITileEntityProvider;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderBlocks;
 import net.minecraft.client.renderer.WorldRenderer;
@@ -65,7 +66,7 @@ public class SectionRender {
 		this.regionIndex = RegionRender.regionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
 	}
 
-	public void rebuild(CameraData camera, SectionManager sectionManager, World world, Set<TileEntity> tileSet) {
+	public boolean rebuild(CameraData camera, SectionManager sectionManager, World world, Set<TileEntity> tileSet) {
 		WorldRenderer.chunksUpdated++;
 		Chunk.isLit = false;
 
@@ -94,7 +95,10 @@ public class SectionRender {
 		tileSet.removeAll(this.tileEntities);
 		this.tileEntities.clear();
 
-		if (!sectionCache.extendedLevelsInChunkCache()) {
+		long start = System.nanoTime();
+		boolean empty = sectionCache.extendedLevelsInChunkCache();
+
+		if (!empty) {
 			// 15x15x15 center blocks.
 			for (int y = 1; y < 15; y++) {
 				for (int z = 1; z < 15; z++) {
@@ -180,7 +184,21 @@ public class SectionRender {
 
 		VertexWriter.DEFAULT_INSTANCE.stopDrawing();
 		translucentWriter.stopDrawing();
+
+		total += System.nanoTime() - start;
+		times += !empty ? 1 : 0;
+
+		if (times >= 4000) {
+			System.out.println("Time passed: " + ((total / 4000) / 1_000_000d) + "ms");
+			times = 0;
+			total = 0;
+		}
+
+		return !empty;
 	}
+
+	private static long total;
+	private static int times;
 
 	public void markDirty(boolean state) {
 		if (state) {
@@ -201,14 +219,7 @@ public class SectionRender {
 			return;
 		}
 
-		Block block = Block.blocksList[blockId];
-
-		if (block == null) {
-			return;
-		}
-
-		int blockRenderPass = block.getRenderBlockPass();
-
+		int blockRenderPass = PrimitivesFlags.RENDER_PASS[blockId];
 		int blockX = x + this.blockX, blockY = y + this.blockY, blockZ = z + this.blockZ;
 
 		if (PrimitivesFlags.SOLID[blockId]) {
@@ -233,9 +244,9 @@ public class SectionRender {
 			drawBitSet |= cache.isBlockOpaqueCubeCenter(blockIndex - makeBlockIndex(1,0,0)) << WEST;
 			drawBitSet |= cache.isBlockOpaqueCubeCenter(blockIndex + makeBlockIndex(1,0,0)) << EAST;
 
-			FullBlockMesher.renderSolidCube(block, cache, blockX, blockY, blockZ, ambient, ~drawBitSet, blockId);
+			FullBlockMesher.renderSolidCube(Block.blocksList[blockId], cache, blockX, blockY, blockZ, ambient, ~drawBitSet, blockId);
 		} else {
-			if (block.hasTileEntity(cache.getBlockMetadata(blockX, blockY, blockZ))) {
+			if (PrimitivesFlags.TILE_ENTITY[blockId]) {
 				TileEntity tileEntity = cache.getBlockTileEntity(blockX, blockY, blockZ);
 
 				if (TileEntityRenderer.instance.hasSpecialRenderer(tileEntity)) {
@@ -249,7 +260,7 @@ public class SectionRender {
 				VertexWriter.setCurrentInstance(VertexWriter.SOLID[MeshDirection.GENERIC]);
 			}
 
-			renderBlocks.renderBlockByRenderType(block, blockX, blockY, blockZ);
+			renderBlocks.renderBlockByRenderType(Block.blocksList[blockId], blockX, blockY, blockZ);
 		}
 	}
 
@@ -260,14 +271,7 @@ public class SectionRender {
 			return;
 		}
 
-		Block block = Block.blocksList[blockId];
-
-		if (block == null) {
-			return;
-		}
-
-		int blockRenderPass = block.getRenderBlockPass();
-
+		int blockRenderPass = PrimitivesFlags.RENDER_PASS[blockId];
 		int blockX = x + this.blockX;
 		int blockY = y + this.blockY;
 		int blockZ = z + this.blockZ;
@@ -296,9 +300,9 @@ public class SectionRender {
 			drawBitSet |= cache.isBlockOpaqueCubeRel(rX - 1, rY, rZ) << WEST;
 			drawBitSet |= cache.isBlockOpaqueCubeRel(rX + 1, rY, rZ) << EAST;
 
-			FullBlockMesher.renderSolidCube(block, cache, blockX, blockY, blockZ, ambient, ~drawBitSet, blockId);
+			FullBlockMesher.renderSolidCube(Block.blocksList[blockId], cache, blockX, blockY, blockZ, ambient, ~drawBitSet, blockId);
 		} else {
-			if (block.hasTileEntity(cache.getBlockMetadata(blockX, blockY, blockZ))) {
+			if (PrimitivesFlags.TILE_ENTITY[blockId]) {
 				TileEntity tileEntity = cache.getBlockTileEntity(blockX, blockY, blockZ);
 
 				if (TileEntityRenderer.instance.hasSpecialRenderer(tileEntity)) {
@@ -312,7 +316,7 @@ public class SectionRender {
 				VertexWriter.setCurrentInstance(VertexWriter.SOLID[MeshDirection.GENERIC]);
 			}
 
-			renderBlocks.renderBlockByRenderType(block, blockX, blockY, blockZ);
+			renderBlocks.renderBlockByRenderType(Block.blocksList[blockId], blockX, blockY, blockZ);
 		}
 	}
 
