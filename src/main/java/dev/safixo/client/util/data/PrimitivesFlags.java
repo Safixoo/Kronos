@@ -19,25 +19,25 @@ public class PrimitivesFlags {
 	public static boolean DEV_ENVIRONMENT;
 	public static boolean DETECTED = false;
 
-	public static final Material[] MATERIAL = new Material[2048];
-	public static final boolean[] SOLID = new boolean[2048];
-	public static final boolean[] NORMAL_BLOCK = new boolean[2048];
+	public static final Material[] MATERIAL = new Material[4096];
+	public static final boolean[] SOLID = new boolean[4096];
+	public static final boolean[] NORMAL_BLOCK = new boolean[4096];
 
-	public static final byte[] SOLID_CULL_MASK = new byte[2048];
-	public static final byte[] SOLID_LIGHT_MASK = new byte[2048];
-	public static final boolean[] DIRECT_CULL = new boolean[2048];
+	public static final byte[] SOLID_CULL_MASK = new byte[4096];
+	public static final byte[] SOLID_LIGHT_MASK = new byte[4096];
+	public static final boolean[] DIRECT_CULL = new boolean[4096];
 
-	public static final boolean[] TILE_ENTITY = new boolean[2048];
-	public static final short[] RENDER_PASS = new short[2048];
+	public static final boolean[] TILE_ENTITY = new boolean[4096];
+	public static final short[] RENDER_PASS = new short[4096];
 
 	private static int LEAVES_TOP_INDEX = 0;
-	private static final int[] LEAVES_INDICES = new int[2048];
-	public static final byte[] COLOR_MODULATOR = new byte[2048];
+	private static final int[] LEAVES_INDICES = new int[4096];
+	public static final byte[] COLOR_MODULATOR = new byte[4096];
 
 	public static void computeFlagArrays() {
 		LEAVES_TOP_INDEX = 0;
 
-		for (int i = 0; i < 2048; i++) {
+		for (int i = 0; i < 4096; i++) {
 			Block block = Block.blocksList[i];
 
 			if (block instanceof BlockLeavesBase) {
@@ -57,7 +57,7 @@ public class PrimitivesFlags {
 	// Process which methods use default model implementation and based on that avoid the dynamic dispatch and the
 	// original method overhead with a more direct call.
 	public static void processModelMethods() {
-		for (int i = 0; i < 2048; i++) {
+		for (int i = 0; i < 4096; i++) {
 			Block block = Block.blocksList[i];
 
 			if (block == null) {

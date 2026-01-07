@@ -2,6 +2,7 @@ package dev.safixo.client.render.pipelines.terrain.meshing;
 
 import dev.safixo.client.render.pipelines.terrain.meshing.data.FacingRender;
 import dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache;
+import dev.safixo.client.render.pipelines.terrain.meshing.vanilla.ModelHelper;
 import dev.safixo.client.util.MathExt;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockGrass;
@@ -101,35 +102,35 @@ public class FullBlockMesher {
 		int pd12Y = p1Y - p2Y;
 		int pd12Z = p1Z - p2Z;
 
-		int cornerPP = processSolidMask(cache, dirX + p12X, dirY + p12Y, dirZ + p12Z);
-		int cornerPN = processSolidMask(cache, dirX + pd12X, dirY + pd12Y, dirZ + pd12Z);
+		int cornerPP = getBlockCacheLazily(cache, dirX + p12X, dirY + p12Y, dirZ + p12Z);
+		int cornerPN = getBlockCacheLazily(cache, dirX + pd12X, dirY + pd12Y, dirZ + pd12Z);
 
-		int lightPP = fullFace(posZ | posX) == 0 ? light(cache, dirX + p12X, dirY + p12Y, dirZ + p12Z, cornerPP) : 0;
-		int lightPN = fullFace(negZ | posX) == 0 ? light(cache, dirX + pd12X, dirY + pd12Y, dirZ + pd12Z, cornerPN) : 0;
+		int lightPP = ModelHelper.fullFace(posZ | posX) == 0 ? ModelHelper.light(cache, dirX + p12X, dirY + p12Y, dirZ + p12Z, cornerPP) : 0;
+		int lightPN = ModelHelper.fullFace(negZ | posX) == 0 ? ModelHelper.light(cache, dirX + pd12X, dirY + pd12Y, dirZ + pd12Z, cornerPN) : 0;
 
-		int cornerNP = processSolidMask(cache, dirX - pd12X, dirY - pd12Y, dirZ - pd12Z);
-		int cornerNN = processSolidMask(cache, dirX - p12X, dirY - p12Y, dirZ - p12Z);
+		int cornerNP = getBlockCacheLazily(cache, dirX - pd12X, dirY - pd12Y, dirZ - pd12Z);
+		int cornerNN = getBlockCacheLazily(cache, dirX - p12X, dirY - p12Y, dirZ - p12Z);
 
-		int lightNP = fullFace(posZ | negX) == 0 ? light(cache, dirX - pd12X, dirY - pd12Y, dirZ - pd12Z, cornerNP) : 0;
-		int lightNN = fullFace(negZ | negX) == 0 ? light(cache, dirX - p12X, dirY - p12Y, dirZ - p12Z, cornerNN) : 0;
+		int lightNP = ModelHelper.fullFace(posZ | negX) == 0 ? ModelHelper.light(cache, dirX - pd12X, dirY - pd12Y, dirZ - pd12Z, cornerNP) : 0;
+		int lightNN = ModelHelper.fullFace(negZ | negX) == 0 ? ModelHelper.light(cache, dirX - p12X, dirY - p12Y, dirZ - p12Z, cornerNN) : 0;
 
-		int shade0 = ao(posZ, posX, cornerPP);
-		int shade1 = ao(negZ, posX, cornerPN);
-		int shade2 = ao(negZ, negX, cornerNN);
-		int shade3 = ao(posZ, negX, cornerNP);
+		int shade0 = ModelHelper.ao(posZ, posX, cornerPP);
+		int shade1 = ModelHelper.ao(negZ, posX, cornerPN);
+		int shade2 = ModelHelper.ao(negZ, negX, cornerNN);
+		int shade3 = ModelHelper.ao(posZ, negX, cornerNP);
 
-		int lightMap = getLightFaceDir(cache, dirX, dirY, dirZ);
+		int lightMap = cache.getLightBrightnessForSkyBlocks(dirX, dirY, dirZ, 0);
 
-		int lightPZ = light(posZ);
-		int lightPX = light(posX);
+		int lightPZ = ModelHelper.light(posZ);
+		int lightPX = ModelHelper.light(posX);
 
-		int lightNZ = light(negZ);
-		int lightNX = light(negX);
+		int lightNZ = ModelHelper.light(negZ);
+		int lightNX = ModelHelper.light(negX);
 
-		int light0 = avg(avg(lightPP, lightMap), avg(lightPZ, lightPX)); // 0 vertex
-		int light1 = avg(avg(lightPN, lightMap), avg(lightPX, lightNZ)); // 1 vertex
-		int light2 = avg(avg(lightNN, lightMap), avg(lightNZ, lightNX)); // 2 vertex
-		int light3 = avg(avg(lightNP, lightMap), avg(lightNX, lightPZ)); // 3 vertex
+		int light0 = ModelHelper.avg(ModelHelper.avg(lightPP, lightMap), ModelHelper.avg(lightPZ, lightPX)); // 0 vertex
+		int light1 = ModelHelper.avg(ModelHelper.avg(lightPN, lightMap), ModelHelper.avg(lightPX, lightNZ)); // 1 vertex
+		int light2 = ModelHelper.avg(ModelHelper.avg(lightNN, lightMap), ModelHelper.avg(lightNZ, lightNX)); // 2 vertex
+		int light3 = ModelHelper.avg(ModelHelper.avg(lightNP, lightMap), ModelHelper.avg(lightNX, lightPZ)); // 3 vertex
 
 		int uv0 = facing.uvData[0];
 		int uv1 = facing.uvData[1];
@@ -184,73 +185,6 @@ public class FullBlockMesher {
 		}
 	}
 
-	private static int light(int blockCache) {
-		return blockCache >>> 4;
-	}
-
-	private static int light(SectionCache cache, int x, int y, int z, int blockCache) {
-		if (blockCache == ~1) {
-			return cache.getLightBrightnessForSkyBlocks(x, y, z, 0);
-		}
-
-		return blockCache >>> 4;
-	}
-
-	private static int getLightFaceDir(SectionCache cache, int x, int y, int z) {
-		int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
-
-		int blockX = x - cache.blockX;
-		int blockY = y - cache.blockY;
-		int blockZ = z - cache.blockZ;
-
-		int sectionIndex = SectionCache.sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
-		int skyLight = SectionCache.getNibble(SectionCache.SKY_LIGHT[sectionIndex], blockIndex);
-		int blockLight = SectionCache.getNibble(SectionCache.BLOCK_LIGHT[sectionIndex], blockIndex);
-
-		return MathExt.getLightmapCoord(skyLight & 0xF, blockLight & 0xF);
-	}
-
-	private static int fullFace(int blockCache) {
-		return blockCache & 0b1;
-	}
-
-	private static int processSolidMask(SectionCache cache, int x, int y, int z) {
-		int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
-
-		int blockX = x - cache.blockX;
-		int blockY = y - cache.blockY;
-		int blockZ = z - cache.blockZ;
-
-		int sectionIndex = SectionCache.sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
-		int solidBlock = PrimitivesFlags.SOLID_LIGHT_MASK[MathExt.byteToUnsigned(SectionCache.SECTION_BLOCKS[sectionIndex][blockIndex])];
-
-		if (solidBlock == 1) {
-			return solidBlock;
-		}
-
-		return ~1;
-	}
-
-	private static int getBlockCached(SectionCache cache, int x, int y, int z) {
-		int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
-
-		int blockX = x - cache.blockX;
-		int blockY = y - cache.blockY;
-		int blockZ = z - cache.blockZ;
-
-		int sectionIndex = SectionCache.sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
-		int solidBlock = PrimitivesFlags.SOLID_LIGHT_MASK[MathExt.byteToUnsigned(SectionCache.SECTION_BLOCKS[sectionIndex][blockIndex])];
-
-		if (solidBlock == 1) {
-			return solidBlock;
-		}
-
-		int skyLight = SectionCache.getNibble(SectionCache.SKY_LIGHT[sectionIndex], blockIndex);
-		int blockLight = SectionCache.getNibble(SectionCache.BLOCK_LIGHT[sectionIndex], blockIndex);
-
-		return MathExt.getLightmapCoord(skyLight, blockLight) << 4;
-	}
-
 	public static void renderFaceNoSmooth(FacingRender facing, int dir, SectionCache cache, int x, int y, int z, int blockColor) {
 		Vector3i dirVec = Direction.getDirection(dir);
 
@@ -275,18 +209,6 @@ public class FullBlockMesher {
 		addVertex(writer, facing, 3, x, y, z, uvs[uv3 & 0xFFFF], uvs[uv3 >> 16], blockColor, lightMap);
 	}
 
-	private static int avg(int a, int b) {
-		if (b == 0) {
-			return a;
-		}
-		if (a == 0) {
-			return b;
-		}
-
-		int sumLight = (a + b);
-		return sumLight >>> 1;
-	}
-
 	private static void addVertex(VertexWriter writer, FacingRender facing, int vertInd, int x, int y, int z, float u, float v, int color, int lightMap) {
 		Vector3i vertOff = facing.quadVerts[vertInd];
 		int relX = x + vertOff.x;
@@ -299,37 +221,41 @@ public class FullBlockMesher {
 		writer.addVertexCounter(TerrainFormat.STRIDE);
 	}
 
-	private static final double SOLID_OCC_FACTOR = 0.2;
+	public static int getBlockCacheLazily(SectionCache cache, int x, int y, int z) {
+		int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
 
-	private static final int EMPTY_BLOCK_OCC_FACTOR = 255;
-	private static final int FULL_BLOCK_REDUCE = EMPTY_BLOCK_OCC_FACTOR - (int) (SOLID_OCC_FACTOR * EMPTY_BLOCK_OCC_FACTOR);
+		int blockX = x - cache.blockX;
+		int blockY = y - cache.blockY;
+		int blockZ = z - cache.blockZ;
 
-	private static final byte[] AO_COMPUTED = new byte[0b111 + 1];
+		int sectionIndex = SectionCache.sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
+		int solidBlock = PrimitivesFlags.SOLID_LIGHT_MASK[MathExt.byteToUnsigned(SectionCache.SECTION_BLOCKS[sectionIndex][blockIndex])];
 
-	// Naive approximation to Minecraft ambient occlusion, it skips some classifications differences
-	// (normalCube vs opaqueCube, etc.) but for the general case is MUCH faster and more good-looking.
-	public static int ao(int side1, int side2, int corner) {
-		// Pick the solid bit from the masks and neg it. {0, -1} = {no solid, solid}
-		side1 = -fullFace(side1);
-		side2 = -fullFace(side2);
-		corner = -fullFace(corner);
+		if (solidBlock == 1) {
+			return solidBlock;
+		}
 
-		// If both sides are solid, ignore the corner and treat it as solid.
-		corner |= side1 & side2;
-
-		// Use more -1 bitwise conditionals to reduce lighting if solid. Mimics Vanilla 0.2 ambient factor
-		// for solid blocks, with the catch that is doesn't distinguish the blocks by #isNormalCube() but by #isOpaqueCube.
-		side1 = EMPTY_BLOCK_OCC_FACTOR - (side1 & FULL_BLOCK_REDUCE);
-		side2 = EMPTY_BLOCK_OCC_FACTOR - (side2 & FULL_BLOCK_REDUCE);
-		corner = EMPTY_BLOCK_OCC_FACTOR - (corner & FULL_BLOCK_REDUCE);
-
-		// The extra EMPTY_BLOCK_OCC_FACTOR is because the block by the face side of the block is always un-solid
-		// either it would be culled.
-		return (EMPTY_BLOCK_OCC_FACTOR + side1 + side2 + corner) >> 2;
+		return ~1;
 	}
 
-	public static int aoPrecomputed(int side1, int side2, int corner) {
-		return AO_COMPUTED[(side1 | side2 << 1 | corner << 2) & 0b111] & 0xFF;
+	public static int getBlockCached(SectionCache cache, int x, int y, int z) {
+		int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
+
+		int blockX = x - cache.blockX;
+		int blockY = y - cache.blockY;
+		int blockZ = z - cache.blockZ;
+
+		int sectionIndex = SectionCache.sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
+		int solidBlock = PrimitivesFlags.SOLID_LIGHT_MASK[MathExt.byteToUnsigned(SectionCache.SECTION_BLOCKS[sectionIndex][blockIndex])];
+
+		if (solidBlock == 1) {
+			return solidBlock;
+		}
+
+		int skyLight = SectionCache.getNibble(SectionCache.SKY_LIGHT[sectionIndex], blockIndex);
+		int blockLight = SectionCache.getNibble(SectionCache.BLOCK_LIGHT[sectionIndex], blockIndex);
+
+		return MathExt.getLightmapCoord(skyLight, blockLight) << 4;
 	}
 
 	private static Vector3i createVec3i(int x, int y, int z) {
@@ -371,13 +297,6 @@ public class FullBlockMesher {
 		OVERLAY_UVS[1] = BlockGrass.getIconSideOverlay().getMinV();
 		OVERLAY_UVS[2] = BlockGrass.getIconSideOverlay().getMaxU();
 		OVERLAY_UVS[3] = BlockGrass.getIconSideOverlay().getMaxV();
-
-		// 0b001 side1
-		// 0b010 side2
-		// 0b100 corner
-		for (int i = 0; i <= 0b111; i++) {
-			AO_COMPUTED[i] = (byte) ao(i & 0b001, i & 0b010, i & 0b100);
-		}
 
 		int minU = 0;
 		int minV = 1;

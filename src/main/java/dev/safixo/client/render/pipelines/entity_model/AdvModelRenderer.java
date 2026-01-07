@@ -8,11 +8,11 @@ import dev.safixo.client.util.Matrix4Stack;
 import dev.safixo.client.util.memory.NativeBuffer;
 import dev.safixo.client.util.memory.UnsafeUtil;
 import dev.safixo.core.hooks.GLFunctions;
-import dev.safixo.core.hooks.GlStateManager;
 import net.minecraft.client.model.ModelBox;
 import net.minecraft.client.model.ModelRenderer;
 import net.minecraft.client.renderer.Tessellator;
 import org.joml.Matrix4f;
+import org.joml.Matrix4x3f;
 import org.lwjgl.opengl.*;
 
 import java.nio.FloatBuffer;
@@ -58,6 +58,7 @@ public class AdvModelRenderer {
 	private static final FloatBuffer BUFFER = NativeBuffer.wrap(PTR_BUFFER + Matrix4Stack.M00_OFFSET).asFloatBuffer();
 	private static final Matrix4f MATRIX = new Matrix4f();
 
+	//
 	public static void render(ModelRenderer model, float scale) {
 		if (model.isHidden || !model.showModel) {
 			return;
@@ -74,21 +75,30 @@ public class AdvModelRenderer {
 		GLFunctions.glPushMatrix();
 
 		Matrix4f modelView = MATRIX.identity();
-		modelView.translate(
+		modelView.translation(
 			model.offsetX + model.rotationPointX * scale,
 			model.offsetY + model.rotationPointY * scale,
 			model.offsetZ + model.rotationPointZ * scale
 		);
 
-		if (model.rotateAngleY != 0.0F) {
-			modelView.rotateY(model.rotateAngleY);
+		boolean rotY = model.rotateAngleY != 0.0F;
+		boolean rotX = model.rotateAngleX != 0.0F;
+		boolean rotZ = model.rotateAngleZ != 0.0F;
+
+		if (rotX && rotY && rotZ) {
+			modelView.rotateZYX(model.rotateAngleZ, model.rotateAngleY, model.rotateAngleX);
+		} else {
+			if (rotY) {
+				modelView.rotateY(model.rotateAngleY);
+			}
+			if (rotX) {
+				modelView.rotateX(model.rotateAngleX);
+			}
+			if (rotZ) {
+				modelView.rotateZ(model.rotateAngleZ);
+			}
 		}
-		if (model.rotateAngleX != 0.0F) {
-			modelView.rotateX(model.rotateAngleX);
-		}
-		if (model.rotateAngleZ != 0.0F) {
-			modelView.rotateZ(model.rotateAngleZ);
-		}
+
 		Matrix4Stack.copyMat(modelView, PTR_BUFFER);
 		GLFunctions.glMultMatrix(BUFFER);
 
@@ -118,15 +128,30 @@ public class AdvModelRenderer {
 		int vertexArray = displayList >>> 16;
 
 		GLFunctions.glPushMatrix();
-		GLFunctions.glTranslatef(model.rotationPointX * scale, model.rotationPointY * scale, model.rotationPointZ * scale);
-		if (model.rotateAngleY != 0.0F) {
-			GLFunctions.glRotatef(model.rotateAngleY * (180F / (float)Math.PI), 0.0F, 1.0F, 0.0F);
-		}
-		if (model.rotateAngleX != 0.0F) {
-			GLFunctions.glRotatef(model.rotateAngleX * (180F / (float)Math.PI), 1.0F, 0.0F, 0.0F);
-		}
-		if (model.rotateAngleZ != 0.0F) {
-			GLFunctions.glRotatef(model.rotateAngleZ * (180F / (float)Math.PI), 0.0F, 0.0F, 1.0F);
+
+		Matrix4f modelView = MATRIX.identity();
+		modelView.translation(
+			model.rotationPointX * scale,
+			model.rotationPointY * scale,
+			model.rotationPointZ * scale
+		);
+
+		boolean rotY = model.rotateAngleY != 0.0F;
+		boolean rotX = model.rotateAngleX != 0.0F;
+		boolean rotZ = model.rotateAngleZ != 0.0F;
+
+		if (rotX && rotY && rotZ) {
+			modelView.rotateZYX(model.rotateAngleZ, model.rotateAngleY, model.rotateAngleX);
+		} else {
+			if (rotY) {
+				modelView.rotateY(model.rotateAngleY);
+			}
+			if (rotX) {
+				modelView.rotateX(model.rotateAngleX);
+			}
+			if (rotZ) {
+				modelView.rotateZ(model.rotateAngleZ);
+			}
 		}
 
 		GlVertexArrayObject.bindVertexArray(vertexArray);

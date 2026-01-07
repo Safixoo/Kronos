@@ -1,10 +1,8 @@
 package dev.safixo.client.render.pipelines.terrain.meshing.data;
 
 import dev.safixo.client.render.pipelines.terrain.meshing.FullBlockMesher;
-import dev.safixo.client.render.pipelines.terrain.meshing.vanilla.VanillaBlockMesher;
 import dev.safixo.client.util.Direction;
 import org.joml.Vector3i;
-import org.joml.Vector4i;
 
 @SuppressWarnings("PointlessArithmeticExpression")
 public class FacingRender {

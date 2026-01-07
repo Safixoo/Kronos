@@ -219,10 +219,10 @@ public class SectionCache implements IBlockAccess {
 
 	@Override
 	public TileEntity getBlockTileEntity(int x, int y, int z) {
-		int chunkX = (x >> 4) - (this.blockX >> 4);
-		int chunkZ = (z >> 4) - (this.blockZ >> 4);
+		int chunkX = x - this.blockX;
+		int chunkZ = z - this.blockZ;
 
-		return CHUNKS[sectionIndex(chunkX, 0, chunkZ)].getChunkBlockTileEntity(x & 15, y, z & 15);
+		return CHUNKS[sectionIndex(chunkX >> 4, 0, chunkZ >> 4)].getChunkBlockTileEntity(x & 15, y, z & 15);
 	}
 
 	@Override
@@ -234,16 +234,10 @@ public class SectionCache implements IBlockAccess {
 		int blockZ = z - this.blockZ;
 
 		int sectionIndex = sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
-		int blockId = MathExt.byteToUnsigned(SECTION_BLOCKS[sectionIndex][blockIndex]);
-
-		if (blockId != 0 && PrimitivesFlags.SOLID[blockId]) {
-			return 0;
-		}
-
 		int skyLight = getNibble(SKY_LIGHT[sectionIndex], blockIndex);
 		int blockLight = getNibble(BLOCK_LIGHT[sectionIndex], blockIndex);
 
-		return MathExt.getLightmapCoord(skyLight & 0xF, blockLight & 0xF);
+		return MathExt.getLightmapCoord(skyLight, Math.max(defBlockLight, blockLight));
 	}
 
 	public int getBlockIdCenter(int x, int y, int z) {

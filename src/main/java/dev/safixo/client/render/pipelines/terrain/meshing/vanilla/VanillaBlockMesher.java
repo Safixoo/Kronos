@@ -3,24 +3,29 @@ package dev.safixo.client.render.pipelines.terrain.meshing.vanilla;
 import dev.safixo.client.render.pipelines.terrain.meshing.FullBlockMesher;
 import dev.safixo.client.render.pipelines.terrain.meshing.ModelColorizer;
 import dev.safixo.client.render.pipelines.terrain.meshing.data.FacingRender;
-import dev.safixo.client.util.ColorBGRManager;
 import dev.safixo.client.util.Direction;
 import dev.safixo.client.util.data.PrimitivesFlags;
 import net.minecraft.block.Block;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderBlocks;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.util.Icon;
 import net.minecraft.world.IBlockAccess;
 import org.joml.Vector3i;
 
-import static dev.safixo.client.render.pipelines.terrain.meshing.vanilla.ABBIndexed.*;
+import static dev.safixo.client.render.pipelines.terrain.meshing.vanilla.ModelHelper.*;
+import static dev.safixo.client.util.ColorBGRManager.*;
 import static dev.safixo.client.util.Direction.*;
 import static dev.safixo.client.util.Direction.EAST;
 
 public class VanillaBlockMesher {
 	private static final float[] UVS = new float[4];
-	private static final float[] BOUNDS = new float[7];
-	private static final byte[] ROTATIONS = new byte[6];
+
+	private static final float[] BOUNDS = new float[SIZE];
+	private static final byte[] ROTATIONS = new byte[COUNT];
+
+	private static final int[] LIGHT = new int[4];
+	private static final int[] AO = new int[4];
 
 	@SuppressWarnings("unused") // asm redirected.
 	public static boolean renderStandardBlock(RenderBlocks render, Block block, int x, int y, int z) {
@@ -28,7 +33,10 @@ public class VanillaBlockMesher {
 	}
 
 	/**
-	 * @return If it has something meshed.
+	 * Total rewrite of the pipeline for rendering most of the blocks of the game. The main improvements that come
+	 * are lighting fixes, much better performance and improved culling by analyzing block model, also the code should
+	 * be much more readable and compact in contrast to the inlined field hell that RenderBlocks has which doesn't help
+	 * performance.
 	 */
 	public static boolean renderStandardBlock(RenderBlocks blocks, IBlockAccess cache, Block block, float[] bounds, int x, int y, int z) {
 		Tessellator tes = Tessellator.instance;
@@ -42,6 +50,7 @@ public class VanillaBlockMesher {
 		drawSet |= block.shouldSideBeRendered(cache, x - 1, y, z, 4) ? 1 << WEST : 0;
 		drawSet |= block.shouldSideBeRendered(cache, x + 1, y, z, 5) ? 1 << EAST : 0;
 
+		// Early exit.
 		if (drawSet == 0) {
 			return false;
 		}
@@ -50,7 +59,7 @@ public class VanillaBlockMesher {
 			? block.colorMultiplier(blocks.blockAccess, x, y, z)
 			: 0xFF_FF_FF_FF;
 
-		ABBIndexed.aabbToArray(blocks, BOUNDS);
+		int flag = ModelHelper.processModel(blocks, BOUNDS);
 
 		byte[] uvRotate = ROTATIONS;
 		uvRotate[Direction.DOWN] = (byte) blocks.uvRotateBottom;
@@ -60,6 +69,8 @@ public class VanillaBlockMesher {
 		uvRotate[Direction.WEST] = (byte) blocks.uvRotateNorth;
 		uvRotate[Direction.EAST] = (byte) blocks.uvRotateSouth;
 
+		boolean ao = Minecraft.isAmbientOcclusionEnabled();
+
 		for (int dir = 0; dir < Direction.COUNT; dir++) {
 			if ((drawSet & (1 << dir)) == 0) {
 				continue;
@@ -68,7 +79,7 @@ public class VanillaBlockMesher {
 			int dirColor;
 
 			if (color != 0xFFFFFF && block.blockID != Block.grass.blockID || dir == UP) {
-				dirColor = ColorBGRManager.multiplyColor(color, FullBlockMesher.SHADE_FULL_FACTOR[dir]);
+				dirColor = multiplyColor(color, FullBlockMesher.SHADE_FULL_FACTOR[dir]);
 			} else {
 				dirColor = FullBlockMesher.SHADE_FULL_COLOR[dir];
 			}
@@ -76,6 +87,7 @@ public class VanillaBlockMesher {
 			FacingRender face = FACE_RENDER[dir];
 			Icon currentTex = blocks.overrideBlockTexture != null ? blocks.overrideBlockTexture : block.getBlockTexture(cache, x, y, z, dir);
 
+			// TODO: The methods names are incorrect and misleading, fix it.
 			UVS[0] = currentTex.getInterpolatedU(face.minUInd(bounds));
 			UVS[1] = currentTex.getInterpolatedV(face.maxUInd(bounds));
 
@@ -83,7 +95,12 @@ public class VanillaBlockMesher {
 			UVS[3] = currentTex.getInterpolatedV(face.maxVInd(bounds));
 
 			int uvRotation = uvRotate[dir];
-			renderQuadNoAmbient(tes, face, cache, bounds, dir, x, y, z, dirColor, uvRotation);
+
+			if (ao) {
+				renderQuadYesAmbient(tes, face, cache, bounds, dir, x, y, z, dirColor, uvRotation, flag);
+			} else {
+				renderQuadNoAmbient(tes, face, cache, bounds, dir, x, y, z, dirColor, uvRotation);
+			}
 		}
 
 		return true;
@@ -104,6 +121,23 @@ public class VanillaBlockMesher {
 		bufferVertex(tes, face, bounds, 1, x, y, z, uvs[uv1 & 0xFFFF], uvs[uv1 >> 16], color, lightMap);
 		bufferVertex(tes, face, bounds, 2, x, y, z, uvs[uv2 & 0xFFFF], uvs[uv2 >> 16], color, lightMap);
 		bufferVertex(tes, face, bounds, 3, x, y, z, uvs[uv3 & 0xFFFF], uvs[uv3 >> 16], color, lightMap);
+	}
+
+	public static void renderQuadYesAmbient(Tessellator tes, FacingRender face, IBlockAccess cache, float[] bounds,
+											int dir, int x, int y, int z, int color, int uvRotate, int flag) {
+		ModelLighter.applyLighting(face, cache, BOUNDS, dir, x, y, z, AO, LIGHT, flag);
+
+		uvRotate <<= 2;
+		final float[] uvs = UVS;
+		int uv0 = face.uvData[uvRotate + 0];
+		int uv1 = face.uvData[uvRotate + 1];
+		int uv2 = face.uvData[uvRotate + 2];
+		int uv3 = face.uvData[uvRotate + 3];
+
+		bufferVertex(tes, face, bounds, 0, x, y, z, uvs[uv0 & 0xFFFF], uvs[uv0 >> 16], multiplyColor(color, AO[0]), LIGHT[0]);
+		bufferVertex(tes, face, bounds, 1, x, y, z, uvs[uv1 & 0xFFFF], uvs[uv1 >> 16], multiplyColor(color, AO[1]), LIGHT[1]);
+		bufferVertex(tes, face, bounds, 2, x, y, z, uvs[uv2 & 0xFFFF], uvs[uv2 >> 16], multiplyColor(color, AO[2]), LIGHT[2]);
+		bufferVertex(tes, face, bounds, 3, x, y, z, uvs[uv3 & 0xFFFF], uvs[uv3 >> 16], multiplyColor(color, AO[3]), LIGHT[3]);
 	}
 
 	public static void bufferVertex(Tessellator tes, FacingRender face, float[] bounds, int vertInd,

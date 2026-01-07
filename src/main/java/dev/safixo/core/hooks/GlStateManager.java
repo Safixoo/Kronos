@@ -24,11 +24,12 @@ public class GlStateManager {
 
 	public static long LAST_COLOR_MATERIAL = -31;
 	public static int LAST_VIEWPORT_WH = -1;
-	public static int CURRENT_UNIT = -1;
-	public static int LAST_TEXTURE = -1;
 	public static int LAST_UNIT = -1;
 	public static int LAST_COLOR = -1;
 	public static int LAST_DEPTH_FUNC = -1;
+
+	public static int CURRENT_UNIT = 0;
+	private static final int[] TEXTURE_PER_UNIT = new int[10];
 
 	public static int FOG_MODE;
 	public static float FOG_START, FOG_END;
@@ -109,7 +110,6 @@ public class GlStateManager {
 
 		if (color != LAST_COLOR) {
 			LAST_COLOR = color;
-
 			flushDrawState();
 			GL11.glColor4f(red, green, blue, alpha);
 		}
@@ -118,9 +118,11 @@ public class GlStateManager {
 	public static void glBindTexture(int target, int texture) {
 		flushDrawState();
 
-		if (texture != LAST_TEXTURE) {
+		if (CURRENT_UNIT == -1) {
 			GL11.glBindTexture(target, texture);
-			LAST_TEXTURE = texture;
+		} else if (texture != TEXTURE_PER_UNIT[CURRENT_UNIT]) {
+			GL11.glBindTexture(target, texture);
+			TEXTURE_PER_UNIT[CURRENT_UNIT] = texture;
 		}
 	}
 
@@ -162,7 +164,6 @@ public class GlStateManager {
 		LAST_DEPTH_FUNC = -1;
 		CURRENT_UNIT = -1;
 		LAST_COLOR_MATERIAL = -1;
-		LAST_TEXTURE = -1;
 	}
 
 	public static void glDisableClientStateDirect(int cap) {
@@ -244,8 +245,6 @@ public class GlStateManager {
 	public static void glBindFramebuffer(int target, int frameBuffer) {
 		flushDrawState();
 		GL30.glBindFramebuffer(target, frameBuffer);
-
-		LAST_TEXTURE = -1;
 	}
 
 	public static void glGetFloat(int name, FloatBuffer params) {
@@ -278,7 +277,6 @@ public class GlStateManager {
 		if (activeTex != CURRENT_UNIT) {
 			flushDrawState();
 			GL13.glActiveTexture(activeTex);
-			LAST_TEXTURE = -1;
 			CURRENT_UNIT = activeTex;
 		}
 	}
