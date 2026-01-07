@@ -5,6 +5,7 @@ import dev.safixo.client.render.gfx.util.GpuFlags;
 import dev.safixo.client.util.ColorBGRManager;
 import dev.safixo.client.util.Matrix4Stack;
 import org.joml.Matrix4f;
+import org.lwjgl.Sys;
 import org.lwjgl.opengl.*;
 import org.lwjgl.util.glu.Project;
 
@@ -14,7 +15,7 @@ import java.nio.IntBuffer;
 import java.util.Arrays;
 
 @SuppressWarnings("unused")
-public class GlStateManager {
+public class GlStateTracker {
 	public static final boolean SKIP_CACHE = true;
 	private static final byte[] CAP_BITS = new byte[32827];
 
@@ -32,7 +33,7 @@ public class GlStateManager {
 	private static final int[] TEXTURE_PER_UNIT = new int[10];
 
 	public static int FOG_MODE;
-	public static float FOG_START, FOG_END;
+	public static float FOG_START, FOG_END, FOG_DENSITY;
 	public static float FOG_COLOR_R, FOG_COLOR_G, FOG_COLOR_B;
 
 	private static final Matrix4Stack MODEL_VIEW_STACK = new Matrix4Stack(256);
@@ -453,6 +454,8 @@ public class GlStateManager {
 			FOG_START = value;
 		} else if (mode == GL11.GL_FOG_END) {
 			FOG_END = value;
+		} else if (mode == GL11.GL_FOG_DENSITY) {
+			FOG_DENSITY = value;
 		}
 
 		GL11.glFogf(mode, value);

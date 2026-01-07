@@ -4,14 +4,18 @@ import dev.safixo.client.render.pipelines.terrain.meshing.FullBlockMesher;
 import dev.safixo.client.util.Direction;
 import org.joml.Vector3i;
 
+import static dev.safixo.client.util.Direction.*;
+
 @SuppressWarnings("PointlessArithmeticExpression")
 public class FacingRender {
+	public byte dirX, dirY, dirZ;
 	public byte aoCornerX0, aoCornerY0, aoCornerZ0;
 	public byte aoCornerX1, aoCornerY1, aoCornerZ1;
 
-	public final Vector3i[] quadVerts = new Vector3i[Direction.COUNT];
-	public final int[] uvData = new int[16];
-	public int[] texBounds = new int[4];
+	public final Vector3i[] quadVerts = new Vector3i[4];
+	public final short[] uvData = new short[16];
+	public byte[] weightIndices = new byte[8];
+	public byte bA, bB, bC, bD;
 
 	public int aoCorner0;
 	public int aoCorner1;
@@ -34,7 +38,7 @@ public class FacingRender {
 
 	}
 
-	public void processCornersDir() {
+	public void processCornersDir(int dir) {
 		this.aoCornerX0 = Direction.x(this.aoCorner0);
 		this.aoCornerY0 = Direction.y(this.aoCorner0);
 		this.aoCornerZ0 = Direction.z(this.aoCorner0);
@@ -42,37 +46,66 @@ public class FacingRender {
 		this.aoCornerX1 = Direction.x(this.aoCorner1);
 		this.aoCornerY1 = Direction.y(this.aoCorner1);
 		this.aoCornerZ1 = Direction.z(this.aoCorner1);
+
+		this.dirX = Direction.x(dir);
+		this.dirY = Direction.y(dir);
+		this.dirZ = Direction.z(dir);
+
+		for (int i = 0; i < 4; i++) {
+			int ind = i * 2;
+			Vector3i vertOff = this.quadVerts[i];
+
+			if (dir == DOWN) {
+				this.weightIndices[ind] = (byte) vertOff.z;
+				this.weightIndices[ind + 1] = (byte) -vertOff.x;
+			} else if (dir == UP) {
+				this.weightIndices[ind] = (byte) vertOff.z;
+				this.weightIndices[ind + 1] = (byte) vertOff.x;
+			} else if (dir == NORTH) {
+				this.weightIndices[ind] = (byte) -vertOff.x;
+				this.weightIndices[ind + 1] = (byte) vertOff.y;
+			} else if (dir == SOUTH) {
+				this.weightIndices[ind] = (byte) vertOff.y;
+				this.weightIndices[ind + 1] = (byte) -vertOff.x;
+			} else if (dir == WEST) {
+				this.weightIndices[ind] = (byte) vertOff.z;
+				this.weightIndices[ind + 1] = (byte) vertOff.y;
+			} else {
+				this.weightIndices[ind] = (byte) vertOff.z;
+				this.weightIndices[ind + 1] = (byte) -vertOff.y;
+			}
+		}
 	}
 
 	public void setTexInd(int x, int y, int z, int w) {
 		for (int i = 0; i < 4; i++) {
-			this.uvData[i * 4 + 0] = FullBlockMesher.MAP_ID_TO_UV[x + ROTATION[i]];
-			this.uvData[i * 4 + 1] = FullBlockMesher.MAP_ID_TO_UV[y + ROTATION[i]];
-			this.uvData[i * 4 + 2] = FullBlockMesher.MAP_ID_TO_UV[z + ROTATION[i]];
-			this.uvData[i * 4 + 3] = FullBlockMesher.MAP_ID_TO_UV[w + ROTATION[i]];
+			this.uvData[i * 4 + 0] = (short) FullBlockMesher.MAP_ID_TO_UV[x + ROTATION[i]];
+			this.uvData[i * 4 + 1] = (short) FullBlockMesher.MAP_ID_TO_UV[y + ROTATION[i]];
+			this.uvData[i * 4 + 2] = (short) FullBlockMesher.MAP_ID_TO_UV[z + ROTATION[i]];
+			this.uvData[i * 4 + 3] = (short) FullBlockMesher.MAP_ID_TO_UV[w + ROTATION[i]];
 		}
 	}
 
 	public void setBoundsTex(int a, int b, int c, int d) {
-		this.texBounds[0] = a;
-		this.texBounds[1] = b;
-		this.texBounds[2] = c;
-		this.texBounds[3] = d;
+		this.bA = (byte) a;
+		this.bB = (byte) b;
+		this.bC = (byte) c;
+		this.bD = (byte) d;
 	}
 
 	public float minUInd(float[] bounds) {
-		return (this.texBounds[0] < 0 ? 1.0f - bounds[-this.texBounds[0]] : bounds[this.texBounds[0]]) * 16.0f;
+		return this.bA < 0 ? 1.0f - bounds[-this.bA] : bounds[this.bA];
 	}
 
 	public float minVInd(float[] bounds) {
-		return (this.texBounds[1] < 0 ? 1.0f - bounds[-this.texBounds[1]] : bounds[this.texBounds[1]]) * 16.0f;
+		return this.bB < 0 ? 1.0f - bounds[-this.bB] : bounds[this.bB];
 	}
 
 	public float maxUInd(float[] bounds) {
-		return (this.texBounds[2] < 0 ? 1.0f - bounds[-this.texBounds[2]] : bounds[this.texBounds[2]]) * 16.0f;
+		return this.bC < 0 ? 1.0f - bounds[-this.bC] : bounds[this.bC];
 	}
 
 	public float maxVInd(float[] bounds) {
-		return (this.texBounds[3] < 0 ? 1.0f - bounds[-this.texBounds[3]] : bounds[this.texBounds[3]]) * 16.0f;
+		return this.bD < 0 ? 1.0f - bounds[-this.bD] : bounds[this.bD];
 	}
 }

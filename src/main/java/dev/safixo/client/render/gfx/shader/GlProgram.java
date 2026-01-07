@@ -2,8 +2,11 @@ package dev.safixo.client.render.gfx.shader;
 
 import org.lwjgl.opengl.GL20;
 
+import java.util.List;
+
 public abstract class GlProgram {
 	private String vertexShaderPath, fragmentShaderPath;
+	private List<ShaderDefine> shaderDefines;
 	private int id;
 
 	public GlProgram(String vertexPath, String fragmentPath) {
@@ -15,16 +18,36 @@ public abstract class GlProgram {
 		this.processUniformLocations();
 	}
 
+	public GlProgram(List<ShaderDefine> shaderDefines, String vertexPath, String fragmentPath) {
+		this();
+
+		this.addShaderPath(vertexPath, fragmentPath);
+		this.compile(shaderDefines);
+
+		this.processUniformLocations();
+	}
+
 	public GlProgram() {
 		this.id = GL20.glCreateProgram();
 	}
 
+
 	public void compile() {
+		this.compile(null);
+	}
+
+	public void compile(List<ShaderDefine> shaderDefines) {
+		if (shaderDefines == null) {
+			shaderDefines = this.shaderDefines;
+		} else {
+			this.shaderDefines = shaderDefines;
+		}
+
 		GlShader vertexShader = new GlShader(GL20.GL_VERTEX_SHADER);
 		GlShader fragmentShader = new GlShader(GL20.GL_FRAGMENT_SHADER);
 
-		vertexShader.compile(this.vertexShaderPath);
-		fragmentShader.compile(this.fragmentShaderPath);
+		vertexShader.compile(shaderDefines, this.vertexShaderPath);
+		fragmentShader.compile(shaderDefines, this.fragmentShaderPath);
 
 		this.attachShader(vertexShader);
 		this.attachShader(fragmentShader);

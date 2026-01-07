@@ -2,7 +2,7 @@ package dev.safixo.client.render.pipelines.terrain.meshing.vanilla;
 
 import dev.safixo.client.render.pipelines.terrain.meshing.data.FacingRender;
 import net.minecraft.world.IBlockAccess;
-import org.joml.Vector3i;
+import org.joml.Vector2i;
 
 import static dev.safixo.client.util.Direction.*;
 
@@ -10,15 +10,14 @@ public class ModelLighter {
 	public static void applyLighting(FacingRender face, IBlockAccess cache, float[] bounds,
 									 int dir, int x, int y, int z, int[] ao, int[] light, int partialSides)
 	{
-		setupCornerLighting(face, cache, x, y, z, dir, ao, light);
+		setupCornerLighting(face, cache, x, y, z, ao, light);
 
 		if ((partialSides & (1 << dir)) != 0) {
-			processPartialAlignedLight(face, dir, bounds, ao, light);
+			processPartialAlignedLight(face, bounds, ao, light);
 		}
 	}
 
-	public static void setupCornerLighting(FacingRender face, IBlockAccess cache, int x, int y, int z,
-										   int dir, int[] color, int[] light) {
+	public static void setupCornerLighting(FacingRender face, IBlockAccess cache, int x, int y, int z, int[] ao, int[] light) {
 		int p1X = face.aoCornerX0;
 		int p1Y = face.aoCornerY0;
 		int p1Z = face.aoCornerZ0;
@@ -27,14 +26,14 @@ public class ModelLighter {
 		int p2Y = face.aoCornerY1;
 		int p2Z = face.aoCornerZ1;
 
-		int dirX = x + x(dir);
-		int dirY = y + y(dir);
-		int dirZ = z + z(dir);
+		x += face.dirX;
+		y += face.dirY;
+		z += face.dirZ;
 
-		int posZ = ModelHelper.getBlockCached(cache, dirX + p2X, dirY + p2Y, dirZ + p2Z);
-		int negZ = ModelHelper.getBlockCached(cache, dirX - p2X, dirY - p2Y, dirZ - p2Z);
-		int posX = ModelHelper.getBlockCached(cache, dirX + p1X, dirY + p1Y, dirZ + p1Z);
-		int negX = ModelHelper.getBlockCached(cache, dirX - p1X, dirY - p1Y, dirZ - p1Z);
+		int posZ = ModelHelper.getBlockCached(cache, x + p2X, y + p2Y, z + p2Z);
+		int negZ = ModelHelper.getBlockCached(cache, x - p2X, y - p2Y, z - p2Z);
+		int posX = ModelHelper.getBlockCached(cache, x + p1X, y + p1Y, z + p1Z);
+		int negX = ModelHelper.getBlockCached(cache, x - p1X, y - p1Y, z - p1Z);
 
 		int p12X = p1X + p2X;
 		int p12Y = p1Y + p2Y;
@@ -44,24 +43,24 @@ public class ModelLighter {
 		int pd12Y = p1Y - p2Y;
 		int pd12Z = p1Z - p2Z;
 
-		int cornerPP = ModelHelper.getBlockCacheLazily(cache, dirX + p12X, dirY + p12Y, dirZ + p12Z);
-		int cornerPN = ModelHelper.getBlockCacheLazily(cache, dirX + pd12X, dirY + pd12Y, dirZ + pd12Z);
+		int cornerPP = ModelHelper.getBlockCacheLazily(cache, x + p12X, y + p12Y, z + p12Z);
+		int cornerPN = ModelHelper.getBlockCacheLazily(cache, x + pd12X, y + pd12Y, z + pd12Z);
 
-		int lightPP = ModelHelper.fullFace(posZ | posX) == 0 ? ModelHelper.light(cache, dirX + p12X, dirY + p12Y, dirZ + p12Z, cornerPP) : 0;
-		int lightPN = ModelHelper.fullFace(negZ | posX) == 0 ? ModelHelper.light(cache, dirX + pd12X, dirY + pd12Y, dirZ + pd12Z, cornerPN) : 0;
+		int lightPP = ModelHelper.fullFace(posZ | posX) == 0 ? ModelHelper.light(cache, x + p12X, y + p12Y, z + p12Z, cornerPP) : 0;
+		int lightPN = ModelHelper.fullFace(negZ | posX) == 0 ? ModelHelper.light(cache, x + pd12X, y + pd12Y, z + pd12Z, cornerPN) : 0;
 
-		int cornerNP = ModelHelper.getBlockCacheLazily(cache, dirX - pd12X, dirY - pd12Y, dirZ - pd12Z);
-		int cornerNN = ModelHelper.getBlockCacheLazily(cache, dirX - p12X, dirY - p12Y, dirZ - p12Z);
+		int cornerNP = ModelHelper.getBlockCacheLazily(cache, x - pd12X, y - pd12Y, z - pd12Z);
+		int cornerNN = ModelHelper.getBlockCacheLazily(cache, x - p12X, y - p12Y, z - p12Z);
 
-		int lightNP = ModelHelper.fullFace(posZ | negX) == 0 ? ModelHelper.light(cache, dirX - pd12X, dirY - pd12Y, dirZ - pd12Z, cornerNP) : 0;
-		int lightNN = ModelHelper.fullFace(negZ | negX) == 0 ? ModelHelper.light(cache, dirX - p12X, dirY - p12Y, dirZ - p12Z, cornerNN) : 0;
+		int lightNP = ModelHelper.fullFace(posZ | negX) == 0 ? ModelHelper.light(cache, x - pd12X, y - pd12Y, z - pd12Z, cornerNP) : 0;
+		int lightNN = ModelHelper.fullFace(negZ | negX) == 0 ? ModelHelper.light(cache, x - p12X, y - p12Y, z - p12Z, cornerNN) : 0;
 
-		color[0] = ModelHelper.ao(posZ, posX, cornerPP);
-		color[1] = ModelHelper.ao(negZ, posX, cornerPN);
-		color[2] = ModelHelper.ao(negZ, negX, cornerNN);
-		color[3] = ModelHelper.ao(posZ, negX, cornerNP);
+		ao[0] = ModelHelper.ao(posZ, posX, cornerPP);
+		ao[1] = ModelHelper.ao(negZ, posX, cornerPN);
+		ao[2] = ModelHelper.ao(negZ, negX, cornerNN);
+		ao[3] = ModelHelper.ao(posZ, negX, cornerNP);
 
-		int lightMap = cache.getLightBrightnessForSkyBlocks(dirX, dirY, dirZ, 0);
+		int lightMap = cache.getLightBrightnessForSkyBlocks(x, y, z, 0);
 
 		int lightPZ = ModelHelper.light(posZ);
 		int lightPX = ModelHelper.light(posX);
@@ -75,57 +74,37 @@ public class ModelLighter {
 		light[3] = ModelHelper.avg(ModelHelper.avg(lightNP, lightMap), ModelHelper.avg(lightNX, lightPZ)); // 3 vertex
 	}
 
-	public static void processPartialAlignedLight(FacingRender face, int dir, float[] bounds, int[] ao, int[] light) {
-		float uf;
-		float vf;
+	public static void processPartialAlignedLight(FacingRender face, float[] bounds, int[] ao, int[] light) {
+		long pack0 = light[0] | (long) ao[0] << 32L;
+		long pack1 = light[1] | (long) ao[1] << 32L;
+		long pack2 = light[2] | (long) ao[2] << 32L;
+		long pack3 = light[3] | (long) ao[3] << 32L;
 
 		for (int i = 0; i < 4; i++) {
-			Vector3i vertOff = face.quadVerts[i];
-			float x = bounds[vertOff.x];
-			float y = bounds[vertOff.y];
-			float z = bounds[vertOff.z];
+			int ind = i << 1;
+			int wx = face.weightIndices[ind];
+			int wy = face.weightIndices[ind + 1];
 
-			if (dir == DOWN) {
-				uf = z;
-				vf = 1.0f - x;
-			} else if (dir == UP) {
-				uf = z;
-				vf = x;
-			} else if (dir == NORTH) {
-				uf = 1.0f - x;
-				vf = y;
-			} else if (dir == SOUTH) {
-				uf = y;
-				vf = 1.0f - x;
-			} else if (dir == WEST) {
-				uf = z;
-				vf = y;
-			} else {
-				uf = z;
-				vf = 1.0f - y;
-			}
+			float uf = wx < 0 ? 1.0f - bounds[-wx] : bounds[wx];
+			float vf = wy < 0 ? 1.0f - bounds[-wy] : bounds[wy];
 
-			long u = (long) (uf * 4096);
-			long v = (long) (vf * 4096);
+			int u = (int) (uf * 256);
+			int v = (int) (vf * 256);
 
-			long w0 = v * u;
-			long w1 = v * (4096 - u);
-			long w2 = (4096 - v) * (4096 - u);
-			long w3 = (4096 - v) * u;
+			int w0 = v * u;
+			int w1 = v * (256 - u);
+			int w2 = (256 - v) * (256 - u);
+			int w3 = (256 - v) * u;
 
-			long l0 = (w0 * light[0]) >> 24;
-			long l1 = (w1 * light[1]) >> 24;
-			long l2 = (w2 * light[2]) >> 24;
-			long l3 = (w3 * light[3]) >> 24;
+			long la0 = w0 * pack0;
+			long la1 = w1 * pack1;
+			long la2 = w2 * pack2;
+			long la3 = w3 * pack3;
 
-			light[i] = (int) (l0 + l1 + l2 + l3);
+			long sum = la0 + la1 + la2 + la3;
 
-			long a0 = (w0 * ao[0]) >> 24;
-			long a1 = (w1 * ao[1]) >> 24;
-			long a2 = (w2 * ao[2]) >> 24;
-			long a3 = (w3 * ao[3]) >> 24;
-
-			ao[i] = (int) (a0 + a1 + a2 + a3);
+			light[i] = (int) (sum >>> 16);
+			ao[i] =    (int) (sum >>> 48);
 		}
 	}
 }

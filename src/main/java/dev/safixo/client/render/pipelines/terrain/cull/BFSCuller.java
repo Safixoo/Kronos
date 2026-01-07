@@ -1,6 +1,6 @@
 package dev.safixo.client.render.pipelines.terrain.cull;
 
-import dev.safixo.core.hooks.GlStateManager;
+import dev.safixo.core.hooks.GlStateTracker;
 import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
 import dev.safixo.client.render.pipelines.terrain.SectionFlags;
 import dev.safixo.client.render.pipelines.terrain.SectionRender;
@@ -61,7 +61,7 @@ public class BFSCuller {
 			queueRegionNode(this.bfsQueue, origin, flags);
 		}
 
-		double maxDistance = Math.min(GlStateManager.FOG_END, camera.renderDistance << 4);
+		double maxDistance = Math.min(GlStateTracker.FOG_END, camera.renderDistance << 4);
 		search(this.bfsQueue, camera.intX, camera.intY, camera.intZ, (int) MathExt.square(maxDistance), this.activeFrame);
 	}
 

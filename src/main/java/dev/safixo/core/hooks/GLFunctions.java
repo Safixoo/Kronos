@@ -10,7 +10,7 @@ import java.nio.FloatBuffer;
 public class GLFunctions {
 	public static void glLoadMatrix(FloatBuffer matrix) {
 		if (GpuFlags.EXT_DSA) {
-			EXTDirectStateAccess.glMatrixLoadEXT(GlStateManager.MAT_MODE, matrix);
+			EXTDirectStateAccess.glMatrixLoadEXT(GlStateTracker.MAT_MODE, matrix);
 		} else {
 			GL11.glMultMatrix(matrix);
 		}
@@ -18,7 +18,7 @@ public class GLFunctions {
 
 	public static void glMultMatrix(FloatBuffer matrix) {
 		if (GpuFlags.EXT_DSA) {
-			EXTDirectStateAccess.glMatrixMultEXT(GlStateManager.MAT_MODE, matrix);
+			EXTDirectStateAccess.glMatrixMultEXT(GlStateTracker.MAT_MODE, matrix);
 		} else {
 			GL11.glMultMatrix(matrix);
 		}
@@ -26,7 +26,7 @@ public class GLFunctions {
 
 	public static void glPushMatrix() {
 		if (GpuFlags.EXT_DSA) {
-			EXTDirectStateAccess.glMatrixPushEXT(GlStateManager.MAT_MODE);
+			EXTDirectStateAccess.glMatrixPushEXT(GlStateTracker.MAT_MODE);
 		} else {
 			GL11.glPushMatrix();
 		}
@@ -34,7 +34,7 @@ public class GLFunctions {
 
 	public static void glPopMatrix() {
 		if (GpuFlags.EXT_DSA) {
-			EXTDirectStateAccess.glMatrixPopEXT(GlStateManager.MAT_MODE);
+			EXTDirectStateAccess.glMatrixPopEXT(GlStateTracker.MAT_MODE);
 		} else {
 			GL11.glPopMatrix();
 		}
@@ -46,7 +46,7 @@ public class GLFunctions {
 
 	public static void glTranslatef(float x, float y, float z) {
 		if (GpuFlags.EXT_DSA) {
-			EXTDirectStateAccess.glMatrixTranslatefEXT(GlStateManager.MAT_MODE, x, y, z);
+			EXTDirectStateAccess.glMatrixTranslatefEXT(GlStateTracker.MAT_MODE, x, y, z);
 		} else {
 			GL11.glTranslatef(x, y, z);
 		}
@@ -54,7 +54,7 @@ public class GLFunctions {
 
 	public static void glRotatef(float angle, float x, float y, float z) {
 		if (GpuFlags.EXT_DSA) {
-			EXTDirectStateAccess.glMatrixRotatefEXT(GlStateManager.MAT_MODE, angle, x, y, z);
+			EXTDirectStateAccess.glMatrixRotatefEXT(GlStateTracker.MAT_MODE, angle, x, y, z);
 		} else {
 			GL11.glRotatef(angle, x, y, z);
 		}

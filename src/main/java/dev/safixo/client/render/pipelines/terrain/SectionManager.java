@@ -1,8 +1,13 @@
 package dev.safixo.client.render.pipelines.terrain;
 
+import dev.safixo.client.render.pipelines.terrain.shader.ExpFogProgram;
+import dev.safixo.client.render.pipelines.terrain.shader.LinearFogProgram;
+import dev.safixo.client.render.pipelines.terrain.shader.TerrainProgram;
 import dev.safixo.client.util.ClientChunkListener;
+import dev.safixo.core.hooks.GlStateTracker;
 import it.unimi.dsi.fastutil.longs.*;
 import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
+import jogamp.opengl.GLStateTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.EntityClientPlayerMP;
 import net.minecraft.client.multiplayer.WorldClient;
@@ -22,6 +27,7 @@ import dev.safixo.client.render.pipelines.terrain.region.RegionManager;
 import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
 import dev.safixo.client.util.Direction;
 import dev.safixo.client.util.MathExt;
+import org.lwjgl.opengl.GL11;
 
 import java.util.List;
 import java.util.Set;
@@ -36,7 +42,9 @@ public class SectionManager {
 
 	private static SectionManager INSTANCE;
 
-	private TerrainProgram terrainShader;
+	private LinearFogProgram linearFogProgram;
+	private ExpFogProgram expFogProgram;
+
 	private final BFSCuller bfsCuller = new BFSCuller();
 	private final RegionManager regionManager = new RegionManager();
 	private World worldObj;
@@ -144,8 +152,11 @@ public class SectionManager {
 			return;
 		}
 
-		if (INSTANCE.terrainShader != null) {
-			INSTANCE.terrainShader.delete();
+		if (INSTANCE.expFogProgram != null) {
+			INSTANCE.expFogProgram.delete();
+		}
+		if (INSTANCE.linearFogProgram != null) {
+			INSTANCE.linearFogProgram.delete();
 		}
 
 		INSTANCE.clearRenderer();
@@ -273,22 +284,30 @@ public class SectionManager {
 	public void drawRenderPass(int renderPass) {
 		// Disables fog when option is active.
 		boolean noFog = false;
+		boolean expFog = GlStateTracker.FOG_MODE == GL11.GL_EXP;
+		boolean linearFog = GlStateTracker.FOG_MODE == GL11.GL_LINEAR;
 
-		if (this.terrainShader == null) {
-			this.terrainShader = new TerrainProgram();
+		TerrainProgram terrainShader;
+
+		if (expFog && this.expFogProgram == null) {
+			this.expFogProgram = new ExpFogProgram();
+		} else if (linearFog && this.linearFogProgram == null) {
+			this.linearFogProgram = new LinearFogProgram();
 		}
 
+		terrainShader = expFog ? this.expFogProgram : this.linearFogProgram;
+
 		if (!this.lastEvent && Keyboard.getEventKey() == Keyboard.KEY_ADD) {
-			this.terrainShader.compile();
+			terrainShader.compile();
 		}
 
 		this.lastEvent = Keyboard.getEventKey() == Keyboard.KEY_ADD;
 
-		this.terrainShader.useProgram();
-		this.terrainShader.setupUniforms(noFog);
+		terrainShader.useProgram();
+		terrainShader.setupUniforms(noFog);
 
-		this.regionManager.drawAllRegions(this.terrainShader, this.bfsCuller.bfsQueue, this.camera, renderPass);
-		this.terrainShader.disableProgram();
+		this.regionManager.drawAllRegions(terrainShader, this.bfsCuller.bfsQueue, this.camera, renderPass);
+		terrainShader.disableProgram();
 	}
 
 	boolean lastEvent = false;

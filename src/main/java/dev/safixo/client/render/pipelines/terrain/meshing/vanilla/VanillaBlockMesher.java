@@ -3,6 +3,7 @@ package dev.safixo.client.render.pipelines.terrain.meshing.vanilla;
 import dev.safixo.client.render.pipelines.terrain.meshing.FullBlockMesher;
 import dev.safixo.client.render.pipelines.terrain.meshing.ModelColorizer;
 import dev.safixo.client.render.pipelines.terrain.meshing.data.FacingRender;
+import dev.safixo.client.util.AtlasSpriteUnsafe;
 import dev.safixo.client.util.Direction;
 import dev.safixo.client.util.data.PrimitivesFlags;
 import net.minecraft.block.Block;
@@ -18,6 +19,7 @@ import static dev.safixo.client.util.ColorBGRManager.*;
 import static dev.safixo.client.util.Direction.*;
 import static dev.safixo.client.util.Direction.EAST;
 
+@SuppressWarnings("unused") // asm redirected.
 public class VanillaBlockMesher {
 	private static final float[] UVS = new float[4];
 
@@ -27,7 +29,6 @@ public class VanillaBlockMesher {
 	private static final int[] LIGHT = new int[4];
 	private static final int[] AO = new int[4];
 
-	@SuppressWarnings("unused") // asm redirected.
 	public static boolean renderStandardBlock(RenderBlocks render, Block block, int x, int y, int z) {
 		return renderStandardBlock(render, render.blockAccess, block, BOUNDS, x, y, z);
 	}
@@ -59,7 +60,8 @@ public class VanillaBlockMesher {
 			? block.colorMultiplier(blocks.blockAccess, x, y, z)
 			: 0xFF_FF_FF_FF;
 
-		int flag = ModelHelper.processModel(blocks, BOUNDS);
+		boolean ao = Minecraft.isAmbientOcclusionEnabled();
+		int flag = ModelHelper.processModel(blocks, BOUNDS, blocks.partialRenderBounds && ao);
 
 		byte[] uvRotate = ROTATIONS;
 		uvRotate[Direction.DOWN] = (byte) blocks.uvRotateBottom;
@@ -69,8 +71,6 @@ public class VanillaBlockMesher {
 		uvRotate[Direction.WEST] = (byte) blocks.uvRotateNorth;
 		uvRotate[Direction.EAST] = (byte) blocks.uvRotateSouth;
 
-		boolean ao = Minecraft.isAmbientOcclusionEnabled();
-
 		for (int dir = 0; dir < Direction.COUNT; dir++) {
 			if ((drawSet & (1 << dir)) == 0) {
 				continue;
@@ -78,21 +78,25 @@ public class VanillaBlockMesher {
 
 			int dirColor;
 
-			if (color != 0xFFFFFF && block.blockID != Block.grass.blockID || dir == UP) {
+			if (color != 0xFFFFFF && block != Block.grass || dir == UP) {
 				dirColor = multiplyColor(color, FullBlockMesher.SHADE_FULL_FACTOR[dir]);
 			} else {
 				dirColor = FullBlockMesher.SHADE_FULL_COLOR[dir];
 			}
 
-			FacingRender face = FACE_RENDER[dir];
 			Icon currentTex = blocks.overrideBlockTexture != null ? blocks.overrideBlockTexture : block.getBlockTexture(cache, x, y, z, dir);
 
-			// TODO: The methods names are incorrect and misleading, fix it.
-			UVS[0] = currentTex.getInterpolatedU(face.minUInd(bounds));
-			UVS[1] = currentTex.getInterpolatedV(face.maxUInd(bounds));
+			float minU = AtlasSpriteUnsafe.minU(currentTex);
+			float minV = AtlasSpriteUnsafe.minV(currentTex);
+			float maxU = AtlasSpriteUnsafe.maxU(currentTex) - minU;
+			float maxV = AtlasSpriteUnsafe.maxV(currentTex) - minV;
+			FacingRender face = FACE_RENDER[dir];
 
-			UVS[2] = currentTex.getInterpolatedU(face.minVInd(bounds));
-			UVS[3] = currentTex.getInterpolatedV(face.maxVInd(bounds));
+			// TODO: The methods names are incorrect and misleading, fix it.
+			UVS[0] = minU + maxU * face.minUInd(bounds);
+			UVS[1] = minV + maxV * face.maxUInd(bounds);
+			UVS[2] = minU + maxU * face.minVInd(bounds);
+			UVS[3] = minV + maxV * face.maxVInd(bounds);
 
 			int uvRotation = uvRotate[dir];
 
@@ -117,10 +121,10 @@ public class VanillaBlockMesher {
 		int uv2 = face.uvData[uvRotate + 2];
 		int uv3 = face.uvData[uvRotate + 3];
 
-		bufferVertex(tes, face, bounds, 0, x, y, z, uvs[uv0 & 0xFFFF], uvs[uv0 >> 16], color, lightMap);
-		bufferVertex(tes, face, bounds, 1, x, y, z, uvs[uv1 & 0xFFFF], uvs[uv1 >> 16], color, lightMap);
-		bufferVertex(tes, face, bounds, 2, x, y, z, uvs[uv2 & 0xFFFF], uvs[uv2 >> 16], color, lightMap);
-		bufferVertex(tes, face, bounds, 3, x, y, z, uvs[uv3 & 0xFFFF], uvs[uv3 >> 16], color, lightMap);
+		bufferVertex(tes, face, bounds, 0, x, y, z, uvs[uv0 & 0xFF], uvs[uv0 >>> 8], color, lightMap);
+		bufferVertex(tes, face, bounds, 1, x, y, z, uvs[uv1 & 0xFF], uvs[uv1 >>> 8], color, lightMap);
+		bufferVertex(tes, face, bounds, 2, x, y, z, uvs[uv2 & 0xFF], uvs[uv2 >>> 8], color, lightMap);
+		bufferVertex(tes, face, bounds, 3, x, y, z, uvs[uv3 & 0xFF], uvs[uv3 >>> 8], color, lightMap);
 	}
 
 	public static void renderQuadYesAmbient(Tessellator tes, FacingRender face, IBlockAccess cache, float[] bounds,
@@ -134,10 +138,10 @@ public class VanillaBlockMesher {
 		int uv2 = face.uvData[uvRotate + 2];
 		int uv3 = face.uvData[uvRotate + 3];
 
-		bufferVertex(tes, face, bounds, 0, x, y, z, uvs[uv0 & 0xFFFF], uvs[uv0 >> 16], multiplyColor(color, AO[0]), LIGHT[0]);
-		bufferVertex(tes, face, bounds, 1, x, y, z, uvs[uv1 & 0xFFFF], uvs[uv1 >> 16], multiplyColor(color, AO[1]), LIGHT[1]);
-		bufferVertex(tes, face, bounds, 2, x, y, z, uvs[uv2 & 0xFFFF], uvs[uv2 >> 16], multiplyColor(color, AO[2]), LIGHT[2]);
-		bufferVertex(tes, face, bounds, 3, x, y, z, uvs[uv3 & 0xFFFF], uvs[uv3 >> 16], multiplyColor(color, AO[3]), LIGHT[3]);
+		bufferVertex(tes, face, bounds, 0, x, y, z, uvs[uv0 & 0xFF], uvs[uv0 >>> 8], multiplyColor(color, AO[0]), LIGHT[0]);
+		bufferVertex(tes, face, bounds, 1, x, y, z, uvs[uv1 & 0xFF], uvs[uv1 >>> 8], multiplyColor(color, AO[1]), LIGHT[1]);
+		bufferVertex(tes, face, bounds, 2, x, y, z, uvs[uv2 & 0xFF], uvs[uv2 >>> 8], multiplyColor(color, AO[2]), LIGHT[2]);
+		bufferVertex(tes, face, bounds, 3, x, y, z, uvs[uv3 & 0xFF], uvs[uv3 >>> 8], multiplyColor(color, AO[3]), LIGHT[3]);
 	}
 
 	public static void bufferVertex(Tessellator tes, FacingRender face, float[] bounds, int vertInd,
@@ -241,13 +245,13 @@ public class VanillaBlockMesher {
 		NEG_Z.setBoundsTex(MAX_X, MIN_X, -MIN_Y, -MAX_Y);
 		NEG_Z.setTexInd(1, 2, 3, 0);
 
-		NEG_X.processCornersDir();
-		POS_X.processCornersDir();
+		NEG_X.processCornersDir(WEST);
+		POS_X.processCornersDir(EAST);
 
-		NEG_Z.processCornersDir();
-		POS_Z.processCornersDir();
+		NEG_Z.processCornersDir(NORTH);
+		POS_Z.processCornersDir(SOUTH);
 
-		NEG_Y.processCornersDir();
-		POS_Y.processCornersDir();
+		NEG_Y.processCornersDir(DOWN);
+		POS_Y.processCornersDir(UP);
 	}
 }

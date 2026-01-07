@@ -1,7 +1,7 @@
 package dev.safixo.client.render.pipelines.cloud;
 
 import dev.safixo.client.render.gfx.shader.GlProgram;
-import dev.safixo.core.hooks.GlStateManager;
+import dev.safixo.core.hooks.GlStateTracker;
 import org.lwjgl.opengl.GL20;
 
 public class CloudProgram extends GlProgram {
@@ -22,7 +22,7 @@ public class CloudProgram extends GlProgram {
 
 	public void uploadUniforms(int distance, float r, float g, float b) {
 		GL20.glUniform1f(this.u_CloudEnd, distance);
-		GL20.glUniform4f(this.u_FogColor, GlStateManager.FOG_COLOR_R * r, GlStateManager.FOG_COLOR_G * g, GlStateManager.FOG_COLOR_B * b, 0.0f);
+		GL20.glUniform4f(this.u_FogColor, GlStateTracker.FOG_COLOR_R * r, GlStateTracker.FOG_COLOR_G * g, GlStateTracker.FOG_COLOR_B * b, 0.0f);
 		GL20.glUniform3f(this.u_CloudColor, r, g, b);
 	}
 

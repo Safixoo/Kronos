@@ -17,7 +17,7 @@ uniform mat4 u_ModelViewMat;
 uniform sampler2D u_LightTex;
 
 const float POSITION_SCALE = 1u << 20u;
-const float RADIUS = 0.5;
+const float RADIUS = 0.2;
 
 const float REGION_SIZE_X = 128u + RADIUS * 2;
 const float REGION_SIZE_Y = 128u + RADIUS * 2;

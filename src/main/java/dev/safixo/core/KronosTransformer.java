@@ -115,12 +115,12 @@ public class KronosTransformer implements IClassTransformer {
 				//  in meshing which is stupid slow thanks to Forge.
 			case ACTIVE_RENDER_INFO:
 				// TODO: this is not even verified to help even, to avoid this mess the best option is to backport
-				//  Angelica's ASM GlStateManager or hooking to the matrices setup which is ugly.
+				//  Angelica's ASM GlStateTracker or hooking to the matrices setup which is ugly.
 		}
 
 		fillStateMachineFunctions();
 
-		if (!transformedName.equals("dev.safixo.core.hooks.GlStateManager") && !transformedName.equals("dev.safixo.core.hooks.GLFunctions")) {
+		if (!transformedName.equals("dev.safixo.core.hooks.GlStateTracker") && !transformedName.equals("dev.safixo.core.hooks.GLFunctions")) {
 			redirectGlCalls(reference);
 		}
 
@@ -241,7 +241,7 @@ public class KronosTransformer implements IClassTransformer {
 
 					if (m.owner.contains("lwjgl")) {
 						if (FUNCTION_NAMES.contains(m.name)) {
-							m.owner = "dev/safixo/core/hooks/GlStateManager";
+							m.owner = "dev/safixo/core/hooks/GlStateTracker";
 							shouldReplace = true;
 						}
 					}

@@ -24,55 +24,24 @@ public class ModelHelper {
 
 	public static final int SIZE = 7;
 
-	/**
-	 * Behaves just as a quad from a full voxel block.
-	 */
-	public static final int FULLY_ALIGNED_QUAD = 0b001;
-	/**
-	 * The quad doesn't fill the entire volume, can't map the vertices
-	 * lighting directly from the corners as it's corners are not the same
-	 * as full block ones.
-	 */
-	public static final int PARTIAL_QUAD = 0b010;
-	/**
-	 * Is not fully aligned to the grid, although their volume could be
-	 * aligned to the one from a full quad, i.e. it can be full quad that was
-	 * translated and no longer is aligned to the grid.
-	 */
-	public static final int PARALLEL_QUAD = 0b100;
-
-	public static int processModel(RenderBlocks blocks, float[] bounds) {
+	public static int processModel(RenderBlocks blocks, float[] bounds, boolean partial) {
 		bounds[MIN_Y] = (float) (blocks.renderMinY);
-		bounds[MIN_Z] = (float) (blocks.renderMinZ);
-		bounds[MIN_X] = (float) (blocks.renderMinX);
-
 		bounds[MAX_Y] = (float) (blocks.renderMaxY);
+
+		bounds[MIN_Z] = (float) (blocks.renderMinZ);
 		bounds[MAX_Z] = (float) (blocks.renderMaxZ);
+
+		bounds[MIN_X] = (float) (blocks.renderMinX);
 		bounds[MAX_X] = (float) (blocks.renderMaxX);
 
-		boolean minY = lossyEqual(blocks.renderMinY, 0.0f);
-		boolean maxY = lossyEqual(blocks.renderMaxY, 1.0f);
+		if (!partial) {
+			return 0b0;
+		}
 
 		int flag = 0;
-
-		if (minY || maxY) {
-			flag |= 0b111100;
-		}
-
-		boolean minX = lossyEqual(blocks.renderMinX, 0.0f);
-		boolean maxX = lossyEqual(blocks.renderMaxX, 1.0f);
-
-		if (minX || maxX) {
-			flag |= 0b001111;
-		}
-
-		boolean minZ = lossyEqual(blocks.renderMinZ, 0.0f);
-		boolean maxZ = lossyEqual(blocks.renderMaxZ, 1.0f);
-
-		if (minZ || maxZ) {
-			flag |= 0b110011;
-		}
-
+		flag |= blocks.renderMinY >= 0.025f || blocks.renderMaxY <= 0.975f ? 0b111100 : 0;
+		flag |= blocks.renderMinX >= 0.025f || blocks.renderMaxX <= 0.975f ? 0b001111 : 0;
+		flag |= blocks.renderMinZ >= 0.025f || blocks.renderMaxZ <= 0.975f ? 0b110011 : 0;
 		return flag;
 	}
 
@@ -84,7 +53,7 @@ public class ModelHelper {
 			return solidBlock; // 0b1
 		}
 
-		return cache.getLightBrightnessForSkyBlocks(x, y, z, Block.lightValue[blockId]) << 4;
+		return cache.getLightBrightnessForSkyBlocks(x, y, z, 0) << 4;
 	}
 
 	public static int getBlockCacheLazily(IBlockAccess cache, int x, int y, int z) {

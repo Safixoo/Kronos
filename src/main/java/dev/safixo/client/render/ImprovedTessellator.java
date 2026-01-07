@@ -1,13 +1,11 @@
 package dev.safixo.client.render;
 
-import com.sun.tools.jdi.PrimitiveValueImpl;
 import dev.safixo.client.render.gfx.buffer.GlVertexBuffer;
 import dev.safixo.client.render.gfx.vertex.GlVertexArrayObject;
-import dev.safixo.client.render.vertex.VertexWriter;
 import dev.safixo.client.util.data.PrimitivesFlags;
 import dev.safixo.client.util.memory.NativeBuffer;
 import dev.safixo.client.util.memory.UnsafeUtil;
-import dev.safixo.core.hooks.GlStateManager;
+import dev.safixo.core.hooks.GlStateTracker;
 import dev.safixo.core.hooks.TessellatorHook;
 import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.Tessellator;
@@ -90,30 +88,30 @@ public class ImprovedTessellator extends Tessellator {
 		GlVertexArrayObject.bindVertexArray(vertexArray);
 		this.vertexBuffer.bind();
 
-		GlStateManager.glEnableClientStateDirect(GL11.GL_VERTEX_ARRAY);
+		GlStateTracker.glEnableClientStateDirect(GL11.GL_VERTEX_ARRAY);
 		GL11.glVertexPointer(3, GL11.GL_FLOAT, stride, 0);
 
 		int offset = UNDEFINED_FORMAT;
 
 		if ((flags & VERTEX_UV) != 0) {
-			GlStateManager.glEnableClientStateDirect(GL11.GL_TEXTURE_COORD_ARRAY);
+			GlStateTracker.glEnableClientStateDirect(GL11.GL_TEXTURE_COORD_ARRAY);
 			GL11.glTexCoordPointer(2, GL11.GL_FLOAT, stride, offset);
 			offset += 8;
 		}
 		if ((flags & VERTEX_COLOR) != 0) {
-			GlStateManager.glEnableClientStateDirect(GL11.GL_COLOR_ARRAY);
+			GlStateTracker.glEnableClientStateDirect(GL11.GL_COLOR_ARRAY);
 			GL11.glColorPointer(4, GL11.GL_UNSIGNED_BYTE, stride, offset);
 			offset += 4;
 		}
 		if ((flags & VERTEX_NORMAL) != 0) {
-			GlStateManager.glEnableClientStateDirect(GL11.GL_NORMAL_ARRAY);
+			GlStateTracker.glEnableClientStateDirect(GL11.GL_NORMAL_ARRAY);
 			GL11.glNormalPointer(GL11.GL_BYTE, stride, offset);
 			offset += 4;
 		}
 		if ((flags & VERTEX_LIGHT) != 0) {
 			GL13.glClientActiveTexture(OpenGlHelper.lightmapTexUnit);
 
-			GlStateManager.glEnableClientStateDirect(GL11.GL_TEXTURE_COORD_ARRAY);
+			GlStateTracker.glEnableClientStateDirect(GL11.GL_TEXTURE_COORD_ARRAY);
 			GL11.glTexCoordPointer(2, GL11.GL_SHORT, stride, offset);
 			offset += 4;
 		}
@@ -122,17 +120,17 @@ public class ImprovedTessellator extends Tessellator {
 		GlVertexArrayObject.bindVertexArray(0);
 
 		if ((flags & VERTEX_LIGHT) != 0) {
-			GlStateManager.glDisableClientStateDirect(GL11.GL_TEXTURE_COORD_ARRAY);
+			GlStateTracker.glDisableClientStateDirect(GL11.GL_TEXTURE_COORD_ARRAY);
 			GL13.glClientActiveTexture(OpenGlHelper.defaultTexUnit);
 		}
 		if ((flags & VERTEX_NORMAL) != 0) {
-			GlStateManager.glDisableClientStateDirect(GL11.GL_NORMAL_ARRAY);
+			GlStateTracker.glDisableClientStateDirect(GL11.GL_NORMAL_ARRAY);
 		}
 		if ((flags & VERTEX_COLOR) != 0) {
-			GlStateManager.glDisableClientStateDirect(GL11.GL_COLOR_ARRAY);
+			GlStateTracker.glDisableClientStateDirect(GL11.GL_COLOR_ARRAY);
 		}
 		if ((flags & VERTEX_UV) != 0) {
-			GlStateManager.glDisableClientStateDirect(GL11.GL_TEXTURE_COORD_ARRAY);
+			GlStateTracker.glDisableClientStateDirect(GL11.GL_TEXTURE_COORD_ARRAY);
 		}
 
 		VERTEX_ARRAYS[flags] = vertexArray | offset << 24;

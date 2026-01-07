@@ -1,6 +1,6 @@
 package dev.safixo.client.render.pipelines.terrain.region;
 
-import dev.safixo.client.render.pipelines.terrain.TerrainProgram;
+import dev.safixo.client.render.pipelines.terrain.shader.TerrainProgram;
 import dev.safixo.client.util.memory.NativeBuffer;
 import dev.safixo.client.util.memory.UnsafeUtil;
 import org.lwjgl.opengl.*;
@@ -448,10 +448,8 @@ public class RegionRender {
 	public static void addIndirectCommand(long indirectPtr, int drawCount, int first, int count) {
 		long ptr = indirectPtr + (drawCount << 4);
 
-		UnsafeUtil.memPutInt(ptr + 0, count);
-		UnsafeUtil.memPutInt(ptr + 4, 1);
-		UnsafeUtil.memPutInt(ptr + 8, first);
-		UnsafeUtil.memPutInt(ptr + 12, 0);
+		UnsafeUtil.memPutLong(ptr + 0, count | (1L << 32L));
+		UnsafeUtil.memPutLong(ptr + 8, first);
 	}
 
 	private int prepareTranslucentBatch(int regionIndex, int translucentBit, int drawCount) {

@@ -69,25 +69,25 @@ public class FullBlockMesher {
 			uvs[3] = tex.getMaxV();
 
 			if (ambient) {
-				renderFace(render, tex, dir, cache, x, y, z, blockColor, overlayColor);
+				renderFace(render, tex, cache, x, y, z, blockColor, overlayColor);
 			} else {
 				renderFaceNoSmooth(render, dir, cache, x, y, z, blockColor);
 			}
 		}
 	}
 
-	public static void renderFace(FacingRender facing, Icon tex, int dir, SectionCache cache, int x, int y, int z, int blockColor, int overlayColor) {
-		int p1X = facing.aoCornerX0;
-		int p1Y = facing.aoCornerY0;
-		int p1Z = facing.aoCornerZ0;
+	public static void renderFace(FacingRender face, Icon tex, SectionCache cache, int x, int y, int z, int blockColor, int overlayColor) {
+		int p1X = face.aoCornerX0;
+		int p1Y = face.aoCornerY0;
+		int p1Z = face.aoCornerZ0;
 
-		int p2X = facing.aoCornerX1;
-		int p2Y = facing.aoCornerY1;
-		int p2Z = facing.aoCornerZ1;
+		int p2X = face.aoCornerX1;
+		int p2Y = face.aoCornerY1;
+		int p2Z = face.aoCornerZ1;
 
-		int dirX = x + x(dir);
-		int dirY = y + y(dir);
-		int dirZ = z + z(dir);
+		int dirX = x + face.dirX;
+		int dirY = y + face.dirY;
+		int dirZ = z + face.dirZ;
 
 		int posZ = getBlockCached(cache, dirX + p2X, dirY + p2Y, dirZ + p2Z);
 		int negZ = getBlockCached(cache, dirX - p2X, dirY - p2Y, dirZ - p2Z);
@@ -114,10 +114,10 @@ public class FullBlockMesher {
 		int lightNP = ModelHelper.fullFace(posZ | negX) == 0 ? ModelHelper.light(cache, dirX - pd12X, dirY - pd12Y, dirZ - pd12Z, cornerNP) : 0;
 		int lightNN = ModelHelper.fullFace(negZ | negX) == 0 ? ModelHelper.light(cache, dirX - p12X, dirY - p12Y, dirZ - p12Z, cornerNN) : 0;
 
-		int shade0 = ModelHelper.ao(posZ, posX, cornerPP);
-		int shade1 = ModelHelper.ao(negZ, posX, cornerPN);
-		int shade2 = ModelHelper.ao(negZ, negX, cornerNN);
-		int shade3 = ModelHelper.ao(posZ, negX, cornerNP);
+		int ao0 = ModelHelper.ao(posZ, posX, cornerPP);
+		int ao1 = ModelHelper.ao(negZ, posX, cornerPN);
+		int ao2 = ModelHelper.ao(negZ, negX, cornerNN);
+		int ao3 = ModelHelper.ao(posZ, negX, cornerNP);
 
 		int lightMap = cache.getLightBrightnessForSkyBlocks(dirX, dirY, dirZ, 0);
 
@@ -132,15 +132,15 @@ public class FullBlockMesher {
 		int light2 = ModelHelper.avg(ModelHelper.avg(lightNN, lightMap), ModelHelper.avg(lightNZ, lightNX)); // 2 vertex
 		int light3 = ModelHelper.avg(ModelHelper.avg(lightNP, lightMap), ModelHelper.avg(lightNX, lightPZ)); // 3 vertex
 
-		int uv0 = facing.uvData[0];
-		int uv1 = facing.uvData[1];
-		int uv2 = facing.uvData[2];
-		int uv3 = facing.uvData[3];
+		int uv0 = face.uvData[0];
+		int uv1 = face.uvData[1];
+		int uv2 = face.uvData[2];
+		int uv3 = face.uvData[3];
 
-		int color0 = ColorBGRManager.multiplyColor(blockColor, shade0);
-		int color1 = ColorBGRManager.multiplyColor(blockColor, shade1);
-		int color2 = ColorBGRManager.multiplyColor(blockColor, shade2);
-		int color3 = ColorBGRManager.multiplyColor(blockColor, shade3);
+		int color0 = ColorBGRManager.multiplyColor(blockColor, ao0);
+		int color1 = ColorBGRManager.multiplyColor(blockColor, ao1);
+		int color2 = ColorBGRManager.multiplyColor(blockColor, ao2);
+		int color3 = ColorBGRManager.multiplyColor(blockColor, ao3);
 
 		x &= RegionRender.BLOCK_BITS_X;
 		y &= RegionRender.BLOCK_BITS_Y;
@@ -153,34 +153,34 @@ public class FullBlockMesher {
 		float[] texUv = TEX_UVS;
 
 		if (flip) {
-			addVertex(writer, facing, 0, x, y, z, texUv[uv0 & 0xFFFF], texUv[uv0 >>> 16], color0, light0);
-			addVertex(writer, facing, 1, x, y, z, texUv[uv1 & 0xFFFF], texUv[uv1 >>> 16], color1, light1);
-			addVertex(writer, facing, 2, x, y, z, texUv[uv2 & 0xFFFF], texUv[uv2 >>> 16], color2, light2);
-			addVertex(writer, facing, 3, x, y, z, texUv[uv3 & 0xFFFF], texUv[uv3 >>> 16], color3, light3);
+			addVertex(writer, face, 0, x, y, z, texUv[uv0 & 0xFF], texUv[uv0 >>> 8], color0, light0);
+			addVertex(writer, face, 1, x, y, z, texUv[uv1 & 0xFF], texUv[uv1 >>> 8], color1, light1);
+			addVertex(writer, face, 2, x, y, z, texUv[uv2 & 0xFF], texUv[uv2 >>> 8], color2, light2);
+			addVertex(writer, face, 3, x, y, z, texUv[uv3 & 0xFF], texUv[uv3 >>> 8], color3, light3);
 		} else {
-			addVertex(writer, facing, 3, x, y, z, texUv[uv3 & 0xFFFF], texUv[uv3 >>> 16], color3, light3);
-			addVertex(writer, facing, 0, x, y, z, texUv[uv0 & 0xFFFF], texUv[uv0 >>> 16], color0, light0);
-			addVertex(writer, facing, 1, x, y, z, texUv[uv1 & 0xFFFF], texUv[uv1 >>> 16], color1, light1);
-			addVertex(writer, facing, 2, x, y, z, texUv[uv2 & 0xFFFF], texUv[uv2 >>> 16], color2, light2);
+			addVertex(writer, face, 3, x, y, z, texUv[uv3 & 0xFF], texUv[uv3 >>> 8], color3, light3);
+			addVertex(writer, face, 0, x, y, z, texUv[uv0 & 0xFF], texUv[uv0 >>> 8], color0, light0);
+			addVertex(writer, face, 1, x, y, z, texUv[uv1 & 0xFF], texUv[uv1 >>> 8], color1, light1);
+			addVertex(writer, face, 2, x, y, z, texUv[uv2 & 0xFF], texUv[uv2 >>> 8], color2, light2);
 		}
 
 		if (tex == SIDE_GRASS_NON_OVERLAY) {
 			texUv = OVERLAY_UVS;
-			color0 = ColorBGRManager.multiplyColor(overlayColor, shade0);
-			color1 = ColorBGRManager.multiplyColor(overlayColor, shade1);
-			color2 = ColorBGRManager.multiplyColor(overlayColor, shade2);
-			color3 = ColorBGRManager.multiplyColor(overlayColor, shade3);
+			color0 = ColorBGRManager.multiplyColor(overlayColor, ao0);
+			color1 = ColorBGRManager.multiplyColor(overlayColor, ao1);
+			color2 = ColorBGRManager.multiplyColor(overlayColor, ao2);
+			color3 = ColorBGRManager.multiplyColor(overlayColor, ao3);
 
 			if (flip) {
-				addVertex(writer, facing, 0, x, y, z, texUv[uv0 & 0xFFFF], texUv[uv0 >>> 16], color0, light0);
-				addVertex(writer, facing, 1, x, y, z, texUv[uv1 & 0xFFFF], texUv[uv1 >>> 16], color1, light1);
-				addVertex(writer, facing, 2, x, y, z, texUv[uv2 & 0xFFFF], texUv[uv2 >>> 16], color2, light2);
-				addVertex(writer, facing, 3, x, y, z, texUv[uv3 & 0xFFFF], texUv[uv3 >>> 16], color3, light3);
+				addVertex(writer, face, 0, x, y, z, texUv[uv0 & 0xFF], texUv[uv0 >>> 8], color0, light0);
+				addVertex(writer, face, 1, x, y, z, texUv[uv1 & 0xFF], texUv[uv1 >>> 8], color1, light1);
+				addVertex(writer, face, 2, x, y, z, texUv[uv2 & 0xFF], texUv[uv2 >>> 8], color2, light2);
+				addVertex(writer, face, 3, x, y, z, texUv[uv3 & 0xFF], texUv[uv3 >>> 8], color3, light3);
 			} else {
-				addVertex(writer, facing, 3, x, y, z, texUv[uv3 & 0xFFFF], texUv[uv3 >>> 16], color3, light3);
-				addVertex(writer, facing, 0, x, y, z, texUv[uv0 & 0xFFFF], texUv[uv0 >>> 16], color0, light0);
-				addVertex(writer, facing, 1, x, y, z, texUv[uv1 & 0xFFFF], texUv[uv1 >>> 16], color1, light1);
-				addVertex(writer, facing, 2, x, y, z, texUv[uv2 & 0xFFFF], texUv[uv2 >>> 16], color2, light2);
+				addVertex(writer, face, 3, x, y, z, texUv[uv3 & 0xFF], texUv[uv3 >>> 8], color3, light3);
+				addVertex(writer, face, 0, x, y, z, texUv[uv0 & 0xFF], texUv[uv0 >>> 8], color0, light0);
+				addVertex(writer, face, 1, x, y, z, texUv[uv1 & 0xFF], texUv[uv1 >>> 8], color1, light1);
+				addVertex(writer, face, 2, x, y, z, texUv[uv2 & 0xFF], texUv[uv2 >>> 8], color2, light2);
 			}
 		}
 	}
@@ -203,10 +203,10 @@ public class FullBlockMesher {
 		VertexWriter writer = VertexWriter.getCurrentInstance();
 		writer.ensureCapacity(TerrainFormat.STRIDE * 4);
 
-		addVertex(writer, facing, 0, x, y, z, uvs[uv0 & 0xFFFF], uvs[uv0 >> 16], blockColor, lightMap);
-		addVertex(writer, facing, 1, x, y, z, uvs[uv1 & 0xFFFF], uvs[uv1 >> 16], blockColor, lightMap);
-		addVertex(writer, facing, 2, x, y, z, uvs[uv2 & 0xFFFF], uvs[uv2 >> 16], blockColor, lightMap);
-		addVertex(writer, facing, 3, x, y, z, uvs[uv3 & 0xFFFF], uvs[uv3 >> 16], blockColor, lightMap);
+		addVertex(writer, facing, 0, x, y, z, uvs[uv0 & 0xFF], uvs[uv0 >>> 8], blockColor, lightMap);
+		addVertex(writer, facing, 1, x, y, z, uvs[uv1 & 0xFF], uvs[uv1 >>> 8], blockColor, lightMap);
+		addVertex(writer, facing, 2, x, y, z, uvs[uv2 & 0xFF], uvs[uv2 >>> 8], blockColor, lightMap);
+		addVertex(writer, facing, 3, x, y, z, uvs[uv3 & 0xFF], uvs[uv3 >>> 8], blockColor, lightMap);
 	}
 
 	private static void addVertex(VertexWriter writer, FacingRender facing, int vertInd, int x, int y, int z, float u, float v, int color, int lightMap) {
@@ -340,44 +340,44 @@ public class FullBlockMesher {
 
 		POS_X.aoCorner0 = NEG_Y_DIR;
 		POS_X.aoCorner1 = POS_Z_DIR;
-		POS_X.quadVerts[0] = createVec3i(1 , 0, 1);
-		POS_X.quadVerts[1] = createVec3i(1 , 0, 0);
-		POS_X.quadVerts[2] = createVec3i(1 , 1, 0);
-		POS_X.quadVerts[3] = createVec3i(1 , 1, 1);
+		POS_X.quadVerts[0] = createVec3i(1, 0, 1);
+		POS_X.quadVerts[1] = createVec3i(1, 0, 0);
+		POS_X.quadVerts[2] = createVec3i(1, 1, 0);
+		POS_X.quadVerts[3] = createVec3i(1, 1, 1);
 		POS_X.setTexInd(1, 2, 3, 0);
 
 		NEG_X.aoCorner0 = POS_Y_DIR;
 		NEG_X.aoCorner1 = POS_Z_DIR;
-		NEG_X.quadVerts[0] = createVec3i(0 , 1, 1);
-		NEG_X.quadVerts[1] = createVec3i(0 , 1, 0);
-		NEG_X.quadVerts[2] = createVec3i(0 , 0, 0);
-		NEG_X.quadVerts[3] = createVec3i(0 , 0, 1);
+		NEG_X.quadVerts[0] = createVec3i(0, 1, 1);
+		NEG_X.quadVerts[1] = createVec3i(0, 1, 0);
+		NEG_X.quadVerts[2] = createVec3i(0, 0, 0);
+		NEG_X.quadVerts[3] = createVec3i(0, 0, 1);
 		NEG_X.setTexInd(3, 0, 1, 2);
 
 		POS_Z.aoCorner0 = NEG_X_DIR;
 		POS_Z.aoCorner1 = POS_Y_DIR;
-		POS_Z.quadVerts[0] = createVec3i(0, 1, 1 );
-		POS_Z.quadVerts[1] = createVec3i(0, 0, 1 );
-		POS_Z.quadVerts[2] = createVec3i(1, 0, 1 );
-		POS_Z.quadVerts[3] = createVec3i(1, 1, 1 );
+		POS_Z.quadVerts[0] = createVec3i(0, 1, 1);
+		POS_Z.quadVerts[1] = createVec3i(0, 0, 1);
+		POS_Z.quadVerts[2] = createVec3i(1, 0, 1);
+		POS_Z.quadVerts[3] = createVec3i(1, 1, 1);
 		POS_Z.setTexInd(0, 1, 2, 3);
 
 		NEG_Z.aoCorner0 = POS_Y_DIR;
 		NEG_Z.aoCorner1 = NEG_X_DIR;
 		NEG_Z.quadVerts[0] = createVec3i(0, 1, 0);
-		NEG_Z.quadVerts[1] = createVec3i(1, 1, 0 );
-		NEG_Z.quadVerts[2] = createVec3i(1, 0, 0 );
-		NEG_Z.quadVerts[3] = createVec3i(0, 0, 0 );
+		NEG_Z.quadVerts[1] = createVec3i(1, 1, 0);
+		NEG_Z.quadVerts[2] = createVec3i(1, 0, 0);
+		NEG_Z.quadVerts[3] = createVec3i(0, 0, 0);
 		NEG_Z.setTexInd(3, 0, 1, 2);
 
-		NEG_X.processCornersDir();
-		POS_X.processCornersDir();
+		NEG_X.processCornersDir(WEST);
+		POS_X.processCornersDir(EAST);
 
-		NEG_Z.processCornersDir();
-		POS_Z.processCornersDir();
+		NEG_Z.processCornersDir(NORTH);
+		POS_Z.processCornersDir(SOUTH);
 
-		NEG_Y.processCornersDir();
-		POS_Y.processCornersDir();
+		NEG_Y.processCornersDir(DOWN);
+		POS_Y.processCornersDir(UP);
 
 		for (int i = 0; i < Direction.COUNT; i++) {
 			SHADE_FULL_COLOR[i] = ColorBGRManager.multiplyColor(0xFF_FF_FF, SIDE_LIGHT_MULTIPLIER[i]);
@@ -386,6 +386,6 @@ public class FullBlockMesher {
 	}
 
 	private static int compactId(int u, int v) {
-		return u | v << 16;
+		return u | v << 8;
 	}
 }
