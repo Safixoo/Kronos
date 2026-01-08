@@ -103,7 +103,7 @@ public class ModelLighter {
 
 			long sum = la0 + la1 + la2 + la3;
 
-			light[i] = (int) (sum >>> 16);
+			light[i] = (int) (sum >>> 16) & 0xF000F0;
 			ao[i] =    (int) (sum >>> 48);
 		}
 	}

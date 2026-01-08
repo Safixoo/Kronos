@@ -209,11 +209,13 @@ public class FullBlockMesher {
 		addVertex(writer, facing, 3, x, y, z, uvs[uv3 & 0xFF], uvs[uv3 >>> 8], blockColor, lightMap);
 	}
 
-	private static void addVertex(VertexWriter writer, FacingRender facing, int vertInd, int x, int y, int z, float u, float v, int color, int lightMap) {
-		Vector3i vertOff = facing.quadVerts[vertInd];
-		int relX = x + vertOff.x;
-		int relY = y + vertOff.y;
-		int relZ = z + vertOff.z;
+	private static void addVertex(VertexWriter writer, FacingRender face, int vertInd, int x, int y, int z, float u, float v, int color, int lightMap) {
+		int vertOff = (int) (face.quadVert >>> (9 * vertInd));
+		int relX = x + (vertOff & 0b111);
+		vertOff >>>= 3;
+		int relY = y + (vertOff & 0b111);
+		vertOff >>>= 3;
+		int relZ = z + (vertOff & 0b111);
 
 		long ptr = writer.getTotalOffset();
 
@@ -324,50 +326,50 @@ public class FullBlockMesher {
 
 		NEG_Y.aoCorner0 = NEG_X_DIR;
 		NEG_Y.aoCorner1 = POS_Z_DIR;
-		NEG_Y.quadVerts[0] = createVec3i(0, 0, 1);
-		NEG_Y.quadVerts[1] = createVec3i(0, 0, 0);
-		NEG_Y.quadVerts[2] = createVec3i(1, 0, 0);
-		NEG_Y.quadVerts[3] = createVec3i(1, 0, 1);
+		NEG_Y.setQuadVerts(0, createVec3i(0, 0, 1));
+		NEG_Y.setQuadVerts(1, createVec3i(0, 0, 0));
+		NEG_Y.setQuadVerts(2, createVec3i(1, 0, 0));
+		NEG_Y.setQuadVerts(3, createVec3i(1, 0, 1));
 		NEG_Y.setTexInd(0, 1, 2, 3);
 
 		POS_Y.aoCorner0 = POS_X_DIR;
 		POS_Y.aoCorner1 = POS_Z_DIR;
-		POS_Y.quadVerts[0] = createVec3i(1, 1, 1);
-		POS_Y.quadVerts[1] = createVec3i(1, 1, 0);
-		POS_Y.quadVerts[2] = createVec3i(0, 1, 0);
-		POS_Y.quadVerts[3] = createVec3i(0, 1, 1);
+		POS_Y.setQuadVerts(0, createVec3i(1, 1, 1));
+		POS_Y.setQuadVerts(1, createVec3i(1, 1, 0));
+		POS_Y.setQuadVerts(2, createVec3i(0, 1, 0));
+		POS_Y.setQuadVerts(3, createVec3i(0, 1, 1));
 		POS_Y.setTexInd(2, 3, 0, 1);
 
 		POS_X.aoCorner0 = NEG_Y_DIR;
 		POS_X.aoCorner1 = POS_Z_DIR;
-		POS_X.quadVerts[0] = createVec3i(1, 0, 1);
-		POS_X.quadVerts[1] = createVec3i(1, 0, 0);
-		POS_X.quadVerts[2] = createVec3i(1, 1, 0);
-		POS_X.quadVerts[3] = createVec3i(1, 1, 1);
+		POS_X.setQuadVerts(0, createVec3i(1, 0, 1));
+		POS_X.setQuadVerts(1, createVec3i(1, 0, 0));
+		POS_X.setQuadVerts(2, createVec3i(1, 1, 0));
+		POS_X.setQuadVerts(3, createVec3i(1, 1, 1));
 		POS_X.setTexInd(1, 2, 3, 0);
 
 		NEG_X.aoCorner0 = POS_Y_DIR;
 		NEG_X.aoCorner1 = POS_Z_DIR;
-		NEG_X.quadVerts[0] = createVec3i(0, 1, 1);
-		NEG_X.quadVerts[1] = createVec3i(0, 1, 0);
-		NEG_X.quadVerts[2] = createVec3i(0, 0, 0);
-		NEG_X.quadVerts[3] = createVec3i(0, 0, 1);
+		NEG_X.setQuadVerts(0, createVec3i(0, 1, 1));
+		NEG_X.setQuadVerts(1, createVec3i(0, 1, 0));
+		NEG_X.setQuadVerts(2, createVec3i(0, 0, 0));
+		NEG_X.setQuadVerts(3, createVec3i(0, 0, 1));
 		NEG_X.setTexInd(3, 0, 1, 2);
 
 		POS_Z.aoCorner0 = NEG_X_DIR;
 		POS_Z.aoCorner1 = POS_Y_DIR;
-		POS_Z.quadVerts[0] = createVec3i(0, 1, 1);
-		POS_Z.quadVerts[1] = createVec3i(0, 0, 1);
-		POS_Z.quadVerts[2] = createVec3i(1, 0, 1);
-		POS_Z.quadVerts[3] = createVec3i(1, 1, 1);
+		POS_Z.setQuadVerts(0, createVec3i(0, 1, 1));
+		POS_Z.setQuadVerts(1, createVec3i(0, 0, 1));
+		POS_Z.setQuadVerts(2, createVec3i(1, 0, 1));
+		POS_Z.setQuadVerts(3, createVec3i(1, 1, 1));
 		POS_Z.setTexInd(0, 1, 2, 3);
 
 		NEG_Z.aoCorner0 = POS_Y_DIR;
 		NEG_Z.aoCorner1 = NEG_X_DIR;
-		NEG_Z.quadVerts[0] = createVec3i(0, 1, 0);
-		NEG_Z.quadVerts[1] = createVec3i(1, 1, 0);
-		NEG_Z.quadVerts[2] = createVec3i(1, 0, 0);
-		NEG_Z.quadVerts[3] = createVec3i(0, 0, 0);
+		NEG_Z.setQuadVerts(0, createVec3i(0, 1, 0));
+		NEG_Z.setQuadVerts(1, createVec3i(1, 1, 0));
+		NEG_Z.setQuadVerts(2, createVec3i(1, 0, 0));
+		NEG_Z.setQuadVerts(3, createVec3i(0, 0, 0));
 		NEG_Z.setTexInd(3, 0, 1, 2);
 
 		NEG_X.processCornersDir(WEST);

@@ -146,10 +146,12 @@ public class VanillaBlockMesher {
 
 	public static void bufferVertex(Tessellator tes, FacingRender face, float[] bounds, int vertInd,
 									int x, int y, int z, float u, float v, int color, int lightMap) {
-		Vector3i vertOff = face.quadVerts[vertInd];
-		float relX = x + bounds[vertOff.x];
-		float relY = y + bounds[vertOff.y];
-		float relZ = z + bounds[vertOff.z];
+		int vertOff = (int) (face.quadVert >>> (9 * vertInd));
+		float relX = x + bounds[vertOff & 0b111];
+		vertOff >>= 3;
+		float relY = y + bounds[vertOff & 0b111];
+		vertOff >>= 3;
+		float relZ = z + bounds[vertOff & 0b111];
 
 		tes.setColorOpaque_I(color);
 		tes.setBrightness(lightMap);
@@ -193,55 +195,55 @@ public class VanillaBlockMesher {
 	static {
 		NEG_Y.aoCorner0 = NEG_X_DIR;
 		NEG_Y.aoCorner1 = POS_Z_DIR;
-		NEG_Y.quadVerts[0] = createVec3i(MIN_X, MIN_Y, MAX_Z);
-		NEG_Y.quadVerts[1] = createVec3i(MIN_X, MIN_Y, MIN_Z);
-		NEG_Y.quadVerts[2] = createVec3i(MAX_X, MIN_Y, MIN_Z);
-		NEG_Y.quadVerts[3] = createVec3i(MAX_X, MIN_Y, MAX_Z);
+		NEG_Y.setQuadVerts(0, createVec3i(MIN_X, MIN_Y, MAX_Z));
+		NEG_Y.setQuadVerts(1, createVec3i(MIN_X, MIN_Y, MIN_Z));
+		NEG_Y.setQuadVerts(2, createVec3i(MAX_X, MIN_Y, MIN_Z));
+		NEG_Y.setQuadVerts(3, createVec3i(MAX_X, MIN_Y, MAX_Z));
 		NEG_Y.setBoundsTex(MIN_X, MAX_X, MIN_Z, MAX_Z);
 		NEG_Y.setTexInd(2, 3, 0, 1);
 
 		POS_Y.aoCorner0 = POS_X_DIR;
 		POS_Y.aoCorner1 = POS_Z_DIR;
-		POS_Y.quadVerts[0] = createVec3i(MAX_X, MAX_Y, MAX_Z);
-		POS_Y.quadVerts[1] = createVec3i(MAX_X, MAX_Y, MIN_Z);
-		POS_Y.quadVerts[2] = createVec3i(MIN_X, MAX_Y, MIN_Z);
-		POS_Y.quadVerts[3] = createVec3i(MIN_X, MAX_Y, MAX_Z);
+		POS_Y.setQuadVerts(0, createVec3i(MAX_X, MAX_Y, MAX_Z));
+		POS_Y.setQuadVerts(1, createVec3i(MAX_X, MAX_Y, MIN_Z));
+		POS_Y.setQuadVerts(2, createVec3i(MIN_X, MAX_Y, MIN_Z));
+		POS_Y.setQuadVerts(3, createVec3i(MIN_X, MAX_Y, MAX_Z));
 		POS_Y.setBoundsTex(MIN_X, MAX_X, MIN_Z, MAX_Z);
 		POS_Y.setTexInd(2, 3, 0, 1);
 
 		POS_X.aoCorner0 = NEG_Y_DIR;
 		POS_X.aoCorner1 = POS_Z_DIR;
-		POS_X.quadVerts[0] = createVec3i(MAX_X, MIN_Y, MAX_Z);
-		POS_X.quadVerts[1] = createVec3i(MAX_X, MIN_Y, MIN_Z);
-		POS_X.quadVerts[2] = createVec3i(MAX_X, MAX_Y, MIN_Z);
-		POS_X.quadVerts[3] = createVec3i(MAX_X, MAX_Y, MAX_Z);
+		POS_X.setQuadVerts(0, createVec3i(MAX_X, MIN_Y, MAX_Z));
+		POS_X.setQuadVerts(1, createVec3i(MAX_X, MIN_Y, MIN_Z));
+		POS_X.setQuadVerts(2, createVec3i(MAX_X, MAX_Y, MIN_Z));
+		POS_X.setQuadVerts(3, createVec3i(MAX_X, MAX_Y, MAX_Z));
 		POS_X.setBoundsTex(MAX_Z, MIN_Z, -MIN_Y, -MAX_Y);
 		POS_X.setTexInd(3, 0, 1, 2);
 
 		NEG_X.aoCorner0 = POS_Y_DIR;
 		NEG_X.aoCorner1 = POS_Z_DIR;
-		NEG_X.quadVerts[0] = createVec3i(MIN_X, MAX_Y, MAX_Z);
-		NEG_X.quadVerts[1] = createVec3i(MIN_X, MAX_Y, MIN_Z);
-		NEG_X.quadVerts[2] = createVec3i(MIN_X, MIN_Y, MIN_Z);
-		NEG_X.quadVerts[3] = createVec3i(MIN_X, MIN_Y, MAX_Z);
+		NEG_X.setQuadVerts(0, createVec3i(MIN_X, MAX_Y, MAX_Z));
+		NEG_X.setQuadVerts(1, createVec3i(MIN_X, MAX_Y, MIN_Z));
+		NEG_X.setQuadVerts(2, createVec3i(MIN_X, MIN_Y, MIN_Z));
+		NEG_X.setQuadVerts(3, createVec3i(MIN_X, MIN_Y, MAX_Z));
 		NEG_X.setBoundsTex(MAX_Z, MIN_Z, -MIN_Y, -MAX_Y);
 		NEG_X.setTexInd(1, 2, 3, 0);
 
 		POS_Z.aoCorner0 = NEG_X_DIR;
 		POS_Z.aoCorner1 = POS_Y_DIR;
-		POS_Z.quadVerts[0] = createVec3i(MIN_X, MAX_Y, MAX_Z);
-		POS_Z.quadVerts[1] = createVec3i(MIN_X, MIN_Y, MAX_Z);
-		POS_Z.quadVerts[2] = createVec3i(MAX_X, MIN_Y, MAX_Z);
-		POS_Z.quadVerts[3] = createVec3i(MAX_X, MAX_Y, MAX_Z);
+		POS_Z.setQuadVerts(0, createVec3i(MIN_X, MAX_Y, MAX_Z));
+		POS_Z.setQuadVerts(1, createVec3i(MIN_X, MIN_Y, MAX_Z));
+		POS_Z.setQuadVerts(2, createVec3i(MAX_X, MIN_Y, MAX_Z));
+		POS_Z.setQuadVerts(3, createVec3i(MAX_X, MAX_Y, MAX_Z));
 		POS_Z.setBoundsTex(MAX_X, MIN_X, -MIN_Y, -MAX_Y);
 		POS_Z.setTexInd(2, 3, 0, 1);
 
 		NEG_Z.aoCorner0 = POS_Y_DIR;
 		NEG_Z.aoCorner1 = NEG_X_DIR;
-		NEG_Z.quadVerts[0] = createVec3i(MIN_X, MAX_Y, MIN_Z);
-		NEG_Z.quadVerts[1] = createVec3i(MAX_X, MAX_Y, MIN_Z);
-		NEG_Z.quadVerts[2] = createVec3i(MAX_X, MIN_Y, MIN_Z);
-		NEG_Z.quadVerts[3] = createVec3i(MIN_X, MIN_Y, MIN_Z);
+		NEG_Z.setQuadVerts(0, createVec3i(MIN_X, MAX_Y, MIN_Z));
+		NEG_Z.setQuadVerts(1, createVec3i(MAX_X, MAX_Y, MIN_Z));
+		NEG_Z.setQuadVerts(2, createVec3i(MAX_X, MIN_Y, MIN_Z));
+		NEG_Z.setQuadVerts(3, createVec3i(MIN_X, MIN_Y, MIN_Z));
 		NEG_Z.setBoundsTex(MAX_X, MIN_X, -MIN_Y, -MAX_Y);
 		NEG_Z.setTexInd(1, 2, 3, 0);
 

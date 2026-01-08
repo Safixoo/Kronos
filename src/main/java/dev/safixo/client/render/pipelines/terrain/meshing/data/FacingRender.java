@@ -12,7 +12,8 @@ public class FacingRender {
 	public byte aoCornerX0, aoCornerY0, aoCornerZ0;
 	public byte aoCornerX1, aoCornerY1, aoCornerZ1;
 
-	public final Vector3i[] quadVerts = new Vector3i[4];
+	// (0b111 * 3) * 4
+	public long quadVert;
 	public final short[] uvData = new short[16];
 	public byte[] weightIndices = new byte[8];
 	public byte bA, bB, bC, bD;
@@ -21,6 +22,11 @@ public class FacingRender {
 	public int aoCorner1;
 
 	public static final byte[] ROTATION = new byte[4 * Direction.COUNT];
+
+	public void setQuadVerts(int ind, Vector3i verts) {
+		long data = (verts.x & 0b111) | (verts.y & 0b111) << 3 | (verts.z & 0b111) << 6;
+		this.quadVert |= data << (9 * ind);
+	}
 
 	// Emulates RenderBlocks rotation flags, somehow it works for the vanilla models that I tried, although
 	// this was made kind of by reversing the behaviour and not trying to mimic the psychotic code used in
@@ -53,26 +59,29 @@ public class FacingRender {
 
 		for (int i = 0; i < 4; i++) {
 			int ind = i * 2;
-			Vector3i vertOff = this.quadVerts[i];
+			int vertIndices = (int) (this.quadVert >>> (9 * i));
+			int x = (vertIndices >>> 0) & 0b111;
+			int y = (vertIndices >>> 3) & 0b111;
+			int z = (vertIndices >>> 6) & 0b111;
 
 			if (dir == DOWN) {
-				this.weightIndices[ind] = (byte) vertOff.z;
-				this.weightIndices[ind + 1] = (byte) -vertOff.x;
+				this.weightIndices[ind] = (byte) z;
+				this.weightIndices[ind + 1] = (byte) -x;
 			} else if (dir == UP) {
-				this.weightIndices[ind] = (byte) vertOff.z;
-				this.weightIndices[ind + 1] = (byte) vertOff.x;
+				this.weightIndices[ind] = (byte) z;
+				this.weightIndices[ind + 1] = (byte) x;
 			} else if (dir == NORTH) {
-				this.weightIndices[ind] = (byte) -vertOff.x;
-				this.weightIndices[ind + 1] = (byte) vertOff.y;
+				this.weightIndices[ind] = (byte) -x;
+				this.weightIndices[ind + 1] = (byte) y;
 			} else if (dir == SOUTH) {
-				this.weightIndices[ind] = (byte) vertOff.y;
-				this.weightIndices[ind + 1] = (byte) -vertOff.x;
+				this.weightIndices[ind] = (byte) y;
+				this.weightIndices[ind + 1] = (byte) -x;
 			} else if (dir == WEST) {
-				this.weightIndices[ind] = (byte) vertOff.z;
-				this.weightIndices[ind + 1] = (byte) vertOff.y;
+				this.weightIndices[ind] = (byte) z;
+				this.weightIndices[ind + 1] = (byte) y;
 			} else {
-				this.weightIndices[ind] = (byte) vertOff.z;
-				this.weightIndices[ind + 1] = (byte) -vertOff.y;
+				this.weightIndices[ind] = (byte) z;
+				this.weightIndices[ind + 1] = (byte) -y;
 			}
 		}
 	}
