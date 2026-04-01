@@ -278,11 +278,11 @@ public class ImprovedTessellator extends Tessellator {
 			return;
 		}
 
+		this.flags |= VERTEX_UV;
+
 		if (this.offset + 64 >= this.capacity) {
 			this.resize();
 		}
-
-		this.flags |= VERTEX_UV;
 
 		if (this.lastFlag != this.flags && ((this.vertices & 3) == 0 || this.drawMode != GL11.GL_QUADS)) {
 			this.flushState();
@@ -295,14 +295,14 @@ public class ImprovedTessellator extends Tessellator {
 		float yP = (float) y + this.yOff;
 		float zP = (float) z + this.zOff;
 
-		UnsafeUtil.memPutFloat(ptr + 0, xP);
-		UnsafeUtil.memPutFloat(ptr + 4, yP);
-		UnsafeUtil.memPutFloat(ptr + 8, zP);
+		long writePtr = ptr;
 
-		UnsafeUtil.memPutFloat(ptr + 12, (float) u);
-		UnsafeUtil.memPutFloat(ptr + 16, (float) v);
+		UnsafeUtil.memPutFloat(writePtr, xP); writePtr += 4;
+		UnsafeUtil.memPutFloat(writePtr, yP); writePtr += 4;
+		UnsafeUtil.memPutFloat(writePtr, zP); writePtr += 4;
 
-		long writePtr = ptr + 20;
+		UnsafeUtil.memPutFloat(writePtr, (float) u); writePtr += 4;
+		UnsafeUtil.memPutFloat(writePtr, (float) v); writePtr += 4;
 
 		if ((flags & VERTEX_COLOR) != 0) {
 			UnsafeUtil.memPutInt(writePtr, this.color);
@@ -332,7 +332,7 @@ public class ImprovedTessellator extends Tessellator {
 			this.resize();
 		}
 
-		if (this.lastFlag != this.flags && (this.vertices & 3) == 0) {
+		if (this.lastFlag != this.flags && ((this.vertices & 3) == 0 || this.drawMode != GL11.GL_QUADS)) {
 			this.flushState();
 		}
 
@@ -343,11 +343,13 @@ public class ImprovedTessellator extends Tessellator {
 		float yP = (float) y + this.yOff;
 		float zP = (float) z + this.zOff;
 
-		UnsafeUtil.memPutFloat(ptr + 0, xP);
-		UnsafeUtil.memPutFloat(ptr + 4, yP);
-		UnsafeUtil.memPutFloat(ptr + 8, zP);
+		long writePtr = ptr;
 
-		long writePtr = ptr + UNDEFINED_FORMAT + (flags & VERTEX_UV);
+		UnsafeUtil.memPutFloat(writePtr, xP); writePtr += 4;
+		UnsafeUtil.memPutFloat(writePtr, yP); writePtr += 4;
+		UnsafeUtil.memPutFloat(writePtr, zP); writePtr += 4;
+
+		writePtr += (flags & VERTEX_UV);
 
 		if ((flags & VERTEX_COLOR) != 0) {
 			UnsafeUtil.memPutInt(writePtr, this.color);

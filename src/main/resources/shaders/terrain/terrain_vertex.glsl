@@ -1,10 +1,11 @@
 #version 330
 #extension GL_ARB_gpu_shader5 : enable
 
-in uvec2 a_Position;
-in vec2 a_Uv;
-in vec3 a_Color;
-in uint a_Lightmap;
+// Not specifying the layout seems to break 7520U APU.
+layout(location = 0) in uvec2 a_Position;
+layout(location = 1) in vec2 a_Uv;
+layout(location = 2) in vec3 a_Color;
+layout(location = 3) in uint a_Lightmap;
 
 out vec3 v_Color;
 out vec2 v_TextureUv;
@@ -16,12 +17,12 @@ uniform mat4 u_ModelViewMat;
 
 uniform sampler2D u_LightTex;
 
-const float POSITION_SCALE = 1u << 20u;
-const float RADIUS = 0.2;
+const float POSITION_SCALE = float(1u << 20u);
+const float RADIUS = 0.5;
 
-const float REGION_SIZE_X = 128u + RADIUS * 2;
-const float REGION_SIZE_Y = 128u + RADIUS * 2;
-const float REGION_SIZE_Z = 128u + RADIUS * 2;
+const float REGION_SIZE_X = 128.0 + RADIUS * 2;
+const float REGION_SIZE_Y = 128.0 + RADIUS * 2;
+const float REGION_SIZE_Z = 128.0 + RADIUS * 2;
 
 const float REGION_SCALE_X = REGION_SIZE_X / POSITION_SCALE;
 const float REGION_SCALE_Y = REGION_SIZE_Y / POSITION_SCALE;

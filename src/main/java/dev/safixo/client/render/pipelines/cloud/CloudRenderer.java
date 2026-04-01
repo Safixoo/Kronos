@@ -2,6 +2,7 @@ package dev.safixo.client.render.pipelines.cloud;
 
 import dev.safixo.client.render.gfx.buffer.GlVertexBuffer;
 import dev.safixo.client.render.gfx.util.RenderBuffer;
+import dev.safixo.client.render.pipelines.terrain.cull.FrustumCuller;
 import dev.safixo.client.util.ColorBGRManager;
 import dev.safixo.client.util.Direction;
 import dev.safixo.client.util.MathExt;
@@ -9,35 +10,42 @@ import dev.safixo.client.render.vertex.VertexWriter;
 import dev.safixo.client.render.vertex.DefaultVertexFormats;
 import dev.safixo.client.render.vertex.writers.CloudFormat;
 import dev.safixo.core.HookUtils;
+import dev.safixo.core.hooks.GlStateTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.WorldClient;
 import net.minecraft.client.renderer.RenderGlobal;
 import net.minecraft.client.resources.Resource;
 import net.minecraft.client.resources.ResourceManager;
+import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.Vec3;
 import net.minecraft.world.World;
 import org.lwjgl.opengl.*;
 
 import javax.imageio.ImageIO;
+import javax.swing.plaf.basic.BasicInternalFrameTitlePane;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Field;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
+
+import static dev.safixo.client.render.vertex.writers.CloudFormat.*;
+import static dev.safixo.client.util.ColorBGRManager.multiplyColor;
 
 public class CloudRenderer {
 	private static final int CLOUD_STRIDE = DefaultVertexFormats.CLOUD_FORMAT.getStride();
 
 	private static final ResourceLocation CLOUD_TEXTURE = new ResourceLocation("textures/environment/clouds.png");
-	private static final int CLOUD_WIDTH = 12;
+	public static final int CLOUD_WIDTH = 12;
 	private static final int CLOUD_HEIGHT = 4;
 
 	private static final int CLOUD_BOTTOM_FACTOR = ColorBGRManager.normToFactor(0.7F);
 	private static final int CLOUD_X_FACTOR = ColorBGRManager.normToFactor(0.9F);
 	private static final int CLOUD_Z_FACTOR = ColorBGRManager.normToFactor(0.8F);
 
-	private static final byte[] VISIBLE_BITS = new byte[256 * 256];
 	private static final int[] CLOUD_TEX_COLOR = new int[256 * 256];
 
 	private static final float CULL_Y = CLOUD_HEIGHT + 1;
@@ -53,7 +61,39 @@ public class CloudRenderer {
 	private static final int ZP = Direction.SOUTH;
 	private static final int ZN = Direction.NORTH;
 
-	private static void setupRender(World world, ResourceManager manager, int distance, float partialTick) {
+	public static final int MAX_CELL_DISTANCE = 50;
+
+	private static final short[] CELL_XY_DATA = new short[MathExt.square(MAX_CELL_DISTANCE * 2 + 1)];
+	private static final int[] MAX_DISTANCE_INDEX = new int[MAX_CELL_DISTANCE + 1];
+
+	private static final int EMPTY_CLOUD = 0;
+
+	static {
+		Arrays.fill(MAX_DISTANCE_INDEX, Integer.MIN_VALUE);
+		ArrayList<Short> indices = new ArrayList<>();
+
+		for (int cellX = -MAX_CELL_DISTANCE; cellX <= MAX_CELL_DISTANCE; cellX++) {
+			for (int cellZ = -MAX_CELL_DISTANCE; cellZ <= MAX_CELL_DISTANCE; cellZ++) {
+				indices.add((short) ((cellX + MAX_CELL_DISTANCE) << 8 | (cellZ + MAX_CELL_DISTANCE) & 0xFF));
+			}
+		}
+
+		Short[] cellIndicesBoxed = indices.toArray(new Short[0]);
+		Arrays.sort(cellIndicesBoxed, new ShortDistanceComp());
+
+		for (int i = 0; i < indices.size(); i++) {
+			short cellData = cellIndicesBoxed[i];
+
+			CELL_XY_DATA[i] = cellData;
+			int cellZ = (cellData & 0xFF) - MAX_CELL_DISTANCE;
+			int cellX = (cellData >>> 8) - MAX_CELL_DISTANCE;
+
+			int distance = Math.min(MAX_CELL_DISTANCE, (int) (0.5D + Math.sqrt(MathExt.square(cellX) + MathExt.square(cellZ))));
+			MAX_DISTANCE_INDEX[distance] = Math.max(MAX_DISTANCE_INDEX[distance], i);
+		}
+	}
+
+	private static void setupRender(World world, ResourceManager manager, float partialTick, int distance) {
 		Vec3 cloudColor = world.getCloudColour(partialTick);
 		float r = (float) cloudColor.xCoord;
 		float g = (float) cloudColor.yCoord;
@@ -66,7 +106,7 @@ public class CloudRenderer {
 		writer.setVertexFormat(DefaultVertexFormats.CLOUD_FORMAT);
 
 		if (VERTEX_BUFFER == null) {
-			VERTEX_BUFFER = new RenderBuffer(DefaultVertexFormats.CLOUD_FORMAT, CLOUD_STRIDE * 16384, GL15.GL_STREAM_DRAW);
+			VERTEX_BUFFER = new RenderBuffer(DefaultVertexFormats.CLOUD_FORMAT, 0, GL15.GL_STATIC_DRAW);
 		}
 
 		if (CLOUD_SHADER == null) {
@@ -77,7 +117,7 @@ public class CloudRenderer {
 		}
 
 		CLOUD_SHADER.useProgram();
-		CLOUD_SHADER.uploadUniforms(distance, r, g, b);
+		CLOUD_SHADER.uploadUniforms(r, g, b, distance);
 	}
 
 	private static void clearState(VertexWriter writer) {
@@ -97,20 +137,26 @@ public class CloudRenderer {
 		Minecraft mc = Minecraft.getMinecraft();
 		WorldClient world = mc.theWorld;
 
-		int renderDistanceChunks = 22;
-		int cellDistance = ((renderDistanceChunks + (32 / renderDistanceChunks)) * 16) / CLOUD_WIDTH;
+		int renderDistance = MathExt.getCanonicalRenderDistance(mc.gameSettings);
+		int cellDistance = Math.max((int) (GlStateTracker.FOG_END / CLOUD_WIDTH), (renderDistance * 16) / CLOUD_WIDTH) - 1;
+		cellDistance = Math.min(cellDistance, MAX_CELL_DISTANCE);
 
 		// Prepare for rendering the clouds.
-		CloudRenderer.setupRender(world, mc.getResourceManager(), cellDistance * CLOUD_WIDTH, partialTick);
+		CloudRenderer.setupRender(world, mc.getResourceManager(), partialTick, cellDistance);
 
-		float playerX = (float) (mc.renderViewEntity.prevPosX + (mc.renderViewEntity.posX - mc.renderViewEntity.prevPosX) * partialTick);
-		float playerY = (float) (mc.renderViewEntity.lastTickPosY + (mc.renderViewEntity.posY - mc.renderViewEntity.lastTickPosY) * partialTick);
-		float playerZ = (float) (mc.renderViewEntity.prevPosZ + (mc.renderViewEntity.posZ - mc.renderViewEntity.prevPosZ) * partialTick);
+		EntityLivingBase player = mc.renderViewEntity;
+		float playerX = (float) MathExt.lerp(player.lastTickPosX, player.posX, partialTick);
+		float playerY = (float) MathExt.lerp(player.lastTickPosY, player.posY, partialTick);
+		float playerZ = (float) MathExt.lerp(player.lastTickPosZ, player.posZ, partialTick);
+
+		float cloudHeight = world.provider.getCloudHeight();
+		float viewY = cloudHeight - playerY + 0.33F;
+
+		int maxDistance = (int) (MathExt.square(cellDistance) - MathExt.square(viewY / CLOUD_WIDTH));
+		cellDistance = (int) Math.sqrt(maxDistance);
 
 		int cloudTickCounter = getCloudTickCounter(mc.renderGlobal);
 		double tickPosition = cloudTickCounter + partialTick;
-
-		float viewY = world.provider.getCloudHeight() - playerY + 0.33F;
 
 		double worldX = (playerX + tickPosition * 0.03F) / CLOUD_WIDTH;
 		double worldZ = (playerZ + 3.96F) / CLOUD_WIDTH;
@@ -130,321 +176,221 @@ public class CloudRenderer {
 		VertexWriter writer = VertexWriter.getCurrentInstance();
 		RenderBuffer buffer = VERTEX_BUFFER;
 
-		buffer.bindBuffer(true);
+		FrustumCuller.prepareCloudFrustum(viewY);
 
-		// Build and write cloud geometry.
-		buildGeometry(writer, cellDistance, worldFloorX, worldFloorZ, viewY);
+		// Generate and write the clouds' geometry.
+		buildGeometry(writer, cellDistance, worldFracX, worldFracZ, worldFloorX, worldFloorZ, viewY);
 
-		// Upload geometry.
-		buffer.getVertexBuffer().bufferSubData(writer.getVertexDataNio(), 0, writer.getOffset());
+		// Upload the geometry.
+		buffer.getVertexBuffer().bufferData(writer.getVertexDataNio(), writer.getOffset());
 
-		buffer.bindBuffer(false);
-
-		// Draw clouds.
+		// Draw the clouds.
 		drawClouds(writer.getVertices(), worldFracX, viewY, worldFracZ);
 
 		// Clear the state.
-		CloudRenderer.clearState(writer);
+		clearState(writer);
 	}
 
 	private static void drawClouds(int vertices, float worldFracX, float viewY, float worldFracZ) {
-		GL11.glEnable(GL11.GL_BLEND);
 		GL11.glDisable(GL11.GL_ALPHA_TEST);
+		GL11.glEnable(GL11.GL_BLEND);
 		GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
 
-		CLOUD_SHADER.setOffset(-worldFracX, viewY, -worldFracZ);
-
-		if (Math.abs(viewY) < CULL_Y) {
-			GL11.glDisable(GL11.GL_CULL_FACE);
-		}
-
+		CLOUD_SHADER.setOffset(-worldFracX - MAX_CELL_DISTANCE, viewY, -worldFracZ - MAX_CELL_DISTANCE);
 		VERTEX_BUFFER.bindState(true);
 
 		GlVertexBuffer vertexBuffer = VERTEX_BUFFER.getVertexBuffer();
-
-		// Render depth pre-pass.
-		GL11.glColorMask(false, false, false, false);
-		vertexBuffer.draw(vertices, 0);
-
-		// Render the actual geometry.
-		GL11.glColorMask(true, true, true, true);
 		vertexBuffer.draw(vertices, 0);
 
 		VERTEX_BUFFER.bindState(false);
 
 		GL11.glDisable(GL11.GL_BLEND);
 		GL11.glEnable(GL11.GL_ALPHA_TEST);
-
-		if (Math.abs(viewY) < CULL_Y) {
-			GL11.glEnable(GL11.GL_CULL_FACE);
-		}
 	}
 
-	private static void buildPXPZ(VertexWriter writer, int cloudX, int cloudZ, int color, int visibleMask) {
-		// -X Face
-		if ((visibleMask & (1 << XN)) != 0) {
-			int usedColor = ColorBGRManager.multiplyColor(color, CLOUD_X_FACTOR);
-			addVertex(writer, cloudX, 0, cloudZ + 1, usedColor);
-			addVertex(writer, cloudX, CLOUD_HEIGHT, cloudZ + 1, usedColor);
-			addVertex(writer, cloudX, CLOUD_HEIGHT, cloudZ, usedColor);
-			addVertex(writer, cloudX, 0, cloudZ, usedColor);
-		}
+	private static final float EPSILON = 1E-1F;
 
-		// -Z Face
-		if ((visibleMask & (1 << ZN)) != 0) {
-			int usedColor = ColorBGRManager.multiplyColor(color, CLOUD_Z_FACTOR);
-			addVertex(writer, cloudX, CLOUD_HEIGHT, cloudZ, usedColor);
-			addVertex(writer, cloudX + 1, CLOUD_HEIGHT, cloudZ, usedColor);
-			addVertex(writer, cloudX + 1, 0, cloudZ, usedColor);
-			addVertex(writer, cloudX, 0, cloudZ, usedColor);
-		}
-	}
+	private static void buildGeometry(VertexWriter writer, int cellDistance,
+									  float worldFracX, float worldFracZ,
+									  int worldFloorX, int worldFloorZ, float viewY) {
+		writer.ensureCapacity(CLOUD_STRIDE * 32768);
 
-	private static void buildNXNZ(VertexWriter writer, int cloudX, int cloudZ, int color, int visibleMask) {
-		// +X Face
-		if ((visibleMask & (1 << XP)) != 0) {
-			int usedColor = ColorBGRManager.multiplyColor(color, CLOUD_X_FACTOR);
-			addVertex(writer, cloudX + 1, 0, cloudZ, usedColor);
-			addVertex(writer, cloudX + 1, CLOUD_HEIGHT, cloudZ, usedColor);
-			addVertex(writer, cloudX + 1, CLOUD_HEIGHT, cloudZ + 1, usedColor);
-			addVertex(writer, cloudX + 1, 0, cloudZ + 1, usedColor);
-		}
+		int maxIteration = MAX_DISTANCE_INDEX[cellDistance];
 
-		// +Z Face
-		if ((visibleMask & (1 << ZP)) != 0) {
-			int usedColor = ColorBGRManager.multiplyColor(color, CLOUD_Z_FACTOR);
-			addVertex(writer, cloudX, 0, cloudZ + 1, usedColor);
-			addVertex(writer, cloudX + 1, 0, cloudZ + 1, usedColor);
-			addVertex(writer, cloudX + 1, CLOUD_HEIGHT, cloudZ + 1, usedColor);
-			addVertex(writer, cloudX, CLOUD_HEIGHT, cloudZ + 1, usedColor);
-		}
-	}
+		int startX = (worldFracX < 0.5f ? 0 : 1) + MAX_CELL_DISTANCE;
+		int startZ = (worldFracZ < 0.5f ? 0 : 1) + MAX_CELL_DISTANCE;
 
-	private static void buildNXPZ(VertexWriter writer, int cloudX, int cloudZ, int color, int visibleMask) {
-		// -X Face
-		if ((visibleMask & (1 << XN)) != 0) {
-			int usedColor = ColorBGRManager.multiplyColor(color, CLOUD_X_FACTOR);
-			addVertex(writer, cloudX, 0, cloudZ + 1, usedColor);
-			addVertex(writer, cloudX, CLOUD_HEIGHT, cloudZ + 1, usedColor);
-			addVertex(writer, cloudX, CLOUD_HEIGHT, cloudZ, usedColor);
-			addVertex(writer, cloudX, 0, cloudZ, usedColor);
-		}
+		worldFloorX -= MAX_CELL_DISTANCE;
+		worldFloorZ -= MAX_CELL_DISTANCE;
 
-		// +Z Face
-		if ((visibleMask & (1 << ZP)) != 0) {
-			int usedColor = ColorBGRManager.multiplyColor(color, CLOUD_Z_FACTOR);
-			addVertex(writer, cloudX, 0, cloudZ + 1, usedColor);
-			addVertex(writer, cloudX + 1, 0, cloudZ + 1, usedColor);
-			addVertex(writer, cloudX + 1, CLOUD_HEIGHT, cloudZ + 1, usedColor);
-			addVertex(writer, cloudX, CLOUD_HEIGHT, cloudZ + 1, usedColor);
-		}
-	}
+		int insideCellsInd = -viewY >= EPSILON && -viewY <= CLOUD_HEIGHT + EPSILON ? MAX_DISTANCE_INDEX[1] : -1;
 
-	private static void buildPXNZ(VertexWriter writer, int cloudX, int cloudZ, int color, int visibleMask) {
-		// +X Face
-		if ((visibleMask & (1 << XP)) != 0) {
-			int usedColor = ColorBGRManager.multiplyColor(color, CLOUD_X_FACTOR);
-			addVertex(writer, cloudX + 1, 0, cloudZ, usedColor);
-			addVertex(writer, cloudX + 1, CLOUD_HEIGHT, cloudZ, usedColor);
-			addVertex(writer, cloudX + 1, CLOUD_HEIGHT, cloudZ + 1, usedColor);
-			addVertex(writer, cloudX + 1, 0, cloudZ + 1, usedColor);
-		}
+		for (int i = 0; i <= maxIteration; i++) {
+			int cellData = CELL_XY_DATA[i];
 
-		// -Z Face
-		if ((visibleMask & (1 << ZN)) != 0) {
-			int usedColor = ColorBGRManager.multiplyColor(color, CLOUD_Z_FACTOR);
-			addVertex(writer, cloudX, CLOUD_HEIGHT, cloudZ, usedColor);
-			addVertex(writer, cloudX + 1, CLOUD_HEIGHT, cloudZ, usedColor);
-			addVertex(writer, cloudX + 1, 0, cloudZ, usedColor);
-			addVertex(writer, cloudX, 0, cloudZ, usedColor);
-		}
-	}
+			int cellX = cellData >>> 8;
+			int cellZ = cellData & 0xFF;
 
-	private static void buildNPY(VertexWriter writer, int cloudX, float cloudY, int cloudZ, int color) {
-		// +Y Face
-		if (cloudY < -1) {
-			addVertex(writer, cloudX, CLOUD_HEIGHT, cloudZ + 1, color);
-			addVertex(writer, cloudX + 1, CLOUD_HEIGHT, cloudZ + 1, color);
-			addVertex(writer, cloudX + 1, CLOUD_HEIGHT, cloudZ, color);
-			addVertex(writer, cloudX, CLOUD_HEIGHT, cloudZ, color);
-		} else {
-			int usedColor = ColorBGRManager.multiplyColor(color, CLOUD_BOTTOM_FACTOR);
-			addVertex(writer, cloudX, 0, cloudZ, usedColor);
-			addVertex(writer, cloudX + 1, 0, cloudZ, usedColor);
-			addVertex(writer, cloudX + 1, 0, cloudZ + 1, usedColor);
-			addVertex(writer, cloudX, 0, cloudZ + 1, usedColor);
-		}
-	}
-
-	private static void buildYInverted(VertexWriter writer, int cloudX, float cloudY, int cloudZ, int color) {
-		// -Y Face
-		if (cloudY < -1) {
-			int usedColor = ColorBGRManager.multiplyColor(color, CLOUD_BOTTOM_FACTOR);
-			addVertex(writer, cloudX, 0, cloudZ, usedColor);
-			addVertex(writer, cloudX + 1, 0, cloudZ, usedColor);
-			addVertex(writer, cloudX + 1, 0, cloudZ + 1, usedColor);
-			addVertex(writer, cloudX, 0, cloudZ + 1, usedColor);
-		} else {
-			addVertex(writer, cloudX, CLOUD_HEIGHT, cloudZ + 1, color);
-			addVertex(writer, cloudX + 1, CLOUD_HEIGHT, cloudZ + 1, color);
-			addVertex(writer, cloudX + 1, CLOUD_HEIGHT, cloudZ, color);
-			addVertex(writer, cloudX, CLOUD_HEIGHT, cloudZ, color);
-		}
-	}
-
-	private static void buildGeometry(VertexWriter writer, int cellDistance, int worldFloorX, int worldFloorZ, float viewY) {
-		int maxDistance = (cellDistance * 3) >>> 1;
-		writer.ensureCapacity(CLOUD_STRIDE * 16384 * 4);
-
-		// -+X -+Z
-		for (int cellX = 1; cellX <= cellDistance; cellX++) {
-			for (int cellZ = 1; cellZ <= cellDistance; cellZ++) {
-				int width = (cellX + worldFloorX) & 0xFF;
-				int height = (cellZ + worldFloorZ) & 0xFF;
-				int visibleMask = getCellBits(width, height);
-
-				if (visibleMask == 0 || cellZ + cellX > maxDistance) {
-					continue;
-				}
-				int color = getCloudColor(width, height);
-
-				buildNPY(writer, cellX, viewY, cellZ, color);
-				buildPXPZ(writer, cellX, cellZ, color, visibleMask);
-			}
-		}
-		for (int cellX = -cellDistance; cellX < 0; cellX++) {
-			for (int cellZ = -cellDistance; cellZ < 0; cellZ++) {
-				int width = (cellX + worldFloorX) & 0xFF;
-				int height = (cellZ + worldFloorZ) & 0xFF;
-				int visibleMask = getCellBits(width, height);
-
-				if (visibleMask == 0 || -cellZ - cellX > maxDistance) {
-					continue;
-				}
-				int color = getCloudColor(width, height);
-
-				buildNPY(writer, cellX, viewY, cellZ, color);
-				buildNXNZ(writer, cellX, cellZ, color, visibleMask);
-			}
-		}
-
-		// +-X -+Z
-		for (int cellX = 1; cellX <= cellDistance; cellX++) {
-			for (int cellZ = -cellDistance; cellZ < 0; cellZ++) {
-				int width = (cellX + worldFloorX) & 0xFF;
-				int height = (cellZ + worldFloorZ) & 0xFF;
-				int visibleMask = getCellBits(width, height);
-
-				if (visibleMask == 0 || cellX - cellZ > maxDistance) {
-					continue;
-				}
-				int color = getCloudColor(width, height);
-
-				buildNPY(writer, cellX, viewY, cellZ, color);
-				buildNXPZ(writer, cellX, cellZ, color, visibleMask);
-			}
-		}
-		for (int cellX = -cellDistance; cellX < 0; cellX++) {
-			for (int cellZ = 1; cellZ <= cellDistance; cellZ++) {
-				int width = (cellX + worldFloorX) & 0xFF;
-				int height = (cellZ + worldFloorZ) & 0xFF;
-				int visibleMask = getCellBits(width, height);
-
-				if (visibleMask == 0 || cellZ - cellX > maxDistance) {
-					continue;
-				}
-				int color = getCloudColor(width, height);
-
-				buildNPY(writer, cellX, viewY, cellZ, color);
-				buildPXNZ(writer, cellX, cellZ, color, visibleMask);
-			}
-		}
-
-		for (int cellX = -cellDistance; cellX <= cellDistance; cellX++) {
 			int width = (cellX + worldFloorX) & 0xFF;
-			int visibleMask = getCellBits(width, worldFloorZ & 0xFF);
-
-			if (visibleMask == 0) {
-				continue;
-			}
-			int color = getCloudColor(width, worldFloorZ & 0xFF);
-
-			buildNPY(writer, cellX, viewY, 0, color);
-
-			if (cellX < 0) {
-				buildNXNZ(writer, cellX, 0, color, visibleMask);
-				buildNXPZ(writer, cellX, 0, color, visibleMask);
-			} else {
-				buildPXNZ(writer, cellX, 0, color, visibleMask);
-				buildPXPZ(writer, cellX, 0, color, visibleMask);
-			}
-		}
-
-		for (int cellZ = -cellDistance; cellZ <= cellDistance; cellZ++) {
 			int height = (cellZ + worldFloorZ) & 0xFF;
-			int visibleMask = getCellBits(worldFloorX & 0xFF, height);
+			int color = getCloudColor(width, height);
 
-			if (visibleMask == 0) {
+			if (color == EMPTY_CLOUD || !FrustumCuller.cloudWithinFrustumBounds(cellX, cellZ)) {
 				continue;
 			}
-			int color = getCloudColor(worldFloorX & 0xFF, height);
 
-			if (cellZ != 0) {
-				buildNPY(writer, 0, viewY, cellZ, color);
+			int visibleMask = color >>> 24;
+			long cellVertex = formatPosition(cellX, 0, cellZ);
+
+			if (cellX < startX) {
+				if ((visibleMask & (1 << XP)) != 0) {
+					long ptr = writer.getTotalOffset();
+					long vertex = cellVertex | formatColor(multiplyColor(color, CLOUD_X_FACTOR));
+					// +X Face
+					addVertex(ptr, vertex + formatPosition(1, 0, 0)); ptr += CLOUD_STRIDE;
+					addVertex(ptr, vertex + formatPosition(1, CLOUD_HEIGHT, 0)); ptr += CLOUD_STRIDE;
+					addVertex(ptr, vertex + formatPosition(1, CLOUD_HEIGHT, 1)); ptr += CLOUD_STRIDE;
+					addVertex(ptr, vertex + formatPosition(1, 0, 1));
+					pushQuad(writer);
+				}
+			} else if ((visibleMask & (1 << XN)) != 0) {
+				long ptr = writer.getTotalOffset();
+				long vertex = cellVertex | formatColor(multiplyColor(color, CLOUD_X_FACTOR));
+				// -X Face
+				addVertex(ptr, vertex + formatPosition(0, 0, 1)); ptr += CLOUD_STRIDE;
+				addVertex(ptr, vertex + formatPosition(0, CLOUD_HEIGHT, 1)); ptr += CLOUD_STRIDE;
+				addVertex(ptr, vertex + formatPosition(0, CLOUD_HEIGHT, 0)); ptr += CLOUD_STRIDE;
+				addVertex(ptr, vertex + formatPosition(0, 0, 0));
+				pushQuad(writer);
 			}
 
-			if (cellZ < 0) {
-				buildNXNZ(writer, 0, cellZ, color, visibleMask);
-				buildPXPZ(writer, 0, cellZ, color, visibleMask);
+			if (cellZ < startZ) {
+				if ((visibleMask & (1 << ZP)) != 0) {
+					long ptr = writer.getTotalOffset();
+					long vertex = cellVertex | formatColor(multiplyColor(color, CLOUD_Z_FACTOR));
+					// +Z Face
+					addVertex(ptr, vertex + formatPosition(0, 0, 1)); ptr += CLOUD_STRIDE;
+					addVertex(ptr, vertex + formatPosition(1, 0, 1)); ptr += CLOUD_STRIDE;
+					addVertex(ptr, vertex + formatPosition(1, CLOUD_HEIGHT, 1)); ptr += CLOUD_STRIDE;
+					addVertex(ptr, vertex + formatPosition(0, CLOUD_HEIGHT, 1));
+					pushQuad(writer);
+				}
+			} else if ((visibleMask & (1 << ZN)) != 0) {
+				long ptr = writer.getTotalOffset();
+				long vertex = cellVertex | formatColor(multiplyColor(color, CLOUD_Z_FACTOR));
+				// -Z Face
+				addVertex(ptr, vertex + formatPosition(0, CLOUD_HEIGHT, 0)); ptr += CLOUD_STRIDE;
+				addVertex(ptr, vertex + formatPosition(1, CLOUD_HEIGHT, 0)); ptr += CLOUD_STRIDE;
+				addVertex(ptr, vertex + formatPosition(1, 0, 0)); ptr += CLOUD_STRIDE;
+				addVertex(ptr, vertex + formatPosition(0, 0, 0));
+				pushQuad(writer);
+			}
+
+			long ptr = writer.getTotalOffset();
+
+			if (viewY < -1) {
+				long vertex = cellVertex | formatColor(color);
+				addVertex(ptr, vertex + formatPosition(0, CLOUD_HEIGHT, 1)); ptr += CLOUD_STRIDE;
+				addVertex(ptr, vertex + formatPosition(1, CLOUD_HEIGHT, 1)); ptr += CLOUD_STRIDE;
+				addVertex(ptr, vertex + formatPosition(1, CLOUD_HEIGHT, 0)); ptr += CLOUD_STRIDE;
+				addVertex(ptr, vertex + formatPosition(0, CLOUD_HEIGHT, 0));
 			} else {
-				buildPXPZ(writer, 0, cellZ, color, visibleMask);
-				buildNXPZ(writer, 0, cellZ, color, visibleMask);
+				long vertex = cellVertex | formatColor(multiplyColor(color, CLOUD_BOTTOM_FACTOR));
+				addVertex(ptr, vertex); ptr += CLOUD_STRIDE;
+				addVertex(ptr, vertex + formatPosition(1, 0, 0)); ptr += CLOUD_STRIDE;
+				addVertex(ptr, vertex + formatPosition(1, 0, 1)); ptr += CLOUD_STRIDE;
+				addVertex(ptr, vertex + formatPosition(0, 0, 1));
 			}
-		}
 
-		if (Math.abs(viewY) < CULL_Y) {
-			buildCenterCells(writer, worldFloorX, viewY, worldFloorZ);
-		}
-	}
+			pushQuad(writer);
 
-	private static void buildCenterCells(VertexWriter writer, int worldFloorX, float viewY, int worldFloorZ) {
-		for (int cellZ = -1; cellZ <= 1; cellZ++) {
-			for (int cellX = -1; cellX <= 1; cellX++) {
-				int height = (cellZ + worldFloorZ) & 0xFF;
-				int width = (cellX + worldFloorX) & 0xFF;
-				int color = getCloudColor(width, height);
-
-				if (color == 0) {
-					continue;
-				}
-
-				if (cellX == 0 && cellZ == 0) {
-					buildYInverted(writer, cellX, viewY, cellZ, color);
-					continue;
-				}
-
-				if (Math.abs(cellX + 0.5F) + Math.abs(cellZ + 0.5F) > 2.0F) {
-					continue;
-				}
-
-				buildYInverted(writer, cellX, viewY, cellZ, color);
-
-				int visibleMask = getCellBits(width, height);
-
-				buildNXNZ(writer, cellX, cellZ, color, ~visibleMask);
-				buildPXPZ(writer, cellX, cellZ, color, ~visibleMask);
-				buildPXPZ(writer, cellX, cellZ, color, ~visibleMask);
-				buildNXPZ(writer, cellX, cellZ, color, ~visibleMask);
+			// If were inside a cloud, build its interior geometry.
+			if (i <= insideCellsInd) {
+				buildCenterCells(writer, worldFloorX, worldFloorZ, viewY, i);
 			}
 		}
 	}
 
-	private static int getCellBits(int x, int y) {
-		return VISIBLE_BITS[y | (x << 8)];
+
+	private static void buildCenterCells(VertexWriter writer, int worldFloorX, int worldFloorZ, float viewY, int index) {
+		int cellData = CELL_XY_DATA[index];
+
+		int cellX = cellData >>> 8;
+		int cellZ = cellData & 0xFF;
+
+		int width = (cellX + worldFloorX) & 0xFF;
+		int height = (cellZ + worldFloorZ) & 0xFF;
+		int color = getCloudColor(width, height);
+
+		if (color == EMPTY_CLOUD) {
+			return;
+		}
+
+		long cellVertex = formatPosition(cellX, 0, cellZ);
+		long ptr = writer.getTotalOffset();
+
+		// +Y Face.
+		long vertexYP = cellVertex | formatColor(color);
+		addVertex(ptr, vertexYP + formatPosition(0, CLOUD_HEIGHT, 0)); ptr += CLOUD_STRIDE;
+		addVertex(ptr, vertexYP + formatPosition(1, CLOUD_HEIGHT, 0)); ptr += CLOUD_STRIDE;
+		addVertex(ptr, vertexYP + formatPosition(1, CLOUD_HEIGHT, 1)); ptr += CLOUD_STRIDE;
+		addVertex(ptr, vertexYP + formatPosition(0, CLOUD_HEIGHT, 1)); ptr += CLOUD_STRIDE;
+		// -Y Face.
+		long vertexYN = cellVertex | formatColor(multiplyColor(color, CLOUD_BOTTOM_FACTOR));
+		addVertex(ptr, vertexYN + formatPosition(0, 0, 1)); ptr += CLOUD_STRIDE;
+		addVertex(ptr, vertexYN + formatPosition(1, 0, 1)); ptr += CLOUD_STRIDE;
+		addVertex(ptr, vertexYN + formatPosition(1, 0, 0)); ptr += CLOUD_STRIDE;
+		addVertex(ptr, vertexYN + formatPosition(0, 0, 0)); ptr += CLOUD_STRIDE;
+
+		long vertexZ = cellVertex | formatColor(multiplyColor(color, CLOUD_Z_FACTOR));
+		// -Z Face
+		addVertex(ptr, vertexZ + formatPosition(0, 0, 0)); ptr += CLOUD_STRIDE;
+		addVertex(ptr, vertexZ + formatPosition(1, 0, 0)); ptr += CLOUD_STRIDE;
+		addVertex(ptr, vertexZ + formatPosition(1, CLOUD_HEIGHT, 0)); ptr += CLOUD_STRIDE;
+		addVertex(ptr, vertexZ + formatPosition(0, CLOUD_HEIGHT, 0)); ptr += CLOUD_STRIDE;
+		// +Z Face
+		addVertex(ptr, vertexZ + formatPosition(0, CLOUD_HEIGHT, 1)); ptr += CLOUD_STRIDE;
+		addVertex(ptr, vertexZ + formatPosition(1, CLOUD_HEIGHT, 1)); ptr += CLOUD_STRIDE;
+		addVertex(ptr, vertexZ + formatPosition(1, 0, 1)); ptr += CLOUD_STRIDE;
+		addVertex(ptr, vertexZ + formatPosition(0, 0, 1)); ptr += CLOUD_STRIDE;
+
+		long vertexX = cellVertex | formatColor(multiplyColor(color, CLOUD_X_FACTOR));
+		// +X Face
+		addVertex(ptr, vertexX + formatPosition(1, 0, 1)); ptr += CLOUD_STRIDE;
+		addVertex(ptr, vertexX + formatPosition(1, CLOUD_HEIGHT, 1)); ptr += CLOUD_STRIDE;
+		addVertex(ptr, vertexX + formatPosition(1, CLOUD_HEIGHT, 0)); ptr += CLOUD_STRIDE;
+		addVertex(ptr, vertexX + formatPosition(1, 0, 0)); ptr += CLOUD_STRIDE;
+		// -X Face
+		addVertex(ptr, vertexX + formatPosition(0, 0, 0)); ptr += CLOUD_STRIDE;
+		addVertex(ptr, vertexX + formatPosition(0, CLOUD_HEIGHT, 0)); ptr += CLOUD_STRIDE;
+		addVertex(ptr, vertexX + formatPosition(0, CLOUD_HEIGHT, 1)); ptr += CLOUD_STRIDE;
+		addVertex(ptr, vertexX + formatPosition(0, 0, 1)); ptr += CLOUD_STRIDE;
+
+		if (!(viewY < -1)) {
+			long vertex = cellVertex | formatColor(color);
+			addVertex(ptr, vertex + formatPosition(0, CLOUD_HEIGHT, 1)); ptr += CLOUD_STRIDE;
+			addVertex(ptr, vertex + formatPosition(1, CLOUD_HEIGHT, 1)); ptr += CLOUD_STRIDE;
+			addVertex(ptr, vertex + formatPosition(1, CLOUD_HEIGHT, 0)); ptr += CLOUD_STRIDE;
+			addVertex(ptr, vertex + formatPosition(0, CLOUD_HEIGHT, 0));
+		} else {
+			long vertex = cellVertex | formatColor(multiplyColor(color, CLOUD_BOTTOM_FACTOR));
+			addVertex(ptr, vertex); ptr += CLOUD_STRIDE;
+			addVertex(ptr, vertex + formatPosition(1, 0, 0)); ptr += CLOUD_STRIDE;
+			addVertex(ptr, vertex + formatPosition(1, 0, 1)); ptr += CLOUD_STRIDE;
+			addVertex(ptr, vertex + formatPosition(0, 0, 1));
+		}
+
+		for (int quad = 0; quad < 7; quad++) {
+			pushQuad(writer);
+		}
+	}
+
+	private static int getCloudIndex(int x, int y) {
+		return x << 8 | y;
 	}
 
 	private static int getCloudColor(int x, int y) {
-		return CLOUD_TEX_COLOR[y | (x << 8)];
+		return CLOUD_TEX_COLOR[getCloudIndex(x, y)];
 	}
 
 	private static void processCloudTexture(ResourceManager manager) {
@@ -462,37 +408,56 @@ public class CloudRenderer {
 			throw new RuntimeException("Cloud texture isn't 256x256!, width: " + texture.getWidth() + ", height: " + texture.getHeight());
 		}
 
-		Arrays.fill(VISIBLE_BITS, (byte) 0);
+		int alphaThreshold = 100;
 
 		for (int w = 0; w < 256; w++) {
 			for (int h = 0; h < 256; h++) {
-				int colorInd = h + (w * 256);
+				int colorInd = getCloudIndex(w, h);
 
-				int color = CLOUD_TEX_COLOR[colorInd] = texture.getRGB(w, h);
+				int color = texture.getRGB(w, h);
 				int alpha = color >>> 24;
 
-				if (alpha < 100) {
-					VISIBLE_BITS[colorInd] = 0;
-					CLOUD_TEX_COLOR[colorInd] = 0;
+				if (alpha < alphaThreshold) {
+					CLOUD_TEX_COLOR[colorInd] = EMPTY_CLOUD;
 					continue;
 				}
 
-				VISIBLE_BITS[colorInd] = 0b11;
+				int visibleBits = Direction.UP_BIT | Direction.DOWN_BIT;
 
 				for (int dir = Direction.NORTH; dir < Direction.COUNT; dir++) {
 					int x = Direction.x(dir) + w;
 					int z = Direction.z(dir) + h;
 
-					color = texture.getRGB(x & 0xFF, z & 0xFF);
+					int neighborColor = texture.getRGB(x & 0xFF, z & 0xFF);
+					int neighborAlpha = neighborColor >>> 24;
 
-					VISIBLE_BITS[colorInd] |= (color >>> 24) < 100 ? (byte) (1 << dir) : 0;
+					visibleBits |= neighborAlpha < alphaThreshold ? (1 << dir) : 0;
 				}
+
+				CLOUD_TEX_COLOR[colorInd] = color & 0xFFFFFF | visibleBits << 24;
 			}
 		}
 	}
 
-	private static void addVertex(VertexWriter writer, int x, int y, int z, int color) {
-		CloudFormat.writeCloudVertex(writer.getTotalOffset(), x, y, z, color);
-		writer.addVertexCounter(CLOUD_STRIDE);
+	private static void addVertex(long ptr, long vertex) {
+		writeCloudVertex(ptr, vertex);
+	}
+
+	private static void pushQuad(VertexWriter writer) {
+		writer.offset += CLOUD_STRIDE * 4;
+		writer.vertices += 4;
+	}
+
+	private static class ShortDistanceComp implements Comparator<Short> {
+		@Override
+		public int compare(Short o0, Short o1) {
+			int cellX0 = (o0 & 0xFF) - MAX_CELL_DISTANCE;
+			int cellZ0 = (o0 >>> 8) - MAX_CELL_DISTANCE;
+
+			int cellX1 = (o1 & 0xFF) - MAX_CELL_DISTANCE;
+			int cellZ1 = (o1 >>> 8) - MAX_CELL_DISTANCE;
+
+			return Integer.compare(MathExt.square(cellX0) + MathExt.square(cellZ0), MathExt.square(cellX1) + MathExt.square(cellZ1));
+		}
 	}
 }

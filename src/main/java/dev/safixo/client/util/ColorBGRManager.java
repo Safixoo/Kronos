@@ -49,8 +49,7 @@ public class ColorBGRManager {
 	}
 
 	public static int rgbToBgr(int color) {
-		// (color & 0xFF) << 16 | (color & 0x00FF00) | ((color & 0xFF0000) >> 16)
-		return Integer.reverseBytes(color) >>> 8;
+		return (color & 0xFF) << 16 | (color & 0x00FF00) | ((color & 0xFF0000) >> 16);
 	}
 
 	public static int normToInt(float color) {

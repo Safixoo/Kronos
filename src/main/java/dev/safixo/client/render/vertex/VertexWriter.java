@@ -29,7 +29,8 @@ public class VertexWriter {
 
 	private GlVertexFormat vertexFormat;
 
-	private int offset, vertices;
+	public int offset;
+	public int vertices;
 	public boolean isDrawing = false;
 
 	private static VertexWriter CURRENT_INSTANCE = DEFAULT_INSTANCE;

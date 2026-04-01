@@ -2,6 +2,7 @@ package dev.safixo.client.render.gfx.vertex;
 
 import com.google.common.collect.ImmutableList;
 import dev.safixo.client.render.gfx.vertex.attribute.GlVertexAttribute;
+import dev.safixo.client.render.vertex.DefaultVertexFormats;
 
 public abstract class GlVertexFormat {
 	private final ImmutableList<GlVertexAttribute> vertexProperties;

@@ -3,8 +3,49 @@ package dev.safixo.client.util;
 import dev.safixo.client.render.pipelines.terrain.SectionRender;
 import dev.safixo.client.util.data.CameraData;
 import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
+import dev.safixo.core.HookUtils;
+import dev.safixo.core.hooks.RenderGlobalHook;
+import net.minecraft.client.settings.GameSettings;
 
 public class MathExt {
+	public static int getCanonicalRenderDistance(GameSettings gameSettings) {
+		int realRenderDistance;
+
+		if (!RenderGlobalHook.OPTIFINE_ACTIVE) {
+			// This is more or less the real metric for chunk distance that the game uses.
+			// 0 - Far, 1 - Normal, 2 - Short, 3 - Tiny.
+			// In the future would be productive replace add a bigger slider for render distance,
+			// like optifine.
+			realRenderDistance = ((64 << (3 - gameSettings.renderDistance)) >> 5) + 2;
+		} else {
+			realRenderDistance = (Integer) HookUtils.getFieldObj(gameSettings, "ofRenderDistanceFine", "ofRenderDistanceFine") >> 4;
+		}
+
+		return realRenderDistance;
+	}
+
+	public static int nextPOT(int a) {
+		a--;
+
+		a |= a >> 1;
+		a |= a >> 2;
+		a |= a >> 4;
+		a |= a >> 8;
+		a |= a >> 16;
+
+		a++;
+		return a;
+	}
+
+	public static int floorDiv(int x, int y) {
+		int r = x / y;
+		// if the signs are different and modulo not zero, round down
+		if ((x ^ y) < 0 && (r * y != x)) {
+			r--;
+		}
+		return r;
+	}
+
 	public static float squaredDistanceXYZ(SectionRender render, CameraData cameraData) {
 		float distX = (render.blockX - cameraData.intX + 8) - cameraData.fractX;
 		float distY = (render.blockY - cameraData.intY + 8) - cameraData.fractY;
@@ -129,6 +170,10 @@ public class MathExt {
 	}
 
 	public static float lerp(float start, float end, float t) {
+		return (start + (end - start) * t);
+	}
+
+	public static double lerp(double start, double end, double t) {
 		return (start + (end - start) * t);
 	}
 

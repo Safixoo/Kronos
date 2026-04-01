@@ -1,7 +1,9 @@
 package dev.safixo.client.render.pipelines.terrain.cull;
 
 
+import dev.safixo.client.render.pipelines.cloud.CloudRenderer;
 import org.joml.Matrix4f;
+import org.joml.Vector3fc;
 
 import java.nio.FloatBuffer;
 
@@ -17,6 +19,10 @@ public class FrustumCuller {
 	private static float pyX, pyY, pyZ, pyW;
 
 	private static float nxWG, pxWG, nyWG, pyWG;
+
+	private static int nxWC, pxWC;
+	private static int nxXC, nxZC;
+	private static int pxXC, pxZC;
 
 	/**
 	 * Creates a frustum at the style of JOML, it needs to be normalized to keep as much precision as possible
@@ -115,6 +121,41 @@ public class FrustumCuller {
 		}
 	}
 
+	public static void prepareCloudFrustum(float viewY) {
+		int extraRadius = 9;
+
+		double nxWC = nxWG;
+		nxWC -= (nxX >= 0 ? (CloudRenderer.CLOUD_WIDTH + extraRadius) * nxX : -extraRadius * nxX);
+		nxWC -= viewY * nxY;
+		nxWC -= (nxZ >= 0 ? (CloudRenderer.CLOUD_WIDTH + extraRadius) * nxZ : -extraRadius * nxZ);
+
+		double pxWC = nxWG;
+		pxWC -= pxX >= 0 ? (CloudRenderer.CLOUD_WIDTH + extraRadius) * pxX : -extraRadius * pxX;
+		pxWC -= viewY * pxY;
+		pxWC -= pxZ >= 0 ? (CloudRenderer.CLOUD_WIDTH + extraRadius) * pxZ : -extraRadius * pxZ;
+
+		double nxXC = nxX;
+		double nxZC = nxZ;
+
+		double pxXC = pxX;
+		double pxZC = pxZ;
+
+		nxWC += CloudRenderer.MAX_CELL_DISTANCE * nxXC;
+		nxWC += CloudRenderer.MAX_CELL_DISTANCE * nxZC;
+
+		pxWC += CloudRenderer.MAX_CELL_DISTANCE * pxXC;
+		pxWC += CloudRenderer.MAX_CELL_DISTANCE * pxZC;
+
+		FrustumCuller.nxXC = (int) (nxXC * (1 << 20)) * CloudRenderer.CLOUD_WIDTH;
+		FrustumCuller.nxZC = (int) (nxZC * (1 << 20)) * CloudRenderer.CLOUD_WIDTH;
+
+		FrustumCuller.pxXC = (int) (pxXC * (1 << 20)) * CloudRenderer.CLOUD_WIDTH;
+		FrustumCuller.pxZC = (int) (pxZC * (1 << 20)) * CloudRenderer.CLOUD_WIDTH;
+
+		FrustumCuller.pxWC = (int) (pxWC * (1 << 20)) * CloudRenderer.CLOUD_WIDTH;
+		FrustumCuller.nxWC = (int) (nxWC * (1 << 20)) * CloudRenderer.CLOUD_WIDTH;
+	}
+
 	/**
 	 * Simple JOML testAbb, based on sign of each component pick a corner of the AABB to check, is less precise
 	 * as it takes into account in the wrong way the fract camera position, but should work regardless.
@@ -136,5 +177,9 @@ public class FrustumCuller {
 				pxX * blockX + pxY * blockY + pxZ * blockZ > pxW &&
 				nyX * blockX + nyY * blockY + nyZ * blockZ > nyW &&
 				pyX * blockX + pyY * blockY + pyZ * blockZ > pyW;
+	}
+
+	public static boolean cloudWithinFrustumBounds(int blockX, int blockZ) {
+		return nxXC * blockX + nxZC * blockZ > nxWC && pxXC * blockX + pxZC * blockZ > pxWC;
 	}
 }

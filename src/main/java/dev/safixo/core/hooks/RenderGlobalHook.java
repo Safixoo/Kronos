@@ -5,6 +5,8 @@ import dev.safixo.client.render.gfx.util.GpuFlags;
 import dev.safixo.client.render.pipelines.cloud.CloudRenderer;
 import dev.safixo.client.render.pipelines.terrain.SectionManager;
 import dev.safixo.client.render.vertex.VertexWriter;
+import dev.safixo.client.util.FastLongHashMap;
+import dev.safixo.client.util.MathExt;
 import dev.safixo.client.util.data.PrimitivesFlags;
 import dev.safixo.core.HookUtils;
 import net.minecraft.block.Block;
@@ -75,29 +77,18 @@ public  class RenderGlobalHook {
 
 	// Executed only in the first pass of renderWorld.
 	public static boolean updateRenderers(RenderGlobal renderGlobal, EntityLivingBase player, boolean idk) {
-		double cameraX = player.lastTickPosX + (player.posX - player.lastTickPosX) * PARTIAL_TICK;
-		double cameraY = player.lastTickPosY + (player.posY - player.lastTickPosY) * PARTIAL_TICK;
-		double cameraZ = player.lastTickPosZ + (player.posZ - player.lastTickPosZ) * PARTIAL_TICK;
+		double cameraX = MathExt.lerp(player.lastTickPosX, player.posX, PARTIAL_TICK);
+		double cameraY = MathExt.lerp(player.lastTickPosY, player.posY, PARTIAL_TICK);
+		double cameraZ = MathExt.lerp(player.lastTickPosZ, player.posZ, PARTIAL_TICK);
 
 		Minecraft minecraft = Minecraft.getMinecraft();
-
-		int realRenderDistance;
-
-		if (!OPTIFINE_ACTIVE) {
-			// This is more or less the real metric for chunk distance that the game uses.
-			// 0 - Far, 1 - Normal, 2 - Short, 3 - Tiny.
-			// In the future would be productive replace add a bigger slider for render distance,
-			// like optifine.
-			realRenderDistance = ((64 << (3 - minecraft.gameSettings.renderDistance)) >> 5) + 2;
-		} else {
-			realRenderDistance = (Integer) HookUtils.getFieldObj(minecraft.gameSettings, "ofRenderDistanceFine", "ofRenderDistanceFine") >> 4;
-		}
+		int realRenderDistance = MathExt.getCanonicalRenderDistance(minecraft.gameSettings);
 
 		if (PrimitivesFlags.DEV_ENVIRONMENT) {
-			Minecraft.getMinecraft().thePlayer.capabilities.setFlySpeed(0.25f);
+			minecraft.thePlayer.capabilities.setFlySpeed(0.25f);
 		}
 
-		MANAGER.update(Minecraft.getMinecraft().theWorld, realRenderDistance, cameraX, cameraY, cameraZ, SHOULD_RELOAD, PARTIAL_TICK);
+		MANAGER.update(minecraft.theWorld, realRenderDistance, cameraX, cameraY, cameraZ, SHOULD_RELOAD, PARTIAL_TICK);
 		SHOULD_RELOAD = false;
 
 		return true;
