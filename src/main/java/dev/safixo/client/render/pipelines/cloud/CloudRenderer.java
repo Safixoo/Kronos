@@ -40,7 +40,7 @@ public class CloudRenderer {
 
 	private static final ResourceLocation CLOUD_TEXTURE = new ResourceLocation("textures/environment/clouds.png");
 	public static final int CLOUD_WIDTH = 12;
-	private static final int CLOUD_HEIGHT = 4;
+	public static final int CLOUD_HEIGHT = 4;
 
 	private static final int CLOUD_BOTTOM_FACTOR = ColorBGRManager.normToFactor(0.7F);
 	private static final int CLOUD_X_FACTOR = ColorBGRManager.normToFactor(0.9F);
@@ -68,6 +68,8 @@ public class CloudRenderer {
 
 	private static final int EMPTY_CLOUD = 0;
 
+	// Save a sorted array of indices that we can iterate to generate the perfectly sorted clouds, also ordered
+	// with distance so the fog distance check simplifies to simply stop the iteration after some index.
 	static {
 		Arrays.fill(MAX_DISTANCE_INDEX, Integer.MIN_VALUE);
 		ArrayList<Short> indices = new ArrayList<>();
@@ -176,7 +178,7 @@ public class CloudRenderer {
 		VertexWriter writer = VertexWriter.getCurrentInstance();
 		RenderBuffer buffer = VERTEX_BUFFER;
 
-		FrustumCuller.prepareCloudFrustum(viewY);
+		FrustumCuller.prepareCloudFrustum(worldFracX, viewY, worldFracZ);
 
 		// Generate and write the clouds' geometry.
 		buildGeometry(writer, cellDistance, worldFracX, worldFracZ, worldFloorX, worldFloorZ, viewY);
@@ -210,6 +212,9 @@ public class CloudRenderer {
 
 	private static final float EPSILON = 1E-1F;
 
+	// Meshes a colored voxel for each cell/texel of the cloud texture, in contrast Vanilla generates a giant
+	// tessellated mesh that covers all the texture in a way that only knowing the texture size it can
+	// generate a 3D model of the texture without having info of the texture data (just like item rendering).
 	private static void buildGeometry(VertexWriter writer, int cellDistance,
 									  float worldFracX, float worldFracZ,
 									  int worldFloorX, int worldFloorZ, float viewY) {
@@ -224,6 +229,7 @@ public class CloudRenderer {
 		worldFloorZ -= MAX_CELL_DISTANCE;
 
 		int insideCellsInd = -viewY >= EPSILON && -viewY <= CLOUD_HEIGHT + EPSILON ? MAX_DISTANCE_INDEX[1] : -1;
+		long ptr = writer.getVertexData();
 
 		for (int i = 0; i <= maxIteration; i++) {
 			int cellData = CELL_XY_DATA[i];
@@ -235,6 +241,7 @@ public class CloudRenderer {
 			int height = (cellZ + worldFloorZ) & 0xFF;
 			int color = getCloudColor(width, height);
 
+			// If the cloud texture is empty or is outside the frustum bounds, skip cell.
 			if (color == EMPTY_CLOUD || !FrustumCuller.cloudWithinFrustumBounds(cellX, cellZ)) {
 				continue;
 			}
@@ -242,77 +249,70 @@ public class CloudRenderer {
 			int visibleMask = color >>> 24;
 			long cellVertex = formatPosition(cellX, 0, cellZ);
 
-			if (cellX < startX) {
+			if (cellX < startX) { // back-face cull check
 				if ((visibleMask & (1 << XP)) != 0) {
-					long ptr = writer.getTotalOffset();
 					long vertex = cellVertex | formatColor(multiplyColor(color, CLOUD_X_FACTOR));
 					// +X Face
-					addVertex(ptr, vertex + formatPosition(1, 0, 0)); ptr += CLOUD_STRIDE;
-					addVertex(ptr, vertex + formatPosition(1, CLOUD_HEIGHT, 0)); ptr += CLOUD_STRIDE;
-					addVertex(ptr, vertex + formatPosition(1, CLOUD_HEIGHT, 1)); ptr += CLOUD_STRIDE;
-					addVertex(ptr, vertex + formatPosition(1, 0, 1));
-					pushQuad(writer);
+					writeCloudVertex(ptr, vertex + formatPosition(1, 0, 0)); ptr += CLOUD_STRIDE;
+					writeCloudVertex(ptr, vertex + formatPosition(1, CLOUD_HEIGHT, 0)); ptr += CLOUD_STRIDE;
+					writeCloudVertex(ptr, vertex + formatPosition(1, CLOUD_HEIGHT, 1)); ptr += CLOUD_STRIDE;
+					writeCloudVertex(ptr, vertex + formatPosition(1, 0, 1)); ptr += CLOUD_STRIDE;
 				}
 			} else if ((visibleMask & (1 << XN)) != 0) {
-				long ptr = writer.getTotalOffset();
 				long vertex = cellVertex | formatColor(multiplyColor(color, CLOUD_X_FACTOR));
 				// -X Face
-				addVertex(ptr, vertex + formatPosition(0, 0, 1)); ptr += CLOUD_STRIDE;
-				addVertex(ptr, vertex + formatPosition(0, CLOUD_HEIGHT, 1)); ptr += CLOUD_STRIDE;
-				addVertex(ptr, vertex + formatPosition(0, CLOUD_HEIGHT, 0)); ptr += CLOUD_STRIDE;
-				addVertex(ptr, vertex + formatPosition(0, 0, 0));
-				pushQuad(writer);
+				writeCloudVertex(ptr, vertex + formatPosition(0, 0, 1)); ptr += CLOUD_STRIDE;
+				writeCloudVertex(ptr, vertex + formatPosition(0, CLOUD_HEIGHT, 1)); ptr += CLOUD_STRIDE;
+				writeCloudVertex(ptr, vertex + formatPosition(0, CLOUD_HEIGHT, 0)); ptr += CLOUD_STRIDE;
+				writeCloudVertex(ptr, vertex + formatPosition(0, 0, 0)); ptr += CLOUD_STRIDE;
 			}
 
-			if (cellZ < startZ) {
+			if (cellZ < startZ) { // back-face cull check
 				if ((visibleMask & (1 << ZP)) != 0) {
-					long ptr = writer.getTotalOffset();
 					long vertex = cellVertex | formatColor(multiplyColor(color, CLOUD_Z_FACTOR));
 					// +Z Face
-					addVertex(ptr, vertex + formatPosition(0, 0, 1)); ptr += CLOUD_STRIDE;
-					addVertex(ptr, vertex + formatPosition(1, 0, 1)); ptr += CLOUD_STRIDE;
-					addVertex(ptr, vertex + formatPosition(1, CLOUD_HEIGHT, 1)); ptr += CLOUD_STRIDE;
-					addVertex(ptr, vertex + formatPosition(0, CLOUD_HEIGHT, 1));
-					pushQuad(writer);
+					writeCloudVertex(ptr, vertex + formatPosition(0, 0, 1)); ptr += CLOUD_STRIDE;
+					writeCloudVertex(ptr, vertex + formatPosition(1, 0, 1)); ptr += CLOUD_STRIDE;
+					writeCloudVertex(ptr, vertex + formatPosition(1, CLOUD_HEIGHT, 1)); ptr += CLOUD_STRIDE;
+					writeCloudVertex(ptr, vertex + formatPosition(0, CLOUD_HEIGHT, 1)); ptr += CLOUD_STRIDE;
 				}
 			} else if ((visibleMask & (1 << ZN)) != 0) {
-				long ptr = writer.getTotalOffset();
 				long vertex = cellVertex | formatColor(multiplyColor(color, CLOUD_Z_FACTOR));
 				// -Z Face
-				addVertex(ptr, vertex + formatPosition(0, CLOUD_HEIGHT, 0)); ptr += CLOUD_STRIDE;
-				addVertex(ptr, vertex + formatPosition(1, CLOUD_HEIGHT, 0)); ptr += CLOUD_STRIDE;
-				addVertex(ptr, vertex + formatPosition(1, 0, 0)); ptr += CLOUD_STRIDE;
-				addVertex(ptr, vertex + formatPosition(0, 0, 0));
-				pushQuad(writer);
+				writeCloudVertex(ptr, vertex + formatPosition(0, CLOUD_HEIGHT, 0)); ptr += CLOUD_STRIDE;
+				writeCloudVertex(ptr, vertex + formatPosition(1, CLOUD_HEIGHT, 0)); ptr += CLOUD_STRIDE;
+				writeCloudVertex(ptr, vertex + formatPosition(1, 0, 0)); ptr += CLOUD_STRIDE;
+				writeCloudVertex(ptr, vertex + formatPosition(0, 0, 0)); ptr += CLOUD_STRIDE;
 			}
 
-			long ptr = writer.getTotalOffset();
-
+			// Treat as we are either over or below the clouds.
 			if (viewY < -1) {
 				long vertex = cellVertex | formatColor(color);
-				addVertex(ptr, vertex + formatPosition(0, CLOUD_HEIGHT, 1)); ptr += CLOUD_STRIDE;
-				addVertex(ptr, vertex + formatPosition(1, CLOUD_HEIGHT, 1)); ptr += CLOUD_STRIDE;
-				addVertex(ptr, vertex + formatPosition(1, CLOUD_HEIGHT, 0)); ptr += CLOUD_STRIDE;
-				addVertex(ptr, vertex + formatPosition(0, CLOUD_HEIGHT, 0));
+				writeCloudVertex(ptr, vertex + formatPosition(0, CLOUD_HEIGHT, 1)); ptr += CLOUD_STRIDE;
+				writeCloudVertex(ptr, vertex + formatPosition(1, CLOUD_HEIGHT, 1)); ptr += CLOUD_STRIDE;
+				writeCloudVertex(ptr, vertex + formatPosition(1, CLOUD_HEIGHT, 0)); ptr += CLOUD_STRIDE;
+				writeCloudVertex(ptr, vertex + formatPosition(0, CLOUD_HEIGHT, 0)); ptr += CLOUD_STRIDE;
 			} else {
 				long vertex = cellVertex | formatColor(multiplyColor(color, CLOUD_BOTTOM_FACTOR));
-				addVertex(ptr, vertex); ptr += CLOUD_STRIDE;
-				addVertex(ptr, vertex + formatPosition(1, 0, 0)); ptr += CLOUD_STRIDE;
-				addVertex(ptr, vertex + formatPosition(1, 0, 1)); ptr += CLOUD_STRIDE;
-				addVertex(ptr, vertex + formatPosition(0, 0, 1));
+				writeCloudVertex(ptr, vertex); ptr += CLOUD_STRIDE;
+				writeCloudVertex(ptr, vertex + formatPosition(1, 0, 0)); ptr += CLOUD_STRIDE;
+				writeCloudVertex(ptr, vertex + formatPosition(1, 0, 1)); ptr += CLOUD_STRIDE;
+				writeCloudVertex(ptr, vertex + formatPosition(0, 0, 1)); ptr += CLOUD_STRIDE;
 			}
-
-			pushQuad(writer);
 
 			// If were inside a cloud, build its interior geometry.
 			if (i <= insideCellsInd) {
-				buildCenterCells(writer, worldFloorX, worldFloorZ, viewY, i);
+				ptr += buildCenterCells(ptr, worldFloorX, worldFloorZ, viewY, i);
 			}
 		}
+
+		writer.offset = (int) (ptr - writer.getVertexData());
+		writer.vertices = writer.offset / CLOUD_STRIDE;
 	}
 
-
-	private static void buildCenterCells(VertexWriter writer, int worldFloorX, int worldFloorZ, float viewY, int index) {
+	// Generates all inside faces in a way that they don't get discarded by gl back-face culling, also some extra bottom
+	// and top faces for the inside cells.
+	private static long buildCenterCells(long ptr, int worldFloorX, int worldFloorZ, float viewY, int index) {
 		int cellData = CELL_XY_DATA[index];
 
 		int cellX = cellData >>> 8;
@@ -323,66 +323,63 @@ public class CloudRenderer {
 		int color = getCloudColor(width, height);
 
 		if (color == EMPTY_CLOUD) {
-			return;
+			return 0L;
 		}
 
 		long cellVertex = formatPosition(cellX, 0, cellZ);
-		long ptr = writer.getTotalOffset();
 
 		// +Y Face.
 		long vertexYP = cellVertex | formatColor(color);
-		addVertex(ptr, vertexYP + formatPosition(0, CLOUD_HEIGHT, 0)); ptr += CLOUD_STRIDE;
-		addVertex(ptr, vertexYP + formatPosition(1, CLOUD_HEIGHT, 0)); ptr += CLOUD_STRIDE;
-		addVertex(ptr, vertexYP + formatPosition(1, CLOUD_HEIGHT, 1)); ptr += CLOUD_STRIDE;
-		addVertex(ptr, vertexYP + formatPosition(0, CLOUD_HEIGHT, 1)); ptr += CLOUD_STRIDE;
+		writeCloudVertex(ptr, vertexYP + formatPosition(0, CLOUD_HEIGHT, 0)); ptr += CLOUD_STRIDE;
+		writeCloudVertex(ptr, vertexYP + formatPosition(1, CLOUD_HEIGHT, 0)); ptr += CLOUD_STRIDE;
+		writeCloudVertex(ptr, vertexYP + formatPosition(1, CLOUD_HEIGHT, 1)); ptr += CLOUD_STRIDE;
+		writeCloudVertex(ptr, vertexYP + formatPosition(0, CLOUD_HEIGHT, 1)); ptr += CLOUD_STRIDE;
 		// -Y Face.
 		long vertexYN = cellVertex | formatColor(multiplyColor(color, CLOUD_BOTTOM_FACTOR));
-		addVertex(ptr, vertexYN + formatPosition(0, 0, 1)); ptr += CLOUD_STRIDE;
-		addVertex(ptr, vertexYN + formatPosition(1, 0, 1)); ptr += CLOUD_STRIDE;
-		addVertex(ptr, vertexYN + formatPosition(1, 0, 0)); ptr += CLOUD_STRIDE;
-		addVertex(ptr, vertexYN + formatPosition(0, 0, 0)); ptr += CLOUD_STRIDE;
+		writeCloudVertex(ptr, vertexYN + formatPosition(0, 0, 1)); ptr += CLOUD_STRIDE;
+		writeCloudVertex(ptr, vertexYN + formatPosition(1, 0, 1)); ptr += CLOUD_STRIDE;
+		writeCloudVertex(ptr, vertexYN + formatPosition(1, 0, 0)); ptr += CLOUD_STRIDE;
+		writeCloudVertex(ptr, vertexYN + formatPosition(0, 0, 0)); ptr += CLOUD_STRIDE;
 
 		long vertexZ = cellVertex | formatColor(multiplyColor(color, CLOUD_Z_FACTOR));
 		// -Z Face
-		addVertex(ptr, vertexZ + formatPosition(0, 0, 0)); ptr += CLOUD_STRIDE;
-		addVertex(ptr, vertexZ + formatPosition(1, 0, 0)); ptr += CLOUD_STRIDE;
-		addVertex(ptr, vertexZ + formatPosition(1, CLOUD_HEIGHT, 0)); ptr += CLOUD_STRIDE;
-		addVertex(ptr, vertexZ + formatPosition(0, CLOUD_HEIGHT, 0)); ptr += CLOUD_STRIDE;
+		writeCloudVertex(ptr, vertexZ + formatPosition(0, 0, 0)); ptr += CLOUD_STRIDE;
+		writeCloudVertex(ptr, vertexZ + formatPosition(1, 0, 0)); ptr += CLOUD_STRIDE;
+		writeCloudVertex(ptr, vertexZ + formatPosition(1, CLOUD_HEIGHT, 0)); ptr += CLOUD_STRIDE;
+		writeCloudVertex(ptr, vertexZ + formatPosition(0, CLOUD_HEIGHT, 0)); ptr += CLOUD_STRIDE;
 		// +Z Face
-		addVertex(ptr, vertexZ + formatPosition(0, CLOUD_HEIGHT, 1)); ptr += CLOUD_STRIDE;
-		addVertex(ptr, vertexZ + formatPosition(1, CLOUD_HEIGHT, 1)); ptr += CLOUD_STRIDE;
-		addVertex(ptr, vertexZ + formatPosition(1, 0, 1)); ptr += CLOUD_STRIDE;
-		addVertex(ptr, vertexZ + formatPosition(0, 0, 1)); ptr += CLOUD_STRIDE;
+		writeCloudVertex(ptr, vertexZ + formatPosition(0, CLOUD_HEIGHT, 1)); ptr += CLOUD_STRIDE;
+		writeCloudVertex(ptr, vertexZ + formatPosition(1, CLOUD_HEIGHT, 1)); ptr += CLOUD_STRIDE;
+		writeCloudVertex(ptr, vertexZ + formatPosition(1, 0, 1)); ptr += CLOUD_STRIDE;
+		writeCloudVertex(ptr, vertexZ + formatPosition(0, 0, 1)); ptr += CLOUD_STRIDE;
 
 		long vertexX = cellVertex | formatColor(multiplyColor(color, CLOUD_X_FACTOR));
 		// +X Face
-		addVertex(ptr, vertexX + formatPosition(1, 0, 1)); ptr += CLOUD_STRIDE;
-		addVertex(ptr, vertexX + formatPosition(1, CLOUD_HEIGHT, 1)); ptr += CLOUD_STRIDE;
-		addVertex(ptr, vertexX + formatPosition(1, CLOUD_HEIGHT, 0)); ptr += CLOUD_STRIDE;
-		addVertex(ptr, vertexX + formatPosition(1, 0, 0)); ptr += CLOUD_STRIDE;
+		writeCloudVertex(ptr, vertexX + formatPosition(1, 0, 1)); ptr += CLOUD_STRIDE;
+		writeCloudVertex(ptr, vertexX + formatPosition(1, CLOUD_HEIGHT, 1)); ptr += CLOUD_STRIDE;
+		writeCloudVertex(ptr, vertexX + formatPosition(1, CLOUD_HEIGHT, 0)); ptr += CLOUD_STRIDE;
+		writeCloudVertex(ptr, vertexX + formatPosition(1, 0, 0)); ptr += CLOUD_STRIDE;
 		// -X Face
-		addVertex(ptr, vertexX + formatPosition(0, 0, 0)); ptr += CLOUD_STRIDE;
-		addVertex(ptr, vertexX + formatPosition(0, CLOUD_HEIGHT, 0)); ptr += CLOUD_STRIDE;
-		addVertex(ptr, vertexX + formatPosition(0, CLOUD_HEIGHT, 1)); ptr += CLOUD_STRIDE;
-		addVertex(ptr, vertexX + formatPosition(0, 0, 1)); ptr += CLOUD_STRIDE;
+		writeCloudVertex(ptr, vertexX + formatPosition(0, 0, 0)); ptr += CLOUD_STRIDE;
+		writeCloudVertex(ptr, vertexX + formatPosition(0, CLOUD_HEIGHT, 0)); ptr += CLOUD_STRIDE;
+		writeCloudVertex(ptr, vertexX + formatPosition(0, CLOUD_HEIGHT, 1)); ptr += CLOUD_STRIDE;
+		writeCloudVertex(ptr, vertexX + formatPosition(0, 0, 1)); ptr += CLOUD_STRIDE;
 
 		if (!(viewY < -1)) {
 			long vertex = cellVertex | formatColor(color);
-			addVertex(ptr, vertex + formatPosition(0, CLOUD_HEIGHT, 1)); ptr += CLOUD_STRIDE;
-			addVertex(ptr, vertex + formatPosition(1, CLOUD_HEIGHT, 1)); ptr += CLOUD_STRIDE;
-			addVertex(ptr, vertex + formatPosition(1, CLOUD_HEIGHT, 0)); ptr += CLOUD_STRIDE;
-			addVertex(ptr, vertex + formatPosition(0, CLOUD_HEIGHT, 0));
+			writeCloudVertex(ptr, vertex + formatPosition(0, CLOUD_HEIGHT, 1)); ptr += CLOUD_STRIDE;
+			writeCloudVertex(ptr, vertex + formatPosition(1, CLOUD_HEIGHT, 1)); ptr += CLOUD_STRIDE;
+			writeCloudVertex(ptr, vertex + formatPosition(1, CLOUD_HEIGHT, 0)); ptr += CLOUD_STRIDE;
+			writeCloudVertex(ptr, vertex + formatPosition(0, CLOUD_HEIGHT, 0));
 		} else {
 			long vertex = cellVertex | formatColor(multiplyColor(color, CLOUD_BOTTOM_FACTOR));
-			addVertex(ptr, vertex); ptr += CLOUD_STRIDE;
-			addVertex(ptr, vertex + formatPosition(1, 0, 0)); ptr += CLOUD_STRIDE;
-			addVertex(ptr, vertex + formatPosition(1, 0, 1)); ptr += CLOUD_STRIDE;
-			addVertex(ptr, vertex + formatPosition(0, 0, 1));
+			writeCloudVertex(ptr, vertex); ptr += CLOUD_STRIDE;
+			writeCloudVertex(ptr, vertex + formatPosition(1, 0, 0)); ptr += CLOUD_STRIDE;
+			writeCloudVertex(ptr, vertex + formatPosition(1, 0, 1)); ptr += CLOUD_STRIDE;
+			writeCloudVertex(ptr, vertex + formatPosition(0, 0, 1));
 		}
 
-		for (int quad = 0; quad < 7; quad++) {
-			pushQuad(writer);
-		}
+		return (CLOUD_STRIDE * 4L) * 7L;
 	}
 
 	private static int getCloudIndex(int x, int y) {
@@ -439,15 +436,6 @@ public class CloudRenderer {
 		}
 	}
 
-	private static void addVertex(long ptr, long vertex) {
-		writeCloudVertex(ptr, vertex);
-	}
-
-	private static void pushQuad(VertexWriter writer) {
-		writer.offset += CLOUD_STRIDE * 4;
-		writer.vertices += 4;
-	}
-
 	private static class ShortDistanceComp implements Comparator<Short> {
 		@Override
 		public int compare(Short o0, Short o1) {
@@ -457,7 +445,7 @@ public class CloudRenderer {
 			int cellX1 = (o1 & 0xFF) - MAX_CELL_DISTANCE;
 			int cellZ1 = (o1 >>> 8) - MAX_CELL_DISTANCE;
 
-			return Integer.compare(MathExt.square(cellX0) + MathExt.square(cellZ0), MathExt.square(cellX1) + MathExt.square(cellZ1));
+			return Integer.signum((MathExt.square(cellX0) + MathExt.square(cellZ0)) - (MathExt.square(cellX1) + MathExt.square(cellZ1)));
 		}
 	}
 }

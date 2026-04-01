@@ -17,14 +17,14 @@ public class CloudFormat extends GlVertexFormat {
 	}
 
 	public static void writeCloudVertex(long ptr, int x, int y, int z, int color) {
-		UnsafeUtil.memPutLong(ptr, (x & 0xFF) | (y & 0xFF) << 8 | (z & 0xFF) << 16 | (long) color << 24L);
+		UnsafeUtil.memPutLong(ptr, formatPosition(x, y, z) | formatColor(color));
 	}
 
 	public static void writeCloudVertex(long ptr, long vertex) {
 		UnsafeUtil.memPutLong(ptr, vertex);
 	}
 
-	public static long formatPosition(int x, int y, int z) {
+	public static long formatPosition(long x, long y, long z) {
 		return x | (y << 8) | (z << 16);
 	}
 

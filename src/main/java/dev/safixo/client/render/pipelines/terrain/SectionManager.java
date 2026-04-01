@@ -7,7 +7,6 @@ import dev.safixo.client.util.ClientChunkListener;
 import dev.safixo.core.hooks.GlStateTracker;
 import it.unimi.dsi.fastutil.longs.*;
 import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
-import jogamp.opengl.GLStateTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.EntityClientPlayerMP;
 import net.minecraft.client.multiplayer.WorldClient;

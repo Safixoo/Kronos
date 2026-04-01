@@ -20,9 +20,8 @@ public class FrustumCuller {
 
 	private static float nxWG, pxWG, nyWG, pyWG;
 
-	private static int nxWC, pxWC;
-	private static int nxXC, nxZC;
-	private static int pxXC, pxZC;
+	private static int nxXC, nxZC, nxWC;
+	private static int pxXC, pxZC, pxWC;
 
 	/**
 	 * Creates a frustum at the style of JOML, it needs to be normalized to keep as much precision as possible
@@ -121,18 +120,8 @@ public class FrustumCuller {
 		}
 	}
 
-	public static void prepareCloudFrustum(float viewY) {
-		int extraRadius = 9;
-
-		double nxWC = nxWG;
-		nxWC -= (nxX >= 0 ? (CloudRenderer.CLOUD_WIDTH + extraRadius) * nxX : -extraRadius * nxX);
-		nxWC -= viewY * nxY;
-		nxWC -= (nxZ >= 0 ? (CloudRenderer.CLOUD_WIDTH + extraRadius) * nxZ : -extraRadius * nxZ);
-
-		double pxWC = nxWG;
-		pxWC -= pxX >= 0 ? (CloudRenderer.CLOUD_WIDTH + extraRadius) * pxX : -extraRadius * pxX;
-		pxWC -= viewY * pxY;
-		pxWC -= pxZ >= 0 ? (CloudRenderer.CLOUD_WIDTH + extraRadius) * pxZ : -extraRadius * pxZ;
+	public static void prepareCloudFrustum(float worldFracX, float viewY, float worldFracZ) {
+		int extraRadius = 0;
 
 		double nxXC = nxX;
 		double nxZC = nxZ;
@@ -140,20 +129,35 @@ public class FrustumCuller {
 		double pxXC = pxX;
 		double pxZC = pxZ;
 
-		nxWC += CloudRenderer.MAX_CELL_DISTANCE * nxXC;
-		nxWC += CloudRenderer.MAX_CELL_DISTANCE * nxZC;
+		double nxWC = nxWG;
+		nxWC -= (nxX >= 0 ? CloudRenderer.CLOUD_WIDTH + extraRadius : -extraRadius) * nxXC;
+		nxWC -= ((nxY >= 0 ? CloudRenderer.CLOUD_HEIGHT + extraRadius : -extraRadius) + viewY) * (double) nxY;
+		nxWC -= (nxZ >= 0 ? CloudRenderer.CLOUD_WIDTH + extraRadius : -extraRadius) * nxZC;
 
-		pxWC += CloudRenderer.MAX_CELL_DISTANCE * pxXC;
-		pxWC += CloudRenderer.MAX_CELL_DISTANCE * pxZC;
+		double pxWC = nxWG;
+		pxWC -= (pxX >= 0 ? CloudRenderer.CLOUD_WIDTH + extraRadius : -extraRadius) * pxXC;
+		pxWC -= ((pxY >= 0 ? CloudRenderer.CLOUD_HEIGHT + extraRadius : -extraRadius) + viewY) * (double) pxY;
+		pxWC -= (pxZ >= 0 ? CloudRenderer.CLOUD_WIDTH + extraRadius : -extraRadius) * pxZC;
 
-		FrustumCuller.nxXC = (int) (nxXC * (1 << 20)) * CloudRenderer.CLOUD_WIDTH;
-		FrustumCuller.nxZC = (int) (nxZC * (1 << 20)) * CloudRenderer.CLOUD_WIDTH;
+		nxXC *= CloudRenderer.CLOUD_WIDTH;
+		nxZC *= CloudRenderer.CLOUD_WIDTH;
+		pxXC *= CloudRenderer.CLOUD_WIDTH;
+		pxZC *= CloudRenderer.CLOUD_WIDTH;
 
-		FrustumCuller.pxXC = (int) (pxXC * (1 << 20)) * CloudRenderer.CLOUD_WIDTH;
-		FrustumCuller.pxZC = (int) (pxZC * (1 << 20)) * CloudRenderer.CLOUD_WIDTH;
+		nxWC += (CloudRenderer.MAX_CELL_DISTANCE + worldFracX) * nxXC;
+		nxWC += (CloudRenderer.MAX_CELL_DISTANCE + worldFracZ) * nxZC;
 
-		FrustumCuller.pxWC = (int) (pxWC * (1 << 20)) * CloudRenderer.CLOUD_WIDTH;
-		FrustumCuller.nxWC = (int) (nxWC * (1 << 20)) * CloudRenderer.CLOUD_WIDTH;
+		pxWC += (CloudRenderer.MAX_CELL_DISTANCE + worldFracX) * pxXC;
+		pxWC += (CloudRenderer.MAX_CELL_DISTANCE + worldFracZ) * pxZC;
+
+		FrustumCuller.nxXC = (int) (nxXC * (1 << 20));
+		FrustumCuller.nxZC = (int) (nxZC * (1 << 20));
+
+		FrustumCuller.pxXC = (int) (pxXC * (1 << 20));
+		FrustumCuller.pxZC = (int) (pxZC * (1 << 20));
+
+		FrustumCuller.pxWC = (int) (pxWC * (1 << 20));
+		FrustumCuller.nxWC = (int) (nxWC * (1 << 20));
 	}
 
 	/**
