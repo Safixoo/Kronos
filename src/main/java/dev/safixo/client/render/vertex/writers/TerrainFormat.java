@@ -16,7 +16,7 @@ public class TerrainFormat extends GlVertexFormat {
 	static final int UV_BITS = 16;
 	static final float UV_PRECISION = (1 << UV_BITS);
 
-	public static final float RADIUS = 0.2f;
+	public static final float RADIUS = 0.5f;
 	static final float DIAMETER = RADIUS * 2.0f;
 
 	static final float FACT_X = (1 << POSITION_BITS) / (DIAMETER_X + DIAMETER);

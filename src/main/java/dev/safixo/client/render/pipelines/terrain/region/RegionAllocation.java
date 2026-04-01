@@ -58,8 +58,7 @@ public class RegionAllocation {
 
 		// If it has been overpassed the copying buffer limit, do mental gymnastics.
 		if (newSize > SPARE_BUFFER_ALLOC) {
-
-			// If the region is more than 64MB avoid allocating a temporal buffer as is preferred
+			// If the region is more than 32MB avoid allocating a temporal buffer as is preferred
 			// to not duplicate that much memory.
 			if (this.offset > (32 << 20)) {
 				this.vertexBuffer.allocateSpace((int) newSize, GL15.GL_STATIC_DRAW);

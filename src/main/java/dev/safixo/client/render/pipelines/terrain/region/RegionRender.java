@@ -325,8 +325,12 @@ public class RegionRender {
 			GL14.glMultiDrawArrays(GL11.GL_QUADS, firstBuff, countBuff);
 		} else {
 			ByteBuffer indirectBuff = NativeBuffer.wrap(pass == 0 ? this.solidIndirectPtr : this.translucentIndirectPtr);
-			((Buffer) indirectBuff).limit(drawCount * 16);
 
+			if (indirectBuff == null) {
+				return;
+			}
+
+			((Buffer) indirectBuff).limit(drawCount * 16);
 			GL43.glMultiDrawArraysIndirect(GL11.GL_QUADS, indirectBuff, drawCount, 0);
 		}
 	}

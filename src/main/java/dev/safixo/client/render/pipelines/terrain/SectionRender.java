@@ -5,7 +5,6 @@ import dev.safixo.client.util.MathExt;
 import it.unimi.dsi.fastutil.objects.ReferenceArrayList;
 import it.unimi.dsi.fastutil.objects.ReferenceList;
 import net.minecraft.block.Block;
-import net.minecraft.block.ITileEntityProvider;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderBlocks;
 import net.minecraft.client.renderer.WorldRenderer;
@@ -35,7 +34,8 @@ public class SectionRender {
 	private static final int AIR_ID = 0;
 
 	// Most of the section data, flags is a bit-mask from SectionFlag encoding.
-	public int currentFrame, flags = SectionFlags.setDirty(0b0, true);
+	public int currentFrame, flags = SectionFlags.setDirty(0b0, true) |
+									SectionFlags.setCullFaces(0b0, 0b111_111);
 
 	// Section position relative to blocks.
 	public int blockX, blockY, blockZ;
@@ -223,7 +223,7 @@ public class SectionRender {
 			}
 			solidBlocks[Direction.COUNT]++;
 
-			int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
+			int blockIndex = makeBlockIndex(x, y, z);
 			int drawBitSet = 0;
 
 			drawBitSet |= cache.isBlockOpaqueCubeCenter(blockIndex + makeBlockIndex(0,1,0)) << UP;

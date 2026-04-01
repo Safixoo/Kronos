@@ -5,7 +5,6 @@ import dev.safixo.client.render.gfx.util.GpuFlags;
 import dev.safixo.client.util.ColorBGRManager;
 import dev.safixo.client.util.Matrix4Stack;
 import org.joml.Matrix4f;
-import org.lwjgl.Sys;
 import org.lwjgl.opengl.*;
 import org.lwjgl.util.glu.Project;
 
@@ -42,7 +41,10 @@ public class GlStateTracker {
 	private static final Matrix4Stack NULL_STACK = new Matrix4Stack(256);
 
 	public static Matrix4Stack CURRENT_STACK = PROJECTION_STACK;
-	public static int MAT_MODE = -1;
+	public static String VENDOR;
+	public static int MAT_MODE = GL11.GL_PROJECTION_MATRIX;
+
+	private static final Matrix4f MATRIX = new Matrix4f();
 
 	static {
 		Arrays.fill(CAP_BITS, UNDEFINED);
@@ -61,7 +63,7 @@ public class GlStateTracker {
 	}
 
 	public static void gluPerspective(float fovy, float aspect, float zNear, float zFar) {
-		CURRENT_STACK.top().mul(new Matrix4f().setPerspective((float) Math.toRadians(fovy), aspect, zNear, zFar));
+		CURRENT_STACK.top().mul(MATRIX.setPerspective((float) Math.toRadians(fovy), aspect, zNear, zFar));
 		Project.gluPerspective(fovy, aspect, zNear, zFar);
 	}
 
@@ -138,7 +140,6 @@ public class GlStateTracker {
 			LAST_VBO_ID = id;
 		}
 
-		flushDrawState();
 		GL15.glBindBuffer(target, id);
 	}
 
@@ -249,13 +250,19 @@ public class GlStateTracker {
 	}
 
 	public static void glGetFloat(int name, FloatBuffer params) {
-		if (name == GL11.GL_MODELVIEW_MATRIX) {
-			MODEL_VIEW_STACK.top().get(params);
-			return;
+		if (VENDOR == null) {
+			VENDOR = GL11.glGetString(GL11.GL_VENDOR);
 		}
-		else if (name == GL11.GL_PROJECTION_MATRIX) {
-			PROJECTION_STACK.top().get(params);
-			return;
+
+		if (VENDOR != null && VENDOR.contains("Nvidia")) {
+			if (name == GL11.GL_MODELVIEW_MATRIX) {
+				MODEL_VIEW_STACK.top().get(params);
+				return;
+			}
+			else if (name == GL11.GL_PROJECTION_MATRIX) {
+				PROJECTION_STACK.top().get(params);
+				return;
+			}
 		}
 
 		GL11.glGetFloat(name, params);
@@ -346,8 +353,6 @@ public class GlStateTracker {
 			LAST_COLOR_MATERIAL = mask;
 		}
 	}
-
-	private static final Matrix4f MATRIX = new Matrix4f();
 
 	public static void glMultMatrix(FloatBuffer matrix) {
 		flushDrawState();
