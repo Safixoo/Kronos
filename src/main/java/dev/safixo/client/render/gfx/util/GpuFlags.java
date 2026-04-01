@@ -1,6 +1,7 @@
 package dev.safixo.client.render.gfx.util;
 
 import org.lwjgl.opengl.ContextCapabilities;
+import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GLContext;
 
 public class GpuFlags {
@@ -12,7 +13,8 @@ public class GpuFlags {
 	public static void processFlags() {
 		ContextCapabilities capabilities = GLContext.getCapabilities();
 
-		EXT_DSA = capabilities.GL_EXT_direct_state_access;
+		// The extension has worked in my Nvidia' GPU, but in an AMD APU seems to fail bad.
+		EXT_DSA = capabilities.GL_EXT_direct_state_access && GL11.glGetString(GL11.GL_VENDOR).contains("Nvidia");
 
 		if (capabilities.OpenGL43) {
 			OPENGL_VERSION = 43;
@@ -31,7 +33,7 @@ public class GpuFlags {
 		PROCESSED_FLAGS = true;
 	}
 
-	public static boolean checkModSupport() {
+	public static void checkModSupport() {
 		if (!PROCESSED_FLAGS) {
 			processFlags();
 		}
@@ -44,6 +46,5 @@ public class GpuFlags {
 			);
 		}
 
-		return true;
 	}
 }

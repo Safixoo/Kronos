@@ -14,95 +14,138 @@ public class LongHashMapHook {
 		cw.visit(V1_7, ACC_PUBLIC, "net/minecraft/util/LongHashMap", null,
 			"java/lang/Object", null);
 
-		// private final Long2ReferenceMap<Object> map = new Long2ReferenceOpenHashMap<>();
+		// private final FastLongHashMap map;
 		cw.visitField(ACC_PRIVATE | ACC_FINAL, "map",
-			"Lit/unimi/dsi/fastutil/longs/Long2ReferenceMap;",
-			"Lit/unimi/dsi/fastutil/longs/Long2ReferenceMap<Ljava/lang/Object;>;",
+			"Ldev/safixo/client/util/FastLongHashMap;",
+			null,
 			null).visitEnd();
 
-		// Constructor
-		MethodVisitor mv = cw.visitMethod(ACC_PUBLIC, "<init>", "()V", null, null);
+		MethodVisitor mv;
 
+		// Constructor
+		mv = cw.visitMethod(ACC_PUBLIC, "<init>", "()V", null, null);
 		mv.visitCode();
+
 		mv.visitVarInsn(ALOAD, 0);
 		mv.visitMethodInsn(INVOKESPECIAL, "java/lang/Object", "<init>", "()V");
+
 		mv.visitVarInsn(ALOAD, 0);
-		mv.visitTypeInsn(NEW, "it/unimi/dsi/fastutil/longs/Long2ReferenceOpenHashMap");
+		mv.visitTypeInsn(NEW, "dev/safixo/client/util/FastLongHashMap");
 		mv.visitInsn(DUP);
-		mv.visitMethodInsn(INVOKESPECIAL, "it/unimi/dsi/fastutil/longs/Long2ReferenceOpenHashMap", "<init>", "()V");
-		mv.visitFieldInsn(PUTFIELD, "net/minecraft/util/LongHashMap", "map",
-			"Lit/unimi/dsi/fastutil/longs/Long2ReferenceMap;");
+		mv.visitMethodInsn(INVOKESPECIAL,
+			"dev/safixo/client/util/FastLongHashMap",
+			"<init>",
+			"()V");
+
+		mv.visitFieldInsn(PUTFIELD,
+			"net/minecraft/util/LongHashMap",
+			"map",
+			"Ldev/safixo/client/util/FastLongHashMap;");
+
 		mv.visitInsn(RETURN);
 		mv.visitMaxs(0, 0);
 		mv.visitEnd();
 
-		// public int getNumHashElements() { return this.map.size(); }
+		// public int getNumHashElements()
 		mv = cw.visitMethod(ACC_PUBLIC, inDev ? "getNumHashElements" : "func_76162_a", "()I", null, null);
-
 		mv.visitCode();
+
 		mv.visitVarInsn(ALOAD, 0);
-		mv.visitFieldInsn(GETFIELD, "net/minecraft/util/LongHashMap", "map",
-			"Lit/unimi/dsi/fastutil/longs/Long2ReferenceMap;");
-		mv.visitMethodInsn(INVOKEINTERFACE, "it/unimi/dsi/fastutil/longs/Long2ReferenceMap",
-			"size", "()I");
+		mv.visitFieldInsn(GETFIELD,
+			"net/minecraft/util/LongHashMap",
+			"map",
+			"Ldev/safixo/client/util/FastLongHashMap;");
+
+		mv.visitMethodInsn(INVOKEVIRTUAL,
+			"dev/safixo/client/util/FastLongHashMap",
+			"getSize",
+			"()I");
+
 		mv.visitInsn(IRETURN);
 		mv.visitMaxs(0, 0);
 		mv.visitEnd();
 
-		// public Object getValueByKey(long key) { return this.map.get(key); }
+		// public Object getValueByKey(long key)
 		mv = cw.visitMethod(ACC_PUBLIC, inDev ? "getValueByKey" : "func_76164_a", "(J)Ljava/lang/Object;", null, null);
-
 		mv.visitCode();
+
 		mv.visitVarInsn(ALOAD, 0);
-		mv.visitFieldInsn(GETFIELD, "net/minecraft/util/LongHashMap", "map",
-			"Lit/unimi/dsi/fastutil/longs/Long2ReferenceMap;");
+		mv.visitFieldInsn(GETFIELD,
+			"net/minecraft/util/LongHashMap",
+			"map",
+			"Ldev/safixo/client/util/FastLongHashMap;");
+
 		mv.visitVarInsn(LLOAD, 1);
-		mv.visitMethodInsn(INVOKEINTERFACE, "it/unimi/dsi/fastutil/longs/Long2ReferenceMap",
-			"get", "(J)Ljava/lang/Object;");
+
+		mv.visitMethodInsn(INVOKEVIRTUAL,
+			"dev/safixo/client/util/FastLongHashMap",
+			"get",
+			"(J)Ljava/lang/Object;");
+
 		mv.visitInsn(ARETURN);
 		mv.visitMaxs(0, 0);
 		mv.visitEnd();
 
-		// public boolean containsItem(long key) { return this.map.containsKey(key); }
+		// public boolean containsItem(long key)
 		mv = cw.visitMethod(ACC_PUBLIC, inDev ? "containsItem" : "func_76161_b", "(J)Z", null, null);
-
 		mv.visitCode();
+
 		mv.visitVarInsn(ALOAD, 0);
-		mv.visitFieldInsn(GETFIELD, "net/minecraft/util/LongHashMap", "map",
-			"Lit/unimi/dsi/fastutil/longs/Long2ReferenceMap;");
+		mv.visitFieldInsn(GETFIELD,
+			"net/minecraft/util/LongHashMap",
+			"map",
+			"Ldev/safixo/client/util/FastLongHashMap;");
+
 		mv.visitVarInsn(LLOAD, 1);
-		mv.visitMethodInsn(INVOKEINTERFACE, "it/unimi/dsi/fastutil/longs/Long2ReferenceMap",
-			"containsKey", "(J)Z");
+
+		mv.visitMethodInsn(INVOKEVIRTUAL,
+			"dev/safixo/client/util/FastLongHashMap",
+			"contains",
+			"(J)Z");
+
 		mv.visitInsn(IRETURN);
 		mv.visitMaxs(0, 0);
 		mv.visitEnd();
 
-		// public void add(long key, Object obj) { this.map.put(key, obj); }
+		// public void add(long key, Object obj)
 		mv = cw.visitMethod(ACC_PUBLIC, inDev ? "add" : "func_76163_a", "(JLjava/lang/Object;)V", null, null);
-
 		mv.visitCode();
+
 		mv.visitVarInsn(ALOAD, 0);
-		mv.visitFieldInsn(GETFIELD, "net/minecraft/util/LongHashMap", "map",
-			"Lit/unimi/dsi/fastutil/longs/Long2ReferenceMap;");
+		mv.visitFieldInsn(GETFIELD,
+			"net/minecraft/util/LongHashMap",
+			"map",
+			"Ldev/safixo/client/util/FastLongHashMap;");
+
 		mv.visitVarInsn(LLOAD, 1);
 		mv.visitVarInsn(ALOAD, 3);
-		mv.visitMethodInsn(INVOKEINTERFACE, "it/unimi/dsi/fastutil/longs/Long2ReferenceMap",
-			"put", "(JLjava/lang/Object;)Ljava/lang/Object;");
-		mv.visitInsn(POP);
+
+		mv.visitMethodInsn(INVOKEVIRTUAL,
+			"dev/safixo/client/util/FastLongHashMap",
+			"put",
+			"(JLjava/lang/Object;)V");
+
 		mv.visitInsn(RETURN);
 		mv.visitMaxs(0, 0);
 		mv.visitEnd();
 
-		// public Object remove(long key) { return this.map.remove(key); }
+		// public Object remove(long key)
 		mv = cw.visitMethod(ACC_PUBLIC, inDev ? "remove" : "func_76159_d", "(J)Ljava/lang/Object;", null, null);
-
 		mv.visitCode();
+
 		mv.visitVarInsn(ALOAD, 0);
-		mv.visitFieldInsn(GETFIELD, "net/minecraft/util/LongHashMap", "map",
-			"Lit/unimi/dsi/fastutil/longs/Long2ReferenceMap;");
+		mv.visitFieldInsn(GETFIELD,
+			"net/minecraft/util/LongHashMap",
+			"map",
+			"Ldev/safixo/client/util/FastLongHashMap;");
+
 		mv.visitVarInsn(LLOAD, 1);
-		mv.visitMethodInsn(INVOKEINTERFACE, "it/unimi/dsi/fastutil/longs/Long2ReferenceMap",
-			"remove", "(J)Ljava/lang/Object;");
+
+		mv.visitMethodInsn(INVOKEVIRTUAL,
+			"dev/safixo/client/util/FastLongHashMap",
+			"remove",
+			"(J)Ljava/lang/Object;");
+
 		mv.visitInsn(ARETURN);
 		mv.visitMaxs(0, 0);
 		mv.visitEnd();

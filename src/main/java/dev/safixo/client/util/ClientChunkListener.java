@@ -12,11 +12,8 @@ import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.world.ChunkEvent;
 
 public class ClientChunkListener extends ChunkProviderClient {
-	private final Long2ReferenceOpenHashMap<ChunkMetadata> chunkMap = new Long2ReferenceOpenHashMap<>(512, 0.5f);
+	private final FastLongHashMap chunkMap = new FastLongHashMap(512);
 	private final LongArrayList chunksToSend = new LongArrayList();
-
-	private Chunk lastChunk;
-	private long lastPosition = -1;
 
 	private final World world;
 	private final EmptyChunk blankChunk;
@@ -29,16 +26,16 @@ public class ClientChunkListener extends ChunkProviderClient {
 
 	@Override
 	public String makeString() {
-		return "KronosChunkCache: " + this.chunkMap.size();
+		return "KronosChunkCache: " + this.chunkMap.getSize();
 	}
 
 	public boolean shouldLoadChunk(int x, int z) {
-		ChunkMetadata meta = this.chunkMap.get(MathExt.asLong(x, z));
+		ChunkMetadata meta = (ChunkMetadata) this.chunkMap.get(MathExt.asLong(x, z));
 		return meta != null && meta.adjacentMask == 0b111_111_111;
 	}
 
 	public void unloadChunk(int x, int z) {
-		ChunkMetadata meta = this.chunkMap.get(MathExt.asLong(x, z));
+		ChunkMetadata meta = (ChunkMetadata) this.chunkMap.get(MathExt.asLong(x, z));
 
 		if (meta == null) {
 			return;
@@ -74,8 +71,7 @@ public class ClientChunkListener extends ChunkProviderClient {
 	@Override
 	public Chunk provideChunk(int x, int z) {
 		long position = MathExt.asLong(x, z);
-		ChunkMetadata meta = this.chunkMap.get(position);
-
+		ChunkMetadata meta = (ChunkMetadata) this.chunkMap.get(position);
 		return meta == null ? this.blankChunk : meta.chunk;
 	}
 
@@ -109,7 +105,7 @@ public class ClientChunkListener extends ChunkProviderClient {
 					continue;
 				}
 
-				ChunkMetadata neighborNode = this.chunkMap.get(MathExt.asLong(x, z));
+				ChunkMetadata neighborNode = (ChunkMetadata) this.chunkMap.get(MathExt.asLong(x, z));
 
 				int currentX = x - chunk.xPosition + 1;
 				int currentZ = z - chunk.zPosition + 1;

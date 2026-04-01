@@ -1,6 +1,7 @@
 package dev.safixo.core.hooks;
 
 import dev.safixo.client.render.ImprovedTessellator;
+import dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache;
 import dev.safixo.client.util.ClientChunkListener;
 import dev.safixo.client.util.MathExt;
 import dev.safixo.client.util.data.PrimitivesFlags;
@@ -12,7 +13,9 @@ import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.world.EnumSkyBlock;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
+import net.minecraft.world.chunk.EmptyChunk;
 import net.minecraft.world.chunk.IChunkProvider;
+import net.minecraft.world.chunk.storage.ExtendedBlockStorage;
 
 @SuppressWarnings("unused")
 public class MinecraftHook {
@@ -128,6 +131,7 @@ public class MinecraftHook {
 		return ptr + ITEM_STRIDE;
 	}
 
+	// Here chunkExists is avoided but shouldn't change behavior because this is used only for the client.
 	public static int getLightBrightnessForSkyBlocks(World world, int x, int y, int z, int minBlockLight) {
 		// if y < 0, makes y = 0, otherwise nothing.
 		y &= ~(y >> 31);
@@ -136,51 +140,30 @@ public class MinecraftHook {
 			return MathExt.getLightmapCoord(15, 0);
 		}
 
-		return getSavedLightValue(world, x, y, z);
-	}
-
-	private static Chunk LAST_CHUNK;
-	private static long LAST_POSITION;
-
-	public static int getBlockId(World world, int x, int y, int z) {
-		Chunk chunk = getChunk(world, x >> 4, z >> 4);
-		return chunk.getBlockID(x & 15, y, z & 15);
-	}
-
-	public static int getSavedLightValue(World world, int x, int y, int z) {
-		if (y >= 256) {
-			y = 255;
-		}
-
 		int chunkX = x >> 4;
 		int chunkZ = z >> 4;
 
-		Chunk chunk = getChunk(world, chunkX, chunkZ);
+		Chunk chunk = world.getChunkFromChunkCoords(chunkX, chunkZ);
 
-		int blockId = chunk.getBlockID(x & 15, y, z & 15);
+		ExtendedBlockStorage blockStorage = chunk.getBlockStorageArray()[y >> 4];
+		int blockLight = 0;
+		int skyLight = 0;
 
-		if (PrimitivesFlags.SOLID[blockId]) {
-			return 0;
+		if (blockStorage != null) {
+			int blockIndex = SectionCache.makeBlockIndex(x & 15, y & 15, z & 15);
+
+			byte[] blockLightArray = blockStorage.getBlocklightArray().data;
+			blockLight = SectionCache.getNibble(blockLightArray, blockIndex);
+
+			if (blockStorage.getSkylightArray() != null && !world.provider.hasNoSky) {
+				byte[] skyLightArray = blockStorage.getSkylightArray().data;
+				skyLight = SectionCache.getNibble(skyLightArray, blockIndex);
+			}
+		} else if (chunk.canBlockSeeTheSky(x & 15, y, z & 15)) {
+			skyLight = 15;
 		}
 
-		int blockLight = chunk.getSavedLightValue(EnumSkyBlock.Block, x & 15, y, z & 15);
-		int skyLight = chunk.getSavedLightValue(EnumSkyBlock.Sky, x & 15, y, z & 15);
-
-		return MathExt.getLightmapCoord(skyLight, blockLight);
-	}
-
-	public static Chunk getChunk(World world, int chunkX, int chunkZ) {
-		long position = MathExt.asLong(chunkX, chunkZ);
-		Chunk chunk;
-
-		if (position == LAST_POSITION && LAST_CHUNK != null) {
-			chunk = LAST_CHUNK;
-		} else {
-			LAST_CHUNK = chunk = world.getChunkFromChunkCoords(chunkX, chunkZ);
-			LAST_POSITION = position;
-		}
-
-		return chunk;
+		return MathExt.getLightmapCoord(skyLight, Math.max(minBlockLight, blockLight));
 	}
 
 	public static IChunkProvider createChunkProvider(WorldClient worldClient) {

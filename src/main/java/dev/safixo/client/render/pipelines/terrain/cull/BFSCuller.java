@@ -15,7 +15,7 @@ public class BFSCuller {
 	private int activeFrame;
 
 	// The max denominator would always be a renderDistance * 3 worst case, and should always
-	// be used in a consequential way, so it shouldn't mean a problem to the cache.
+	// be accessed in a linear way, so it shouldn't mean a problem for the cache.
 	private static final long[] INV_DIVS = new long[512];
 
 	public static final int PRECISION_BITS = 25;
