@@ -7,6 +7,7 @@ import dev.safixo.client.util.memory.NativeBuffer;
 import dev.safixo.client.util.memory.UnsafeUtil;
 import dev.safixo.core.hooks.GlStateTracker;
 import dev.safixo.core.hooks.TessellatorHook;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.Tessellator;
 import org.lwjgl.opengl.*;
@@ -37,7 +38,7 @@ public class ImprovedTessellator extends Tessellator {
 
 	private final GlVertexBuffer vertexBuffer = new GlVertexBuffer(MIN_ALLOC, GL15.GL_STREAM_DRAW);
 
-	private boolean disabledColor;
+	private boolean disabledColor, canDraw;
 	public int drawMode, flags, capacity = MIN_ALLOC;
 
 	public int vertices, offset;
@@ -85,7 +86,7 @@ public class ImprovedTessellator extends Tessellator {
 		vertexArray = GL30.glGenVertexArrays();
 		int stride = STRIDES[flags];
 
-		GlVertexArrayObject.bindVertexArray(vertexArray);
+		GL30.glBindVertexArray(vertexArray);
 		this.vertexBuffer.bind();
 
 		GlStateTracker.glEnableClientStateDirect(GL11.GL_VERTEX_ARRAY);
@@ -117,7 +118,7 @@ public class ImprovedTessellator extends Tessellator {
 		}
 
 		this.vertexBuffer.unbind();
-		GlVertexArrayObject.bindVertexArray(0);
+		GL30.glBindVertexArray(0);
 
 		if ((flags & VERTEX_LIGHT) != 0) {
 			GlStateTracker.glDisableClientStateDirect(GL11.GL_TEXTURE_COORD_ARRAY);
@@ -140,6 +141,7 @@ public class ImprovedTessellator extends Tessellator {
 	@Override
 	public int draw() {
 		this.lastFlag = this.flags;
+		this.canDraw = true;
 		this.flags = 0;
 
 		int offset = this.offset;
@@ -153,7 +155,7 @@ public class ImprovedTessellator extends Tessellator {
 	}
 
 	public void flushState() {
-		if (this.vertices == 0 || this.lastFlag == -1) {
+		if (this.vertices == 0 || this.lastFlag == -1 || !this.canDraw) {
 			return;
 		}
 
@@ -165,11 +167,12 @@ public class ImprovedTessellator extends Tessellator {
 		this.vertices = 0;
 		this.offset = 0;
 		this.lastFlag = -1;
+		this.canDraw = false;
 
 		int packedData = this.getVertexArray(flags);
 		int vertexArray = packedData & 0xFFFFF;
 
-		GlVertexArrayObject.bindVertexArray(vertexArray);
+		GL30.glBindVertexArray(vertexArray);
 
 		this.vertexBuffer.bufferData(this.vertexPtrNio, offset);
 		this.vertexBuffer.draw(drawMode, vertices, 0);
@@ -284,7 +287,7 @@ public class ImprovedTessellator extends Tessellator {
 			this.resize();
 		}
 
-		if (this.lastFlag != this.flags && ((this.vertices & 3) == 0 || this.drawMode != GL11.GL_QUADS)) {
+		if (this.lastFlag != this.flags) {
 			this.flushState();
 		}
 
@@ -317,6 +320,7 @@ public class ImprovedTessellator extends Tessellator {
 			writePtr += 4;
 		}
 
+		this.lastFlag = this.flags;
 		this.offset += (int) (writePtr - ptr);
 		this.vertices++;
 	}
@@ -332,7 +336,7 @@ public class ImprovedTessellator extends Tessellator {
 			this.resize();
 		}
 
-		if (this.lastFlag != this.flags && ((this.vertices & 3) == 0 || this.drawMode != GL11.GL_QUADS)) {
+		if (this.lastFlag != this.flags) {
 			this.flushState();
 		}
 
@@ -364,6 +368,7 @@ public class ImprovedTessellator extends Tessellator {
 			writePtr += 4;
 		}
 
+		this.lastFlag = this.flags;
 		this.offset += (int) (writePtr - ptr);
 		this.vertices++;
 	}
