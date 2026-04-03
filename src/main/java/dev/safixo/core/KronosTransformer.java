@@ -149,6 +149,10 @@ public class KronosTransformer implements IClassTransformer {
 		FUNCTION_NAMES.add("glScaled");
 		FUNCTION_NAMES.add("glRotatef");
 
+		FUNCTION_NAMES.add("glCopyTexSubImage2D");
+		FUNCTION_NAMES.add("glMultiTexCoord2f");
+		FUNCTION_NAMES.add("glActiveTexture");
+
 		FUNCTION_NAMES.add("glRotated");
 		FUNCTION_NAMES.add("glTranslatef");
 		FUNCTION_NAMES.add("glBindFramebuffer");
@@ -171,9 +175,12 @@ public class KronosTransformer implements IClassTransformer {
 		FUNCTION_NAMES.add("glEnableClientState");
 		FUNCTION_NAMES.add("glDisableClientState");
 
+		FUNCTION_NAMES.add("glBindVertexArray");
+
 		FUNCTION_NAMES.add("glNewList");
 		FUNCTION_NAMES.add("glEndList");
 		FUNCTION_NAMES.add("glCallList");
+		FUNCTION_NAMES.add("glColorMask");
 
 		FUNCTION_NAMES.add("glFog");
 		FUNCTION_NAMES.add("glFogf");

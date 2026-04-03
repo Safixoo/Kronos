@@ -3,6 +3,7 @@ package dev.safixo.core.hooks;
 import dev.safixo.client.render.ImprovedTessellator;
 import dev.safixo.client.render.gfx.util.GpuFlags;
 import dev.safixo.client.render.pipelines.cloud.CloudRenderer;
+import dev.safixo.client.render.pipelines.entity_model.AdvModelRenderer;
 import dev.safixo.client.render.pipelines.terrain.SectionManager;
 import dev.safixo.client.render.vertex.VertexWriter;
 import dev.safixo.client.util.FastLongHashMap;
@@ -73,6 +74,7 @@ public  class RenderGlobalHook {
 
 	private static void clearBuffers() {
 		VertexWriter.clearBuffers();
+		AdvModelRenderer.cleanupEntityModelPool();
 	}
 
 	// Executed only in the first pass of renderWorld.

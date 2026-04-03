@@ -37,34 +37,23 @@ public class GlVertexArrayObject {
 		GL30.glDeleteVertexArrays(this.id);
 	}
 
-	public void generateHandle() {
-		this.id = GL30.glGenVertexArrays();
-	}
-
 	public int getHandle() {
 		return this.id;
 	}
 
 	public void bind(GlVertexBuffer vbo) {
+		if (this.vertexFormat == null && this.id == 0x80000000) {
+			this.id = GL30.glGenVertexArrays();
+		}
+
 		if (this.id == 0x80000000) {
 			this.saveStateInVao(vbo);
 		}
 
-		bindVertexArray(this.id);
+		GL30.glBindVertexArray(this.id);
 	}
 
 	public void unbind() {
-		bindVertexArray(0);
-	}
-
-	static int LAST_VAO = -777;
-
-	public static void bindVertexArray(int vao) {
-		if (LAST_VAO == vao) {
-			return;
-		}
-
-		LAST_VAO = vao;
-		GL30.glBindVertexArray(vao);
+		GL30.glBindVertexArray(0);
 	}
 }

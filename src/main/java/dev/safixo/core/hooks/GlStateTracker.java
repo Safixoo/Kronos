@@ -15,7 +15,7 @@ import java.util.Arrays;
 
 @SuppressWarnings("unused")
 public class GlStateTracker {
-	public static final boolean SKIP_CACHE = true;
+	public static final boolean SKIP_CACHE = false;
 	private static final byte[] CAP_BITS = new byte[32827];
 
 	private static final byte UNDEFINED = 0b01;
@@ -90,7 +90,7 @@ public class GlStateTracker {
 	}
 
 	public static void glDepthFunc(int mask) {
-		if (mask != LAST_DEPTH_FUNC) {
+		if (mask != LAST_DEPTH_FUNC || SKIP_CACHE) {
 			LAST_DEPTH_FUNC = mask;
 			flushDrawState();
 			GL11.glDepthFunc(mask);
@@ -100,9 +100,8 @@ public class GlStateTracker {
 	public static void glColor3f(float red, float green, float blue) {
 		int color = ColorBGRManager.packColor(red, green, blue) | LAST_COLOR & 0xFF_000000;
 
-		if (color != LAST_COLOR) {
+		if (color != LAST_COLOR || SKIP_CACHE) {
 			LAST_COLOR = color;
-
 			flushDrawState();
 			GL11.glColor3f(red, green, blue);
 		}
@@ -111,7 +110,7 @@ public class GlStateTracker {
 	public static void glColor4f(float red, float green, float blue, float alpha) {
 		int color = ColorBGRManager.packColor(red, green, blue) | ((int) (alpha * 255.0f) << 24);
 
-		if (color != LAST_COLOR) {
+		if (color != LAST_COLOR || SKIP_CACHE) {
 			LAST_COLOR = color;
 			flushDrawState();
 			GL11.glColor4f(red, green, blue, alpha);
@@ -121,7 +120,7 @@ public class GlStateTracker {
 	public static void glBindTexture(int target, int texture) {
 		flushDrawState();
 
-		if (CURRENT_UNIT == -1) {
+		if (CURRENT_UNIT == -1 || SKIP_CACHE) {
 			GL11.glBindTexture(target, texture);
 		} else if (texture != TEXTURE_PER_UNIT[CURRENT_UNIT]) {
 			GL11.glBindTexture(target, texture);
@@ -132,7 +131,7 @@ public class GlStateTracker {
 	public static int LAST_VBO_ID = -1;
 
 	public static void glBindBuffer(int target, int id) {
-		if (target == GL15.GL_ARRAY_BUFFER) {
+		if (target == GL15.GL_ARRAY_BUFFER && !SKIP_CACHE) {
 			if (id == LAST_VBO_ID) {
 				return;
 			}
@@ -219,7 +218,7 @@ public class GlStateTracker {
 	}
 
 	public static void glMatrixMode(int mode) {
-		if (MAT_MODE != mode) {
+		if (MAT_MODE != mode || SKIP_CACHE) {
 			flushDrawState();
 
 			if (mode == GL11.GL_PROJECTION) {
@@ -271,10 +270,15 @@ public class GlStateTracker {
 	public static void glViewport(int x, int y, int width, int height) {
 		int mask = width | height << 16;
 
-		if (mask != LAST_VIEWPORT_WH) {
+		if (mask != LAST_VIEWPORT_WH || SKIP_CACHE) {
 			LAST_VIEWPORT_WH = mask;
 			GL11.glViewport(x, y, width, height);
 		}
+	}
+
+	public static void glColorMask(boolean red, boolean green, boolean blue, boolean alpha) {
+		flushDrawState();
+		GL11.glColorMask(red, green, blue, alpha);
 	}
 
 	public static int glGetInteger(int name) {
@@ -282,15 +286,39 @@ public class GlStateTracker {
 	}
 
 	public static void glActiveTexture(int activeTex) {
-		if (activeTex != CURRENT_UNIT) {
+		if (activeTex != CURRENT_UNIT || SKIP_CACHE) {
 			flushDrawState();
 			GL13.glActiveTexture(activeTex);
-			CURRENT_UNIT = activeTex;
+			CURRENT_UNIT = GL13.GL_TEXTURE0 - activeTex;
+		}
+	}
+
+	public static int LAST_VAO = -1;
+
+	public static void glBindVertexArray(int vao) {
+		if (LAST_VAO == vao) {
+			return;
+		}
+
+		LAST_VAO = vao;
+		GL30.glBindVertexArray(vao);
+	}
+
+	public static int LASTM = -1;
+	public static float MU, MV;
+
+	public static void glMultiTexCoord2f(int s, float u, float v) {
+		if (LASTM != s || MU != u || MV != v) {
+			LASTM = s;
+			MU = u;
+			MV = v;
+
+			GL13.glMultiTexCoord2f(s, u, v);
 		}
 	}
 
 	public static void glGetInteger(int name, IntBuffer buffer) {
-		if (name == GL11.GL_VIEWPORT) {
+		if (name == GL11.GL_VIEWPORT && !SKIP_CACHE) {
 			int position = buffer.position();
 			buffer.put(0);
 			buffer.put(0);
@@ -310,6 +338,11 @@ public class GlStateTracker {
 	public static void glDepthMask(boolean mask) {
 		flushDrawState();
 		GL11.glDepthMask(mask);
+	}
+
+	public static void glCopyTexSubImage2D(int target, int level, int xoffset, int yoffset, int x, int y, int width, int height) {
+		flushDrawState();
+		GL11.glCopyTexSubImage2D(target, level, xoffset, yoffset, x, y, width, height);
 	}
 
 	public static void glBegin(int mode) {
@@ -347,7 +380,7 @@ public class GlStateTracker {
 	public static void glColorMaterial(int face, int mode) {
 		long mask = (face & 0xFFFFFFFFL) << 32L | (mode & 0xFFFFFFFFL);
 
-		if (LAST_COLOR_MATERIAL != mask) {
+		if (LAST_COLOR_MATERIAL != mask || SKIP_CACHE) {
 			flushDrawState();
 			GL11.glColorMaterial(face, mode);
 			LAST_COLOR_MATERIAL = mask;
@@ -366,10 +399,6 @@ public class GlStateTracker {
 	}
 
 	public static void glScalef(float x, float y, float z) {
-		if (CAP_BITS[GL12.GL_RESCALE_NORMAL] == DEFINED_ENABLED) {
-			return;
-		}
-
 		flushDrawState();
 		CURRENT_STACK.top().scale(x, y, z);
 
@@ -434,11 +463,6 @@ public class GlStateTracker {
 	public static void glNewList(int list, int drawMode) {
 		flushDrawState();
 		GL11.glNewList(list, drawMode);
-	}
-
-	public static void glColorMask(boolean a, boolean b, boolean c, boolean d) {
-		flushDrawState();
-		GL11.glColorMask(a, b, c, d);
 	}
 
 	public static void glBlendFunc(int a, int b) {
