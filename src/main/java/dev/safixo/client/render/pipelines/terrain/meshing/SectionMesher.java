@@ -99,10 +99,10 @@ public class SectionMesher {
 				}
 			}
 
-			processCullFaces(section, sectionCache, solidFaces);
+			processCullFaces(section, solidFaces);
 
-			if (SectionFlags.getCullFaces(section.flags) != 0b111_111) {
-				// 15x15x15 center blocks.
+			if ((SectionFlags.getCullFaces(section.flags) & 0b111_111) != 0b111_111) {
+				// 14x14x14 center blocks.
 				for (int y = 1; y < 15; y++) {
 					for (int z = 1; z < 15; z++) {
 						for (int x = 1; x < 15; x++) {
@@ -112,6 +112,8 @@ public class SectionMesher {
 				}
 			}
 			tileSet.addAll(section.tileEntities);
+		} else {
+			section.flags = SectionFlags.setCullFaces(section.flags, 0b0);
 		}
 
 		int sumVertices = sumAllSolidVertices();
@@ -281,7 +283,7 @@ public class SectionMesher {
 		}
 	}
 
-	private static void processCullFaces(SectionRender section, SectionCache sectionCache, int[] cullFaces) {
+	private static void processCullFaces(SectionRender section, int[] cullFaces) {
 		int solidFacesMask = 0;
 
 		for (int dir = 0; dir < COUNT; dir++) {
@@ -290,7 +292,6 @@ public class SectionMesher {
 			}
 		}
 
-		section.flags = SectionFlags.setAdjacentMask(section.flags, SectionFlags.getAdjacentMask(section.flags));
 		section.flags = SectionFlags.setCullFaces(section.flags, solidFacesMask);
 	}
 
