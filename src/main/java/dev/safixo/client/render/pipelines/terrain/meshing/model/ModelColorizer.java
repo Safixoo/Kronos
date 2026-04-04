@@ -1,4 +1,4 @@
-package dev.safixo.client.render.pipelines.terrain.meshing;
+package dev.safixo.client.render.pipelines.terrain.meshing.model;
 
 import dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache;
 import dev.safixo.client.util.MathExt;
@@ -12,10 +12,13 @@ import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.terraingen.BiomeEvent;
 
 public class ModelColorizer {
+	public static final int DYNAMIC_COLOR = 0;
 	public static final int GRASS_COLOR = 1;
 	public static final int LEAVES_COLOR = 2;
 	public static final int WATER_COLOR = 3;
 	public static final int DEFAULT_COLOR = 4;
+
+	public static final int MAX_COLOR_TYPES = 5;
 
 	private static final int SAMPLE_SIZE = MathExt.square(SectionCache.BIOME_RADIUS * 2 + 1);
 
@@ -27,22 +30,17 @@ public class ModelColorizer {
 		int colorizeType = PrimitivesFlags.COLOR_MODULATOR[block.blockID];
 
 		if (cache.isBiomeUniform()) {
-			switch (colorizeType) {
-				case DEFAULT_COLOR: return 0xFF_FF_FF_FF;
-				case GRASS_COLOR: return cache.grassColor;
-				case LEAVES_COLOR: return cache.foliageColor;
-				case WATER_COLOR: return cache.waterColor;
-				default: return block.colorMultiplier(cache, x, y, z); // slow path.
-			}
-		} else {
-			switch (colorizeType) {
-				case DEFAULT_COLOR: return 0xFF_FF_FF_FF;
-				case GRASS_COLOR: return this.getBlockGrassColor(cache, x, y, z);
-				case LEAVES_COLOR: return this.getBlockLeavesColor(cache, x, y, z);
-				case WATER_COLOR: return this.getBlockWaterColor(cache, x, y, z);
-				default: return block.colorMultiplier(cache, x, y, z); // slow path.
-			}
+			return cache.biomeColors[colorizeType];
 		}
+
+		switch (colorizeType) {
+			case DEFAULT_COLOR: return 0xFFFFFF;
+			case GRASS_COLOR: return this.getBlockGrassColor(cache, x, y, z);
+			case LEAVES_COLOR: return this.getBlockLeavesColor(cache, x, y, z);
+			case WATER_COLOR: return this.getBlockWaterColor(cache, x, y, z);
+		}
+
+		return block.colorMultiplier(cache, x, y, z);
 	}
 
 	public int getBlockLeavesColor(SectionCache cache, int x, int y, int z) {
@@ -64,9 +62,9 @@ public class ModelColorizer {
 				BiomeGenBase biome = cache.getBiomeGenForCoords(x + relX, z + relZ);
 				int color = this.getBiomeFoliageColor(biome);
 
-				b += (color & 0xFF0000) >>> 16;
-				g += (color & 0x00FF00) >>> 8;
-				r += (color & 0x0000FF) >>> 0;
+				b += (color & 0xFF0000);
+				g += (color & 0x00FF00);
+				r += (color & 0x0000FF);
 			}
 		}
 
@@ -74,7 +72,7 @@ public class ModelColorizer {
 		r /= SAMPLE_SIZE;
 		g /= SAMPLE_SIZE;
 		b /= SAMPLE_SIZE;
-		return (b & 0xFF) << 16 | (g & 0xFF) << 8 | (r & 0xFF);
+		return (b & 0xFF0000) | (g & 0x00FF00) | (r & 0x0000FF);
 	}
 
 	public int getBlockGrassColor(SectionCache cache, int x, int y, int z) {
@@ -87,16 +85,16 @@ public class ModelColorizer {
 				BiomeGenBase biome = cache.getBiomeGenForCoords(x + relX, z + relZ);
 				int color = this.getBiomeGrassColor(biome);
 
-				b += (color & 0xFF0000) >>> 16;
-				g += (color & 0x00FF00) >>> 8;
-				r += (color & 0x0000FF) >>> 0;
+				b += (color & 0xFF0000);
+				g += (color & 0x00FF00);
+				r += (color & 0x0000FF);
 			}
 		}
 
 		r /= SAMPLE_SIZE;
 		g /= SAMPLE_SIZE;
 		b /= SAMPLE_SIZE;
-		return (b & 0xFF) << 16 | (g & 0xFF) << 8 | (r & 0xFF);
+		return (b & 0xFF0000) | (g & 0x00FF00) | (r & 0x0000FF);
 	}
 
 	public int getBlockWaterColor(SectionCache cache, int x, int y, int z) {
@@ -109,44 +107,24 @@ public class ModelColorizer {
 				BiomeGenBase biome = cache.getBiomeGenForCoords(x + relX, z + relZ);
 				int color = this.getWaterColorEvent(biome);
 
-				b += (color & 0xFF0000) >>> 16;
-				g += (color & 0x00FF00) >>> 8;
-				r += (color & 0x0000FF) >>> 0;
+				b += (color & 0xFF0000);
+				g += (color & 0x00FF00);
+				r += (color & 0x0000FF);
 			}
 		}
 
 		r /= SAMPLE_SIZE;
 		g /= SAMPLE_SIZE;
 		b /= SAMPLE_SIZE;
-		return (b & 0xFF) << 16 | (g & 0xFF) << 8 | (r & 0xFF);
+		return (b & 0xFF0000) | (g & 0x00FF00) | (r & 0x0000FF);
 	}
 
 	private int getBiomeGrassColor(BiomeGenBase biome) {
-		double temp = MathExt.clamp(biome.getFloatTemperature(), 0.0F, 1.0F);
-		double rainFall = MathExt.clamp(biome.getFloatRainfall(), 0.0F, 1.0F);
-		int color;
-
-		if (biome.getClass() == BiomeGenSwamp.class) {
-			color = ((ColorizerGrass.getGrassColor(temp, rainFall) & 0xFEFEFE) + 0x4E0E4E) >> 1;
-		} else {
-			color = ColorizerGrass.getGrassColor(temp, rainFall);
-		}
-
-		return this.getGrassColorEvent(biome, color);
+		return this.getGrassColorEvent(biome, PrimitivesFlags.GRASS_COLOR[biome.biomeID]);
 	}
 
 	private int getBiomeFoliageColor(BiomeGenBase biome) {
-		double temp = MathExt.clamp(biome.getFloatTemperature(), 0.0F, 1.0F);
-		double rainFall = MathExt.clamp(biome.getFloatRainfall(), 0.0F, 1.0F);
-		int color;
-
-		if (biome.getClass() == BiomeGenSwamp.class) {
-			color = ((ColorizerFoliage.getFoliageColor(temp, rainFall) & 0xFEFEFE) + 0x4E0E4E) >> 1;
-		} else {
-			color = ColorizerFoliage.getFoliageColor(temp, rainFall);
-		}
-
-		return this.getFoliageColorEvent(biome, color);
+		return this.getFoliageColorEvent(biome, PrimitivesFlags.LEAVES_COLOR[biome.biomeID]);
 	}
 
 	private int getWaterColorEvent(BiomeGenBase biome) {

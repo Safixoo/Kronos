@@ -1,8 +1,9 @@
-package dev.safixo.client.render.pipelines.terrain.meshing.vanilla;
+package dev.safixo.client.render.pipelines.terrain.meshing.builders;
 
-import dev.safixo.client.render.pipelines.terrain.meshing.FullBlockMesher;
-import dev.safixo.client.render.pipelines.terrain.meshing.ModelColorizer;
+import dev.safixo.client.render.pipelines.terrain.meshing.model.ModelColorizer;
 import dev.safixo.client.render.pipelines.terrain.meshing.data.FacingRender;
+import dev.safixo.client.render.pipelines.terrain.meshing.model.ModelHelper;
+import dev.safixo.client.render.pipelines.terrain.meshing.model.ModelLighter;
 import dev.safixo.client.util.AtlasSpriteUnsafe;
 import dev.safixo.client.util.Direction;
 import dev.safixo.client.util.data.PrimitivesFlags;
@@ -14,7 +15,7 @@ import net.minecraft.util.Icon;
 import net.minecraft.world.IBlockAccess;
 import org.joml.Vector3i;
 
-import static dev.safixo.client.render.pipelines.terrain.meshing.vanilla.ModelHelper.*;
+import static dev.safixo.client.render.pipelines.terrain.meshing.model.ModelHelper.*;
 import static dev.safixo.client.util.ColorBGRManager.*;
 import static dev.safixo.client.util.Direction.*;
 import static dev.safixo.client.util.Direction.EAST;
@@ -79,9 +80,9 @@ public class VanillaBlockMesher {
 			int dirColor;
 
 			if (color != 0xFFFFFF && block != Block.grass || dir == UP) {
-				dirColor = multiplyColor(color, FullBlockMesher.SHADE_FULL_FACTOR[dir]);
+				dirColor = multiplyColor(color, VoxelMesher.SHADE_FULL_FACTOR[dir]);
 			} else {
-				dirColor = FullBlockMesher.SHADE_FULL_COLOR[dir];
+				dirColor = VoxelMesher.SHADE_FULL_COLOR[dir];
 			}
 
 			Icon currentTex = blocks.overrideBlockTexture != null ? blocks.overrideBlockTexture : block.getBlockTexture(cache, x, y, z, dir);

@@ -23,7 +23,7 @@ public class KronosTransformer implements IClassTransformer {
 	static final String ADV_MODEL_RENDERER = "dev/safixo/client/render/pipelines/entity_model/AdvModelRenderer";
 
 	static final String REBUILD_LISTENER = "dev/safixo/client/render/pipelines/terrain/meshing/RebuildListener";
-	static final String VANILLA_MESHER = "dev/safixo/client/render/pipelines/terrain/meshing/vanilla/VanillaBlockMesher";
+	static final String VANILLA_MESHER = "dev/safixo/client/render/pipelines/terrain/meshing/builders/VanillaBlockMesher";
 
 	static final String RENDER_BLOCKS = "net.minecraft.client.renderer.RenderBlocks";
 	static final String RENDER_GLOBAL = "net.minecraft.client.renderer.RenderGlobal";

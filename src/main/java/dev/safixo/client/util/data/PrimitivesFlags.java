@@ -1,11 +1,16 @@
 package dev.safixo.client.util.data;
 
-import dev.safixo.client.render.pipelines.terrain.meshing.ModelColorizer;
+import dev.safixo.client.render.pipelines.terrain.meshing.model.ModelColorizer;
+import dev.safixo.client.util.MathExt;
 import net.minecraft.block.*;
 import net.minecraft.block.material.Material;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderGlobal;
+import net.minecraft.world.ColorizerFoliage;
+import net.minecraft.world.ColorizerGrass;
 import net.minecraft.world.IBlockAccess;
+import net.minecraft.world.biome.BiomeGenBase;
+import net.minecraft.world.biome.BiomeGenSwamp;
 
 import java.lang.reflect.Method;
 
@@ -34,6 +39,9 @@ public class PrimitivesFlags {
 	private static final int[] LEAVES_INDICES = new int[4096];
 	public static final byte[] COLOR_MODULATOR = new byte[4096];
 
+	public static final int[] LEAVES_COLOR = new int[256];
+	public static final int[] GRASS_COLOR = new int[256];
+
 	public static void computeFlagArrays() {
 		LEAVES_TOP_INDEX = 0;
 
@@ -51,6 +59,36 @@ public class PrimitivesFlags {
 			SOLID_LIGHT_MASK[i] = (byte) (((block != null && block.isOpaqueCube()) || block instanceof BlockLeaves) ? 1 : 0);
 			TILE_ENTITY[i] = block != null && block.hasTileEntity(0);
 			RENDER_PASS[i] = block == null ? -777 : (short) block.getRenderBlockPass();
+		}
+
+		for (int i = 0; i < 256; i++) {
+			BiomeGenBase biome = BiomeGenBase.biomeList[i];
+
+			if (biome == null) {
+				continue;
+			}
+
+			double temp = MathExt.clamp(biome.getFloatTemperature(), 0.0F, 1.0F);
+			double rainFall = MathExt.clamp(biome.getFloatRainfall(), 0.0F, 1.0F);
+
+			int grassColor;
+
+			if (biome.getClass() == BiomeGenSwamp.class) {
+				grassColor = ((ColorizerGrass.getGrassColor(temp, rainFall) & 0xFEFEFE) + 0x4E0E4E) >> 1;
+			} else {
+				grassColor = ColorizerGrass.getGrassColor(temp, rainFall);
+			}
+
+			int foliageColor;
+
+			if (biome.getClass() == BiomeGenSwamp.class) {
+				foliageColor = ((ColorizerFoliage.getFoliageColor(temp, rainFall) & 0xFEFEFE) + 0x4E0E4E) >> 1;
+			} else {
+				foliageColor = ColorizerFoliage.getFoliageColor(temp, rainFall);
+			}
+
+			GRASS_COLOR[i] = grassColor;
+			LEAVES_COLOR[i] = foliageColor;
 		}
 	}
 
@@ -94,7 +132,7 @@ public class PrimitivesFlags {
 			} else if (colorized.getDeclaringClass() == BlockLeaves.class) {
 				COLOR_MODULATOR[i] = ModelColorizer.LEAVES_COLOR;
 			} else {
-				// dynamic dispatch at runtime.
+				COLOR_MODULATOR[i] = ModelColorizer.DYNAMIC_COLOR;
 			}
 		}
 	}

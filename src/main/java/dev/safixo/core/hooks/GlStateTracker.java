@@ -35,10 +35,10 @@ public class GlStateTracker {
 	public static float FOG_START, FOG_END, FOG_DENSITY;
 	public static float FOG_COLOR_R, FOG_COLOR_G, FOG_COLOR_B;
 
-	private static final Matrix4Stack MODEL_VIEW_STACK = new Matrix4Stack(256);
-	private static final Matrix4Stack PROJECTION_STACK = new Matrix4Stack(256);
-	private static final Matrix4Stack TEXTURE_STACK = new Matrix4Stack(8);
-	private static final Matrix4Stack NULL_STACK = new Matrix4Stack(256);
+	public static final Matrix4Stack MODEL_VIEW_STACK = new Matrix4Stack(256);
+	public static final Matrix4Stack PROJECTION_STACK = new Matrix4Stack(256);
+	public static final Matrix4Stack TEXTURE_STACK = new Matrix4Stack(8);
+	public static final Matrix4Stack NULL_STACK = new Matrix4Stack(256);
 
 	public static Matrix4Stack CURRENT_STACK = PROJECTION_STACK;
 	public static String VENDOR;
