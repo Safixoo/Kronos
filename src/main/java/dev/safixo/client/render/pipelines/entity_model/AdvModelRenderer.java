@@ -9,6 +9,7 @@ import dev.safixo.client.util.Matrix4Stack;
 import dev.safixo.client.util.memory.NativeBuffer;
 import dev.safixo.client.util.memory.UnsafeUtil;
 import dev.safixo.core.hooks.GLFunctions;
+import it.unimi.dsi.fastutil.objects.ReferenceArrayList;
 import net.minecraft.client.model.ModelBox;
 import net.minecraft.client.model.ModelRenderer;
 import net.minecraft.client.renderer.Tessellator;
@@ -23,7 +24,7 @@ import static dev.safixo.client.util.data.PrimitivesFlags.*;
 public class AdvModelRenderer {
 	private static final long DISPLAY_LIST_OFFSET;
 	private static final long COMPILED;
-	
+
 	private static final long PTR_BUFFER = NativeBuffer.nmemAlloc(16 * 4) - Matrix4Stack.M00_OFFSET;
 	private static final FloatBuffer BUFFER = NativeBuffer.wrap(PTR_BUFFER + Matrix4Stack.M00_OFFSET).asFloatBuffer();
 	private static final Matrix4f MATRIX = new Matrix4f();
@@ -34,6 +35,8 @@ public class AdvModelRenderer {
 
 	// Current offset for writing in the vertex buffer.
 	private static int OFFSET = 0;
+
+	private static final ReferenceArrayList<ModelRenderer> MODELS = new ReferenceArrayList<>();
 
 	static {
 		long offset;
@@ -117,7 +120,7 @@ public class AdvModelRenderer {
 			}
 
 			GL30.glBindVertexArray(VERTEX_ARRAY.getHandle());
-			GL11.glDrawArrays(GL11.GL_QUADS, offset / 24, vertices);
+			GL11.glDrawArrays(GL11.GL_QUADS, offset, vertices);
 
 			if (model.childModels != null) {
 				for (int i = 0; i < model.childModels.size(); i++) {
@@ -150,7 +153,7 @@ public class AdvModelRenderer {
 			GLFunctions.glMultMatrix(BUFFER);
 
 			GL30.glBindVertexArray(VERTEX_ARRAY.getHandle());
-			GL11.glDrawArrays(GL11.GL_QUADS, offset / 24, vertices);
+			GL11.glDrawArrays(GL11.GL_QUADS, offset, vertices);
 
 			if (model.childModels != null) {
 				for (int i = 0; i < model.childModels.size(); i++) {
@@ -194,6 +197,7 @@ public class AdvModelRenderer {
 		VertexWriter writer = new VertexWriter(512);
 
 		REDIRECT_DRAWING = true;
+		MODELS.add(model);
 
 		writer.startDrawing();
 		writer.setVertexFormat(DefaultVertexFormats.ENTITY_FORMAT);
@@ -254,5 +258,12 @@ public class AdvModelRenderer {
 		VERTEX_ARRAY = null;
 		VERTEX_BUFFER = null;
 		OFFSET = 0;
+
+		for (ModelRenderer model : MODELS) {
+			setCompiled(model, false);
+			setDisplayList(model, 0);
+		}
+
+		MODELS.clear();
 	}
 }
