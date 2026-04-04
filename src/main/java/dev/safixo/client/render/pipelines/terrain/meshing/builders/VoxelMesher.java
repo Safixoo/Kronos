@@ -1,8 +1,10 @@
-package dev.safixo.client.render.pipelines.terrain.meshing;
+package dev.safixo.client.render.pipelines.terrain.meshing.builders;
 
 import dev.safixo.client.render.pipelines.terrain.meshing.data.FacingRender;
 import dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache;
-import dev.safixo.client.render.pipelines.terrain.meshing.vanilla.ModelHelper;
+import dev.safixo.client.render.pipelines.terrain.meshing.model.ModelColorizer;
+import dev.safixo.client.render.pipelines.terrain.meshing.model.ModelHelper;
+import dev.safixo.client.util.AtlasSpriteUnsafe;
 import dev.safixo.client.util.MathExt;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockGrass;
@@ -18,7 +20,7 @@ import org.joml.Vector3i;
 import static dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache.makeBlockIndex;
 import static dev.safixo.client.util.Direction.*;
 
-public class FullBlockMesher {
+public class VoxelMesher {
 	public static final ModelColorizer MODEL_COLORIZER = new ModelColorizer();
 	public static final int[] MAP_ID_TO_UV = new int[4 * 4];
 
@@ -30,11 +32,9 @@ public class FullBlockMesher {
 	private static final Icon SIDE_GRASS_NON_OVERLAY = Block.grass.getIcon(5, 5);
 	public static final float[] SIDE_LIGHT_MULTIPLIER = new float[] { 0.5F, 1.0F, 0.8F, 0.8F, 0.6F, 0.6F };
 
-	public static void renderSolidCube(Block block, SectionCache cache, int x, int y, int z, boolean ambient, int drawSet, int blockId) {
-		if (drawSet == 0) {
-			return;
-		}
+	private static final int BLOCK_GRASS_ID = Block.grass.blockID;
 
+	public static void meshVoxel(Block block, SectionCache cache, int x, int y, int z, boolean ambient, int drawSet, int blockId) {
 		if (!PrimitivesFlags.DIRECT_CULL[blockId]) {
 			drawSet |= block.shouldSideBeRendered(cache, x, y - 1, z, 0) ? 1 << DOWN : 0;
 			drawSet |= block.shouldSideBeRendered(cache, x, y + 1, z, 1) ? 1 << UP : 0;
@@ -53,20 +53,27 @@ public class FullBlockMesher {
 			}
 
 			VertexWriter.setCurrentInstance(VertexWriter.SOLID[dir]);
-
 			Icon tex = block.getBlockTexture(cache, x, y, z, dir);
-			FacingRender render = FACE_RENDER[dir];
 
-			boolean shouldColor = modelColor != 0xFFFFFF && blockId != Block.grass.blockID || dir == UP;
+			int blockColor;
+			int overlayColor;
 
-			int blockColor = shouldColor ? ColorBGRManager.multiplyColor(modelColor, SHADE_FULL_FACTOR[dir]) : SHADE_FULL_COLOR[dir];
-			int overlayColor = tex == SIDE_GRASS_NON_OVERLAY && !shouldColor ? ColorBGRManager.multiplyColorByColor(modelColor, blockColor) : blockColor;
+			if (modelColor != 0xFFFFFF && blockId != BLOCK_GRASS_ID || dir == UP) {
+				blockColor = ColorBGRManager.multiplyColor(modelColor, SHADE_FULL_FACTOR[dir]);
+				overlayColor = blockColor;
+			} else {
+				blockColor = SHADE_FULL_COLOR[dir];
+				overlayColor = tex == SIDE_GRASS_NON_OVERLAY ? ColorBGRManager.multiplyColorByColor(modelColor, blockColor) : blockColor;
+			}
 
 			final float[] uvs = TEX_UVS;
+
 			uvs[0] = tex.getMinU();
 			uvs[1] = tex.getMinV();
 			uvs[2] = tex.getMaxU();
 			uvs[3] = tex.getMaxV();
+
+			FacingRender render = FACE_RENDER[dir];
 
 			if (ambient) {
 				renderFace(render, tex, cache, x, y, z, blockColor, overlayColor);
@@ -153,15 +160,15 @@ public class FullBlockMesher {
 		float[] texUv = TEX_UVS;
 
 		if (flip) {
-			addVertex(writer, face, 0, x, y, z, texUv[uv0 & 0xFF], texUv[uv0 >>> 8], color0, light0);
-			addVertex(writer, face, 1, x, y, z, texUv[uv1 & 0xFF], texUv[uv1 >>> 8], color1, light1);
-			addVertex(writer, face, 2, x, y, z, texUv[uv2 & 0xFF], texUv[uv2 >>> 8], color2, light2);
-			addVertex(writer, face, 3, x, y, z, texUv[uv3 & 0xFF], texUv[uv3 >>> 8], color3, light3);
+			addVertex(writer, face, 0 * 9, x, y, z, texUv[uv0 & 0xFF], texUv[uv0 >>> 8], color0, light0);
+			addVertex(writer, face, 1 * 9, x, y, z, texUv[uv1 & 0xFF], texUv[uv1 >>> 8], color1, light1);
+			addVertex(writer, face, 2 * 9, x, y, z, texUv[uv2 & 0xFF], texUv[uv2 >>> 8], color2, light2);
+			addVertex(writer, face, 3 * 9, x, y, z, texUv[uv3 & 0xFF], texUv[uv3 >>> 8], color3, light3);
 		} else {
-			addVertex(writer, face, 3, x, y, z, texUv[uv3 & 0xFF], texUv[uv3 >>> 8], color3, light3);
-			addVertex(writer, face, 0, x, y, z, texUv[uv0 & 0xFF], texUv[uv0 >>> 8], color0, light0);
-			addVertex(writer, face, 1, x, y, z, texUv[uv1 & 0xFF], texUv[uv1 >>> 8], color1, light1);
-			addVertex(writer, face, 2, x, y, z, texUv[uv2 & 0xFF], texUv[uv2 >>> 8], color2, light2);
+			addVertex(writer, face, 3 * 9, x, y, z, texUv[uv3 & 0xFF], texUv[uv3 >>> 8], color3, light3);
+			addVertex(writer, face, 0 * 9, x, y, z, texUv[uv0 & 0xFF], texUv[uv0 >>> 8], color0, light0);
+			addVertex(writer, face, 1 * 9, x, y, z, texUv[uv1 & 0xFF], texUv[uv1 >>> 8], color1, light1);
+			addVertex(writer, face, 2 * 9, x, y, z, texUv[uv2 & 0xFF], texUv[uv2 >>> 8], color2, light2);
 		}
 
 		if (tex == SIDE_GRASS_NON_OVERLAY) {
@@ -172,15 +179,15 @@ public class FullBlockMesher {
 			color3 = ColorBGRManager.multiplyColor(overlayColor, ao3);
 
 			if (flip) {
-				addVertex(writer, face, 0, x, y, z, texUv[uv0 & 0xFF], texUv[uv0 >>> 8], color0, light0);
-				addVertex(writer, face, 1, x, y, z, texUv[uv1 & 0xFF], texUv[uv1 >>> 8], color1, light1);
-				addVertex(writer, face, 2, x, y, z, texUv[uv2 & 0xFF], texUv[uv2 >>> 8], color2, light2);
-				addVertex(writer, face, 3, x, y, z, texUv[uv3 & 0xFF], texUv[uv3 >>> 8], color3, light3);
+				addVertex(writer, face, 0 * 9, x, y, z, texUv[uv0 & 0xFF], texUv[uv0 >>> 8], color0, light0);
+				addVertex(writer, face, 1 * 9, x, y, z, texUv[uv1 & 0xFF], texUv[uv1 >>> 8], color1, light1);
+				addVertex(writer, face, 2 * 9, x, y, z, texUv[uv2 & 0xFF], texUv[uv2 >>> 8], color2, light2);
+				addVertex(writer, face, 3 * 9, x, y, z, texUv[uv3 & 0xFF], texUv[uv3 >>> 8], color3, light3);
 			} else {
-				addVertex(writer, face, 3, x, y, z, texUv[uv3 & 0xFF], texUv[uv3 >>> 8], color3, light3);
-				addVertex(writer, face, 0, x, y, z, texUv[uv0 & 0xFF], texUv[uv0 >>> 8], color0, light0);
-				addVertex(writer, face, 1, x, y, z, texUv[uv1 & 0xFF], texUv[uv1 >>> 8], color1, light1);
-				addVertex(writer, face, 2, x, y, z, texUv[uv2 & 0xFF], texUv[uv2 >>> 8], color2, light2);
+				addVertex(writer, face, 3 * 9, x, y, z, texUv[uv3 & 0xFF], texUv[uv3 >>> 8], color3, light3);
+				addVertex(writer, face, 0 * 9, x, y, z, texUv[uv0 & 0xFF], texUv[uv0 >>> 8], color0, light0);
+				addVertex(writer, face, 1 * 9, x, y, z, texUv[uv1 & 0xFF], texUv[uv1 >>> 8], color1, light1);
+				addVertex(writer, face, 2 * 9, x, y, z, texUv[uv2 & 0xFF], texUv[uv2 >>> 8], color2, light2);
 			}
 		}
 	}
@@ -210,7 +217,8 @@ public class FullBlockMesher {
 	}
 
 	private static void addVertex(VertexWriter writer, FacingRender face, int vertInd, int x, int y, int z, float u, float v, int color, int lightMap) {
-		int vertOff = (int) (face.quadVert >>> (9 * vertInd));
+		int vertOff = (int) (face.quadVert >>> vertInd);
+
 		int relX = x + (vertOff & 0b111);
 		vertOff >>>= 3;
 		int relY = y + (vertOff & 0b111);

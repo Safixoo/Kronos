@@ -1,7 +1,6 @@
 package dev.safixo.client.render.pipelines.terrain.meshing.data;
 
-import dev.safixo.client.render.pipelines.terrain.meshing.UniformFakeBiome;
-import dev.safixo.client.render.pipelines.terrain.meshing.ModelColorizer;
+import dev.safixo.client.render.pipelines.terrain.meshing.model.ModelColorizer;
 import dev.safixo.client.util.MathExt;
 import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;
@@ -19,7 +18,7 @@ import dev.safixo.client.util.data.PrimitivesFlags;
 import java.util.Arrays;
 
 public class SectionCache implements IBlockAccess {
-	private static final UniformFakeBiome FAKE_BIOME = new UniformFakeBiome(Integer.MAX_VALUE);
+	private static final FakeInlinedBiome FAKE_BIOME = new FakeInlinedBiome(Integer.MAX_VALUE);
 	private static final Chunk[] CHUNKS = new Chunk[3 * 3];
 	private static final ModelColorizer COLORIZER = new ModelColorizer();
 
@@ -36,7 +35,9 @@ public class SectionCache implements IBlockAccess {
 
 	public static final int BIOME_RADIUS = 1;
 	private static final int BIOME_CHUNK_WIDTH = 16 + (BIOME_RADIUS * 2);
+
 	private static final BiomeGenBase[] BIOMES = new BiomeGenBase[BIOME_CHUNK_WIDTH * BIOME_CHUNK_WIDTH];
+	private static final int[] BIOMES_COLOR = new int[BIOME_CHUNK_WIDTH * BIOME_CHUNK_WIDTH];
 
 	public static final byte[][] SECTION_BLOCKS = new byte[3 * 3 * 3][];
 	public static final byte[][] SECTION_DATA = new byte[3 * 3 * 3][];
@@ -44,13 +45,10 @@ public class SectionCache implements IBlockAccess {
 	public static final byte[][] BLOCK_LIGHT = new byte[3 * 3 * 3][];
 
 	private static byte[] CENTER_BLOCKS;
-	private static byte[] CENTER_DATA;
+	private static byte[] CENTER_METADATA;
 
 	private boolean centerSectEmpty;
-
-	public int waterColor;
-	public int foliageColor;
-	public int grassColor;
+	public int[] biomeColors = new int[ModelColorizer.MAX_COLOR_TYPES];
 
 	static {
 		Arrays.fill(SECTION_BLOCKS, DEFAULT_BYTE_ARRAY);
@@ -174,17 +172,22 @@ public class SectionCache implements IBlockAccess {
 			this.uniformBiome = uniformed;
 
 			if (uniformed) {
-				this.grassColor = COLORIZER.getBlockGrassColor(this, this.blockX + 16, this.blockY + 16, this.blockZ + 16);
-				this.foliageColor = COLORIZER.getBlockLeavesColor(this, this.blockX + 16, this.blockY + 16, this.blockZ + 16);
-				this.waterColor = COLORIZER.getBlockWaterColor(this, this.blockX + 16, this.blockY + 16, this.blockZ + 16);
+				int grassColor = COLORIZER.getBlockGrassColor(this, this.blockX + 16, this.blockY + 16, this.blockZ + 16);
+				int foliageColor = COLORIZER.getBlockLeavesColor(this, this.blockX + 16, this.blockY + 16, this.blockZ + 16);
+				int waterColor = COLORIZER.getBlockWaterColor(this, this.blockX + 16, this.blockY + 16, this.blockZ + 16);
 
-				FAKE_BIOME.setColors(this.waterColor, this.foliageColor, this.grassColor);
+				this.biomeColors[ModelColorizer.GRASS_COLOR] = grassColor;
+				this.biomeColors[ModelColorizer.LEAVES_COLOR] = foliageColor;
+				this.biomeColors[ModelColorizer.WATER_COLOR] = waterColor;
+				this.biomeColors[ModelColorizer.DEFAULT_COLOR] = 0xFFFFFFFF;
+
+				FAKE_BIOME.setColors(waterColor, foliageColor, grassColor);
 				Arrays.fill(BIOMES, FAKE_BIOME);
 			}
 		}
 
 		CENTER_BLOCKS = SECTION_BLOCKS[sectionIndex(1, 1, 1)];
-		CENTER_DATA = SECTION_DATA[sectionIndex(1, 1, 1)];
+		CENTER_METADATA = SECTION_DATA[sectionIndex(1, 1, 1)];
 	}
 
 	public static int sectionIndex(int x, int y, int z) {
@@ -244,6 +247,10 @@ public class SectionCache implements IBlockAccess {
 		return MathExt.byteToUnsigned(CENTER_BLOCKS[makeBlockIndex(x & 15, y & 15, z & 15)]);
 	}
 
+	public int getBlockIdCenter(int blockIndex) {
+		return MathExt.byteToUnsigned(CENTER_BLOCKS[blockIndex]);
+	}
+
 	// AFAIK, not used for rendering.
 	public float getBrightness(int x, int y, int z, int min) {
 		return 0;
@@ -272,7 +279,7 @@ public class SectionCache implements IBlockAccess {
 	}
 
 	public int getBlockMetadataCenter(int x, int y, int z) {
-		return getNibble(CENTER_DATA, makeBlockIndex(x & 15, y & 15, z & 15));
+		return getNibble(CENTER_METADATA, makeBlockIndex(x & 15, y & 15, z & 15));
 	}
 
 	@Override
@@ -294,7 +301,7 @@ public class SectionCache implements IBlockAccess {
 		return PrimitivesFlags.SOLID_CULL_MASK[MathExt.byteToUnsigned(SECTION_BLOCKS[sectionIndex][blockIndex])];
 	}
 
-	public int isBlockOpaqueCubeRel(int x, int y, int z) {
+	public int isVoxelFull(int x, int y, int z) {
 		int sectionIndex = sectionIndex(x >> 4, y >> 4, z >> 4);
 		int blockInd = makeBlockIndex(x & 15, y & 15, z & 15);
 
@@ -306,7 +313,7 @@ public class SectionCache implements IBlockAccess {
 		return this.isBlockOpaqueCubeInt(x, y, z) != 0;
 	}
 
-	public int isBlockOpaqueCubeCenter(int blockIndex) {
+	public int isVoxelFullFromCenter(int blockIndex) {
 		return PrimitivesFlags.SOLID_CULL_MASK[MathExt.byteToUnsigned(CENTER_BLOCKS[blockIndex])];
 	}
 

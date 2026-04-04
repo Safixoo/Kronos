@@ -60,7 +60,6 @@ public class GlVertexBuffer {
 		} else {
 			this.bind();
 			GL15.glBufferData(GL15.GL_ARRAY_BUFFER, buffer, this.hint);
-			this.unbind();
 		}
 	}
 

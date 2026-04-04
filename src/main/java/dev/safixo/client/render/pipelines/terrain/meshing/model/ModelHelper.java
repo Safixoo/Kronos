@@ -1,8 +1,6 @@
-package dev.safixo.client.render.pipelines.terrain.meshing.vanilla;
+package dev.safixo.client.render.pipelines.terrain.meshing.model;
 
-import dev.safixo.client.util.Direction;
 import dev.safixo.client.util.data.PrimitivesFlags;
-import net.minecraft.block.Block;
 import net.minecraft.client.renderer.RenderBlocks;
 import net.minecraft.world.IBlockAccess;
 

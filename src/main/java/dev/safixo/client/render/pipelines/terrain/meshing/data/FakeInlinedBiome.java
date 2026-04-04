@@ -1,6 +1,5 @@
-package dev.safixo.client.render.pipelines.terrain.meshing;
+package dev.safixo.client.render.pipelines.terrain.meshing.data;
 
-import dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache;
 import net.minecraft.world.biome.BiomeGenBase;
 
 /**
@@ -8,10 +7,10 @@ import net.minecraft.world.biome.BiomeGenBase;
  * system was a good idea), to avoid the slowness of it I use a fake Biome to colorize faster blocks that I don't
  * have a direct managed pipeline, using in advantage chunks with a unique biome and the usage of {@link SectionCache}.
  */
-public class UniformFakeBiome extends BiomeGenBase {
+public class FakeInlinedBiome extends BiomeGenBase {
 	public int waterColor, foliageColor, grassColor;
 
-	public UniformFakeBiome(int id) {
+	public FakeInlinedBiome(int id) {
 		super(id, false);
 	}
 

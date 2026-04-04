@@ -4,6 +4,7 @@ import dev.safixo.client.render.ImprovedTessellator;
 import dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache;
 import dev.safixo.client.util.ClientChunkListener;
 import dev.safixo.client.util.MathExt;
+import dev.safixo.client.util.Matrix4Stack;
 import dev.safixo.client.util.data.PrimitivesFlags;
 import dev.safixo.client.util.memory.UnsafeUtil;
 import dev.safixo.core.HookUtils;
@@ -13,9 +14,9 @@ import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.world.EnumSkyBlock;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
-import net.minecraft.world.chunk.EmptyChunk;
 import net.minecraft.world.chunk.IChunkProvider;
 import net.minecraft.world.chunk.storage.ExtendedBlockStorage;
+import org.joml.Matrix4f;
 
 @SuppressWarnings("unused")
 public class MinecraftHook {
@@ -40,7 +41,6 @@ public class MinecraftHook {
 
 	public static void renderItemIn2D(Tessellator tes, float minU, float maxV, float maxU, float minV, int width, int height, float scale) {
 		ImprovedTessellator ver = (ImprovedTessellator) tes;
-
 		ver.startDrawingQuads();
 
 		long ptr = ver.vertexPtr + ver.offset;
@@ -50,17 +50,22 @@ public class MinecraftHook {
 			ver.resize();
 		}
 
-		// Front quad.
-		ptr = addVertex(ptr, 0.0F, 0.0F, 0.0F, minU, minV, FRONT_NORMAL);
-		ptr = addVertex(ptr, 1.0F, 0.0F, 0.0F, maxU, minV, FRONT_NORMAL);
-		ptr = addVertex(ptr, 1.0F, 1.0F, 0.0F, maxU, maxV, FRONT_NORMAL);
-		ptr = addVertex(ptr, 0.0F, 1.0F, 0.0F, minU, maxV, FRONT_NORMAL);
+		Matrix4f matrix = GlStateTracker.MODEL_VIEW_STACK.top();
 
-		// Behind quad.
-		ptr = addVertex(ptr, 0.0F, 1.0F, -scale, minU, maxV, BEHIND_NORMAL);
-		ptr = addVertex(ptr, 1.0F, 1.0F, -scale, maxU, maxV, BEHIND_NORMAL);
-		ptr = addVertex(ptr, 1.0F, 0.0F, -scale, maxU, minV, BEHIND_NORMAL);
-		ptr = addVertex(ptr, 0.0F, 0.0F, -scale, minU, minV, BEHIND_NORMAL);
+		if (matrix.m22() > 0) {
+			// Front quad.
+			ptr = addVertex(ptr, 0.0F, 0.0F, 0.0F, minU, minV, FRONT_NORMAL);
+			ptr = addVertex(ptr, 1.0F, 0.0F, 0.0F, maxU, minV, FRONT_NORMAL);
+			ptr = addVertex(ptr, 1.0F, 1.0F, 0.0F, maxU, maxV, FRONT_NORMAL);
+			ptr = addVertex(ptr, 0.0F, 1.0F, 0.0F, minU, maxV, FRONT_NORMAL);
+		}
+		if (matrix.m22() < 0) {
+			// Behind quad.
+			ptr = addVertex(ptr, 0.0F, 1.0F, -scale, minU, maxV, BEHIND_NORMAL);
+			ptr = addVertex(ptr, 1.0F, 1.0F, -scale, maxU, maxV, BEHIND_NORMAL);
+			ptr = addVertex(ptr, 1.0F, 0.0F, -scale, maxU, minV, BEHIND_NORMAL);
+			ptr = addVertex(ptr, 0.0F, 0.0F, -scale, minU, minV, BEHIND_NORMAL);
+		}
 
 		float invWidth = 1.0f / width;
 		float invHeight = 1.0f / height;
@@ -77,17 +82,22 @@ public class MinecraftHook {
 			float relW = i * invWidth;
 			float nextRelW = relW + invWidth;
 			float u = minU + (maxU - minU) * relW - halfTexelU;
-			// -X
-			ptr = addVertex(ptr, relW, 0.0F, -scale, u, minV, LEFT_NORMAL);
-			ptr = addVertex(ptr, relW, 0.0F, 0.0F, u, minV, LEFT_NORMAL);
-			ptr = addVertex(ptr, relW, 1.0F, 0.0F, u, maxV, LEFT_NORMAL);
-			ptr = addVertex(ptr, relW, 1.0F, -scale, u, maxV, LEFT_NORMAL);
 
-			// +X
-			ptr = addVertex(ptr, nextRelW, 1.0F, -scale, u, maxV, RIGHT_NORMAL);
-			ptr = addVertex(ptr, nextRelW, 1.0F, 0.0F, u, maxV, RIGHT_NORMAL);
-			ptr = addVertex(ptr, nextRelW, 0.0F, 0.0F, u, minV, RIGHT_NORMAL);
-			ptr = addVertex(ptr, nextRelW, 0.0F, -scale, u, minV, RIGHT_NORMAL);
+			if (matrix.m02() > 0) {
+				// +X
+				ptr = addVertex(ptr, nextRelW, 1.0F, -scale, u, maxV, RIGHT_NORMAL);
+				ptr = addVertex(ptr, nextRelW, 1.0F, 0.0F, u, maxV, RIGHT_NORMAL);
+				ptr = addVertex(ptr, nextRelW, 0.0F, 0.0F, u, minV, RIGHT_NORMAL);
+				ptr = addVertex(ptr, nextRelW, 0.0F, -scale, u, minV, RIGHT_NORMAL);
+			}
+			if (matrix.m02() < 0) {
+				// -X
+				ptr = addVertex(ptr, relW, 0.0F, -scale, u, minV, LEFT_NORMAL);
+				ptr = addVertex(ptr, relW, 0.0F, 0.0F, u, minV, LEFT_NORMAL);
+				ptr = addVertex(ptr, relW, 1.0F, 0.0F, u, maxV, LEFT_NORMAL);
+				ptr = addVertex(ptr, relW, 1.0F, -scale, u, maxV, LEFT_NORMAL);
+			}
+
 		}
 
 		ver.offset = (int) (ptr - ver.vertexPtr);
@@ -99,17 +109,21 @@ public class MinecraftHook {
 			float relW = i * invHeight;
 			float nextRelW = relW + invHeight;
 			float v = minV + (maxV - minV) * relW - haltTexelV;
-			// +Y
-			ptr = addVertex(ptr, 0.0F, nextRelW, 0.0F, minU, v, TOP_NORMAL);
-			ptr = addVertex(ptr, 1.0F, nextRelW, 0.0F, maxU, v, TOP_NORMAL);
-			ptr = addVertex(ptr, 1.0F, nextRelW, -scale, maxU, v, TOP_NORMAL);
-			ptr = addVertex(ptr, 0.0F, nextRelW, -scale, minU, v, TOP_NORMAL);
 
-			// -Y
-			ptr = addVertex(ptr, 1.0F, relW, 0.0F, maxU, v, BOTTOM_NORMAL);
-			ptr = addVertex(ptr, 0.0F, relW, 0.0F, minU, v, BOTTOM_NORMAL);
-			ptr = addVertex(ptr, 0.0F, relW, -scale, minU, v, BOTTOM_NORMAL);
-			ptr = addVertex(ptr, 1.0F, relW, -scale, maxU, v, BOTTOM_NORMAL);
+			if (matrix.m12() > 0) {
+				// +Y
+				ptr = addVertex(ptr, 0.0F, nextRelW, 0.0F, minU, v, TOP_NORMAL);
+				ptr = addVertex(ptr, 1.0F, nextRelW, 0.0F, maxU, v, TOP_NORMAL);
+				ptr = addVertex(ptr, 1.0F, nextRelW, -scale, maxU, v, TOP_NORMAL);
+				ptr = addVertex(ptr, 0.0F, nextRelW, -scale, minU, v, TOP_NORMAL);
+			}
+			if (matrix.m12() < 0) {
+				// -Y
+				ptr = addVertex(ptr, 1.0F, relW, 0.0F, maxU, v, BOTTOM_NORMAL);
+				ptr = addVertex(ptr, 0.0F, relW, 0.0F, minU, v, BOTTOM_NORMAL);
+				ptr = addVertex(ptr, 0.0F, relW, -scale, minU, v, BOTTOM_NORMAL);
+				ptr = addVertex(ptr, 1.0F, relW, -scale, maxU, v, BOTTOM_NORMAL);
+			}
 		}
 
 		ver.offset = (int) (ptr - ver.vertexPtr);

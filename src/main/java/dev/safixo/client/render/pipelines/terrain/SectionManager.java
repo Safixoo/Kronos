@@ -1,5 +1,6 @@
 package dev.safixo.client.render.pipelines.terrain;
 
+import dev.safixo.client.render.pipelines.terrain.meshing.SectionMesher;
 import dev.safixo.client.render.pipelines.terrain.shader.ExpFogProgram;
 import dev.safixo.client.render.pipelines.terrain.shader.LinearFogProgram;
 import dev.safixo.client.render.pipelines.terrain.shader.TerrainProgram;
@@ -243,7 +244,7 @@ public class SectionManager {
 			SectionRender section = updateArray[i++];
 
 			if (section.currentFrame == this.bfsCuller.getActiveFrame() && section.isDirty()) {
-				boolean nonEmpty = section.rebuild(this.camera, this, this.worldObj, tileSet);
+				boolean nonEmpty = SectionMesher.rebuild(section, this.camera, this, this.worldObj, tileSet);
 
 				if (nonEmpty) {
 					j++;

@@ -42,20 +42,20 @@ public class TerrainFormat extends GlVertexFormat {
 		return (int) ((pos + RADIUS) * scale) & 0xFFFFF;
 	}
 
-	private static int processUv(double u, double v) {
+	private static long processUv(double u, double v) {
 		int roundU = (int) (u * UV_PRECISION);
 		int roundV = (int) (v * UV_PRECISION);
 
 		roundU -= (roundU & 0x10000) >>> 16;
 		roundV -= (roundV & 0x10000) >>> 16;
 
-		int intU = roundU & 0xFFFF;
-		int intV = roundV & 0xFFFF;
+		long intU = roundU & 0xFFFFL;
+		long intV = roundV & 0xFFFFL;
 
 		return (intU | intV << 16);
 	}
 
-	// It does use a similar idea to Sodium 20-bit position.
+	// Uses the same encoding as Sodium 20-bit vertex positions.
 	private static long processPosition(int x, int y, int z) {
 		int lowHalf = 0;
 
@@ -80,9 +80,7 @@ public class TerrainFormat extends GlVertexFormat {
 		long position = processPosition(intX, intY, intZ);
 
 		UnsafeUtil.memPutLong(ptr, position);
-		UnsafeUtil.memPutInt(ptr + 8, processUv(u, v));
-		UnsafeUtil.memPutInt(ptr + 12, color);
-		UnsafeUtil.memPutInt(ptr + 15, compressLightmap(lightMap));
+		UnsafeUtil.memPutLong(ptr + 8, processUv(u, v) | (long) color << 32 | (long) compressLightmap(lightMap) << 56);
 	}
 
 	// skylight << 20 | blocklight << 4

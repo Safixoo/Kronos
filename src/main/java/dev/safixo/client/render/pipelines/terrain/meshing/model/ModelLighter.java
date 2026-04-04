@@ -1,10 +1,7 @@
-package dev.safixo.client.render.pipelines.terrain.meshing.vanilla;
+package dev.safixo.client.render.pipelines.terrain.meshing.model;
 
 import dev.safixo.client.render.pipelines.terrain.meshing.data.FacingRender;
 import net.minecraft.world.IBlockAccess;
-import org.joml.Vector2i;
-
-import static dev.safixo.client.util.Direction.*;
 
 public class ModelLighter {
 	public static void applyLighting(FacingRender face, IBlockAccess cache, float[] bounds,
