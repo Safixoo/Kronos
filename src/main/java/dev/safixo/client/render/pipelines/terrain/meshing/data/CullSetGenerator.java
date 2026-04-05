@@ -1,6 +1,8 @@
 package dev.safixo.client.render.pipelines.terrain.meshing.data;
 
+import dev.safixo.client.render.pipelines.terrain.SectionRender;
 import dev.safixo.client.util.Direction;
+import dev.safixo.client.util.data.CameraData;
 import dev.safixo.client.util.data.PrimitivesFlags;
 import it.unimi.dsi.fastutil.shorts.ShortArrayList;
 
@@ -16,9 +18,17 @@ public class CullSetGenerator {
 		Arrays.fill(FULL_SOLID, (byte) 1);
 	}
 
-	public static int floodFillSection() {
+	public static int floodFillSection(SectionRender section, CameraData camera) {
 		System.arraycopy(FULL_SOLID, 0, VISITED_CENTER_BLOCKS, 0, 4096);
 		QUEUE.clear();
+
+		int cameraChunkX = camera.intX >> 4, cameraChunkY = camera.intY >> 4, cameraChunkZ = camera.intZ >> 4;
+		int sectionX = section.blockX >> 4, sectionY = section.blockY >> 4, sectionZ = section.blockZ >> 4;
+		boolean inside = cameraChunkX == sectionX && cameraChunkY == sectionY && cameraChunkZ == sectionZ;
+
+		if (inside && isVisitable(pack(camera.intX & 15, camera.intY & 15, camera.intZ & 15))) {
+			addToQueue(pack(camera.intX & 15, camera.intY & 15, camera.intZ & 15));
+		}
 
 		visitStartingEdges();
 
@@ -122,18 +132,11 @@ public class CullSetGenerator {
 	}
 
 	private static boolean isVisitable(int packed) {
-		byte[] visitedBlocks = VISITED_CENTER_BLOCKS;
-		byte[] blockData = CENTER_BLOCKS;
-		boolean[] solidBlocks = PrimitivesFlags.SOLID;
-
-		return !solidBlocks[blockData[packed] & 0xFF] && visitedBlocks[packed] == 1;
+		return isVisitable(CENTER_BLOCKS, packed);
 	}
 
 	private static boolean isVisitable(byte[] blockData, int packed) {
-		byte[] visitedBlocks = VISITED_CENTER_BLOCKS;
-		boolean[] solidBlocks = PrimitivesFlags.SOLID;
-
-		return !solidBlocks[blockData[packed] & 0xFF] && visitedBlocks[packed] == 1;
+		return PrimitivesFlags.SOLID_CULL_MASK[blockData[packed] & 0xFF] == 0 && VISITED_CENTER_BLOCKS[packed] == 1;
 	}
 
 	private static int addOpenFaces(int x, int y, int z) {

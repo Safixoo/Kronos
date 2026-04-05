@@ -55,11 +55,15 @@ public class SectionMesher {
 		}
 		section.tileEntities.clear();
 
-		boolean ambient = Minecraft.getMinecraft().gameSettings.ambientOcclusion != 0;
-		boolean empty = sectionCache.extendedLevelsInChunkCache();
+		int cameraChunkX = camera.intX >> 4, cameraChunkY = camera.intY >> 4, cameraChunkZ = camera.intZ >> 4;
+		int sectionX = section.blockX >> 4, sectionY = section.blockY >> 4, sectionZ = section.blockZ >> 4;
 
-		if (!empty) {
-			section.flags = SectionFlags.setCullFaces(section.flags, CullSetGenerator.floodFillSection());
+		boolean ambient = Minecraft.getMinecraft().gameSettings.ambientOcclusion != 0;
+		boolean airEmpty = sectionCache.extendedLevelsInChunkCache();
+		boolean insideSection = cameraChunkX == sectionX && cameraChunkY == sectionY && cameraChunkZ == sectionZ;
+
+		if (!airEmpty) {
+			section.flags = SectionFlags.setCullFaces(section.flags, CullSetGenerator.floodFillSection(section, camera));
 
 			// +-X face
 			for (int y = 0; y < 16; y++) {
@@ -97,10 +101,7 @@ public class SectionMesher {
 				}
 			}
 
-			int cameraChunkX = camera.intX >> 4, cameraChunkZ = camera.intZ >> 4;
-			int sectionX = section.blockX >> 4, sectionZ = section.blockZ >> 4;
-
-			if ((cameraChunkX == sectionX && cameraChunkZ == sectionZ) || (SectionFlags.getCullFaces(section.flags) & 0b111_111) != 0b111_111) {
+			if (insideSection || (SectionFlags.getCullFaces(section.flags) & 0b111_111) != 0b111_111) {
 				// 14x14x14 center blocks.
 				for (int y = 1; y < 15; y++) {
 					for (int z = 1; z < 15; z++) {
@@ -150,7 +151,7 @@ public class SectionMesher {
 		VertexWriter.DEFAULT_INSTANCE.stopDrawing();
 		translucentWriter.stopDrawing();
 
-		return !empty;
+		return !airEmpty;
 	}
 
 	private static void meshBlockCenter(SectionRender section, RenderBlocks renderBlocks, SectionCache cache, int x, int y, int z, boolean ambient) {
