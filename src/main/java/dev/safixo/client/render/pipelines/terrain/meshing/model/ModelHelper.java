@@ -1,5 +1,6 @@
 package dev.safixo.client.render.pipelines.terrain.meshing.model;
 
+import dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache;
 import dev.safixo.client.util.data.PrimitivesFlags;
 import net.minecraft.client.renderer.RenderBlocks;
 import net.minecraft.world.IBlockAccess;
@@ -77,6 +78,22 @@ public class ModelHelper {
 	public static int light(IBlockAccess cache, int x, int y, int z, int blockCache) {
 		if (blockCache == ~1) {
 			return cache.getLightBrightnessForSkyBlocks(x, y, z, 0);
+		}
+
+		return blockCache >>> 4;
+	}
+
+	public static int light(SectionCache cache, int x, int y, int z, int blockCache) {
+		if (blockCache == ~1) {
+			return cache.getLight(x, y, z, 0);
+		}
+
+		return blockCache >>> 4;
+	}
+
+	public static int lightCenter(SectionCache cache, int x, int y, int z, int blockCache) {
+		if (blockCache == ~1) {
+			return cache.getLightCenter(x, y, z, 0);
 		}
 
 		return blockCache >>> 4;

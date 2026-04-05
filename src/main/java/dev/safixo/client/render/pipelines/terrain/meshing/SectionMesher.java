@@ -4,6 +4,7 @@ import dev.safixo.client.render.pipelines.terrain.SectionFlags;
 import dev.safixo.client.render.pipelines.terrain.SectionManager;
 import dev.safixo.client.render.pipelines.terrain.SectionRender;
 import dev.safixo.client.render.pipelines.terrain.meshing.builders.VoxelMesher;
+import dev.safixo.client.render.pipelines.terrain.meshing.builders.VoxelMesherCenter;
 import dev.safixo.client.render.pipelines.terrain.meshing.data.CullSetGenerator;
 import dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache;
 import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
@@ -176,7 +177,7 @@ public class SectionMesher {
 			drawBitSet |= cache.isVoxelFullFromCenter(blockIndex + makeBlockIndex(1,0,0)) << EAST;
 
 			if (drawBitSet != 0b111_111) {
-				VoxelMesher.meshVoxel(Block.blocksList[blockId], cache, blockX, blockY, blockZ, ambient, ~drawBitSet, blockId);
+				VoxelMesherCenter.meshVoxel(Block.blocksList[blockId], cache, blockX, blockY, blockZ, ambient, ~drawBitSet, blockId);
 			}
 		} else {
 			if (PrimitivesFlags.TILE_ENTITY[blockId]) {

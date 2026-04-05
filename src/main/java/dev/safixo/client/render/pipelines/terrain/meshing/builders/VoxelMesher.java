@@ -26,13 +26,13 @@ public class VoxelMesher {
 
 	public static final int[] SHADE_FULL_COLOR = new int[Direction.COUNT];
 	public static final int[] SHADE_FULL_FACTOR = new int[Direction.COUNT];
-	private static final float[] TEX_UVS = new float[4];
-	private static final float[] OVERLAY_UVS = new float[4];
+	protected static final float[] TEX_UVS = new float[4];
+	protected static final float[] OVERLAY_UVS = new float[4];
 
-	private static final Icon SIDE_GRASS_NON_OVERLAY = Block.grass.getIcon(5, 5);
+	protected static final Icon SIDE_GRASS_NON_OVERLAY = Block.grass.getIcon(5, 5);
 	public static final float[] SIDE_LIGHT_MULTIPLIER = new float[] { 0.5F, 1.0F, 0.8F, 0.8F, 0.6F, 0.6F };
 
-	private static final int BLOCK_GRASS_ID = Block.grass.blockID;
+	protected static final int BLOCK_GRASS_ID = Block.grass.blockID;
 
 	public static void meshVoxel(Block block, SectionCache cache, int x, int y, int z, boolean ambient, int drawSet, int blockId) {
 		if (!PrimitivesFlags.DIRECT_CULL[blockId]) {
@@ -156,19 +156,19 @@ public class VoxelMesher {
 		VertexWriter writer = VertexWriter.getCurrentInstance();
 		writer.ensureCapacity(TerrainFormat.STRIDE * 4);
 
-		boolean flip = color0 > color3 || color2 > color1;
+		boolean flip = ao0 > ao3 || ao2 > ao1;
 		float[] texUv = TEX_UVS;
 
 		if (flip) {
-			addVertex(writer, face, 0 * 9, x, y, z, texUv[uv0 & 0xFF], texUv[uv0 >>> 8], color0, light0);
-			addVertex(writer, face, 1 * 9, x, y, z, texUv[uv1 & 0xFF], texUv[uv1 >>> 8], color1, light1);
-			addVertex(writer, face, 2 * 9, x, y, z, texUv[uv2 & 0xFF], texUv[uv2 >>> 8], color2, light2);
-			addVertex(writer, face, 3 * 9, x, y, z, texUv[uv3 & 0xFF], texUv[uv3 >>> 8], color3, light3);
+			addVertex(writer, face, 0 * 12, x, y, z, texUv[uv0 & 0xFF], texUv[uv0 >>> 8], color0, light0);
+			addVertex(writer, face, 1 * 12, x, y, z, texUv[uv1 & 0xFF], texUv[uv1 >>> 8], color1, light1);
+			addVertex(writer, face, 2 * 12, x, y, z, texUv[uv2 & 0xFF], texUv[uv2 >>> 8], color2, light2);
+			addVertex(writer, face, 3 * 12, x, y, z, texUv[uv3 & 0xFF], texUv[uv3 >>> 8], color3, light3);
 		} else {
-			addVertex(writer, face, 3 * 9, x, y, z, texUv[uv3 & 0xFF], texUv[uv3 >>> 8], color3, light3);
-			addVertex(writer, face, 0 * 9, x, y, z, texUv[uv0 & 0xFF], texUv[uv0 >>> 8], color0, light0);
-			addVertex(writer, face, 1 * 9, x, y, z, texUv[uv1 & 0xFF], texUv[uv1 >>> 8], color1, light1);
-			addVertex(writer, face, 2 * 9, x, y, z, texUv[uv2 & 0xFF], texUv[uv2 >>> 8], color2, light2);
+			addVertex(writer, face, 3 * 12, x, y, z, texUv[uv3 & 0xFF], texUv[uv3 >>> 8], color3, light3);
+			addVertex(writer, face, 0 * 12, x, y, z, texUv[uv0 & 0xFF], texUv[uv0 >>> 8], color0, light0);
+			addVertex(writer, face, 1 * 12, x, y, z, texUv[uv1 & 0xFF], texUv[uv1 >>> 8], color1, light1);
+			addVertex(writer, face, 2 * 12, x, y, z, texUv[uv2 & 0xFF], texUv[uv2 >>> 8], color2, light2);
 		}
 
 		if (tex == SIDE_GRASS_NON_OVERLAY) {
@@ -179,15 +179,15 @@ public class VoxelMesher {
 			color3 = ColorBGRManager.multiplyColor(overlayColor, ao3);
 
 			if (flip) {
-				addVertex(writer, face, 0 * 9, x, y, z, texUv[uv0 & 0xFF], texUv[uv0 >>> 8], color0, light0);
-				addVertex(writer, face, 1 * 9, x, y, z, texUv[uv1 & 0xFF], texUv[uv1 >>> 8], color1, light1);
-				addVertex(writer, face, 2 * 9, x, y, z, texUv[uv2 & 0xFF], texUv[uv2 >>> 8], color2, light2);
-				addVertex(writer, face, 3 * 9, x, y, z, texUv[uv3 & 0xFF], texUv[uv3 >>> 8], color3, light3);
+				addVertex(writer, face, 0 * 12, x, y, z, texUv[uv0 & 0xFF], texUv[uv0 >>> 8], color0, light0);
+				addVertex(writer, face, 1 * 12, x, y, z, texUv[uv1 & 0xFF], texUv[uv1 >>> 8], color1, light1);
+				addVertex(writer, face, 2 * 12, x, y, z, texUv[uv2 & 0xFF], texUv[uv2 >>> 8], color2, light2);
+				addVertex(writer, face, 3 * 12, x, y, z, texUv[uv3 & 0xFF], texUv[uv3 >>> 8], color3, light3);
 			} else {
-				addVertex(writer, face, 3 * 9, x, y, z, texUv[uv3 & 0xFF], texUv[uv3 >>> 8], color3, light3);
-				addVertex(writer, face, 0 * 9, x, y, z, texUv[uv0 & 0xFF], texUv[uv0 >>> 8], color0, light0);
-				addVertex(writer, face, 1 * 9, x, y, z, texUv[uv1 & 0xFF], texUv[uv1 >>> 8], color1, light1);
-				addVertex(writer, face, 2 * 9, x, y, z, texUv[uv2 & 0xFF], texUv[uv2 >>> 8], color2, light2);
+				addVertex(writer, face, 3 * 12, x, y, z, texUv[uv3 & 0xFF], texUv[uv3 >>> 8], color3, light3);
+				addVertex(writer, face, 0 * 12, x, y, z, texUv[uv0 & 0xFF], texUv[uv0 >>> 8], color0, light0);
+				addVertex(writer, face, 1 * 12, x, y, z, texUv[uv1 & 0xFF], texUv[uv1 >>> 8], color1, light1);
+				addVertex(writer, face, 2 * 12, x, y, z, texUv[uv2 & 0xFF], texUv[uv2 >>> 8], color2, light2);
 			}
 		}
 	}
@@ -216,14 +216,14 @@ public class VoxelMesher {
 		addVertex(writer, facing, 3, x, y, z, uvs[uv3 & 0xFF], uvs[uv3 >>> 8], blockColor, lightMap);
 	}
 
-	private static void addVertex(VertexWriter writer, FacingRender face, int vertInd, int x, int y, int z, float u, float v, int color, int lightMap) {
+	public static void addVertex(VertexWriter writer, FacingRender face, int vertInd, int x, int y, int z, float u, float v, int color, int lightMap) {
 		int vertOff = (int) (face.quadVert >>> vertInd);
 
-		int relX = x + (vertOff & 0b111);
-		vertOff >>>= 3;
-		int relY = y + (vertOff & 0b111);
-		vertOff >>>= 3;
-		int relZ = z + (vertOff & 0b111);
+		int relX = x + (vertOff & 0xF);
+		vertOff >>>= 4;
+		int relY = y + (vertOff & 0xF);
+		vertOff >>>= 4;
+		int relZ = z + (vertOff & 0xF);
 
 		long ptr = writer.getTotalOffset();
 

@@ -47,6 +47,9 @@ public class SectionCache implements IBlockAccess {
 	public static byte[] CENTER_BLOCKS;
 	public static byte[] CENTER_METADATA;
 
+	public static byte[] CENTER_SKYLIGHT;
+	public static byte[] CENTER_BLOCKLIGHT;
+
 	public static final byte[] VISITED_CENTER_BLOCKS = new byte[4096];
 
 	private boolean centerSectEmpty;
@@ -188,6 +191,9 @@ public class SectionCache implements IBlockAccess {
 			}
 		}
 
+		CENTER_SKYLIGHT = SKY_LIGHT[sectionIndex(1, 1, 1)];
+		CENTER_BLOCKLIGHT = BLOCK_LIGHT[sectionIndex(1, 1, 1)];
+
 		CENTER_BLOCKS = SECTION_BLOCKS[sectionIndex(1, 1, 1)];
 		CENTER_METADATA = SECTION_DATA[sectionIndex(1, 1, 1)];
 	}
@@ -232,6 +238,10 @@ public class SectionCache implements IBlockAccess {
 
 	@Override
 	public int getLightBrightnessForSkyBlocks(int x, int y, int z, int defBlockLight) {
+		return this.getLight(x, y, z, defBlockLight);
+	}
+
+	public int getLight(int x, int y, int z, int defBlockLight) {
 		int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
 
 		int blockX = x - this.blockX;
@@ -239,6 +249,22 @@ public class SectionCache implements IBlockAccess {
 		int blockZ = z - this.blockZ;
 
 		int sectionIndex = sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
+		int skyLight = getNibble(SKY_LIGHT[sectionIndex], blockIndex);
+		int blockLight = getNibble(BLOCK_LIGHT[sectionIndex], blockIndex);
+
+		return MathExt.getLightmapCoord(skyLight, Math.max(defBlockLight, blockLight));
+	}
+
+	public int getLightCenter(int x, int y, int z, int defBlockLight) {
+		int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
+		int skyLight = getNibble(CENTER_SKYLIGHT, blockIndex);
+		int blockLight = getNibble(CENTER_BLOCKLIGHT, blockIndex);
+
+		return MathExt.getLightmapCoord(skyLight, Math.max(defBlockLight, blockLight));
+	}
+
+	public int getLightBrightnessForSkyBlocks(int blockIndex, int defBlockLight) {
+		int sectionIndex = sectionIndex(1, 1, 1);
 		int skyLight = getNibble(SKY_LIGHT[sectionIndex], blockIndex);
 		int blockLight = getNibble(BLOCK_LIGHT[sectionIndex], blockIndex);
 

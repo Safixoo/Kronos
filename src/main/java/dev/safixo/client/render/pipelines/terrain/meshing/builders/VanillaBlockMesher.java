@@ -147,12 +147,12 @@ public class VanillaBlockMesher {
 
 	public static void bufferVertex(Tessellator tes, FacingRender face, float[] bounds, int vertInd,
 									int x, int y, int z, float u, float v, int color, int lightMap) {
-		int vertOff = (int) (face.quadVert >>> (9 * vertInd));
-		float relX = x + bounds[vertOff & 0b111];
-		vertOff >>= 3;
-		float relY = y + bounds[vertOff & 0b111];
-		vertOff >>= 3;
-		float relZ = z + bounds[vertOff & 0b111];
+		int vertOff = (int) (face.quadVert >>> (12 * vertInd));
+		float relX = x + bounds[vertOff & 0xF];
+		vertOff >>= 4;
+		float relY = y + bounds[vertOff & 0xF];
+		vertOff >>= 4;
+		float relZ = z + bounds[vertOff & 0xF];
 
 		tes.setColorOpaque_I(color);
 		tes.setBrightness(lightMap);

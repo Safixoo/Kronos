@@ -8,6 +8,7 @@ import static dev.safixo.client.util.Direction.*;
 
 @SuppressWarnings("PointlessArithmeticExpression")
 public class FacingRender {
+	public short dirPacked;
 	public byte dirX, dirY, dirZ;
 	public byte aoCornerX0, aoCornerY0, aoCornerZ0;
 	public byte aoCornerX1, aoCornerY1, aoCornerZ1;
@@ -18,14 +19,14 @@ public class FacingRender {
 	public byte[] weightIndices = new byte[8];
 	public byte bA, bB, bC, bD;
 
-	public int aoCorner0;
-	public int aoCorner1;
+	public short aoCorner0Packed, aoCorner1Packed;
+	public short aoCorner0, aoCorner1;
 
 	public static final byte[] ROTATION = new byte[4 * Direction.COUNT];
 
 	public void setQuadVerts(int ind, Vector3i verts) {
-		long data = (verts.x & 0b111) | (verts.y & 0b111) << 3 | (verts.z & 0b111) << 6;
-		this.quadVert |= data << (9 * ind);
+		long data = (verts.x & 0xF) | (verts.y & 0xF) << 4 | (verts.z & 0xF) << 8;
+		this.quadVert |= data << (12 * ind);
 	}
 
 	// Emulates RenderBlocks rotation flags, somehow it works for the vanilla models that I tried, although
@@ -53,16 +54,20 @@ public class FacingRender {
 		this.aoCornerY1 = Direction.y(this.aoCorner1);
 		this.aoCornerZ1 = Direction.z(this.aoCorner1);
 
+		this.aoCorner0Packed = (short) (SectionCache.makeBlockIndex(this.aoCornerX0, this.aoCornerY0, this.aoCornerZ0) & 0xFFF);
+		this.aoCorner1Packed = (short) (SectionCache.makeBlockIndex(this.aoCornerX1, this.aoCornerY1, this.aoCornerZ1) & 0xFFF);
+		this.dirPacked = (short) (SectionCache.makeBlockIndex(this.dirX, this.dirY, this.dirZ) & 0xFFF);
+
 		this.dirX = Direction.x(dir);
 		this.dirY = Direction.y(dir);
 		this.dirZ = Direction.z(dir);
 
 		for (int i = 0; i < 4; i++) {
 			int ind = i * 2;
-			int vertIndices = (int) (this.quadVert >>> (9 * i));
-			int x = (vertIndices >>> 0) & 0b111;
-			int y = (vertIndices >>> 3) & 0b111;
-			int z = (vertIndices >>> 6) & 0b111;
+			int vertIndices = (int) (this.quadVert >>> (12 * i));
+			int x = (vertIndices >>> 0) & 0xF;
+			int y = (vertIndices >>> 4) & 0xF;
+			int z = (vertIndices >>> 8) & 0xF;
 
 			if (dir == DOWN) {
 				this.weightIndices[ind] = (byte) z;

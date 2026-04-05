@@ -4,24 +4,28 @@ import dev.safixo.client.render.pipelines.terrain.SectionRender;
 import dev.safixo.client.util.Direction;
 import dev.safixo.client.util.data.CameraData;
 import dev.safixo.client.util.data.PrimitivesFlags;
-import it.unimi.dsi.fastutil.shorts.ShortArrayList;
 
 import java.util.Arrays;
 
 import static dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache.*;
+import static dev.safixo.client.util.Direction.*;
 
 public class CullSetGenerator {
-	public static final ShortArrayList QUEUE = new ShortArrayList();
-	private static final byte[] FULL_SOLID = new byte[4096];
+	private static final short[] QUEUE = new short[16 * 16 * 16];
+	private static final byte[] FULL_SOLID = new byte[16 * 16 * 16];
+
+	private static int INDEX = 0;
 
 	static {
 		Arrays.fill(FULL_SOLID, (byte) 1);
 	}
 
-	public static int floodFillSection(SectionRender section, CameraData camera) {
+	private static void restartQueue() {
 		System.arraycopy(FULL_SOLID, 0, VISITED_CENTER_BLOCKS, 0, 4096);
-		QUEUE.clear();
+		INDEX = 0;
+	}
 
+	private static void handlePlayerPosition(SectionRender section, CameraData camera) {
 		int cameraChunkX = camera.intX >> 4, cameraChunkY = camera.intY >> 4, cameraChunkZ = camera.intZ >> 4;
 		int sectionX = section.blockX >> 4, sectionY = section.blockY >> 4, sectionZ = section.blockZ >> 4;
 		boolean inside = cameraChunkX == sectionX && cameraChunkY == sectionY && cameraChunkZ == sectionZ;
@@ -29,46 +33,55 @@ public class CullSetGenerator {
 		if (inside && isVisitable(pack(camera.intX & 15, camera.intY & 15, camera.intZ & 15))) {
 			addToQueue(pack(camera.intX & 15, camera.intY & 15, camera.intZ & 15));
 		}
+	}
 
+	public static int floodFillSection(SectionRender section, CameraData camera) {
+		restartQueue();
+		handlePlayerPosition(section, camera);
 		visitStartingEdges();
 
-		int index = 0;
 		int openFaces = 0;
+		int index = 0;
 
-		while (index < QUEUE.size()) {
-			int position = QUEUE.getShort(index++);
+		while (index < INDEX) {
+			int position = QUEUE[index++];
 			int x = (position >>> 0) & 0xF;
 			int z = (position >>> 4) & 0xF;
 			int y = (position >>> 8);
 
-			openFaces |= addOpenFaces(x, y, z);
-
 			{
-				if (x < 15 && isVisitable(position + pack(1, 0, 0))) {
+				if (x == 15) {
+					openFaces |= 1 << EAST;
+				} else if (isVisitable(position + pack(1, 0, 0))) {
 					addToQueue(position + pack(1, 0, 0));
 				}
-
-				if (x > 0 && isVisitable(position - pack(1, 0, 0))) {
+				if (x == 0) {
+					openFaces |= 1 << WEST;
+				} else if (isVisitable(position - pack(1, 0, 0))) {
 					addToQueue(position - pack(1, 0, 0));
 				}
 			}
-
 			{
-				if (y < 15 && isVisitable(position + pack(0, 1, 0))) {
+				if (y == 15) {
+					openFaces |= 1 << UP;
+				} else if (isVisitable(position + pack(0, 1, 0))) {
 					addToQueue(position + pack(0, 1, 0));
 				}
-
-				if (y > 0 && isVisitable(position - pack(0, 1, 0))) {
+				if (y == 0) {
+					openFaces |= 1 << DOWN;
+				} else if (isVisitable(position - pack(0, 1, 0))) {
 					addToQueue(position - pack(0, 1, 0));
 				}
 			}
-
 			{
-				if (z < 15 && isVisitable(position + pack(0, 0, 1))) {
+				if (z == 15) {
+					openFaces |= 1 << SOUTH;
+				} else if (isVisitable(position + pack(0, 0, 1))) {
 					addToQueue(position + pack(0, 0, 1));
 				}
-
-				if (z > 0 && isVisitable(position - pack(0, 0, 1))) {
+				if (z == 0) {
+					openFaces |= 1 << NORTH;
+				} else if (isVisitable(position - pack(0, 0, 1))) {
 					addToQueue(position - pack(0, 0, 1));
 				}
 			}
@@ -127,7 +140,7 @@ public class CullSetGenerator {
 	}
 
 	private static void addToQueue(int pack) {
-		QUEUE.add((short) pack);
+		QUEUE[INDEX++] = (short) pack;
 		VISITED_CENTER_BLOCKS[pack] = 0;
 	}
 
@@ -142,13 +155,13 @@ public class CullSetGenerator {
 	private static int addOpenFaces(int x, int y, int z) {
 		int cullBits = 0;
 
-		if (x == 0)  cullBits |= 1 << Direction.WEST;
+		if (x == 0) cullBits |= 1 << Direction.WEST;
 		else if (x == 15) cullBits |= 1 << Direction.EAST;
 
-		if (y == 0)  cullBits |= 1 << Direction.DOWN;
+		if (y == 0) cullBits |= 1 << Direction.DOWN;
 		else if (y == 15) cullBits |= 1 << Direction.UP;
 
-		if (z == 0)  cullBits |= 1 << Direction.NORTH;
+		if (z == 0) cullBits |= 1 << Direction.NORTH;
 		else if (z == 15) cullBits |= 1 << Direction.SOUTH;
 
 		return cullBits;
