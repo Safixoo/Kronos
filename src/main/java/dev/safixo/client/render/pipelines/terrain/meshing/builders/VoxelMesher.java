@@ -4,7 +4,6 @@ import dev.safixo.client.render.pipelines.terrain.meshing.data.FacingRender;
 import dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache;
 import dev.safixo.client.render.pipelines.terrain.meshing.model.ModelColorizer;
 import dev.safixo.client.render.pipelines.terrain.meshing.model.ModelHelper;
-import dev.safixo.client.util.AtlasSpriteUnsafe;
 import dev.safixo.client.util.MathExt;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockGrass;
@@ -18,6 +17,7 @@ import dev.safixo.client.render.vertex.writers.TerrainFormat;
 import org.joml.Vector3i;
 
 import static dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache.makeBlockIndex;
+import static dev.safixo.client.render.pipelines.terrain.meshing.model.ModelHelper.*;
 import static dev.safixo.client.util.Direction.*;
 
 public class VoxelMesher {
@@ -109,35 +109,35 @@ public class VoxelMesher {
 		int pd12Y = p1Y - p2Y;
 		int pd12Z = p1Z - p2Z;
 
-		int cornerPP = getBlockCacheLazily(cache, dirX + p12X, dirY + p12Y, dirZ + p12Z);
-		int cornerPN = getBlockCacheLazily(cache, dirX + pd12X, dirY + pd12Y, dirZ + pd12Z);
+		int cornerPP = isFullVoxel(cache, dirX + p12X, dirY + p12Y, dirZ + p12Z);
+		int cornerPN = isFullVoxel(cache, dirX + pd12X, dirY + pd12Y, dirZ + pd12Z);
 
-		int lightPP = ModelHelper.fullFace(posZ | posX) == 0 ? ModelHelper.light(cache, dirX + p12X, dirY + p12Y, dirZ + p12Z, cornerPP) : 0;
-		int lightPN = ModelHelper.fullFace(negZ | posX) == 0 ? ModelHelper.light(cache, dirX + pd12X, dirY + pd12Y, dirZ + pd12Z, cornerPN) : 0;
+		int lightPP = fullFace((posZ | posX) & ~cornerPP) == 0 ? cache.getLight(dirX + p12X, dirY + p12Y, dirZ + p12Z, 0) : 0;
+		int lightPN = fullFace((negZ | posX) & ~cornerPN) == 0 ? cache.getLight(dirX + pd12X, dirY + pd12Y, dirZ + pd12Z, 0) : 0;
 
-		int cornerNP = getBlockCacheLazily(cache, dirX - pd12X, dirY - pd12Y, dirZ - pd12Z);
-		int cornerNN = getBlockCacheLazily(cache, dirX - p12X, dirY - p12Y, dirZ - p12Z);
+		int cornerNP = isFullVoxel(cache, dirX - pd12X, dirY - pd12Y, dirZ - pd12Z);
+		int cornerNN = isFullVoxel(cache, dirX - p12X, dirY - p12Y, dirZ - p12Z);
 
-		int lightNP = ModelHelper.fullFace(posZ | negX) == 0 ? ModelHelper.light(cache, dirX - pd12X, dirY - pd12Y, dirZ - pd12Z, cornerNP) : 0;
-		int lightNN = ModelHelper.fullFace(negZ | negX) == 0 ? ModelHelper.light(cache, dirX - p12X, dirY - p12Y, dirZ - p12Z, cornerNN) : 0;
+		int lightNP = fullFace((posZ | negX) & ~cornerNP) == 0 ? cache.getLight(dirX - pd12X, dirY - pd12Y, dirZ - pd12Z, cornerNP) : 0;
+		int lightNN = fullFace((negZ | negX) & ~cornerNN) == 0 ? cache.getLight(dirX - p12X, dirY - p12Y, dirZ - p12Z, cornerNN) : 0;
 
-		int ao0 = ModelHelper.ao(posZ, posX, cornerPP);
-		int ao1 = ModelHelper.ao(negZ, posX, cornerPN);
-		int ao2 = ModelHelper.ao(negZ, negX, cornerNN);
-		int ao3 = ModelHelper.ao(posZ, negX, cornerNP);
+		int ao0 = ao(posZ, posX, cornerPP);
+		int ao1 = ao(negZ, posX, cornerPN);
+		int ao2 = ao(negZ, negX, cornerNN);
+		int ao3 = ao(posZ, negX, cornerNP);
 
 		int lightMap = cache.getLightBrightnessForSkyBlocks(dirX, dirY, dirZ, 0);
 
-		int lightPZ = ModelHelper.light(posZ);
-		int lightPX = ModelHelper.light(posX);
+		int lightPZ = light(posZ);
+		int lightPX = light(posX);
 
-		int lightNZ = ModelHelper.light(negZ);
-		int lightNX = ModelHelper.light(negX);
+		int lightNZ = light(negZ);
+		int lightNX = light(negX);
 
-		int light0 = ModelHelper.avg(ModelHelper.avg(lightPP, lightMap), ModelHelper.avg(lightPZ, lightPX)); // 0 vertex
-		int light1 = ModelHelper.avg(ModelHelper.avg(lightPN, lightMap), ModelHelper.avg(lightPX, lightNZ)); // 1 vertex
-		int light2 = ModelHelper.avg(ModelHelper.avg(lightNN, lightMap), ModelHelper.avg(lightNZ, lightNX)); // 2 vertex
-		int light3 = ModelHelper.avg(ModelHelper.avg(lightNP, lightMap), ModelHelper.avg(lightNX, lightPZ)); // 3 vertex
+		int light0 = avg(avg(lightPP, lightMap), avg(lightPZ, lightPX)); // 0 vertex
+		int light1 = avg(avg(lightPN, lightMap), avg(lightPX, lightNZ)); // 1 vertex
+		int light2 = avg(avg(lightNN, lightMap), avg(lightNZ, lightNX)); // 2 vertex
+		int light3 = avg(avg(lightNP, lightMap), avg(lightNX, lightPZ)); // 3 vertex
 
 		int uv0 = face.uvData[0];
 		int uv1 = face.uvData[1];
@@ -231,7 +231,7 @@ public class VoxelMesher {
 		writer.addVertexCounter(TerrainFormat.STRIDE);
 	}
 
-	public static int getBlockCacheLazily(SectionCache cache, int x, int y, int z) {
+	public static int isFullVoxel(SectionCache cache, int x, int y, int z) {
 		int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
 
 		int blockX = x - cache.blockX;
@@ -239,13 +239,8 @@ public class VoxelMesher {
 		int blockZ = z - cache.blockZ;
 
 		int sectionIndex = SectionCache.sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
-		int solidBlock = PrimitivesFlags.SOLID_LIGHT_MASK[MathExt.byteToUnsigned(SectionCache.SECTION_BLOCKS[sectionIndex][blockIndex])];
 
-		if (solidBlock == 1) {
-			return solidBlock;
-		}
-
-		return ~1;
+		return PrimitivesFlags.SOLID_LIGHT_MASK[MathExt.byteToUnsigned(SectionCache.SECTION_BLOCKS[sectionIndex][blockIndex])];
 	}
 
 	public static int getBlockCached(SectionCache cache, int x, int y, int z) {

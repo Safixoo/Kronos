@@ -2,7 +2,6 @@ package dev.safixo.client.render.pipelines.terrain.meshing.builders;
 
 import dev.safixo.client.render.pipelines.terrain.meshing.data.FacingRender;
 import dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache;
-import dev.safixo.client.render.pipelines.terrain.meshing.model.ModelHelper;
 import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
 import dev.safixo.client.render.vertex.VertexWriter;
 import dev.safixo.client.render.vertex.writers.TerrainFormat;
@@ -15,6 +14,7 @@ import net.minecraft.util.Icon;
 
 import static dev.safixo.client.render.pipelines.terrain.meshing.builders.VoxelMesher.*;
 import static dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache.makeBlockIndex;
+import static dev.safixo.client.render.pipelines.terrain.meshing.model.ModelHelper.*;
 import static dev.safixo.client.util.Direction.*;
 
 public class VoxelMesherCenter  {
@@ -68,60 +68,48 @@ public class VoxelMesherCenter  {
 	}
 
 	public static void renderFace(FacingRender face, Icon tex, SectionCache cache, int x, int y, int z, int blockColor, int overlayColor) {
-		int p1X = face.aoCornerX0;
-		int p1Y = face.aoCornerY0;
-		int p1Z = face.aoCornerZ0;
+		int p1 = face.aoCorner0Packed;
+		int p2 = face.aoCorner1Packed;
 
-		int p2X = face.aoCornerX1;
-		int p2Y = face.aoCornerY1;
-		int p2Z = face.aoCornerZ1;
+		int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15) + face.dirPacked;
 
-		int dirX = x + face.dirX;
-		int dirY = y + face.dirY;
-		int dirZ = z + face.dirZ;
+		int posZ = getBlockCached(blockIndex + p2);
+		int negZ = getBlockCached(blockIndex - p2);
+		int posX = getBlockCached(blockIndex + p1);
+		int negX = getBlockCached(blockIndex - p1);
 
-		int posZ = getBlockCached(dirX + p2X, dirY + p2Y, dirZ + p2Z);
-		int negZ = getBlockCached(dirX - p2X, dirY - p2Y, dirZ - p2Z);
-		int posX = getBlockCached(dirX + p1X, dirY + p1Y, dirZ + p1Z);
-		int negX = getBlockCached(dirX - p1X, dirY - p1Y, dirZ - p1Z);
+		int p12 = p1 + p2;
+		int pd12 = p1 - p2;
 
-		int p12X = p1X + p2X;
-		int p12Y = p1Y + p2Y;
-		int p12Z = p1Z + p2Z;
+		int cornerPP = isFullVoxel(blockIndex + p12);
+		int cornerPN = isFullVoxel(blockIndex + pd12);
 
-		int pd12X = p1X - p2X;
-		int pd12Y = p1Y - p2Y;
-		int pd12Z = p1Z - p2Z;
+		int lightMap = cache.getLightCenter(blockIndex, 0);
 
-		int cornerPP = getBlockCacheLazily(dirX + p12X, dirY + p12Y, dirZ + p12Z);
-		int cornerPN = getBlockCacheLazily(dirX + pd12X, dirY + pd12Y, dirZ + pd12Z);
+		int lightPP = fullFace((posZ | posX) & ~cornerPP) == 0 ? cache.getLightCenter(blockIndex + p12, 0) : 0;
+		int lightPN = fullFace((negZ | posX) & ~cornerPN) == 0 ? cache.getLightCenter(blockIndex + pd12, 0) : 0;
 
-		int lightPP = ModelHelper.fullFace(posZ | posX) == 0 ? ModelHelper.lightCenter(cache, dirX + p12X, dirY + p12Y, dirZ + p12Z, cornerPP) : 0;
-		int lightPN = ModelHelper.fullFace(negZ | posX) == 0 ? ModelHelper.lightCenter(cache, dirX + pd12X, dirY + pd12Y, dirZ + pd12Z, cornerPN) : 0;
+		int cornerNP = isFullVoxel(blockIndex - pd12);
+		int cornerNN = isFullVoxel(blockIndex - p12);
 
-		int cornerNP = getBlockCacheLazily(dirX - pd12X, dirY - pd12Y, dirZ - pd12Z);
-		int cornerNN = getBlockCacheLazily(dirX - p12X, dirY - p12Y, dirZ - p12Z);
+		int lightNP = fullFace((posZ | negX) & ~cornerNP) == 0 ? cache.getLightCenter(blockIndex - pd12, 0) : 0;
+		int lightNN = fullFace((negZ | negX) & ~cornerNN) == 0 ? cache.getLightCenter(blockIndex - p12, 0) : 0;
 
-		int lightNP = ModelHelper.fullFace(posZ | negX) == 0 ? ModelHelper.lightCenter(cache, dirX - pd12X, dirY - pd12Y, dirZ - pd12Z, cornerNP) : 0;
-		int lightNN = ModelHelper.fullFace(negZ | negX) == 0 ? ModelHelper.lightCenter(cache, dirX - p12X, dirY - p12Y, dirZ - p12Z, cornerNN) : 0;
+		int ao0 = ao(posZ, posX, cornerPP);
+		int ao1 = ao(negZ, posX, cornerPN);
+		int ao2 = ao(negZ, negX, cornerNN);
+		int ao3 = ao(posZ, negX, cornerNP);
 
-		int ao0 = ModelHelper.ao(posZ, posX, cornerPP);
-		int ao1 = ModelHelper.ao(negZ, posX, cornerPN);
-		int ao2 = ModelHelper.ao(negZ, negX, cornerNN);
-		int ao3 = ModelHelper.ao(posZ, negX, cornerNP);
+		int lightPZ = light(posZ);
+		int lightPX = light(posX);
 
-		int lightMap = cache.getLightCenter(dirX, dirY, dirZ, 0);
+		int lightNZ = light(negZ);
+		int lightNX = light(negX);
 
-		int lightPZ = ModelHelper.light(posZ);
-		int lightPX = ModelHelper.light(posX);
-
-		int lightNZ = ModelHelper.light(negZ);
-		int lightNX = ModelHelper.light(negX);
-
-		int light0 = ModelHelper.avg(ModelHelper.avg(lightPP, lightMap), ModelHelper.avg(lightPZ, lightPX)); // 0 vertex
-		int light1 = ModelHelper.avg(ModelHelper.avg(lightPN, lightMap), ModelHelper.avg(lightPX, lightNZ)); // 1 vertex
-		int light2 = ModelHelper.avg(ModelHelper.avg(lightNN, lightMap), ModelHelper.avg(lightNZ, lightNX)); // 2 vertex
-		int light3 = ModelHelper.avg(ModelHelper.avg(lightNP, lightMap), ModelHelper.avg(lightNX, lightPZ)); // 3 vertex
+		int light0 = avg(avg(lightPP, lightMap), avg(lightPZ, lightPX)); // 0 vertex
+		int light1 = avg(avg(lightPN, lightMap), avg(lightPX, lightNZ)); // 1 vertex
+		int light2 = avg(avg(lightNN, lightMap), avg(lightNZ, lightNX)); // 2 vertex
+		int light3 = avg(avg(lightNP, lightMap), avg(lightNX, lightPZ)); // 3 vertex
 
 		int uv0 = face.uvData[0];
 		int uv1 = face.uvData[1];
@@ -190,7 +178,24 @@ public class VoxelMesherCenter  {
 		return MathExt.getLightmapCoord(skyLight, blockLight) << 4;
 	}
 
-	public static int getBlockCacheLazily(int x, int y, int z) {
+	public static int getBlockCached(int blockIndex) {
+		int solidBlock = SectionCache.VISITED_CENTER_BLOCKS[blockIndex];
+
+		if (solidBlock == 1) {
+			return solidBlock;
+		}
+
+		int skyLight = SectionCache.getNibble(SectionCache.CENTER_SKYLIGHT, blockIndex);
+		int blockLight = SectionCache.getNibble(SectionCache.CENTER_BLOCKLIGHT, blockIndex);
+
+		return MathExt.getLightmapCoord(skyLight, blockLight) << 4;
+	}
+
+	public static int isFullVoxel(int blockIndex) {
+		return SectionCache.VISITED_CENTER_BLOCKS[blockIndex];
+	}
+
+	public static int isFullVoxel(int x, int y, int z) {
 		int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
 		int solidBlock = SectionCache.VISITED_CENTER_BLOCKS[blockIndex];
 

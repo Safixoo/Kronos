@@ -8,7 +8,6 @@ import static dev.safixo.client.util.Direction.*;
 
 @SuppressWarnings("PointlessArithmeticExpression")
 public class FacingRender {
-	public short dirPacked;
 	public byte dirX, dirY, dirZ;
 	public byte aoCornerX0, aoCornerY0, aoCornerZ0;
 	public byte aoCornerX1, aoCornerY1, aoCornerZ1;
@@ -19,7 +18,8 @@ public class FacingRender {
 	public byte[] weightIndices = new byte[8];
 	public byte bA, bB, bC, bD;
 
-	public short aoCorner0Packed, aoCorner1Packed;
+	public int dirPacked;
+	public int aoCorner0Packed, aoCorner1Packed;
 	public short aoCorner0, aoCorner1;
 
 	public static final byte[] ROTATION = new byte[4 * Direction.COUNT];
@@ -54,13 +54,13 @@ public class FacingRender {
 		this.aoCornerY1 = Direction.y(this.aoCorner1);
 		this.aoCornerZ1 = Direction.z(this.aoCorner1);
 
-		this.aoCorner0Packed = (short) (SectionCache.makeBlockIndex(this.aoCornerX0, this.aoCornerY0, this.aoCornerZ0) & 0xFFF);
-		this.aoCorner1Packed = (short) (SectionCache.makeBlockIndex(this.aoCornerX1, this.aoCornerY1, this.aoCornerZ1) & 0xFFF);
-		this.dirPacked = (short) (SectionCache.makeBlockIndex(this.dirX, this.dirY, this.dirZ) & 0xFFF);
+		this.aoCorner0Packed = SectionCache.makeBlockIndex(this.aoCornerX0, this.aoCornerY0, this.aoCornerZ0);
+		this.aoCorner1Packed = SectionCache.makeBlockIndex(this.aoCornerX1, this.aoCornerY1, this.aoCornerZ1);
 
 		this.dirX = Direction.x(dir);
 		this.dirY = Direction.y(dir);
 		this.dirZ = Direction.z(dir);
+		this.dirPacked = SectionCache.makeBlockIndex(this.dirX, this.dirY, this.dirZ);
 
 		for (int i = 0; i < 4; i++) {
 			int ind = i * 2;

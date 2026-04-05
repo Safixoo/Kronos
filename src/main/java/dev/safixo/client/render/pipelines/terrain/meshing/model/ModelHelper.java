@@ -84,11 +84,11 @@ public class ModelHelper {
 	}
 
 	public static int light(SectionCache cache, int x, int y, int z, int blockCache) {
-		if (blockCache == ~1) {
+		if (blockCache == 0) {
 			return cache.getLight(x, y, z, 0);
 		}
 
-		return blockCache >>> 4;
+		return 0;
 	}
 
 	public static int lightCenter(SectionCache cache, int x, int y, int z, int blockCache) {
@@ -97,6 +97,14 @@ public class ModelHelper {
 		}
 
 		return blockCache >>> 4;
+	}
+
+	public static int lightCenter(SectionCache cache, int blockIndex, int blockCache) {
+		if (blockCache == 0) {
+			return cache.getLightCenter(blockIndex, 0);
+		}
+
+		return 0;
 	}
 
 	// Naive approximation to Minecraft ambient occlusion, it skips some classifications differences

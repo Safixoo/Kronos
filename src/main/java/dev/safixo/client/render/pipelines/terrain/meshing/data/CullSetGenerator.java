@@ -18,6 +18,7 @@ public class CullSetGenerator {
 
 	static {
 		Arrays.fill(FULL_SOLID, (byte) 1);
+		Arrays.fill(VISITED_CENTER_BLOCKS, (byte) 1);
 	}
 
 	private static void restartQueue() {
