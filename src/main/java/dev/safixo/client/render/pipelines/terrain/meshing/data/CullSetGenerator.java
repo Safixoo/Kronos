@@ -122,18 +122,11 @@ public class CullSetGenerator {
 	}
 
 	private static boolean isVisitable(int packed) {
-		byte[] visitedBlocks = VISITED_CENTER_BLOCKS;
-		byte[] blockData = CENTER_BLOCKS;
-		boolean[] solidBlocks = PrimitivesFlags.SOLID;
-
-		return !solidBlocks[blockData[packed] & 0xFF] && visitedBlocks[packed] == 1;
+		return isVisitable(CENTER_BLOCKS, packed);
 	}
 
 	private static boolean isVisitable(byte[] blockData, int packed) {
-		byte[] visitedBlocks = VISITED_CENTER_BLOCKS;
-		boolean[] solidBlocks = PrimitivesFlags.SOLID;
-
-		return !solidBlocks[blockData[packed] & 0xFF] && visitedBlocks[packed] == 1;
+		return PrimitivesFlags.SOLID_CULL_MASK[blockData[packed] & 0xFF] == 0 && VISITED_CENTER_BLOCKS[packed] == 1;
 	}
 
 	private static int addOpenFaces(int x, int y, int z) {
