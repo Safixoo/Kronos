@@ -22,8 +22,8 @@ public class SectionCache implements IBlockAccess {
 	private static final Chunk[] CHUNKS = new Chunk[3 * 3];
 	private static final ModelColorizer COLORIZER = new ModelColorizer();
 
-	private static final byte[] DEFAULT_BYTE_ARRAY = new byte[16 * 16 * 16];
-	private static final byte[] DEFAULT_FULL_BYTE_ARRAY = new byte[16 * 16 * 16];
+	public static final byte[] DEFAULT_BYTE_ARRAY = new byte[16 * 16 * 16];
+	public static final byte[] DEFAULT_FULL_BYTE_ARRAY = new byte[16 * 16 * 16];
 
 	static {
 		Arrays.fill(DEFAULT_FULL_BYTE_ARRAY, (byte) 0xFF);
@@ -44,8 +44,10 @@ public class SectionCache implements IBlockAccess {
 	public static final byte[][] SKY_LIGHT = new byte[3 * 3 * 3][];
 	public static final byte[][] BLOCK_LIGHT = new byte[3 * 3 * 3][];
 
-	private static byte[] CENTER_BLOCKS;
-	private static byte[] CENTER_METADATA;
+	public static byte[] CENTER_BLOCKS;
+	public static byte[] CENTER_METADATA;
+
+	public static final byte[] VISITED_CENTER_BLOCKS = new byte[4096];
 
 	private boolean centerSectEmpty;
 	public int[] biomeColors = new int[ModelColorizer.MAX_COLOR_TYPES];
@@ -289,7 +291,7 @@ public class SectionCache implements IBlockAccess {
 		return PrimitivesFlags.MATERIAL[blockId];
 	}
 
-	public int isBlockOpaqueCubeInt(int x, int y, int z) {
+	public int isVoxelFull(int x, int y, int z) {
 		int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
 
 		int blockX = x - this.blockX;
@@ -301,20 +303,24 @@ public class SectionCache implements IBlockAccess {
 		return PrimitivesFlags.SOLID_CULL_MASK[MathExt.byteToUnsigned(SECTION_BLOCKS[sectionIndex][blockIndex])];
 	}
 
-	public int isVoxelFull(int x, int y, int z) {
+	public int isVoxelFullRelative(int x, int y, int z) {
 		int sectionIndex = sectionIndex(x >> 4, y >> 4, z >> 4);
 		int blockInd = makeBlockIndex(x & 15, y & 15, z & 15);
+
+		if (sectionIndex == sectionIndex(1, 1, 1)) {
+			return this.isVoxelFullFromCenter(blockInd);
+		}
 
 		return PrimitivesFlags.SOLID_CULL_MASK[MathExt.byteToUnsigned(SECTION_BLOCKS[sectionIndex][blockInd])];
 	}
 
 	@Override
 	public boolean isBlockOpaqueCube(int x, int y, int z) {
-		return this.isBlockOpaqueCubeInt(x, y, z) != 0;
+		return this.isVoxelFull(x, y, z) != 0;
 	}
 
 	public int isVoxelFullFromCenter(int blockIndex) {
-		return PrimitivesFlags.SOLID_CULL_MASK[MathExt.byteToUnsigned(CENTER_BLOCKS[blockIndex])];
+		return SectionCache.VISITED_CENTER_BLOCKS[blockIndex];
 	}
 
 	@Override

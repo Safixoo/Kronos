@@ -4,11 +4,11 @@ import dev.safixo.client.render.pipelines.terrain.SectionFlags;
 import dev.safixo.client.render.pipelines.terrain.SectionManager;
 import dev.safixo.client.render.pipelines.terrain.SectionRender;
 import dev.safixo.client.render.pipelines.terrain.meshing.builders.VoxelMesher;
+import dev.safixo.client.render.pipelines.terrain.meshing.data.CullSetGenerator;
 import dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache;
 import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
 import dev.safixo.client.render.vertex.DefaultVertexFormats;
 import dev.safixo.client.render.vertex.VertexWriter;
-import dev.safixo.client.util.Direction;
 import dev.safixo.client.util.MeshDirection;
 import dev.safixo.client.util.data.CameraData;
 import dev.safixo.client.util.data.PrimitivesFlags;
@@ -45,63 +45,62 @@ public class SectionMesher {
 		RenderBlocks renderBlocks = new RenderBlocks(sectionCache);
 
 		VertexWriter translucentWriter = VertexWriter.TRANSLUCENT;
-
 		for (int dir = 0; dir < MeshDirection.COUNT; dir++) {
 			prepareWriterForTerrain(section, VertexWriter.SOLID[dir]);
 		}
-
 		prepareWriterForTerrain(section, translucentWriter);
-
-		int[] solidFaces = new int[Direction.COUNT + 1];
-		boolean ambient = Minecraft.getMinecraft().gameSettings.ambientOcclusion != 0;
 
 		for (int i = 0; i < section.tileEntities.size(); i++) {
 			tileSet.remove(section.tileEntities.get(i));
 		}
 		section.tileEntities.clear();
 
+		boolean ambient = Minecraft.getMinecraft().gameSettings.ambientOcclusion != 0;
 		boolean empty = sectionCache.extendedLevelsInChunkCache();
 
 		if (!empty) {
+			section.flags = SectionFlags.setCullFaces(section.flags, CullSetGenerator.floodFillSection());
+
 			// +-X face
 			for (int y = 0; y < 16; y++) {
 				for (int z = 0; z < 16; z++) {
-					meshBlock(section, renderBlocks, sectionCache, 15, y, z, solidFaces, ambient);
+					meshBlock(section, renderBlocks, sectionCache, 15, y, z, ambient);
 				}
 			}
 			for (int y = 0; y < 16; y++) {
 				for (int z = 0; z < 16; z++) {
-					meshBlock(section, renderBlocks, sectionCache, 0, y, z, solidFaces, ambient);
+					meshBlock(section, renderBlocks, sectionCache, 0, y, z, ambient);
 				}
 			}
 
 			// -+Y face
 			for (int z = 0; z < 16; z++) {
 				for (int x = 1; x < 15; x++) {
-					meshBlock(section, renderBlocks, sectionCache, x, 15, z, solidFaces, ambient);
+					meshBlock(section, renderBlocks, sectionCache, x, 15, z, ambient);
 				}
 			}
 			for (int z = 0; z < 16; z++) {
 				for (int x = 1; x < 15; x++) {
-					meshBlock(section, renderBlocks, sectionCache, x, 0, z, solidFaces, ambient);
+					meshBlock(section, renderBlocks, sectionCache, x, 0, z, ambient);
 				}
 			}
 
 			// -+Z face
 			for (int y = 1; y < 15; y++) {
 				for (int x = 1; x < 15; x++) {
-					meshBlock(section, renderBlocks, sectionCache, x, y, 15, solidFaces, ambient);
+					meshBlock(section, renderBlocks, sectionCache, x, y, 15, ambient);
 				}
 			}
 			for (int y = 1; y < 15; y++) {
 				for (int x = 1; x < 15; x++) {
-					meshBlock(section, renderBlocks, sectionCache, x, y, 0, solidFaces, ambient);
+					meshBlock(section, renderBlocks, sectionCache, x, y, 0, ambient);
 				}
 			}
 
-			processCullFaces(section, solidFaces);
+			int cameraChunkX = camera.intX >> 4, cameraChunkZ = camera.intZ >> 4;
+			int sectionX = section.blockX >> 4, sectionZ = section.blockZ >> 4;
 
-			if ((SectionFlags.getCullFaces(section.flags) & 0b111_111) != 0b111_111) {
+			if ((cameraChunkX == sectionX && cameraChunkZ == sectionZ) || (SectionFlags.getCullFaces(section.flags) & 0b111_111) != 0b111_111) {
 				// 14x14x14 center blocks.
 				for (int y = 1; y < 15; y++) {
 					for (int z = 1; z < 15; z++) {
@@ -131,8 +130,7 @@ public class SectionMesher {
 		int nonEmptyTranslucent = (translucentDrawMask << 1) & 0b10;
 		int nonEmptySolid = solidDrawMask != 0 ? 0b01 : 0;
 
-		int solidBlocks = solidFaces[COUNT];
-		boolean emptySolid = solidBlocks == 4096 && sumVertices == 0;
+		boolean emptySolid = (SectionFlags.getCullFaces(section.flags) & 0b111_111) == 0b111_111 && sumVertices == 0;
 
 		section.flags = SectionFlags.setDirty(section.flags, false);
 		section.flags = SectionFlags.setEmptySolid(section.flags, emptySolid);
@@ -166,7 +164,7 @@ public class SectionMesher {
 		int blockRenderPass = PrimitivesFlags.RENDER_PASS[blockId];
 		int blockX = x + section.blockX, blockY = y + section.blockY, blockZ = z + section.blockZ;
 
-		if (PrimitivesFlags.SOLID[blockId]) {
+		if (cache.isVoxelFullFromCenter(blockIndex) == 1) {
 			int drawBitSet = 0;
 
 			drawBitSet |= cache.isVoxelFullFromCenter(blockIndex + makeBlockIndex(0,1,0)) << UP;
@@ -198,8 +196,9 @@ public class SectionMesher {
 		}
 	}
 
-	private static void meshBlock(SectionRender section, RenderBlocks renderBlocks, SectionCache cache, int x, int y, int z, int[] solidBlocks, boolean ambient) {
-		int blockId = cache.getBlockIdCenter(x, y, z);
+	private static void meshBlock(SectionRender section, RenderBlocks renderBlocks, SectionCache cache, int x, int y, int z, boolean ambient) {
+		int blockIndex = makeBlockIndex(x, y, z);
+		int blockId = cache.getBlockIdCenter(blockIndex);
 
 		if (blockId == AIR_ID) {
 			return;
@@ -210,29 +209,18 @@ public class SectionMesher {
 		int blockY = y + section.blockY;
 		int blockZ = z + section.blockZ;
 
-		if (PrimitivesFlags.SOLID[blockId]) {
-			if (y == 0 || y == 15) {
-				solidBlocks[Direction.DOWN + (y & 1)]++;
-			}
-			if (x == 0 || x == 15) {
-				solidBlocks[Direction.WEST + (x & 1)]++;
-			}
-			if (z == 0 || z == 15) {
-				solidBlocks[Direction.NORTH + (z & 1)]++;
-			}
-			solidBlocks[Direction.COUNT]++;
-
+		if (cache.isVoxelFullFromCenter(blockIndex) == 1) {
 			int rX = x + 16;
 			int rY = y + 16;
 			int rZ = z + 16;
 			int drawBitSet = 0;
 
-			drawBitSet |= cache.isVoxelFull(rX, rY + 1, rZ) << UP;
-			drawBitSet |= cache.isVoxelFull(rX, rY - 1, rZ) << DOWN;
-			drawBitSet |= cache.isVoxelFull(rX, rY, rZ - 1) << NORTH;
-			drawBitSet |= cache.isVoxelFull(rX, rY, rZ + 1) << SOUTH;
-			drawBitSet |= cache.isVoxelFull(rX - 1, rY, rZ) << WEST;
-			drawBitSet |= cache.isVoxelFull(rX + 1, rY, rZ) << EAST;
+			drawBitSet |= cache.isVoxelFullRelative(rX, rY + 1, rZ) << UP;
+			drawBitSet |= cache.isVoxelFullRelative(rX, rY - 1, rZ) << DOWN;
+			drawBitSet |= cache.isVoxelFullRelative(rX, rY, rZ - 1) << NORTH;
+			drawBitSet |= cache.isVoxelFullRelative(rX, rY, rZ + 1) << SOUTH;
+			drawBitSet |= cache.isVoxelFullRelative(rX - 1, rY, rZ) << WEST;
+			drawBitSet |= cache.isVoxelFullRelative(rX + 1, rY, rZ) << EAST;
 
 			if (drawBitSet != 0b111_111) {
 				VoxelMesher.meshVoxel(Block.blocksList[blockId], cache, blockX, blockY, blockZ, ambient, ~drawBitSet, blockId);
