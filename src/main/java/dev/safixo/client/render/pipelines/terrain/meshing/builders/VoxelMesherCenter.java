@@ -166,6 +166,15 @@ public class VoxelMesherCenter  {
 	private static final int FULL_BLOCK_REDUCE = EMPTY_BLOCK_OCC_FACTOR - (int) (SOLID_OCC_FACTOR * EMPTY_BLOCK_OCC_FACTOR);
 
 	public static int ao(int side1, int side2, int corner, int emptyVoxelMask, int fullVoxelMask) {
+		// Cambiar (fullVoxelMask) por (fullVoxelMask >> 2) y las mascaras solidas por -1 absoluto en vez
+		// de un 1 para conseguir lo siguiente:
+		// side1 &= fullVoxelMask;
+    	// side2 &= fullVoxelMask;
+        //
+    	// corner |= side1 & side2;
+        //
+    	// return emptyVoxelMask - (side1 + side2 + corner);
+		
 		side1 = -fullFace(side1);
 		side2 = -fullFace(side2);
 		corner = -fullFace(corner);
