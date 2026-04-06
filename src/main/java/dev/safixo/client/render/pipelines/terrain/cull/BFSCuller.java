@@ -200,7 +200,7 @@ public class BFSCuller {
 		int distY = node.blockY - playerY;
 		int distZ = node.blockZ - playerZ;
 
-		int distance = withinRenderDistance(distX, distY, distZ);
+		int distance = getRenderDistance(distX, distY, distZ);
 
 		if (distance >= fogEnd || !FrustumCuller.withinFrustumBounds(distX, distY, distZ)) {
 			return true;
@@ -224,6 +224,12 @@ public class BFSCuller {
 		return (dirSet & (1 << direction)) != 0 && section.currentFrame == frame;
 	}
 
+	private static boolean isIntersectingAxis(int dir) {
+        int dir0 = dir & 0b110011;
+		int dir1 = dir & 0b001100;
+		return (dir0 & (dir0 >> 1)) != 0 || dir1 == 0b001100;
+	}
+
 	/**
 	 * Uses the key idea from the article of <a href ="https://towardsdatascience.com/a-quick-and-clear-look-at-grid-based-visibility-bf63769fbc78">Grid Based Visibility</a>
 	 * to determine the factor of grid visibility in 3D for the current visited section of the graph.
@@ -231,13 +237,13 @@ public class BFSCuller {
 	 * @return Grid visibility factor
 	 */
 	private static int processGridIndex(SectionRender section, int playerX, int playerY, int playerZ, int outwardDir, int frame) {
-		int diffX = Math.abs((section.blockX >> 4) - (playerX >> 4));
-		int diffY = Math.abs((section.blockY >> 4) - (playerY >> 4));
-		int diffZ = Math.abs((section.blockZ >> 4) - (playerZ >> 4));
-
-		if (diffX == 0 || diffY == 0 || diffZ == 0) {
-			return MAX_PRECISION;
+		if (isIntersectingAxis(outwardDir)) { 
+		    return MAX_PRESICION;
 		}
+		
+		int diffX = (section.blockX >> 4) - (playerX >> 4);
+		int diffY = (section.blockY >> 4) - (playerY >> 4);
+		int diffZ = (section.blockZ >> 4) - (playerZ >> 4);
 
 		int dirSet = ~outwardDir & SectionFlags.getAdjacentMask(section.flags);
 		int gradInd = 0;
@@ -246,21 +252,21 @@ public class BFSCuller {
 		if (renderThisFrame(section.adjacentDown, dirSet, Direction.DOWN, frame)) {
 			gradInd += diffY * section.adjacentDown.gridInd;
 		} else if (renderThisFrame(section.adjacentUp, dirSet, Direction.UP, frame)) {
-			gradInd += diffY * section.adjacentUp.gridInd;
+			gradInd -= diffY * section.adjacentUp.gridInd;
 		}
 
 		// Z
 		if (renderThisFrame(section.adjacentNorth, dirSet, Direction.NORTH, frame)) {
 			gradInd += diffZ * section.adjacentNorth.gridInd;
 		} else if (renderThisFrame(section.adjacentSouth, dirSet, Direction.SOUTH, frame)) {
-			gradInd += diffZ * section.adjacentSouth.gridInd;
+			gradInd -= diffZ * section.adjacentSouth.gridInd;
 		}
 
 		// X
 		if (renderThisFrame(section.adjacentWest, dirSet, Direction.WEST, frame)) {
 			gradInd += diffX * section.adjacentWest.gridInd;
 		} else if (renderThisFrame(section.adjacentEast, dirSet, Direction.EAST, frame)) {
-			gradInd += diffX * section.adjacentEast.gridInd;
+			gradInd -= diffX * section.adjacentEast.gridInd;
 		}
 
 		return (int) ((gradInd * INV_DIVS[diffX + diffY + diffZ]) >> PRECISION_BITS);
@@ -270,7 +276,7 @@ public class BFSCuller {
 	 * Squared sphere distance from the nearest corner, which almost always returns the nearest point
 	 * in cases where an axis is not intersecting with the player.
 	 */
-	private static int withinRenderDistance(int distX, int distY, int distZ) {
+	private static int getDistance(int distX, int distY, int distZ) {
 		distX += (distX >>> 31) << 4;
 		distY += (distY >>> 31) << 4;
 		distZ += (distZ >>> 31) << 4;
@@ -281,11 +287,7 @@ public class BFSCuller {
 	 * Traces a ray from the section to the camera and tries to find obstruction in the way using the visited
 	 * section current frame.
 	 */
-	private static boolean visibleByRayCast(SectionRender node, int frame, int x1, int y1, int z1, int dx, int dy, int dz) {
-		dx -= 8;
-		dy -= 8;
-		dz -= 8;
-
+	private static boolean visibleByRayCast(SectionRender section, int frame, int x1, int y1, int z1, int dx, int dy, int dz) {
 		int invDx = MAX_PRECISION / (Math.abs(dx) + 1);
 		int invDy = MAX_PRECISION / (Math.abs(dy) + 1);
 		int invDz = MAX_PRECISION / (Math.abs(dz) + 1);
@@ -294,36 +296,32 @@ public class BFSCuller {
 		int tDeltaY = invDy << 4;
 		int tDeltaZ = invDz << 4;
 
-		int originOffsetX = (x1 & 15);
-		int originOffsetY = (y1 & 15);
-		int originOffsetZ = (z1 & 15);
-
-		int tMaxX = (dx > 0 ? (16 - originOffsetX) : originOffsetX + 1) * invDx;
-		int tMaxY = (dy > 0 ? (16 - originOffsetY) : originOffsetY + 1) * invDy;
-		int tMaxZ = (dz > 0 ? (16 - originOffsetZ) : originOffsetZ + 1) * invDz;
+		int tMaxX = 8 * invDx;
+		int tMaxY = 8 * invDy;
+		int tMaxZ = 8 * invDz;
 
 		int valid = 0;
 
 		for (int i = 0; i < 4; i++) {
 			if (tMaxX < tMaxY) {
 				if (tMaxX < tMaxZ) {
-					node = dx < 0 ? node.adjacentWest : node.adjacentEast;
+					section = dx < 0 ? section.adjacentWest : section.adjacentEast;
 					tMaxX += tDeltaX;
 				} else {
-					node = dz < 0 ? node.adjacentNorth : node.adjacentSouth;
+					section = dz < 0 ? section.adjacentNorth : section.adjacentSouth;
 					tMaxZ += tDeltaZ;
 				}
 			} else {
 				if (tMaxY < tMaxZ) {
-					node = dy < 0 ? node.adjacentDown : node.adjacentUp;
+					section = dy < 0 ? section.adjacentDown : section.adjacentUp;
 					tMaxY += tDeltaY;
 				} else {
-					node = dz < 0 ? node.adjacentNorth : node.adjacentSouth;
+					section = dz < 0 ? section.adjacentNorth : section.adjacentSouth;
 					tMaxZ += tDeltaZ;
 				}
 			}
 
-			if (node == null || (node.currentFrame != frame && valid++ > 2)) {
+			if (section == null || (section.currentFrame != frame && valid++ > 2)) {
 				break;
 			}
 		}
@@ -333,9 +331,5 @@ public class BFSCuller {
 
 	public int getActiveFrame() {
 		return this.activeFrame;
-	}
-
-	private static int sign(int num) {
-		return (num >> 31) | 1;
 	}
 }
