@@ -19,7 +19,7 @@ import static dev.safixo.client.util.ColorBGRManager.*;
 import static dev.safixo.client.util.Direction.*;
 
 public class VoxelMesherCenter  {
-	private static final int INVALID_LIGHT = -1;
+	private static final int FULL_SOLID = 0xFF_FF_FF;
 	
 	public static void meshVoxel(Block block, SectionCache cache, int x, int y, int z, boolean ambient, int drawSet, int blockId) {
 		if (!PrimitivesFlags.DIRECT_CULL[blockId]) {
@@ -79,28 +79,31 @@ public class VoxelMesherCenter  {
 
 		int lightMap = cache.getLightCenter(blockIndex, 0);
 
-		int lightPP = fullFace((posZ | posX) & ~cornerPP) == 0 ? cache.getLightCenter(blockIndex + p12, 0) : lightMap;
-		int lightPN = fullFace((negZ | posX) & ~cornerPN) == 0 ? cache.getLightCenter(blockIndex + pd12, 0) : lightMap;
+		int lightPP = ((posZ | posX) & ~cornerPP) == 0 ? cache.getLightCenter(blockIndex + p12, 0) : lightMap;
+		int lightPN = ((negZ | posX) & ~cornerPN) == 0 ? cache.getLightCenter(blockIndex + pd12, 0) : lightMap;
 
 		int cornerNP = isFullVoxel(blockIndex - pd12);
 		int cornerNN = isFullVoxel(blockIndex - p12);
 
-		int lightNP = fullFace((posZ | negX) & ~cornerNP) == 0 ? cache.getLightCenter(blockIndex - pd12, 0) : lightMap;
-		int lightNN = fullFace((negZ | negX) & ~cornerNN) == 0 ? cache.getLightCenter(blockIndex - p12, 0) : lightMap;
+		int lightNP = ((posZ | negX) & ~cornerNP) == 0 ? cache.getLightCenter(blockIndex - pd12, 0) : lightMap;
+		int lightNN = ((negZ | negX) & ~cornerNN) == 0 ? cache.getLightCenter(blockIndex - p12, 0) : lightMap;
+
+		int div5Scale = ((1 << 16) / 5) + 1;
 
 		int emptyMask = SHADE_FULL_FACTOR[dir];
-		int fullMask = emptyMask - ((emptyMask * ((1 << 16) / 5)) >> 16);
+		// TODO: agregar directamente en los bits superiores de SHADE_FULL_FACTOR
+		int fullMask = (emptyMask - ((emptyMask * div5Scale) >> 16)) >> 2; 
 		
 		int ao0 = ao(posZ, posX, cornerPP, emptyMask, fullMask);
 		int ao1 = ao(negZ, posX, cornerPN, emptyMask, fullMask);
 		int ao2 = ao(negZ, negX, cornerNN, emptyMask, fullMask);
 		int ao3 = ao(posZ, negX, cornerNP, emptyMask, fullMask);
 
-		int lightPZ = light(posZ);
-		int lightPX = light(posX);
+		int lightPZ = extractLight(posZ);
+		int lightPX = extractLight(posX);
 
-		int lightNZ = light(negZ);
-		int lightNX = light(negX);
+		int lightNZ = extractLight(negZ);
+		int lightNX = extractLight(negX);
 
 		int light0 = avgHere(lightMap, avgHere(lightPZ, lightPX)); // 0 vertex
 		int light1 = avgHere(lightMap, avgHere(lightPX, lightNZ)); // 1 vertex
@@ -160,51 +163,36 @@ public class VoxelMesherCenter  {
 		}
 	}
 
-	private static final double SOLID_OCC_FACTOR = 0.2;
-
-	private static final int EMPTY_BLOCK_OCC_FACTOR = 255;
-	private static final int FULL_BLOCK_REDUCE = EMPTY_BLOCK_OCC_FACTOR - (int) (SOLID_OCC_FACTOR * EMPTY_BLOCK_OCC_FACTOR);
-
 	public static int ao(int side1, int side2, int corner, int emptyVoxelMask, int fullVoxelMask) {
-		// Cambiar (fullVoxelMask) por (fullVoxelMask >> 2) y las mascaras solidas por -1 absoluto en vez
-		// de un 1 para conseguir lo siguiente:
-		// side1 &= fullVoxelMask;
-    	// side2 &= fullVoxelMask;
-        //
-    	// corner |= side1 & side2;
-        //
-    	// return emptyVoxelMask - (side1 + side2 + corner);
+		side1 &= fullVoxelMask;
+		side2 &= fullVoxelMask;
 		
-		side1 = -fullFace(side1);
-		side2 = -fullFace(side2);
-		corner = -fullFace(corner);
-
 		corner |= side1 & side2;
 
-		side1 = emptyVoxelMask - (side1 & fullVoxelMask);
-		side2 = emptyVoxelMask - (side2 & fullVoxelMask);
-		corner = emptyVoxelMask - (corner & fullVoxelMask);
-
-		return (emptyVoxelMask + side1 + side2 + corner) >> 2;
+		return emptyVoxelMask - (side1 + side2 + corner);
 	}
 
 	public static int avgHere(int a, int b) {
-		if (a == INVALID_LIGHT) return b;
-		if (b == INVALID_LIGHT) return a;
+		if (a == FULL_SOLID) return b;
+		if (b == FULL_SOLID) return a;
 		return (a + b) >> 1;
+	}
+
+	public static int extractLight(int mask) {
+		return mask >>> 12;
 	}
 
 	public static int getBlockCached(int blockIndex) {
 		int solidBlock = SectionCache.VISITED_CENTER_BLOCKS[blockIndex];
 
 		if (solidBlock == 1) {
-			return INVALID_LIGHT;
+			return FULL_SOLID;
 		}
 
 		int skyLight = SectionCache.getNibble(SectionCache.CENTER_SKYLIGHT, blockIndex);
 		int blockLight = SectionCache.getNibble(SectionCache.CENTER_BLOCKLIGHT, blockIndex);
 
-		return MathExt.getLightmapCoord(skyLight, blockLight) << 4;
+		return MathExt.getLightmapCoord(skyLight, blockLight) << 12;
 	}
 
 	public static int isFullVoxel(int blockIndex) {
