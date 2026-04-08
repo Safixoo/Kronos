@@ -15,12 +15,9 @@ import net.minecraft.util.Icon;
 import static dev.safixo.client.render.pipelines.terrain.meshing.builders.VoxelMesher.*;
 import static dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache.makeBlockIndex;
 import static dev.safixo.client.render.pipelines.terrain.meshing.model.ModelHelper.*;
-import static dev.safixo.client.util.ColorBGRManager.*;
 import static dev.safixo.client.util.Direction.*;
 
 public class VoxelMesherCenter  {
-	private static final int FULL_SOLID = 0xFF_FF_FF;
-	
 	public static void meshVoxel(Block block, SectionCache cache, int x, int y, int z, boolean ambient, int drawSet, int blockId) {
 		if (!PrimitivesFlags.DIRECT_CULL[blockId]) {
 			drawSet |= block.shouldSideBeRendered(cache, x, y - 1, z, 0) ? 1 << DOWN : 0;
@@ -33,7 +30,6 @@ public class VoxelMesherCenter  {
 		}
 
 		int modelColor = ColorBGRManager.rgbToBgr(MODEL_COLORIZER.getColor(cache, x, y, z, block));
-		int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
 
 		for (int dir = 0; dir < Direction.COUNT; dir++) {
 			if ((drawSet & (1 << dir)) == 0) {
@@ -41,30 +37,40 @@ public class VoxelMesherCenter  {
 			}
 
 			Icon tex = block.getBlockTexture(cache, x, y, z, dir);
-			
-			float[] uvs = TEX_UVS;
+
+			int blockColor = SHADE_FULL_COLOR[dir];
+			int overlayColor = blockColor;
+
+			if (modelColor != 0xFFFFFF) {
+				overlayColor = ColorBGRManager.multiplyColor(modelColor, SHADE_FULL_FACTOR[dir]);
+
+				if (blockId != BLOCK_GRASS_ID || dir == UP) {
+					blockColor = overlayColor;
+				}
+			}
+
+			final float[] uvs = TEX_UVS;
 			uvs[0] = tex.getMinU();
 			uvs[1] = tex.getMinV();
 			uvs[2] = tex.getMaxU();
 			uvs[3] = tex.getMaxV();
 
-			FacingRender render = FACE_RENDER[dir];
 			VertexWriter writer = VertexWriter.SOLID[dir];
-			int colorMask = (blockId != BLOCK_GRASS_ID || dir == UP) ? 0 : -1;
+			FacingRender render = FACE_RENDER[dir];
 
 			if (ambient) {
-				renderFace(writer, render, tex, cache, blockIndex, x, y, z, modelColor, colorMask);
+				renderFace(writer, render, tex, cache, x, y, z, blockColor, overlayColor);
 			} else {
-				renderFaceNoSmooth(render, dir, cache, x, y, z, modelColor);
+				renderFaceNoSmooth(render, dir, cache, x, y, z, blockColor);
 			}
 		}
 	}
 
-	public static void renderFace(VertexWriter writer, FacingRender face, Icon tex, SectionCache cache, int blockIndex, int x, int y, int z, int modelColor, int colorMask) {
+	public static void renderFace(VertexWriter writer, FacingRender face, Icon tex, SectionCache cache, int x, int y, int z, int blockColor, int overlayColor) {
 		int p1 = face.aoCorner0Packed;
 		int p2 = face.aoCorner1Packed;
 
-		blockIndex += face.dirPacked;
+		int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15) + face.dirPacked;
 
 		int posZ = getBlockCached(blockIndex + p2);
 		int negZ = getBlockCached(blockIndex - p2);
@@ -77,27 +83,21 @@ public class VoxelMesherCenter  {
 		int cornerPP = isFullVoxel(blockIndex + p12);
 		int cornerPN = isFullVoxel(blockIndex + pd12);
 
-		int lightMap = cache.getLightCenter(blockIndex, 0);
+		int lightMap = cache.getLightCenter(blockIndex);
 
-		int lightPP = ((posZ | posX) & ~cornerPP) == 0 ? cache.getLightCenter(blockIndex + p12, 0) : lightMap;
-		int lightPN = ((negZ | posX) & ~cornerPN) == 0 ? cache.getLightCenter(blockIndex + pd12, 0) : lightMap;
+		int lightPP = fullFace((posZ | posX) & ~cornerPP) == 0 ? (lightMap + cache.getLightCenter(blockIndex + p12)) >> 1 : lightMap;
+		int lightPN = fullFace((negZ | posX) & ~cornerPN) == 0 ? (lightMap + cache.getLightCenter(blockIndex + pd12)) >> 1 : lightMap;
 
 		int cornerNP = isFullVoxel(blockIndex - pd12);
 		int cornerNN = isFullVoxel(blockIndex - p12);
 
-		int lightNP = ((posZ | negX) & ~cornerNP) == 0 ? cache.getLightCenter(blockIndex - pd12, 0) : lightMap;
-		int lightNN = ((negZ | negX) & ~cornerNN) == 0 ? cache.getLightCenter(blockIndex - p12, 0) : lightMap;
+		int lightNP = fullFace((posZ | negX) & ~cornerNP) == 0 ? (lightMap + cache.getLightCenter(blockIndex - pd12)) >> 1 : lightMap;
+		int lightNN = fullFace((negZ | negX) & ~cornerNN) == 0 ? (lightMap + cache.getLightCenter(blockIndex - p12)) >> 1 : lightMap;
 
-		int div5Scale = ((1 << 16) / 5) + 1;
-
-		int emptyMask = SHADE_FULL_FACTOR[dir];
-		// TODO: agregar directamente en los bits superiores de SHADE_FULL_FACTOR
-		int fullMask = (emptyMask - ((emptyMask * div5Scale) >> 16)) >> 2; 
-		
-		int ao0 = ao(posZ, posX, cornerPP, emptyMask, fullMask);
-		int ao1 = ao(negZ, posX, cornerPN, emptyMask, fullMask);
-		int ao2 = ao(negZ, negX, cornerNN, emptyMask, fullMask);
-		int ao3 = ao(posZ, negX, cornerNP, emptyMask, fullMask);
+		int ao0 = ao(posZ, posX, cornerPP);
+		int ao1 = ao(negZ, posX, cornerPN);
+		int ao2 = ao(negZ, negX, cornerNN);
+		int ao3 = ao(posZ, negX, cornerNP);
 
 		int lightPZ = extractLight(posZ);
 		int lightPX = extractLight(posX);
@@ -105,21 +105,20 @@ public class VoxelMesherCenter  {
 		int lightNZ = extractLight(negZ);
 		int lightNX = extractLight(negX);
 
-		int light0 = avgHere(lightMap, avgHere(lightPZ, lightPX)); // 0 vertex
-		int light1 = avgHere(lightMap, avgHere(lightPX, lightNZ)); // 1 vertex
-		int light2 = avgHere(lightMap, avgHere(lightNZ, lightNX)); // 2 vertex
-		int light3 = avgHere(lightMap, avgHere(lightNX, lightPZ)); // 3 vertex
-
-		int blockColor = modelColor | colorMask;
-		int color0 = multiplyColor(blockColor, ao0);
-		int color1 = multiplyColor(blockColor, ao1);
-		int color2 = multiplyColor(blockColor, ao2);
-		int color3 = multiplyColor(blockColor, ao3);
+		int light0 = avg(lightPP, avg(lightPZ, lightPX)); // 0 vertex
+		int light1 = avg(lightPN, avg(lightPX, lightNZ)); // 1 vertex
+		int light2 = avg(lightNN, avg(lightNZ, lightNX)); // 2 vertex
+		int light3 = avg(lightNP, avg(lightNX, lightPZ)); // 3 vertex
 
 		int uv0 = face.uvData[0];
 		int uv1 = face.uvData[1];
 		int uv2 = face.uvData[2];
 		int uv3 = face.uvData[3];
+
+		int color0 = ColorBGRManager.multiplyColor(blockColor, ao0);
+		int color1 = ColorBGRManager.multiplyColor(blockColor, ao1);
+		int color2 = ColorBGRManager.multiplyColor(blockColor, ao2);
+		int color3 = ColorBGRManager.multiplyColor(blockColor, ao3);
 
 		x &= RegionRender.BLOCK_BITS_X;
 		y &= RegionRender.BLOCK_BITS_Y;
@@ -143,10 +142,10 @@ public class VoxelMesherCenter  {
 		}
 
 		if (tex == SIDE_GRASS_NON_OVERLAY) {
-			color0 = multiplyColor(modelColor, ao0);
-			color1 = multiplyColor(modelColor, ao1);
-			color2 = multiplyColor(modelColor, ao2);
-			color3 = multiplyColor(modelColor, ao3);
+			color0 = ColorBGRManager.multiplyColor(overlayColor, ao0);
+			color1 = ColorBGRManager.multiplyColor(overlayColor, ao1);
+			color2 = ColorBGRManager.multiplyColor(overlayColor, ao2);
+			color3 = ColorBGRManager.multiplyColor(overlayColor, ao3);
 			texUv = OVERLAY_UVS;
 
 			if (flip) {
@@ -163,36 +162,43 @@ public class VoxelMesherCenter  {
 		}
 	}
 
-	public static int ao(int side1, int side2, int corner, int emptyVoxelMask, int fullVoxelMask) {
-		side1 &= fullVoxelMask;
-		side2 &= fullVoxelMask;
-		
+	private static final double SOLID_OCC_FACTOR = 0.2;
+
+	private static final int EMPTY_BLOCK_OCC_FACTOR = 255;
+	private static final int FULL_BLOCK_REDUCE = EMPTY_BLOCK_OCC_FACTOR - (int) (SOLID_OCC_FACTOR * EMPTY_BLOCK_OCC_FACTOR);
+
+	public static int ao(int side1, int side2, int corner) {
+		side1 = -fullFace(side1) & FULL_BLOCK_REDUCE;
+		side2 = -fullFace(side2) & FULL_BLOCK_REDUCE;
+		corner = -fullFace(corner) & FULL_BLOCK_REDUCE;
+
 		corner |= side1 & side2;
 
-		return emptyVoxelMask - (side1 + side2 + corner);
+		return EMPTY_BLOCK_OCC_FACTOR - ((side1 + side2 + corner) >> 2);
 	}
 
-	public static int avgHere(int a, int b) {
-		if (a == FULL_SOLID) return b;
-		if (b == FULL_SOLID) return a;
-		return (a + b) >> 1;
-	}
+	private static int avg(int a, int b) {
+		if (a == 0) return b;
+		if (b == 0) return a;
 
-	public static int extractLight(int mask) {
-		return mask >>> 12;
+		return (a + b) >>> 1;
 	}
 
 	public static int getBlockCached(int blockIndex) {
 		int solidBlock = SectionCache.VISITED_CENTER_BLOCKS[blockIndex];
 
 		if (solidBlock == 1) {
-			return FULL_SOLID;
+			return 1;
 		}
 
 		int skyLight = SectionCache.getNibble(SectionCache.CENTER_SKYLIGHT, blockIndex);
 		int blockLight = SectionCache.getNibble(SectionCache.CENTER_BLOCKLIGHT, blockIndex);
 
-		return MathExt.getLightmapCoord(skyLight, blockLight) << 12;
+		return MathExt.getLightmapCoord(skyLight, blockLight) << 4;
+	}
+
+	private static int extractLight(int light) {
+		return light >> 4;
 	}
 
 	public static int isFullVoxel(int blockIndex) {

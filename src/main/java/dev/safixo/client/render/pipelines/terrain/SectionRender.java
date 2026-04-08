@@ -30,7 +30,7 @@ public class SectionRender {
 	public RegionRender region = RegionRender.NULL;
 
 	// Used in BFS for the grid based visibility technique.
-	public int gridInd = BFSCuller.MAX_PRECISION;
+	public int gridFactor = BFSCuller.MAX_PRECISION;
 
 	// Tile entities from the section.
 	public final ReferenceList<TileEntity> tileEntities = new ReferenceArrayList<>();

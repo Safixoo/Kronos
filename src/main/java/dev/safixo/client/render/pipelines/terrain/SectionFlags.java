@@ -77,10 +77,6 @@ public class SectionFlags {
 		return (flags & DIRTY) != 0;
 	}
 
-	public static int dirtyMask(int flags) {
-		return (flags >>> 22) & 1;
-	}
-
 	public static int setDirty(int flags, boolean dirty) {
 		return (flags & ~DIRTY) | ((dirty ? 1 : 0) << 22);
 	}

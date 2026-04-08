@@ -107,26 +107,14 @@ public class ModelHelper {
 		return 0;
 	}
 
-	// Naive approximation to Minecraft ambient occlusion, it skips some classifications differences
-	// (normalCube vs opaqueCube, etc.).
 	public static int ao(int side1, int side2, int corner) {
-		// Pick the solid bit from the masks and neg it. {0, -1} = {no solid, solid}
-		side1 = -fullFace(side1);
-		side2 = -fullFace(side2);
-		corner = -fullFace(corner);
+		side1 = -fullFace(side1) & FULL_BLOCK_REDUCE;
+		side2 = -fullFace(side2) & FULL_BLOCK_REDUCE;
+		corner = -fullFace(corner) & FULL_BLOCK_REDUCE;
 
-		// If both sides are solid, ignore the corner and treat it as solid.
 		corner |= side1 & side2;
 
-		// Use more -1 bitwise conditionals to reduce lighting if solid. Mimics Vanilla 0.2 ambient factor
-		// for solid blocks, with the catch that is doesn't distinguish the blocks by #isNormalCube() but by #isOpaqueCube.
-		side1 = EMPTY_BLOCK_OCC_FACTOR - (side1 & FULL_BLOCK_REDUCE);
-		side2 = EMPTY_BLOCK_OCC_FACTOR - (side2 & FULL_BLOCK_REDUCE);
-		corner = EMPTY_BLOCK_OCC_FACTOR - (corner & FULL_BLOCK_REDUCE);
-
-		// The extra EMPTY_BLOCK_OCC_FACTOR is because the block by the face side of the block is always un-solid
-		// either it would be culled.
-		return (EMPTY_BLOCK_OCC_FACTOR + side1 + side2 + corner) >> 2;
+		return EMPTY_BLOCK_OCC_FACTOR - ((side1 + side2 + corner) >> 2);
 	}
 
 	public static int avg(int a, int b) {

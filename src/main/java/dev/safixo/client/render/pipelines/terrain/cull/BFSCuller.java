@@ -19,7 +19,7 @@ public class BFSCuller {
 	private static final long[] INV_DIVS = new long[512];
 
 	public static final int PRECISION_BITS = 25;
-	public static final int MAX_PRECISION = 1 << PRECISION_BITS;
+	public static final int MAX_PRECISION = 1 << (PRECISION_BITS + 3);
 
 	static {
 		for (int i = 0; i < 512; i++) {
@@ -77,11 +77,11 @@ public class BFSCuller {
 
 		while ((node = bfsQueue.get(bfsIndex++)) != null) {
 			int flags = node.flags;
-			node.gridInd = MAX_PRECISION;
+			node.gridFactor = MAX_PRECISION;
 
-			int outwardDirections = getOutwardDirections(playerX, playerY, playerZ, node);
+			int visibility = getVisibility(node, flags, playerX, playerY, playerZ, renderDistance, activeFrame);
 
-			if (isSectionInvisible(node, flags, playerX, playerY, playerZ, renderDistance, outwardDirections, activeFrame)) {
+			if (visibility == 0b0) {
 				continue;
 			}
 
@@ -91,35 +91,21 @@ public class BFSCuller {
 
 			queueRegionNode(bfsQueue, node, flags);
 
-			outwardDirections &= SectionFlags.getAdjacentMask(flags);
-			outwardDirections &= ~SectionFlags.getCullFaces(flags);
-
-			exploreNodes(bfsQueue, node, outwardDirections, activeFrame);
+			visibility &= ~SectionFlags.getCullFaces(flags);
+			visibility &= SectionFlags.getAdjacentMask(flags);
+			exploreNodes(bfsQueue, node, visibility, activeFrame);
 		}
 	}
 
 	/**
-	 * The original method comes from the Sodium way of doing BFS culling, only changed to be branch-less,
-	 * (removing the branches is only an optimization in Java because it refuses to generate branch-less code)
-	 * which helps by avoiding back-tracking and doesn't de-reference already visited sections.
+	 * Generates a mask to discard invariants directions early in the search.
 	 */
-	private static int getOutwardDirections(int playerX, int playerY, int playerZ, SectionRender render) {
+	private static int getOutwardDirections(int diffChunkX, int diffChunkY, int diffChunkZ) {
 		int planes = 0;
 
-		int diffChunkX = (render.blockX >> 4) - (playerX >> 4);
-
-		planes |= ( diffChunkX >> 31) & Direction.EAST_BIT;
-		planes |= (-diffChunkX >> 31) & Direction.WEST_BIT;
-
-		int diffChunkY = (render.blockY >> 4) - (playerY >> 4);
-
-		planes |= ( diffChunkY >> 31) & Direction.UP_BIT;
-		planes |= (-diffChunkY >> 31) & Direction.DOWN_BIT;
-
-		int diffChunkZ = (render.blockZ >> 4) - (playerZ >> 4);
-
-		planes |= ( diffChunkZ >> 31) & Direction.SOUTH_BIT;
-		planes |= (-diffChunkZ >> 31) & Direction.NORTH_BIT;
+		planes |= (diffChunkX >> 31) & Direction.EAST_BIT  | (-diffChunkX >> 31) & Direction.WEST_BIT;
+		planes |= (diffChunkY >> 31) & Direction.UP_BIT    | (-diffChunkY >> 31) & Direction.DOWN_BIT;
+		planes |= (diffChunkZ >> 31) & Direction.SOUTH_BIT | (-diffChunkZ >> 31) & Direction.NORTH_BIT;
 
 		return ~planes;
 	}
@@ -135,7 +121,7 @@ public class BFSCuller {
 			RegionRender region = section.region;
 
 			if (region.sectionsToRender == 0) {
-				bfsQueue.regionRenders[bfsQueue.regionPos++] = region;
+				bfsQueue.addRegionToQueue(region);
 			}
 
 			region.renderIndices[region.sectionsToRender++] = (short) section.regionIndex;
@@ -156,32 +142,32 @@ public class BFSCuller {
 		SectionRender render;
 
 		if (Direction.hasSet(directions, Direction.DOWN) && (render = fatherNode.adjacentDown).currentFrame < activeFrame) {
-			queue.addToQueueUnsafe(render);
+			queue.addSectionToQueue(render);
 			render.currentFrame = activeFrame;
 		}
 
 		if (Direction.hasSet(directions, Direction.UP) && (render = fatherNode.adjacentUp).currentFrame < activeFrame) {
-			queue.addToQueueUnsafe(render);
+			queue.addSectionToQueue(render);
 			render.currentFrame = activeFrame;
 		}
 
 		if (Direction.hasSet(directions, Direction.NORTH) && (render = fatherNode.adjacentNorth).currentFrame < activeFrame) {
-			queue.addToQueueUnsafe(render);
+			queue.addSectionToQueue(render);
 			render.currentFrame = activeFrame;
 		}
 
 		if (Direction.hasSet(directions, Direction.SOUTH) && (render = fatherNode.adjacentSouth).currentFrame < activeFrame) {
-			queue.addToQueueUnsafe(render);
+			queue.addSectionToQueue(render);
 			render.currentFrame = activeFrame;
 		}
 
 		if (Direction.hasSet(directions, Direction.WEST) && (render = fatherNode.adjacentWest).currentFrame < activeFrame) {
-			queue.addToQueueUnsafe(render);
+			queue.addSectionToQueue(render);
 			render.currentFrame = activeFrame;
 		}
 
 		if (Direction.hasSet(directions, Direction.EAST) && (render = fatherNode.adjacentEast).currentFrame < activeFrame) {
-			queue.addToQueueUnsafe(render);
+			queue.addSectionToQueue(render);
 			render.currentFrame = activeFrame;
 		}
 	}
@@ -194,30 +180,33 @@ public class BFSCuller {
 	 * where the sections are not empty check whether tracing a ray from the section to the camera finds obstruction
 	 * in the process.
 	 */
-	public static boolean isSectionInvisible(SectionRender node, int flags, int playerX, int playerY, int playerZ, int fogEnd,
-											 int outwardDirections, int frame) {
+	public static int getVisibility(SectionRender node, int flags, int playerX, int playerY, int playerZ, int fogEnd, int frame) {
 		int distX = node.blockX - playerX;
 		int distY = node.blockY - playerY;
 		int distZ = node.blockZ - playerZ;
 
-		int distance = getRenderDistance(distX, distY, distZ);
+		int distance = getDistance(distX, distY, distZ);
 
 		if (distance >= fogEnd || !FrustumCuller.withinFrustumBounds(distX, distY, distZ)) {
-			return true;
+			return 0b0;
 		}
 
-		int gridInd = processGridIndex(node, playerX, playerY, playerZ, outwardDirections, frame);
-		node.gridInd = gridInd;
+		int distChunkX = (node.blockX >> 4) - (playerX >> 4);
+		int distChunkY = (node.blockY >> 4) - (playerY >> 4);
+		int distChunkZ = (node.blockZ >> 4) - (playerZ >> 4);
 
-		if (gridInd < MAX_TOLERANCE) {
-			return true;
+		int outwardMask = getOutwardDirections(distChunkX, distChunkY, distChunkZ);
+		int gridFactor = node.gridFactor = processGridIndex(node, distChunkX, distChunkY, distChunkZ, outwardMask, frame);
+
+		if (gridFactor < MAX_TOLERANCE) {
+			return 0b0;
 		}
 
-		if (distance >= MathExt.square(112) && SectionFlags.hasDrawableFaces(flags)) {
-			return !visibleByRayCast(node, frame, node.blockX + 8, node.blockY + 8, node.blockZ + 8, -distX, -distY, -distZ);
+		if (distance >= MathExt.square(7 * 16) && SectionFlags.hasDrawableFaces(flags) && !visibleByRayCast(node, frame, -distX - 8, -distY - 8, -distZ - 8)) {
+			return 0b0;
 		}
 
-		return false;
+		return outwardMask;
 	}
 
 	private static boolean renderThisFrame(SectionRender section, int dirSet, int direction, int frame) {
@@ -225,7 +214,7 @@ public class BFSCuller {
 	}
 
 	private static boolean isIntersectingAxis(int dir) {
-        int dir0 = dir & 0b110011;
+		int dir0 = dir & 0b110011;
 		int dir1 = dir & 0b001100;
 		return (dir0 & (dir0 >> 1)) != 0 || dir1 == 0b001100;
 	}
@@ -236,37 +225,38 @@ public class BFSCuller {
 	 * As it stands right now is poorly optimized, but it rewards in all the works it skips are sections that it avoids.
 	 * @return Grid visibility factor
 	 */
-	private static int processGridIndex(SectionRender section, int playerX, int playerY, int playerZ, int outwardDir, int frame) {
-		if (isIntersectingAxis(outwardDir)) { 
-		    return MAX_PRESICION;
+	private static int processGridIndex(SectionRender section, int diffX, int diffY, int diffZ, int outwardDir, int frame) {
+		if (diffX == 0 || diffY == 0 || diffZ == 0) {
+		    return MAX_PRECISION;
 		}
-		
-		int diffX = (section.blockX >> 4) - (playerX >> 4);
-		int diffY = (section.blockY >> 4) - (playerY >> 4);
-		int diffZ = (section.blockZ >> 4) - (playerZ >> 4);
+
+		int gradInd = 0;
+
+		diffX = Math.abs(diffX);
+		diffY = Math.abs(diffY);
+		diffZ = Math.abs(diffZ);
 
 		int dirSet = ~outwardDir & SectionFlags.getAdjacentMask(section.flags);
-		int gradInd = 0;
 
 		// Y
 		if (renderThisFrame(section.adjacentDown, dirSet, Direction.DOWN, frame)) {
-			gradInd += diffY * section.adjacentDown.gridInd;
+			gradInd += diffY * section.adjacentDown.gridFactor;
 		} else if (renderThisFrame(section.adjacentUp, dirSet, Direction.UP, frame)) {
-			gradInd -= diffY * section.adjacentUp.gridInd;
+			gradInd += diffY * section.adjacentUp.gridFactor;
 		}
 
 		// Z
 		if (renderThisFrame(section.adjacentNorth, dirSet, Direction.NORTH, frame)) {
-			gradInd += diffZ * section.adjacentNorth.gridInd;
+			gradInd += diffZ * section.adjacentNorth.gridFactor;
 		} else if (renderThisFrame(section.adjacentSouth, dirSet, Direction.SOUTH, frame)) {
-			gradInd -= diffZ * section.adjacentSouth.gridInd;
+			gradInd += diffZ * section.adjacentSouth.gridFactor;
 		}
 
 		// X
 		if (renderThisFrame(section.adjacentWest, dirSet, Direction.WEST, frame)) {
-			gradInd += diffX * section.adjacentWest.gridInd;
+			gradInd += diffX * section.adjacentWest.gridFactor;
 		} else if (renderThisFrame(section.adjacentEast, dirSet, Direction.EAST, frame)) {
-			gradInd -= diffX * section.adjacentEast.gridInd;
+			gradInd += diffX * section.adjacentEast.gridFactor;
 		}
 
 		return (int) ((gradInd * INV_DIVS[diffX + diffY + diffZ]) >> PRECISION_BITS);
@@ -277,9 +267,9 @@ public class BFSCuller {
 	 * in cases where an axis is not intersecting with the player.
 	 */
 	private static int getDistance(int distX, int distY, int distZ) {
-		distX += (distX >>> 31) << 4;
-		distY += (distY >>> 31) << 4;
-		distZ += (distZ >>> 31) << 4;
+		distX += (distX >>> 27); // ... >>> 31) << 4
+		distY += (distY >>> 27); // ... >>> 31) << 4
+		distZ += (distZ >>> 27); // ... >>> 31) << 4
 		return (distX * distX) + (distY * distY) + (distZ * distZ);
 	}
 
@@ -287,18 +277,14 @@ public class BFSCuller {
 	 * Traces a ray from the section to the camera and tries to find obstruction in the way using the visited
 	 * section current frame.
 	 */
-	private static boolean visibleByRayCast(SectionRender section, int frame, int x1, int y1, int z1, int dx, int dy, int dz) {
-		int invDx = MAX_PRECISION / (Math.abs(dx) + 1);
-		int invDy = MAX_PRECISION / (Math.abs(dy) + 1);
-		int invDz = MAX_PRECISION / (Math.abs(dz) + 1);
+	private static boolean visibleByRayCast(SectionRender section, int frame, int dx, int dy, int dz) {
+		int tMaxX = MAX_PRECISION / (Math.abs(dx) | 1);
+		int tMaxY = MAX_PRECISION / (Math.abs(dy) | 1);
+		int tMaxZ = MAX_PRECISION / (Math.abs(dz) | 1);
 
-		int tDeltaX = invDx << 4;
-		int tDeltaY = invDy << 4;
-		int tDeltaZ = invDz << 4;
-
-		int tMaxX = 8 * invDx;
-		int tMaxY = 8 * invDy;
-		int tMaxZ = 8 * invDz;
+		int tDeltaX = tMaxX << 1;
+		int tDeltaY = tMaxY << 1;
+		int tDeltaZ = tMaxZ << 1;
 
 		int valid = 0;
 

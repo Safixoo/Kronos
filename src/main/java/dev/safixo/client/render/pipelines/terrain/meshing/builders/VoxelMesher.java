@@ -3,7 +3,6 @@ package dev.safixo.client.render.pipelines.terrain.meshing.builders;
 import dev.safixo.client.render.pipelines.terrain.meshing.data.FacingRender;
 import dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache;
 import dev.safixo.client.render.pipelines.terrain.meshing.model.ModelColorizer;
-import dev.safixo.client.render.pipelines.terrain.meshing.model.ModelHelper;
 import dev.safixo.client.util.MathExt;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockGrass;
@@ -52,18 +51,17 @@ public class VoxelMesher {
 				continue;
 			}
 
-			VertexWriter.setCurrentInstance(VertexWriter.SOLID[dir]);
 			Icon tex = block.getBlockTexture(cache, x, y, z, dir);
 
-			int blockColor;
-			int overlayColor;
+			int blockColor = SHADE_FULL_COLOR[dir];
+			int overlayColor = blockColor;
 
-			if (modelColor != 0xFFFFFF && blockId != BLOCK_GRASS_ID || dir == UP) {
-				blockColor = ColorBGRManager.multiplyColor(modelColor, SHADE_FULL_FACTOR[dir]);
-				overlayColor = blockColor;
-			} else {
-				blockColor = SHADE_FULL_COLOR[dir];
-				overlayColor = tex == SIDE_GRASS_NON_OVERLAY ? ColorBGRManager.multiplyColorByColor(modelColor, blockColor) : blockColor;
+			if (modelColor != 0xFFFFFF) {
+				overlayColor = ColorBGRManager.multiplyColor(modelColor, SHADE_FULL_FACTOR[dir]);
+
+				if (blockId != BLOCK_GRASS_ID || dir == UP) {
+					blockColor = overlayColor;
+				}
 			}
 
 			final float[] uvs = TEX_UVS;
@@ -74,16 +72,17 @@ public class VoxelMesher {
 			uvs[3] = tex.getMaxV();
 
 			FacingRender render = FACE_RENDER[dir];
+			VertexWriter writer = VertexWriter.SOLID[dir];
 
 			if (ambient) {
-				renderFace(render, tex, cache, x, y, z, blockColor, overlayColor);
+				renderFace(writer, render, tex, cache, x, y, z, blockColor, overlayColor);
 			} else {
 				renderFaceNoSmooth(render, dir, cache, x, y, z, blockColor);
 			}
 		}
 	}
 
-	public static void renderFace(FacingRender face, Icon tex, SectionCache cache, int x, int y, int z, int blockColor, int overlayColor) {
+	public static void renderFace(VertexWriter writer, FacingRender face, Icon tex, SectionCache cache, int x, int y, int z, int blockColor, int overlayColor) {
 		int p1X = face.aoCornerX0;
 		int p1Y = face.aoCornerY0;
 		int p1Z = face.aoCornerZ0;
@@ -130,7 +129,6 @@ public class VoxelMesher {
 
 		int lightPZ = light(posZ);
 		int lightPX = light(posX);
-
 		int lightNZ = light(negZ);
 		int lightNX = light(negX);
 
@@ -153,7 +151,6 @@ public class VoxelMesher {
 		y &= RegionRender.BLOCK_BITS_Y;
 		z &= RegionRender.BLOCK_BITS_Z;
 
-		VertexWriter writer = VertexWriter.getCurrentInstance();
 		writer.ensureCapacity(TerrainFormat.STRIDE * 4);
 
 		boolean flip = ao0 > ao3 || ao2 > ao1;

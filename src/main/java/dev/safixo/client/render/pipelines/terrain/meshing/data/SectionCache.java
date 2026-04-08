@@ -270,6 +270,13 @@ public class SectionCache implements IBlockAccess {
 		return MathExt.getLightmapCoord(skyLight, Math.max(defBlockLight, blockLight));
 	}
 
+	public int getLightCenter(int blockIndex) {
+		int skyLight = getNibble(CENTER_SKYLIGHT, blockIndex);
+		int blockLight = getNibble(CENTER_BLOCKLIGHT, blockIndex);
+
+		return MathExt.getLightmapCoord(skyLight, blockLight);
+	}
+
 	public int getBlockIdCenter(int x, int y, int z) {
 		return MathExt.byteToUnsigned(CENTER_BLOCKS[makeBlockIndex(x & 15, y & 15, z & 15)]);
 	}

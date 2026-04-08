@@ -11,7 +11,7 @@ public class BFSQueue {
 
 	public int regionPos;
 	public int capacity;
-	public int position;
+	public int sectionPos;
 
 	public BFSQueue(int size) {
 		this.sectionRenders = new SectionRender[size];
@@ -24,12 +24,12 @@ public class BFSQueue {
 
 	public void resize() {
 		SectionRender[] newArray = new SectionRender[this.capacity *= 2];
-		System.arraycopy(this.sectionRenders, 0, newArray, 0, this.position);
+		System.arraycopy(this.sectionRenders, 0, newArray, 0, this.sectionPos);
 		this.sectionRenders = newArray;
 	}
 
 	public void verifyCapacity(int offset) {
-		if (this.position + offset >= this.capacity) {
+		if (this.sectionPos + offset >= this.capacity) {
 			this.resize();
 		}
 	}
@@ -44,26 +44,30 @@ public class BFSQueue {
 
 	public void clear() {
 		Arrays.fill(this.sectionRenders, null);
-		this.position = 0;
+		this.sectionPos = 0;
 	}
 
 	public SectionRender get(int position) {
 		return this.sectionRenders[position];
 	}
 
-	public void addToQueueUnsafe(SectionRender render) {
-		this.sectionRenders[this.position++] = render;
+	public void addSectionToQueue(SectionRender render) {
+		this.sectionRenders[this.sectionPos++] = render;
+	}
+
+	public void addRegionToQueue(RegionRender render) {
+		this.regionRenders[this.regionPos++] = render;
 	}
 
 	public void addToQueue(SectionRender render) {
-		if (this.position >= this.capacity) {
+		if (this.sectionPos >= this.capacity) {
 			this.resize();
 		}
 
-		this.sectionRenders[this.position++] = render;
+		this.sectionRenders[this.sectionPos++] = render;
 	}
 
 	public int size() {
-		return this.position;
+		return this.sectionPos;
 	}
 }
