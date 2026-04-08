@@ -5,18 +5,25 @@ import dev.safixo.client.render.gfx.util.GlBufferUtil;
 import dev.safixo.client.render.gfx.vertex.GlVertexArrayObject;
 import dev.safixo.client.render.vertex.DefaultVertexFormats;
 import dev.safixo.client.render.vertex.VertexWriter;
+import dev.safixo.client.render.vertex.writers.EntityFormat;
+import dev.safixo.client.util.Direction;
 import dev.safixo.client.util.Matrix4Stack;
 import dev.safixo.client.util.memory.NativeBuffer;
 import dev.safixo.client.util.memory.UnsafeUtil;
 import dev.safixo.core.hooks.GLFunctions;
+import dev.safixo.core.hooks.GlStateTracker;
 import it.unimi.dsi.fastutil.objects.ReferenceArrayList;
 import net.minecraft.client.model.ModelBox;
 import net.minecraft.client.model.ModelRenderer;
 import net.minecraft.client.renderer.Tessellator;
+import net.minecraftforge.client.model.obj.Vertex;
 import org.joml.Matrix4f;
+import org.lwjgl.MemoryUtil;
 import org.lwjgl.opengl.*;
 
+import java.nio.Buffer;
 import java.nio.FloatBuffer;
+import java.nio.IntBuffer;
 
 import static dev.safixo.client.util.data.PrimitivesFlags.*;
 
@@ -116,11 +123,11 @@ public class AdvModelRenderer {
 			boolean notNullTranslation = offX != 0 || offY != 0 || offZ != 0;
 
 			if (notNullTranslation) {
-				GLFunctions.glTranslatef(offX, offY, offZ);
+				GL11.glTranslatef(offX, offY, offZ);
 			}
 
 			GL30.glBindVertexArray(VERTEX_ARRAY.getHandle());
-			GL11.glDrawArrays(GL11.GL_QUADS, offset, vertices);
+			draw(GL11.GL_QUADS, offset, vertices);
 
 			if (model.childModels != null) {
 				for (int i = 0; i < model.childModels.size(); i++) {
@@ -129,7 +136,7 @@ public class AdvModelRenderer {
 			}
 
 			if (notNullTranslation) {
-				GLFunctions.glTranslatef(-offX, -offY, -offZ);
+				GL11.glTranslatef(-offX, -offY, -offZ);
 			}
 		} else {
 			modelView.translation(offX, offY, offZ);
@@ -147,13 +154,13 @@ public class AdvModelRenderer {
 					modelView.rotateZ(model.rotateAngleZ);
 				}
 			}
-			GLFunctions.glPushMatrix();
+			GL11.glPushMatrix();
 
 			Matrix4Stack.copyMat(modelView, PTR_BUFFER);
-			GLFunctions.glMultMatrix(BUFFER);
+			GL11.glMultMatrix(BUFFER);
 
 			GL30.glBindVertexArray(VERTEX_ARRAY.getHandle());
-			GL11.glDrawArrays(GL11.GL_QUADS, offset, vertices);
+			draw(GL11.GL_QUADS, offset, vertices);
 
 			if (model.childModels != null) {
 				for (int i = 0; i < model.childModels.size(); i++) {
@@ -161,8 +168,55 @@ public class AdvModelRenderer {
 				}
 			}
 
-			GLFunctions.glPopMatrix();
+			GL11.glPopMatrix();
 		}
+	}
+
+	private static final IntBuffer COUNT = NativeBuffer.memAlloc(4 * Direction.COUNT).asIntBuffer();
+	private static final IntBuffer FIRST = NativeBuffer.memAlloc(4 * Direction.COUNT).asIntBuffer();
+
+	// Replace technique with copies of the vertex data place in different spots with each permutation of visible
+	// faces to avoid draw-calls per quad as of now, maybe instead of storing data directly in display-list, store
+	// an index to the final draw-data.
+	// Also, it should also be needed to take over TextureManager to have access to the textures and check the opacity to
+	// know if it is possible to cull back-faces without changing visuals.
+	private static final boolean BACK_FACE_CULLING = false;
+
+	public static void draw(int mode, int offset, int vertices) {
+		if (!BACK_FACE_CULLING) {
+			GL11.glDrawArrays(mode, offset, vertices);
+		}
+
+		Matrix4f matrix = GlStateTracker.MODEL_VIEW_STACK.top();
+		int cubes = vertices / 24;
+
+		COUNT.put(cubes * 4);
+		COUNT.put(cubes * 4);
+		COUNT.put(cubes * 4);
+
+		// add epsilon (???)
+		if (matrix.m12() < 0) { // +Y
+			FIRST.put(offset + cubes * 0);
+		} else { // -Y
+			FIRST.put(offset + cubes * 4);
+		}
+
+		if (matrix.m22() < 0) { // +Z
+			FIRST.put(offset + cubes * 8);
+		} else { // -Z
+			FIRST.put(offset + cubes * 12);
+		}
+
+		if (matrix.m02() < 0) { // +X
+			FIRST.put(offset + cubes * 16);
+		} else { // -X
+			FIRST.put(offset + cubes * 20);
+		}
+
+		((Buffer) FIRST).flip();
+		((Buffer) COUNT).flip();
+
+		GL14.glMultiDrawArrays(mode, FIRST, COUNT);
 	}
 
 	public static void postRender(ModelRenderer model, float scale) {
@@ -237,6 +291,8 @@ public class AdvModelRenderer {
 		VERTEX_ARRAY.unbind();
 		VERTEX_BUFFER.unbind();
 
+		analyzeModel(writer);
+
 		VERTEX_BUFFER.bufferSubData(writer.getVertexDataNio(), OFFSET, writer.getOffset());
 		int drawData = writer.getVertices() | (OFFSET / 24) << 16;
 
@@ -249,6 +305,72 @@ public class AdvModelRenderer {
 
 		setCompiled(model, true);
 		setDisplayList(model, drawData);
+	}
+
+	private static void analyzeModel(VertexWriter entityData) {
+		int entityStride = DefaultVertexFormats.ENTITY_FORMAT.getStride();
+		int normalOffset = 12 + 8;
+
+		for (int dir = 0; dir < Direction.COUNT; dir++) {
+			VertexWriter writerDir = VertexWriter.SOLID[dir];
+			writerDir.startDrawing();
+		}
+
+		int totalOffset = entityData.getOffset();
+
+		for (int quad = 0; quad < (entityData.vertices / 4); quad++) {
+			long readPtr = entityData.getVertexData() + (quad * 4L * entityStride);
+			int normal = UnsafeUtil.memGetInt(readPtr + normalOffset);
+
+			byte normalX = (byte) ((normal >>> 0) & 0xFF);
+			byte normalY = (byte) ((normal >>> 8) & 0xFF);
+			byte normalZ = (byte) ((normal >>> 16) & 0xFF);
+
+			if (normalX > 0) {
+				copyQuad(readPtr, VertexWriter.SOLID[Direction.EAST]);
+			} else if (normalX < 0) {
+				copyQuad(readPtr, VertexWriter.SOLID[Direction.WEST]);
+			} else if (normalY > 0) {
+				copyQuad(readPtr, VertexWriter.SOLID[Direction.UP]);
+			} else if (normalY < 0) {
+				copyQuad(readPtr, VertexWriter.SOLID[Direction.DOWN]);
+			} else if (normalZ > 0) {
+				copyQuad(readPtr, VertexWriter.SOLID[Direction.SOUTH]);
+			} else if (normalZ < 0) {
+				copyQuad(readPtr, VertexWriter.SOLID[Direction.NORTH]);
+			}
+		}
+
+		int offset = 0;
+
+		for (int dir = 0; dir < Direction.COUNT; dir++) {
+			VertexWriter writerDir = VertexWriter.SOLID[dir];
+
+			UnsafeUtil.UNSAFE.copyMemory(writerDir.getVertexData(), entityData.getVertexData() + offset, writerDir.getOffset());
+			offset += writerDir.getOffset();
+
+			writerDir.stopDrawing();
+		}
+	}
+
+	private static void copyQuad(long quadPtr, VertexWriter dest) {
+		dest.ensureCapacity(DefaultVertexFormats.ENTITY_FORMAT.getStride() * 4);
+
+		for (long i = 0; i < 4; i++) {
+			long readPtr = quadPtr + i * DefaultVertexFormats.ENTITY_FORMAT.getStride();
+
+			float x = UnsafeUtil.memGetFloat(readPtr + 0);
+			float y = UnsafeUtil.memGetFloat(readPtr + 4);
+			float z = UnsafeUtil.memGetFloat(readPtr + 8);
+
+			float u = UnsafeUtil.memGetFloat(readPtr + 12);
+			float v = UnsafeUtil.memGetFloat(readPtr + 16);
+
+			int normal = UnsafeUtil.memGetInt(readPtr + 20);
+
+			EntityFormat.writeVertex(dest.getTotalOffset(), x, y, z, u, v, normal);
+			dest.addVertexCounter(DefaultVertexFormats.ENTITY_FORMAT.getStride());
+		}
 	}
 
 	public static void cleanupEntityModelPool() {
