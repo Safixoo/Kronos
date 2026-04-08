@@ -19,7 +19,7 @@ public class BFSCuller {
 	private static final long[] INV_DIVS = new long[512];
 
 	public static final int PRECISION_BITS = 25;
-	public static final int MAX_PRECISION = 1 << (PRECISION_BITS + 3);
+	public static final int MAX_PRECISION = 1 << PRECISION_BITS;
 
 	static {
 		for (int i = 0; i < 512; i++) {
@@ -273,14 +273,16 @@ public class BFSCuller {
 		return (distX * distX) + (distY * distY) + (distZ * distZ);
 	}
 
+	private static final int MAX_PRECISION_OFFSET = MAX_PRECISION * 8;
+
 	/**
 	 * Traces a ray from the section to the camera and tries to find obstruction in the way using the visited
 	 * section current frame.
 	 */
 	private static boolean visibleByRayCast(SectionRender section, int frame, int dx, int dy, int dz) {
-		int tMaxX = MAX_PRECISION / (Math.abs(dx) | 1);
-		int tMaxY = MAX_PRECISION / (Math.abs(dy) | 1);
-		int tMaxZ = MAX_PRECISION / (Math.abs(dz) | 1);
+		int tMaxX = MAX_PRECISION_OFFSET / (Math.abs(dx) | 1);
+		int tMaxY = MAX_PRECISION_OFFSET / (Math.abs(dy) | 1);
+		int tMaxZ = MAX_PRECISION_OFFSET / (Math.abs(dz) | 1);
 
 		int tDeltaX = tMaxX << 1;
 		int tDeltaY = tMaxY << 1;
