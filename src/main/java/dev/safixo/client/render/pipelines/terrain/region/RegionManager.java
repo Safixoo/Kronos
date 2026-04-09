@@ -53,6 +53,57 @@ public class RegionManager {
 		this.regionMap.clear();
 	}
 
+	private RegionRender[] getRegionSorted(CameraData camera) {
+		if (this.regionMap.isEmpty()) {
+			return null;
+		}
+
+		RegionRender[] regions = this.regionMap.values().toArray(new RegionRender[0]);
+		int[] distances = new int[regions.length];
+		int maxRegionDistance = Integer.MIN_VALUE;
+
+		for (int i = 0; i < regions.length; i++) {
+			maxRegionDistance = Math.max(maxRegionDistance, distances[i] = manhattanDistance(regions[i], camera));
+		}
+		maxRegionDistance += 1;
+
+		int[] indices = new int[regions.length];
+		int[] hist = new int[maxRegionDistance];
+
+		for (int i = 0; i < regions.length; i++) {
+			hist[distances[i]]++;
+		}
+
+		// turns histogram into a prefix-sum array.
+		for (int i = 1; i < maxRegionDistance; i++) {
+			hist[i] += hist[i - 1];
+		}
+
+		for (int i = 0; i < regions.length; i++) {
+			indices[--hist[distances[i]]] = i;
+		}
+
+		RegionRender[] regionSorted = new RegionRender[regions.length];
+
+		for (int i = 0; i < indices.length; i++) {
+			regionSorted[i] = regions[indices[i]];
+		}
+
+		return regionSorted;
+	}
+
+	private static int manhattanDistance(RegionRender region, CameraData camera) {
+		int pX = camera.intX >> RegionRender.BLOCK_SHIFT_X;
+		int pY = camera.intY >> RegionRender.BLOCK_SHIFT_Y;
+		int pZ = camera.intZ >> RegionRender.BLOCK_SHIFT_Z;
+
+		int rX = region.regionX;
+		int rY = region.regionY;
+		int rZ = region.regionZ;
+
+		return Math.abs(pX - rX) + Math.abs(pY - rY) + Math.abs(pZ - rZ);
+	}
+
 	public void update(CameraData camera, int renderDistance, boolean worldUpdated) {
 		if (worldUpdated) {
 			this.lastUpdateX = camera.cameraXD();
@@ -94,7 +145,7 @@ public class RegionManager {
 	}
 
 	public void drawAllRegions(TerrainProgram shader, BFSQueue queue, CameraData camera, int pass) {
-		RegionRender[] regionRenders = queue.regionRenders;
+		RegionRender[] regionRenders = this.getRegionSorted(camera);
 
 		if (regionRenders == null) {
 			return;
@@ -105,12 +156,12 @@ public class RegionManager {
 		int inc;
 
 		if (pass == 1) {
-			index = queue.regionPos - 1;
+			index = regionRenders.length - 1;
 			end = -1;
 			inc = -1;
 		} else {
 			index = 0;
-			end = queue.regionPos;
+			end = regionRenders.length;
 			inc = 1;
 		}
 

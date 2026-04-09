@@ -33,7 +33,12 @@ import java.util.List;
 import java.util.Set;
 
 public class SectionManager {
-	public static final int MAX_FULL_UPDATES = 5;
+	static {
+		// free 10mb
+		Minecraft.memoryReserve = null;
+	}
+
+	public static final int MAX_FULL_UPDATES = 3;
 	public static final int MAX_UPDATES_TRIES = 256;
 
 	private static final Item DEBUG_ITEM = null;
@@ -53,6 +58,8 @@ public class SectionManager {
 	private long vramUsed, vramAllocated;
 	private int renderDistance;
 	public int drawnSolidRenderers;
+
+	private boolean terrainDirty;
 
 	private final ReferenceOpenHashSet<TileEntity> tileEntitiesSet = new ReferenceOpenHashSet<>();
 
@@ -144,6 +151,7 @@ public class SectionManager {
 			this.connectNeighbors(sectionRender);
 		}
 
+		this.terrainDirty = true;
 		sectionRender.markDirty(true);
 	}
 
@@ -164,7 +172,11 @@ public class SectionManager {
 	}
 
 	public void update(WorldClient world, int renderDistance, double cameraX, double cameraY, double cameraZ, boolean worldChanged, float partialTick) {
-		this.camera = extractCameraData(cameraX, cameraY, cameraZ, renderDistance);
+		CameraData camera = extractCameraData(cameraX, cameraY, cameraZ, renderDistance);
+
+		boolean shouldUpdateGraph = !camera.equals(this.camera) || this.terrainDirty;
+
+		this.camera = camera;
 		this.regionManager.update(this.camera, renderDistance, worldChanged);
 
 		FrustumCuller.addFractToCamera(this.camera.fractX, this.camera.fractY, this.camera.fractZ);
@@ -198,7 +210,7 @@ public class SectionManager {
 
 		// For debugging occ culling.
 		//noinspection ConstantValue
-		if (playerItem != DEBUG_ITEM || DEBUG_ITEM == null) {
+		if ((playerItem != DEBUG_ITEM || DEBUG_ITEM == null) && shouldUpdateGraph) {
 			this.bfsCuller.init(this.regionManager, renderDistance);
 			this.bfsCuller.updateRenderList(this.sectionMap, this.camera);
 		}
@@ -233,6 +245,10 @@ public class SectionManager {
 	private void queueRebuilds(Set<TileEntity> tileSet) {
 		int rebuildSize = RebuildList.size();
 		int maxSize = Math.min(SectionManager.MAX_UPDATES_TRIES, rebuildSize);
+
+		if (rebuildSize == 0) {
+			this.terrainDirty = false;
+		}
 
 		SectionRender[] updateArray = RebuildList.getBackedArray();
 		PrimitivesFlags.processLeavesSolid();

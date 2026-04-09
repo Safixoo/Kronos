@@ -32,7 +32,6 @@ public class BFSCuller {
 			render.sectionsToRender = 0;
 		}
 
-		this.bfsQueue.prepareRegionArr(renderDistance);
 		this.bfsQueue.clear();
 		this.activeFrame++;
 	}
@@ -119,11 +118,6 @@ public class BFSCuller {
 	private static void queueRegionNode(BFSQueue bfsQueue, SectionRender section, int flags) {
 		if (SectionFlags.hasPassesNonEmpty(flags)) {
 			RegionRender region = section.region;
-
-			if (region.sectionsToRender == 0) {
-				bfsQueue.addRegionToQueue(region);
-			}
-
 			region.renderIndices[region.sectionsToRender++] = (short) section.regionIndex;
 		}
 	}

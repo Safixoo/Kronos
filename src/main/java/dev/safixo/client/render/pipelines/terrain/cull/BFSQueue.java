@@ -7,9 +7,7 @@ import java.util.Arrays;
 
 public class BFSQueue {
 	public SectionRender[] sectionRenders;
-	public RegionRender[] regionRenders;
 
-	public int regionPos;
 	public int capacity;
 	public int sectionPos;
 
@@ -34,14 +32,6 @@ public class BFSQueue {
 		}
 	}
 
-	public void prepareRegionArr(int renderDistance) {
-		int region8 = ((renderDistance * 2 + 1) >> 3);
-		int region4 = (renderDistance >> 2);
-
-		this.regionRenders = new RegionRender[region8 * region4 * region8 + 16];
-		this.regionPos = 0;
-	}
-
 	public void clear() {
 		Arrays.fill(this.sectionRenders, null);
 		this.sectionPos = 0;
@@ -53,10 +43,6 @@ public class BFSQueue {
 
 	public void addSectionToQueue(SectionRender render) {
 		this.sectionRenders[this.sectionPos++] = render;
-	}
-
-	public void addRegionToQueue(RegionRender render) {
-		this.regionRenders[this.regionPos++] = render;
 	}
 
 	public void addToQueue(SectionRender render) {
