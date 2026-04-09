@@ -3,15 +3,19 @@ package dev.safixo.core.hooks;
 import dev.safixo.client.render.ImprovedTessellator;
 import dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache;
 import dev.safixo.client.util.ClientChunkListener;
+import dev.safixo.client.util.Direction;
 import dev.safixo.client.util.MathExt;
 import dev.safixo.client.util.Matrix4Stack;
 import dev.safixo.client.util.data.PrimitivesFlags;
 import dev.safixo.client.util.memory.UnsafeUtil;
 import dev.safixo.core.HookUtils;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockSnow;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.WorldClient;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.world.EnumSkyBlock;
+import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.IChunkProvider;
@@ -185,5 +189,19 @@ public class MinecraftHook {
 		HookUtils.setField(worldClient, "clientChunkProvider", "field_73033_b", listener);
 
 		return listener;
+	}
+
+	public static boolean shouldSideBeRendered(BlockSnow blockSnow, IBlockAccess worldAccess, int x, int y, int z, int dir) {
+		if (dir == Direction.UP) {
+			return true;
+		}
+
+		int blockId = worldAccess.getBlockId(x, y, z);
+
+		if (PrimitivesFlags.SOLID[blockId] || dir > Direction.UP && blockId == Block.snow.blockID) {
+			return false;
+		}
+
+		return true;
 	}
 }

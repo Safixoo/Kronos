@@ -26,6 +26,7 @@ public class KronosTransformer implements IClassTransformer {
 	static final String VANILLA_MESHER = "dev/safixo/client/render/pipelines/terrain/meshing/builders/VanillaBlockMesher";
 
 	static final String RENDER_BLOCKS = "net.minecraft.client.renderer.RenderBlocks";
+	static final String BLOCK_SNOW = "net.minecraft.block.BlockSnow";
 	static final String RENDER_GLOBAL = "net.minecraft.client.renderer.RenderGlobal";
 	static final String ITEM_RENDERER = "net.minecraft.client.renderer.ItemRenderer";
 	static final String CLIPPING_HELPER_IMPL = "net.minecraft.client.renderer.culling.ClippingHelperImpl";
@@ -53,6 +54,8 @@ public class KronosTransformer implements IClassTransformer {
 		// Overwrites classes methods completely with a function call with the same
 		// args and with the instance of the original class.
 		switch (transformedName) {
+			case BLOCK_SNOW:
+				replaceClassMethod(MINECRAFT_HOOK, "shouldSideBeRendered", "a", "(Lacf;IIII)Z", reference, false);
 			case RENDER_BLOCKS:
 				replaceClassMethod(VANILLA_MESHER, "renderStandardBlock", "p", "(Laqz;III)Z", reference, false);
 				break;
