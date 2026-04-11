@@ -4,7 +4,6 @@ import dev.safixo.client.render.pipelines.terrain.shader.TerrainProgram;
 import dev.safixo.client.util.memory.NativeBuffer;
 import dev.safixo.client.util.memory.UnsafeUtil;
 import org.lwjgl.opengl.*;
-import dev.safixo.client.render.pipelines.terrain.SectionManager;
 import dev.safixo.client.render.pipelines.terrain.SectionRender;
 import dev.safixo.client.util.MeshDirection;
 import dev.safixo.client.util.data.CameraData;
@@ -23,8 +22,8 @@ public class RegionRender {
 	// Count of different render-passes possibly dispatched.
 	// - SOLID (0)
 	// - TRANSLUCENT (1)
-	private static final int RENDER_PASSES = 2;
-	private static final int SOLID_PASS = 0, TRANSLUCENT_PASS = 1;
+	public static final int RENDER_PASSES = 2;
+	public static final int SOLID_PASS = 0, TRANSLUCENT_PASS = 1;
 
 	// Region total volume area in SectionRenders.
 	public static final int REGION_SECTION_SIZE = 512; // 8 * 8 * 8
@@ -35,6 +34,8 @@ public class RegionRender {
 
 	// Region coordinates in region space.
 	public int regionX, regionY, regionZ;
+
+	public int activeSections = 0;
 
 	public static final int BLOCK_SHIFT_X = 7;
 	public static final int BLOCK_SHIFT_Y = 7;
@@ -55,6 +56,8 @@ public class RegionRender {
 	// The vertex-buffers and its arenas.
 	private RegionAllocation translucentBuffer;
 	private RegionAllocation solidBuffer;
+
+	private final RegionManager regionManager;
 
 	// Draw-data buffers for uploading, and the draw index.
 	private long solidFirst = UnsafeUtil.NULL, solidCount = UnsafeUtil.NULL;
@@ -93,15 +96,17 @@ public class RegionRender {
 	// Number of sections queued for draw in the current frame.
 	public int sectionsToRender;
 
-	public static final RegionRender NULL = new RegionRender(0, Integer.MIN_VALUE, 0);
+	public static final RegionRender NULL = new RegionRender(null, 0, Integer.MIN_VALUE, 0);
 
 	private long solidIndirectPtr;
 	private long translucentIndirectPtr;
 
-	public RegionRender(int sectionX, int sectionY, int sectionZ) {
+	public RegionRender(RegionManager regionManager, int sectionX, int sectionY, int sectionZ) {
 		this.regionX = sectionX >> (RegionRender.BLOCK_SHIFT_X - 4);
 		this.regionY = sectionY >> (RegionRender.BLOCK_SHIFT_Y - 4);
 		this.regionZ = sectionZ >> (RegionRender.BLOCK_SHIFT_Z - 4);
+
+		this.regionManager = regionManager;
 
 		if (RegionManager.SUPPORT_INDIRECT) {
 			int structSize = 16;
@@ -132,22 +137,12 @@ public class RegionRender {
 		Arrays.fill(this.regionDrawData, 0L);
 
 		if (this.solidBuffer != null) {
-			SectionManager.getCurrentInstance().removeUsedMemory(this.solidBuffer.offset);
-			SectionManager.getCurrentInstance().removeMemory(this.solidBuffer.offset);
-
 			this.solidBuffer.clear();
-			this.solidBuffer.capacity = 0;
-			this.solidBuffer.offset = 0;
 			this.solidBuffer = null;
 		}
 
 		if (this.translucentBuffer != null) {
-			SectionManager.getCurrentInstance().removeUsedMemory(this.translucentBuffer.offset);
-			SectionManager.getCurrentInstance().removeMemory(this.translucentBuffer.offset);
-
 			this.translucentBuffer.clear();
-			this.translucentBuffer.capacity = 0;
-			this.translucentBuffer.offset = 0;
 			this.translucentBuffer = null;
 		}
 
@@ -235,7 +230,6 @@ public class RegionRender {
 				drawData[solidDrawData + dir] = 0L;
 			}
 		}
-
 	}
 
 	// Processing draw data now and not in the BFS, allows decoupling the system and doing the extra

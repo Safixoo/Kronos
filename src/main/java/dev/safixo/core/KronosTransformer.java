@@ -28,6 +28,7 @@ public class KronosTransformer implements IClassTransformer {
 	static final String RENDER_BLOCKS = "net.minecraft.client.renderer.RenderBlocks";
 	static final String BLOCK_SNOW = "net.minecraft.block.BlockSnow";
 	static final String RENDER_GLOBAL = "net.minecraft.client.renderer.RenderGlobal";
+	static final String ENTITY_RENDERER = "net.minecraft.client.renderer.EntityRenderer";
 	static final String ITEM_RENDERER = "net.minecraft.client.renderer.ItemRenderer";
 	static final String CLIPPING_HELPER_IMPL = "net.minecraft.client.renderer.culling.ClippingHelperImpl";
 	static final String CLIPPING_HELPER = "net.minecraft.client.renderer.culling.ClippingHelper";
@@ -54,6 +55,9 @@ public class KronosTransformer implements IClassTransformer {
 		// Overwrites classes methods completely with a function call with the same
 		// args and with the instance of the original class.
 		switch (transformedName) {
+			case ENTITY_RENDERER:
+				replaceClassMethod(MINECRAFT_HOOK, "disableLightmap", "a", "(D)V", reference, true);
+				replaceClassMethod(MINECRAFT_HOOK, "enableLightmap", "b", "(D)V", reference, true);
 			case BLOCK_SNOW:
 				replaceClassMethod(MINECRAFT_HOOK, "shouldSideBeRendered", "a", "(Lacf;IIII)Z", reference, false);
 			case RENDER_BLOCKS:
@@ -170,6 +174,8 @@ public class KronosTransformer implements IClassTransformer {
 		FUNCTION_NAMES.add("glBlendFunc");
 		FUNCTION_NAMES.add("glDepthMask");
 		FUNCTION_NAMES.add("glShadeModel");
+
+		FUNCTION_NAMES.add("glClearColor");
 
 		FUNCTION_NAMES.add("glGetInteger");
 		FUNCTION_NAMES.add("glBindBuffer");

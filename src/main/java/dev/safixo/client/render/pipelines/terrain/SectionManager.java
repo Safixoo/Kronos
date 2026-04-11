@@ -39,7 +39,7 @@ public class SectionManager {
 	}
 
 	public static final int MAX_FULL_UPDATES = 3;
-	public static final int MAX_UPDATES_TRIES = 256;
+	public static final int MAX_UPDATES_TRIES = 32;
 
 	private static final Item DEBUG_ITEM = null;
 
@@ -115,15 +115,15 @@ public class SectionManager {
 		this.vramUsed += bytes;
 	}
 
-	public void removeUsedMemory(long bytes) {
+	public void removeUsedMemory(int bytes) {
 		this.vramUsed -= bytes;
 	}
 
-	public void addMemory(long bytes) {
+	public void addMemory(int bytes) {
 		this.vramAllocated += bytes;
 	}
 
-	public void removeMemory(long bytes) {
+	public void removeMemory(int bytes) {
 		this.vramAllocated -= bytes;
 	}
 
@@ -193,8 +193,8 @@ public class SectionManager {
 
 		IChunkProvider provider = world.getChunkProvider();
 
-		if (provider.getClass() == ClientChunkListener.class) {
-			((ClientChunkListener)provider).processAllQueuedSections();
+		if (provider instanceof ClientChunkListener) {
+			((ClientChunkListener) provider).processAllQueuedSections();
 		}
 
 		EntityClientPlayerMP playerLocal = Minecraft.getMinecraft().thePlayer;
@@ -211,7 +211,7 @@ public class SectionManager {
 		// For debugging occ culling.
 		//noinspection ConstantValue
 		if ((playerItem != DEBUG_ITEM || DEBUG_ITEM == null) && shouldUpdateGraph) {
-			this.bfsCuller.init(this.regionManager, renderDistance);
+			this.bfsCuller.init(this.regionManager);
 			this.bfsCuller.updateRenderList(this.sectionMap, this.camera);
 		}
 

@@ -43,6 +43,22 @@ public class HookUtils {
 		}
 	}
 
+	public static void setFieldValue(Field field, Object instance, Object value) {
+		try {
+			field.set(instance, value);
+		} catch (IllegalAccessException e) {
+			throw new RuntimeException(e);
+		}
+	}
+
+	public static Object getFieldValue(Field field, Object instance) {
+		try {
+			return field.get(instance);
+		} catch (IllegalAccessException e) {
+			throw new RuntimeException(e);
+		}
+	}
+
 	public static Object getFieldStatic(Class<?> clazz, String fieldName, String fieldNotch) {
 		if (!PrimitivesFlags.DETECTED) {
 			PrimitivesFlags.processDevInfo();

@@ -83,30 +83,6 @@ public class ModelHelper {
 		return blockCache >>> 4;
 	}
 
-	public static int light(SectionCache cache, int x, int y, int z, int blockCache) {
-		if (blockCache == 0) {
-			return cache.getLight(x, y, z, 0);
-		}
-
-		return 0;
-	}
-
-	public static int lightCenter(SectionCache cache, int x, int y, int z, int blockCache) {
-		if (blockCache == ~1) {
-			return cache.getLightCenter(x, y, z, 0);
-		}
-
-		return blockCache >>> 4;
-	}
-
-	public static int lightCenter(SectionCache cache, int blockIndex, int blockCache) {
-		if (blockCache == 0) {
-			return cache.getLightCenter(blockIndex, 0);
-		}
-
-		return 0;
-	}
-
 	public static int ao(int side1, int side2, int corner) {
 		side1 = -fullFace(side1) & FULL_BLOCK_REDUCE;
 		side2 = -fullFace(side2) & FULL_BLOCK_REDUCE;
@@ -118,15 +94,10 @@ public class ModelHelper {
 	}
 
 	public static int avg(int a, int b) {
-		if (b == 0) {
-			return a;
-		}
-		if (a == 0) {
-			return b;
-		}
+		if (a == 0) return b;
+		if (b == 0) return a;
 
-		int sumLight = (a + b);
-		return sumLight >>> 1;
+		return (a + b) >>> 1;
 	}
 
 	private static boolean lossyEqual(double a, double b) {

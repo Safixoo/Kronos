@@ -13,7 +13,10 @@ import net.minecraft.block.Block;
 import net.minecraft.block.BlockSnow;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.WorldClient;
+import net.minecraft.client.renderer.EntityRenderer;
+import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.Tessellator;
+import net.minecraft.util.ResourceLocation;
 import net.minecraft.world.EnumSkyBlock;
 import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
@@ -21,10 +24,15 @@ import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.IChunkProvider;
 import net.minecraft.world.chunk.storage.ExtendedBlockStorage;
 import org.joml.Matrix4f;
+import org.lwjgl.opengl.GL11;
+
+import java.lang.reflect.Field;
 
 @SuppressWarnings("unused")
 public class MinecraftHook {
 	private static final int ITEM_STRIDE = 24;
+	public static final Field LIGHTMAP_RESOURCE = HookUtils.getField(EntityRenderer.class,
+		"locationLightMap", "field_110922_T");
 
 	public static void checkGLError(Minecraft minecraft, String str) {
 		if (!PrimitivesFlags.DETECTED) {
@@ -203,5 +211,42 @@ public class MinecraftHook {
 		}
 
 		return true;
+	}
+
+	private static boolean SETUP_LIGHTING = false;
+
+	public static void enableLightmap(EntityRenderer render, double partialTick) {
+		OpenGlHelper.setActiveTexture(OpenGlHelper.lightmapTexUnit);
+		Minecraft.getMinecraft().getTextureManager().bindTexture((ResourceLocation) HookUtils.getFieldValue(LIGHTMAP_RESOURCE, render));
+
+		if (!SETUP_LIGHTING) {
+			float scale = 1.0f / 256.0f;
+			GL11.glMatrixMode(GL11.GL_TEXTURE);
+
+			GL11.glLoadIdentity();
+			GL11.glScalef(scale, scale, scale);
+			GL11.glTranslatef(8.0F, 8.0F, 8.0F);
+
+			GL11.glMatrixMode(GL11.GL_MODELVIEW);
+
+			GL11.glTexParameteri(GL11.GL_TEXTURE_2D, 10241, 9729);
+			GL11.glTexParameteri(GL11.GL_TEXTURE_2D, 10240, 9729);
+			GL11.glTexParameteri(GL11.GL_TEXTURE_2D, 10241, 9729);
+			GL11.glTexParameteri(GL11.GL_TEXTURE_2D, 10240, 9729);
+			GL11.glTexParameteri(GL11.GL_TEXTURE_2D, 10242, 10496);
+			GL11.glTexParameteri(GL11.GL_TEXTURE_2D, 10243, 10496);
+
+			GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+			SETUP_LIGHTING = true;
+		}
+
+		GL11.glEnable(GL11.GL_TEXTURE_2D);
+		OpenGlHelper.setActiveTexture(OpenGlHelper.defaultTexUnit);
+	}
+
+	public static void disableLightmap(EntityRenderer render, double partialTick) {
+		OpenGlHelper.setActiveTexture(OpenGlHelper.lightmapTexUnit);
+		GL11.glDisable(GL11.GL_TEXTURE_2D);
+		OpenGlHelper.setActiveTexture(OpenGlHelper.defaultTexUnit);
 	}
 }

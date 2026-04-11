@@ -29,6 +29,7 @@ public class VoxelMesherCenter  {
 			drawSet |= block.shouldSideBeRendered(cache, x + 1, y, z, 5) ? 1 << EAST : 0;
 		}
 
+		int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
 		int modelColor = ColorBGRManager.rgbToBgr(MODEL_COLORIZER.getColor(cache, x, y, z, block));
 
 		for (int dir = 0; dir < Direction.COUNT; dir++) {
@@ -59,18 +60,18 @@ public class VoxelMesherCenter  {
 			FacingRender render = FACE_RENDER[dir];
 
 			if (ambient) {
-				renderFace(writer, render, tex, cache, x, y, z, blockColor, overlayColor);
+				renderFace(writer, render, tex, cache, x, y, z, blockIndex, blockColor, overlayColor);
 			} else {
 				renderFaceNoSmooth(render, dir, cache, x, y, z, blockColor);
 			}
 		}
 	}
 
-	public static void renderFace(VertexWriter writer, FacingRender face, Icon tex, SectionCache cache, int x, int y, int z, int blockColor, int overlayColor) {
+	public static void renderFace(VertexWriter writer, FacingRender face, Icon tex, SectionCache cache, int x, int y, int z, int blockIndex, int blockColor, int overlayColor) {
 		int p1 = face.aoCorner0Packed;
 		int p2 = face.aoCorner1Packed;
 
-		int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15) + face.dirPacked;
+		blockIndex += face.dirPacked;
 
 		int posZ = getBlockCached(blockIndex + p2);
 		int negZ = getBlockCached(blockIndex - p2);
@@ -83,32 +84,31 @@ public class VoxelMesherCenter  {
 		int cornerPP = isFullVoxel(blockIndex + p12);
 		int cornerPN = isFullVoxel(blockIndex + pd12);
 
-		int lightMap = cache.getLightCenter(blockIndex);
+		int lightMap = cache.getLightmapCenter(blockIndex);
 
-		int lightPP = fullFace((posZ | posX) & ~cornerPP) == 0 ? (lightMap + cache.getLightCenter(blockIndex + p12)) >> 1 : lightMap;
-		int lightPN = fullFace((negZ | posX) & ~cornerPN) == 0 ? (lightMap + cache.getLightCenter(blockIndex + pd12)) >> 1 : lightMap;
+		int lightPP = fullFace((posZ | posX) & ~cornerPP) == 0 ? cache.getLightmapCenter(blockIndex + p12) : 0;
+		int lightPN = fullFace((negZ | posX) & ~cornerPN) == 0 ? cache.getLightmapCenter(blockIndex + pd12) : 0;
 
 		int cornerNP = isFullVoxel(blockIndex - pd12);
 		int cornerNN = isFullVoxel(blockIndex - p12);
 
-		int lightNP = fullFace((posZ | negX) & ~cornerNP) == 0 ? (lightMap + cache.getLightCenter(blockIndex - pd12)) >> 1 : lightMap;
-		int lightNN = fullFace((negZ | negX) & ~cornerNN) == 0 ? (lightMap + cache.getLightCenter(blockIndex - p12)) >> 1 : lightMap;
+		int lightNP = fullFace((posZ | negX) & ~cornerNP) == 0 ? cache.getLightmapCenter(blockIndex - pd12) : 0;
+		int lightNN = fullFace((negZ | negX) & ~cornerNN) == 0 ? cache.getLightmapCenter(blockIndex - p12) : 0;
 
 		int ao0 = ao(posZ, posX, cornerPP);
 		int ao1 = ao(negZ, posX, cornerPN);
 		int ao2 = ao(negZ, negX, cornerNN);
 		int ao3 = ao(posZ, negX, cornerNP);
 
-		int lightPZ = extractLight(posZ);
-		int lightPX = extractLight(posX);
+		int lightPZ = light(posZ);
+		int lightPX = light(posX);
+		int lightNZ = light(negZ);
+		int lightNX = light(negX);
 
-		int lightNZ = extractLight(negZ);
-		int lightNX = extractLight(negX);
-
-		int light0 = avg(lightPP, avg(lightPZ, lightPX)); // 0 vertex
-		int light1 = avg(lightPN, avg(lightPX, lightNZ)); // 1 vertex
-		int light2 = avg(lightNN, avg(lightNZ, lightNX)); // 2 vertex
-		int light3 = avg(lightNP, avg(lightNX, lightPZ)); // 3 vertex
+		int light0 = avg(avg(lightMap, lightPP), avg(lightPZ, lightPX)); // 0 vertex
+		int light1 = avg(avg(lightMap, lightPN), avg(lightPX, lightNZ)); // 1 vertex
+		int light2 = avg(avg(lightMap, lightNN), avg(lightNZ, lightNX)); // 2 vertex
+		int light3 = avg(avg(lightMap, lightNP), avg(lightNX, lightPZ)); // 3 vertex
 
 		int uv0 = face.uvData[0];
 		int uv1 = face.uvData[1];
@@ -162,30 +162,8 @@ public class VoxelMesherCenter  {
 		}
 	}
 
-	private static final double SOLID_OCC_FACTOR = 0.2;
-
-	private static final int EMPTY_BLOCK_OCC_FACTOR = 255;
-	private static final int FULL_BLOCK_REDUCE = EMPTY_BLOCK_OCC_FACTOR - (int) (SOLID_OCC_FACTOR * EMPTY_BLOCK_OCC_FACTOR);
-
-	public static int ao(int side1, int side2, int corner) {
-		side1 = -fullFace(side1) & FULL_BLOCK_REDUCE;
-		side2 = -fullFace(side2) & FULL_BLOCK_REDUCE;
-		corner = -fullFace(corner) & FULL_BLOCK_REDUCE;
-
-		corner |= side1 & side2;
-
-		return EMPTY_BLOCK_OCC_FACTOR - ((side1 + side2 + corner) >> 2);
-	}
-
-	private static int avg(int a, int b) {
-		if (a == 0) return b;
-		if (b == 0) return a;
-
-		return (a + b) >>> 1;
-	}
-
 	public static int getBlockCached(int blockIndex) {
-		int solidBlock = SectionCache.VISITED_CENTER_BLOCKS[blockIndex];
+		int solidBlock = PrimitivesFlags.SOLID_LIGHT_MASK[SectionCache.CENTER_BLOCKS[blockIndex] & 0xFF];
 
 		if (solidBlock == 1) {
 			return 1;
@@ -197,11 +175,7 @@ public class VoxelMesherCenter  {
 		return MathExt.getLightmapCoord(skyLight, blockLight) << 4;
 	}
 
-	private static int extractLight(int light) {
-		return light >> 4;
-	}
-
 	public static int isFullVoxel(int blockIndex) {
-		return SectionCache.VISITED_CENTER_BLOCKS[blockIndex];
+		return PrimitivesFlags.SOLID_LIGHT_MASK[SectionCache.CENTER_BLOCKS[blockIndex] & 0xFF];
 	}
 }

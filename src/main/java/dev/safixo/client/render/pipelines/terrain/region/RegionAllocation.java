@@ -2,7 +2,6 @@ package dev.safixo.client.render.pipelines.terrain.region;
 
 import dev.safixo.client.render.gfx.buffer.GlVertexBuffer;
 import dev.safixo.client.render.gfx.util.GlBufferUtil;
-import dev.safixo.client.render.gfx.util.RenderBuffer;
 import org.lwjgl.opengl.*;
 import dev.safixo.client.render.pipelines.terrain.SectionFlags;
 import dev.safixo.client.render.pipelines.terrain.SectionManager;
@@ -35,20 +34,21 @@ public class RegionAllocation {
 			SPARE_BUFFER = new GlVertexBuffer(SPARE_BUFFER_ALLOC, GL15.GL_STREAM_COPY);
 		}
 
+		SectionManager.getCurrentInstance().addMemory(newCapacity);
 		this.vertexBuffer = new RegionBuffer(newCapacity, GL15.GL_STATIC_DRAW);
 		this.capacity = newCapacity;
 	}
 
-	public long getAmplification(long size) {
+	private long getAmplification(long size) {
 		return (size << 1);
 	}
 
-	public void resize(long size) {
+	private void resize(long size) {
 		if (SPARE_BUFFER == null) {
 			return;
 		}
 
-		long newSize = Math.max(getAmplification(size), size);
+		long newSize = getAmplification(size);
 
 		// If there's a possibility of avoiding using a temp-buffer for the geometry
 		// it's preferable.
@@ -110,8 +110,9 @@ public class RegionAllocation {
 	// When freeing all the allocations of the region, is also wanted to avoid any interference
 	// with the sections and the invalid region/allocation.
 	public void clear() {
-		this.vertexBuffer.delete();
+		SectionManager.getCurrentInstance().removeMemory((int) this.capacity);
 
+		this.vertexBuffer.delete();
 		this.capacity = 0;
 		this.offset = 0;
 
@@ -126,7 +127,8 @@ public class RegionAllocation {
 			alloc.render.flags = flags;
 			alloc.render.markDirty(true);
 			alloc.render.clearAllocations();
-			alloc.render = null;
+
+			SectionManager.getCurrentInstance().removeUsedMemory(alloc.vertices * STRIDE);
 
 			alloc = alloc.next;
 		}
@@ -141,7 +143,6 @@ public class RegionAllocation {
 
 	// Returns first << 32 | count.
 	public long allocate(SectionRender render, long vertexData, int size, int side) {
-		SectionManager.getCurrentInstance().addUsedMemory(size * STRIDE);
 		Allocation alloc = this.fitInFree(size);
 
 		if (alloc == null) {
@@ -150,18 +151,24 @@ public class RegionAllocation {
 
 		alloc.render = render;
 		alloc.sectionId = Allocation.sectionId(render, side);
+		SectionManager.getCurrentInstance().addUsedMemory(alloc.vertices * STRIDE);
+
 		this.uploadAllocation(alloc, vertexData, size);
 
-		return packDrawData(size, (int) alloc.offset);
+		return packDrawData(size, (int) alloc.first);
 	}
 
 	private Allocation allocateNew(SectionRender render, int size, int side) {
 		long maxOffset = this.offset / STRIDE;
 		int sizeInBytes = size * STRIDE;
 
+		SectionManager.getCurrentInstance().removeMemory((int) this.capacity);
+
 		if (this.offset + sizeInBytes > this.capacity) {
 			this.resize(this.offset + sizeInBytes);
 		}
+
+		SectionManager.getCurrentInstance().addMemory((int) this.capacity);
 
 		Allocation newAlloc = new Allocation(render, maxOffset, size, side);
 		Allocation first = this.firstEntry;
@@ -179,19 +186,18 @@ public class RegionAllocation {
 		return newAlloc;
 	}
 
-	public long renewAllocation(SectionRender render, long data, int size, int side) {
+	public long renewAllocation(SectionRender render, long data, int vertices, int side) {
 		Allocation alloc = this.findPrevAlloc(render, side);
 		long drawData;
 
-		if (alloc != null && alloc.size >= size) {
-			this.uploadAllocation(alloc, data, size);
-			drawData = packDrawData(size, (int) alloc.offset);
+		if (alloc != null && alloc.vertices >= vertices) {
+			this.uploadAllocation(alloc, data, vertices);
+			drawData = packDrawData(vertices, (int) alloc.first);
 		} else {
 			if (alloc != null) {
-				SectionManager.getCurrentInstance().removeUsedMemory((long) alloc.size * STRIDE);
 				this.remove(render, side);
 			}
-			drawData = this.allocate(render, data, size, side);
+			drawData = this.allocate(render, data, vertices, side);
 		}
 
 		return drawData;
@@ -207,14 +213,14 @@ public class RegionAllocation {
 		}
 
 		// Base case: first meets the criteria.
-		if (alloc.size >= spaceNeeded) {
+		if (alloc.vertices >= spaceNeeded) {
 			this.freeAllocations = this.freeAllocations.next;
 			alloc.next = null;
 
 			return alloc;
 		}
 
-		while (alloc.next != null && alloc.next.size < spaceNeeded) {
+		while (alloc.next != null && alloc.next.vertices < spaceNeeded) {
 			alloc = alloc.next;
 		}
 
@@ -235,7 +241,7 @@ public class RegionAllocation {
 	// Searches for a previous allocation.
 	public Allocation findPrevAlloc(SectionRender render, int side) {
 		Allocation alloc = this.firstEntry;
-		int sectionId = Allocation.sectionId(render, side);
+		long sectionId = Allocation.sectionId(render, side);
 
 		while (alloc != null && alloc.sectionId != sectionId) {
 			alloc = alloc.next;
@@ -265,7 +271,7 @@ public class RegionAllocation {
 			return;
 		}
 
-		int sectionId = Allocation.sectionId(render, side);
+		long sectionId = Allocation.sectionId(render, side);
 
 		// The allocation shouldn't be null as we are removing an existent
 		// allocation.
@@ -294,6 +300,8 @@ public class RegionAllocation {
 	private void addToFreeList(Allocation alloc) {
 		Allocation free = this.freeAllocations;
 
+		SectionManager.getCurrentInstance().removeUsedMemory(alloc.vertices * STRIDE);
+
 		alloc.render = null;
 		alloc.sectionId = Allocation.UNDEFINED;
 		alloc.next = null;
@@ -311,7 +319,7 @@ public class RegionAllocation {
 	}
 
 	public void uploadAllocation(Allocation alloc, long data, int size) {
-		this.vertexBuffer.upload(data, (int) (alloc.offset * STRIDE), size * STRIDE);
+		this.vertexBuffer.upload(data, (int) (alloc.first * STRIDE), size * STRIDE);
 	}
 
 	public static class Allocation {
@@ -320,22 +328,22 @@ public class RegionAllocation {
 		public Allocation next;
 		public SectionRender render;
 
-		public int sectionId;
+		public long sectionId;
 
 		public Allocation(SectionRender render, long offset, int size, int side) {
 			this.render = render;
 			this.sectionId = sectionId(render, side);
-			this.offset = offset;
-			this.size = size;
+			this.first = offset;
+			this.vertices = size;
 		}
 
 		// Size and offset are written in vertex amount and not bytes to
 		// avoid division to translate byte sizes to vertex counts.
-		public long offset;
-		public int size;
+		public long first;
+		public int vertices;
 
-		public static int sectionId(SectionRender render, int side) {
-			return render.regionIndex << 16 | side;
+		public static long sectionId(SectionRender render, int side) {
+			return render.sectionPos << 4 | side;
 		}
 	}
 }

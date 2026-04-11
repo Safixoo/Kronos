@@ -84,7 +84,7 @@ public class MathExt {
 		return a * b + c;
 	}
 
-	public static float manhattanDistance(RegionRender region, CameraData cameraData) {
+	public static float euclideanDistance(RegionRender region, CameraData cameraData) {
 		float distX = (region.blockX() - cameraData.intX) - cameraData.fractX;
 		float distZ = (region.blockZ() - cameraData.intZ) - cameraData.fractZ;
 

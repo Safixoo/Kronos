@@ -18,6 +18,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderBlocks;
 import net.minecraft.client.renderer.WorldRenderer;
 import net.minecraft.client.renderer.tileentity.TileEntityRenderer;
+import net.minecraft.profiler.Profiler;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
@@ -250,6 +251,7 @@ public class SectionMesher {
 		if (sumVertices > 0) {
 			if (section.region == RegionRender.NULL) {
 				section.region = manager.getRegion(section.blockX >> 4, section.blockY >> 4, section.blockZ >> 4);
+				section.region.activeSections++;
 			}
 
 			section.region.addMeshOrderMask(section.regionIndex, meshDrawOrder);
@@ -267,6 +269,7 @@ public class SectionMesher {
 		if (translucentWriter.getVertices() != 0) {
 			if (section.region == RegionRender.NULL) {
 				section.region = manager.getRegion(section.blockX >> 4, section.blockY >> 4, section.blockZ >> 4);
+				section.region.activeSections++;
 			}
 
 			section.region.addTranslucentMesh(section, translucentWriter);

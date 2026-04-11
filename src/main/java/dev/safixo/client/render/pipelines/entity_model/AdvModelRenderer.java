@@ -185,6 +185,7 @@ public class AdvModelRenderer {
 	public static void draw(int mode, int offset, int vertices) {
 		if (!BACK_FACE_CULLING) {
 			GL11.glDrawArrays(mode, offset, vertices);
+			return;
 		}
 
 		Matrix4f matrix = GlStateTracker.MODEL_VIEW_STACK.top();

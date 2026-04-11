@@ -4,6 +4,9 @@ import dev.safixo.client.render.ImprovedTessellator;
 import dev.safixo.client.render.gfx.util.GpuFlags;
 import dev.safixo.client.util.ColorBGRManager;
 import dev.safixo.client.util.Matrix4Stack;
+import dev.safixo.core.HookUtils;
+import net.minecraft.client.Minecraft;
+import net.minecraft.profiler.Profiler;
 import org.joml.Matrix4f;
 import org.lwjgl.opengl.*;
 import org.lwjgl.util.glu.Project;
@@ -12,6 +15,7 @@ import java.nio.Buffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.util.Arrays;
+import java.util.List;
 
 @SuppressWarnings("unused")
 public class GlStateTracker {
@@ -28,8 +32,8 @@ public class GlStateTracker {
 	public static int LAST_COLOR = -1;
 	public static int LAST_DEPTH_FUNC = -1;
 
-	public static int CURRENT_UNIT = 0;
-	private static final int[] TEXTURE_PER_UNIT = new int[10];
+	public static int CURRENT_UNIT = -1;
+	private static final int[] TEXTURE_PER_UNIT = new int[GL13.GL_TEXTURE31 - GL13.GL_TEXTURE0 + 1];
 
 	public static int FOG_MODE;
 	public static float FOG_START, FOG_END, FOG_DENSITY;
@@ -154,7 +158,12 @@ public class GlStateTracker {
 
 	public static void glClear(int mask) {
 		flushDrawState();
+
 		GL11.glClear(mask);
+	}
+
+	public static void glClearColor(float red, float green, float blue, float alpha) {
+		GL11.glClearColor(red, green, blue, alpha);
 	}
 
 	public static void reset() {
@@ -289,7 +298,7 @@ public class GlStateTracker {
 		if (activeTex != CURRENT_UNIT || SKIP_CACHE) {
 			flushDrawState();
 			GL13.glActiveTexture(activeTex);
-			CURRENT_UNIT = GL13.GL_TEXTURE0 - activeTex;
+			CURRENT_UNIT = activeTex - GL13.GL_TEXTURE0;
 		}
 	}
 

@@ -111,31 +111,31 @@ public class VoxelMesher {
 		int cornerPP = isFullVoxel(cache, dirX + p12X, dirY + p12Y, dirZ + p12Z);
 		int cornerPN = isFullVoxel(cache, dirX + pd12X, dirY + pd12Y, dirZ + pd12Z);
 
-		int lightPP = fullFace((posZ | posX) & ~cornerPP) == 0 ? cache.getLight(dirX + p12X, dirY + p12Y, dirZ + p12Z, 0) : 0;
-		int lightPN = fullFace((negZ | posX) & ~cornerPN) == 0 ? cache.getLight(dirX + pd12X, dirY + pd12Y, dirZ + pd12Z, 0) : 0;
+		int lightMap = cache.getLightmap(dirX, dirY, dirZ);
+
+		int lightPP = fullFace((posZ | posX) & ~cornerPP) == 0 ? cache.getLightmap(dirX + p12X, dirY + p12Y, dirZ + p12Z) : 0;
+		int lightPN = fullFace((negZ | posX) & ~cornerPN) == 0 ? cache.getLightmap(dirX + pd12X, dirY + pd12Y, dirZ + pd12Z) : 0;
 
 		int cornerNP = isFullVoxel(cache, dirX - pd12X, dirY - pd12Y, dirZ - pd12Z);
 		int cornerNN = isFullVoxel(cache, dirX - p12X, dirY - p12Y, dirZ - p12Z);
 
-		int lightNP = fullFace((posZ | negX) & ~cornerNP) == 0 ? cache.getLight(dirX - pd12X, dirY - pd12Y, dirZ - pd12Z, cornerNP) : 0;
-		int lightNN = fullFace((negZ | negX) & ~cornerNN) == 0 ? cache.getLight(dirX - p12X, dirY - p12Y, dirZ - p12Z, cornerNN) : 0;
+		int lightNP = fullFace((posZ | negX) & ~cornerNP) == 0 ? cache.getLightmap(dirX - pd12X, dirY - pd12Y, dirZ - pd12Z) : 0;
+		int lightNN = fullFace((negZ | negX) & ~cornerNN) == 0 ? cache.getLightmap(dirX - p12X, dirY - p12Y, dirZ - p12Z) : 0;
 
 		int ao0 = ao(posZ, posX, cornerPP);
 		int ao1 = ao(negZ, posX, cornerPN);
 		int ao2 = ao(negZ, negX, cornerNN);
 		int ao3 = ao(posZ, negX, cornerNP);
 
-		int lightMap = cache.getLightBrightnessForSkyBlocks(dirX, dirY, dirZ, 0);
-
 		int lightPZ = light(posZ);
 		int lightPX = light(posX);
 		int lightNZ = light(negZ);
 		int lightNX = light(negX);
 
-		int light0 = avg(avg(lightPP, lightMap), avg(lightPZ, lightPX)); // 0 vertex
-		int light1 = avg(avg(lightPN, lightMap), avg(lightPX, lightNZ)); // 1 vertex
-		int light2 = avg(avg(lightNN, lightMap), avg(lightNZ, lightNX)); // 2 vertex
-		int light3 = avg(avg(lightNP, lightMap), avg(lightNX, lightPZ)); // 3 vertex
+		int light0 = avg(avg(lightMap, lightPP), avg(lightPZ, lightPX)); // 0 vertex
+		int light1 = avg(avg(lightMap, lightPN), avg(lightPX, lightNZ)); // 1 vertex
+		int light2 = avg(avg(lightMap, lightNN), avg(lightNZ, lightNX)); // 2 vertex
+		int light3 = avg(avg(lightMap, lightNP), avg(lightNX, lightPZ)); // 3 vertex
 
 		int uv0 = face.uvData[0];
 		int uv1 = face.uvData[1];
@@ -251,7 +251,7 @@ public class VoxelMesher {
 		int solidBlock = PrimitivesFlags.SOLID_LIGHT_MASK[MathExt.byteToUnsigned(SectionCache.SECTION_BLOCKS[sectionIndex][blockIndex])];
 
 		if (solidBlock == 1) {
-			return solidBlock;
+			return 1;
 		}
 
 		int skyLight = SectionCache.getNibble(SectionCache.SKY_LIGHT[sectionIndex], blockIndex);

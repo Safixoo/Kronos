@@ -1,5 +1,6 @@
 package dev.safixo.client.render.pipelines.terrain.region;
 
+import dev.safixo.client.render.pipelines.terrain.region.allocation.NewRegionAllocator;
 import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.objects.*;
@@ -14,6 +15,7 @@ public class RegionManager {
 	public static boolean SUPPORT_INDIRECT = true;
 
 	public final Long2ReferenceOpenHashMap<RegionRender> regionMap = new Long2ReferenceOpenHashMap<>();
+
 	private double lastUpdateX;
 	private double lastUpdateZ;
 
@@ -33,7 +35,7 @@ public class RegionManager {
 		RegionRender region = this.regionMap.get(position);
 
 		if (region == null) {
-			region = new RegionRender(sectionX, sectionY, sectionZ);
+			region = new RegionRender(this, sectionX, sectionY, sectionZ);
 			this.regionMap.put(position, region);
 		}
 
@@ -48,6 +50,11 @@ public class RegionManager {
 		if (RegionAllocation.SPARE_BUFFER != null) {
 			RegionAllocation.SPARE_BUFFER.delete();
 			RegionAllocation.SPARE_BUFFER = null;
+		}
+
+		if (NewRegionAllocator.COPY_BUFFER != null) {
+			NewRegionAllocator.COPY_BUFFER.delete();
+			NewRegionAllocator.COPY_BUFFER = null;
 		}
 
 		this.regionMap.clear();
@@ -131,7 +138,7 @@ public class RegionManager {
 		LongArrayList removedList = new LongArrayList();
 
 		for (RegionRender region : regions) {
-			if (MathExt.manhattanDistance(region, camera) > MathExt.square(renderDistanceBlocks)) {
+			if (MathExt.euclideanDistance(region, camera) > MathExt.square(renderDistanceBlocks) || region.activeSections == 0) {
 				long regionPos = MathExt.asLong(region.regionX, region.regionY, region.regionZ);
 
 				removedList.add(regionPos);

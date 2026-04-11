@@ -106,6 +106,7 @@ public class SectionRender {
 			return;
 		}
 
+		this.region.activeSections--;
 		region.deleteRenderAllocation(this);
 	}
 }

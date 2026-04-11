@@ -19,6 +19,7 @@ import net.minecraft.client.settings.GameSettings;
 import net.minecraft.entity.EntityLivingBase;
 import org.lwjgl.opengl.GL11;
 
+import java.lang.reflect.Field;
 import java.util.List;
 
 // The way it works is kind of hacky, it tries to work around the two pass
@@ -33,6 +34,8 @@ public  class RenderGlobalHook {
 	public static boolean SHOULD_RELOAD;
 	public static boolean OPTIFINE_CHECKED = false;
 	public static boolean OPTIFINE_ACTIVE = false;
+
+	private static final Field RENDERERS_BEING_LOADED = HookUtils.getField(RenderGlobal.class, "renderersBeingRendered", "field_72746_N");
 
 	static float PARTIAL_TICK;
 
@@ -114,11 +117,12 @@ public  class RenderGlobalHook {
 		minecraft.entityRenderer.enableLightmap(partialTick);
 		GL11.glEnable(GL11.GL_CULL_FACE);
 
+
 		if (!OPTIFINE_ACTIVE) {
 			if (renderPass == 0) {
 				// Render solid pass.
 				MANAGER.drawRenderPass(0);
-				HookUtils.setField(global, "renderersBeingRendered", "field_72746_N", MANAGER.drawnSolidRenderers);
+				HookUtils.setFieldValue(RENDERERS_BEING_LOADED, global, MANAGER.drawnSolidRenderers);
 				MANAGER.drawnSolidRenderers = 0;
 			} else {
 				// Render translucent pass.
@@ -130,7 +134,7 @@ public  class RenderGlobalHook {
 		} else {
 			// Render solid pass.
 			MANAGER.drawRenderPass(0);
-			HookUtils.setField(global, "renderersBeingRendered", "field_72746_N", MANAGER.drawnSolidRenderers);
+			HookUtils.setFieldValue(RENDERERS_BEING_LOADED, global, MANAGER.drawnSolidRenderers);
 			MANAGER.drawnSolidRenderers = 0;
 
 			// Render translucent pass.

@@ -238,42 +238,42 @@ public class SectionCache implements IBlockAccess {
 
 	@Override
 	public int getLightBrightnessForSkyBlocks(int x, int y, int z, int defBlockLight) {
-		return this.getLight(x, y, z, defBlockLight);
+		return this.getLightmap(x, y, z, defBlockLight);
 	}
 
-	public int getLight(int x, int y, int z, int defBlockLight) {
+	public int getLightmap(int x, int y, int z, int defBlockLight) {
 		int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
-
 		int blockX = x - this.blockX;
 		int blockY = y - this.blockY;
 		int blockZ = z - this.blockZ;
 
 		int sectionIndex = sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
-		int skyLight = getNibble(SKY_LIGHT[sectionIndex], blockIndex);
-		int blockLight = getNibble(BLOCK_LIGHT[sectionIndex], blockIndex);
-
-		return MathExt.getLightmapCoord(skyLight, Math.max(defBlockLight, blockLight));
+		return extractLightNibbles(SKY_LIGHT[sectionIndex], BLOCK_LIGHT[sectionIndex], blockIndex, defBlockLight);
 	}
 
-	public int getLightCenter(int x, int y, int z, int defBlockLight) {
+	public int getLightmap(int x, int y, int z) {
 		int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
-		int skyLight = getNibble(CENTER_SKYLIGHT, blockIndex);
-		int blockLight = getNibble(CENTER_BLOCKLIGHT, blockIndex);
+		int blockX = x - this.blockX;
+		int blockY = y - this.blockY;
+		int blockZ = z - this.blockZ;
 
-		return MathExt.getLightmapCoord(skyLight, Math.max(defBlockLight, blockLight));
+		int sectionIndex = sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
+		return extractLightNibbles(SKY_LIGHT[sectionIndex], BLOCK_LIGHT[sectionIndex], blockIndex);
 	}
 
-	public int getLightCenter(int blockIndex, int defBlockLight) {
-		int skyLight = getNibble(CENTER_SKYLIGHT, blockIndex);
-		int blockLight = getNibble(CENTER_BLOCKLIGHT, blockIndex);
-
-		return MathExt.getLightmapCoord(skyLight, Math.max(defBlockLight, blockLight));
+	public int getLightmapCenter(int blockIndex) {
+		return extractLightNibbles(CENTER_SKYLIGHT, CENTER_BLOCKLIGHT, blockIndex);
 	}
 
-	public int getLightCenter(int blockIndex) {
-		int skyLight = getNibble(CENTER_SKYLIGHT, blockIndex);
-		int blockLight = getNibble(CENTER_BLOCKLIGHT, blockIndex);
+	private static int extractLightNibbles(byte[] skyLightArray, byte[] blockLightArray, int blockIndex, int minBlockLight) {
+		int skyLight = getNibble(skyLightArray, blockIndex);
+		int blockLight = getNibble(blockLightArray, blockIndex);
+		return MathExt.getLightmapCoord(skyLight, Math.max(minBlockLight, blockLight));
+	}
 
+	private static int extractLightNibbles(byte[] skyLightArray, byte[] blockLightArray, int blockIndex) {
+		int skyLight = getNibble(skyLightArray, blockIndex);
+		int blockLight = getNibble(blockLightArray, blockIndex);
 		return MathExt.getLightmapCoord(skyLight, blockLight);
 	}
 

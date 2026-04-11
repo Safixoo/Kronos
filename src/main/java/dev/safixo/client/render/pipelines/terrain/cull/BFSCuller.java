@@ -16,18 +16,21 @@ public class BFSCuller {
 
 	// The max denominator would always be a renderDistance * 3 worst case, and should always
 	// be accessed in a linear way, so it shouldn't mean a problem for the cache.
-	private static final long[] INV_DIVS = new long[512];
+	private static final long[] INV_DIVS = new long[256];
 
 	public static final int PRECISION_BITS = 25;
 	public static final int MAX_PRECISION = 1 << PRECISION_BITS;
 
+	private static final int MAX_GRID_FACTOR = 1 << 12;
+	private static final int TOLERANCE = (int) (0.15f * MAX_GRID_FACTOR);
+
 	static {
-		for (int i = 0; i < 512; i++) {
-			INV_DIVS[i] = (int) Math.ceil(MAX_PRECISION / (double) i);
+		for (int i = 0; i < 256; i++) {
+			INV_DIVS[i] = (long) Math.ceil(MAX_PRECISION / (double) i);
 		}
 	}
 
-	public void init(RegionManager regionManager, int renderDistance) {
+	public void init(RegionManager regionManager) {
 		for (RegionRender render : regionManager.regionMap.values()) {
 			render.sectionsToRender = 0;
 		}
@@ -49,15 +52,16 @@ public class BFSCuller {
 
 		if (origin != null) {
 			int flags = origin.flags;
-			exploreNodes(this.bfsQueue, origin, SectionFlags.getAdjacentMask(flags), this.activeFrame);
+			searchNeighbors(this.bfsQueue, origin, SectionFlags.getAdjacentMask(flags), this.activeFrame);
 
 			origin.currentFrame = this.activeFrame;
+			origin.gridFactor = MAX_GRID_FACTOR;
 
 			if (SectionFlags.isDirty(flags)) {
 				RebuildList.addToList(origin);
 			}
 
-			queueRegionNode(this.bfsQueue, origin, flags);
+			queueRegionNode(origin, flags);
 		}
 
 		double maxDistance = Math.min(GlStateTracker.FOG_END, camera.renderDistance << 4);
@@ -70,17 +74,33 @@ public class BFSCuller {
 	 * queueing during the search.
 	 */
 	private static void search(BFSQueue bfsQueue, int playerX, int playerY, int playerZ,
-							   int renderDistance, int activeFrame) {
+							   int renderDistance, int frame) {
 		int bfsIndex = 0;
 		SectionRender node;
 
 		while ((node = bfsQueue.get(bfsIndex++)) != null) {
 			int flags = node.flags;
-			node.gridFactor = MAX_PRECISION;
+			node.gridFactor = MAX_GRID_FACTOR;
 
-			int visibility = getVisibility(node, flags, playerX, playerY, playerZ, renderDistance, activeFrame);
+			int distX = node.blockX - playerX;
+			int distY = node.blockY - playerY;
+			int distZ = node.blockZ - playerZ;
 
-			if (visibility == 0b0) {
+			int distance = getDistance(distX, distY, distZ);
+
+			if (distance >= renderDistance || !FrustumCuller.withinFrustumBounds(distX, distY, distZ)) {
+				continue;
+			}
+
+			int distChunkX = (node.blockX >> 4) - (playerX >> 4);
+			int distChunkY = (node.blockY >> 4) - (playerY >> 4);
+			int distChunkZ = (node.blockZ >> 4) - (playerZ >> 4);
+
+			int outwardMask = getOutwardDirections(distChunkX, distChunkY, distChunkZ);
+			int gridFactor = node.gridFactor = processGridIndex(node, flags, distChunkX, distChunkY, distChunkZ, outwardMask, frame);
+
+			if (gridFactor < TOLERANCE ||
+				(distance >= 112 * 112 && SectionFlags.hasDrawableFaces(flags) && !rayVisible(node, frame, -distX - 8, -distY - 8, -distZ - 8))) {
 				continue;
 			}
 
@@ -88,11 +108,11 @@ public class BFSCuller {
 				RebuildList.addToList(node);
 			}
 
-			queueRegionNode(bfsQueue, node, flags);
+			outwardMask &= SectionFlags.getAdjacentMask(flags);
+			outwardMask &= ~SectionFlags.getCullFaces(flags);
 
-			visibility &= ~SectionFlags.getCullFaces(flags);
-			visibility &= SectionFlags.getAdjacentMask(flags);
-			exploreNodes(bfsQueue, node, visibility, activeFrame);
+			queueRegionNode(node, flags);
+			searchNeighbors(bfsQueue, node, outwardMask, frame);
 		}
 	}
 
@@ -110,12 +130,10 @@ public class BFSCuller {
 	}
 
 	/**
-	 * For drawable section that has been visited by the graph, their indices are saved in their respective
-	 * region, and their region are saved based in the BFS order. In a future should be more favorable save only
-	 * the index of section in a branch less manner, and later sort enqueued regions to minimize the work of the BFS
-	 * for node.
+	 * For non-empty sections that has been visited by the graph, their indices are saved in their respective
+	 * region.
 	 */
-	private static void queueRegionNode(BFSQueue bfsQueue, SectionRender section, int flags) {
+	private static void queueRegionNode(SectionRender section, int flags) {
 		if (SectionFlags.hasPassesNonEmpty(flags)) {
 			RegionRender region = section.region;
 			region.renderIndices[region.sectionsToRender++] = (short) section.regionIndex;
@@ -126,8 +144,8 @@ public class BFSCuller {
 	 * Searches outwards from the player possible visitable sections, based in solidness in the section and faces,
 	 * also avoids visiting sections if they were already visited in the current frame.
 	 */
-	private static void exploreNodes(BFSQueue queue, SectionRender fatherNode, int directions, int activeFrame) {
-		if (directions == 0) {
+	private static void searchNeighbors(BFSQueue queue, SectionRender fatherNode, int directions, int activeFrame) {
+		if (directions == 0b0) {
 			return;
 		}
 
@@ -166,42 +184,6 @@ public class BFSCuller {
 		}
 	}
 
-	private static final int MAX_TOLERANCE = (int) (0.15f * MAX_PRECISION);
-
-	/**
-	 * First check if the section is within the fog circle, then if it's outside the camera frustum, after
-	 * use grid based visibility technique to determine a threshold of visibility for the section, and in cases
-	 * where the sections are not empty check whether tracing a ray from the section to the camera finds obstruction
-	 * in the process.
-	 */
-	public static int getVisibility(SectionRender node, int flags, int playerX, int playerY, int playerZ, int fogEnd, int frame) {
-		int distX = node.blockX - playerX;
-		int distY = node.blockY - playerY;
-		int distZ = node.blockZ - playerZ;
-
-		int distance = getDistance(distX, distY, distZ);
-
-		if (distance >= fogEnd || !FrustumCuller.withinFrustumBounds(distX, distY, distZ)) {
-			return 0b0;
-		}
-
-		int distChunkX = (node.blockX >> 4) - (playerX >> 4);
-		int distChunkY = (node.blockY >> 4) - (playerY >> 4);
-		int distChunkZ = (node.blockZ >> 4) - (playerZ >> 4);
-
-		int outwardMask = getOutwardDirections(distChunkX, distChunkY, distChunkZ);
-		int gridFactor = node.gridFactor = processGridIndex(node, distChunkX, distChunkY, distChunkZ, outwardMask, frame);
-
-		if (gridFactor < MAX_TOLERANCE) {
-			return 0b0;
-		}
-
-		if (distance >= MathExt.square(7 * 16) && SectionFlags.hasDrawableFaces(flags) && !visibleByRayCast(node, frame, -distX - 8, -distY - 8, -distZ - 8)) {
-			return 0b0;
-		}
-
-		return outwardMask;
-	}
 
 	private static boolean renderThisFrame(SectionRender section, int dirSet, int direction, int frame) {
 		return (dirSet & (1 << direction)) != 0 && section.currentFrame == frame;
@@ -219,9 +201,9 @@ public class BFSCuller {
 	 * As it stands right now is poorly optimized, but it rewards in all the works it skips are sections that it avoids.
 	 * @return Grid visibility factor
 	 */
-	private static int processGridIndex(SectionRender section, int diffX, int diffY, int diffZ, int outwardDir, int frame) {
+	private static int processGridIndex(SectionRender section, int flags, int diffX, int diffY, int diffZ, int outwardDir, int frame) {
 		if (diffX == 0 || diffY == 0 || diffZ == 0) {
-		    return MAX_PRECISION;
+		    return MAX_GRID_FACTOR;
 		}
 
 		int gradInd = 0;
@@ -230,7 +212,7 @@ public class BFSCuller {
 		diffY = Math.abs(diffY);
 		diffZ = Math.abs(diffZ);
 
-		int dirSet = ~outwardDir & SectionFlags.getAdjacentMask(section.flags);
+		int dirSet = ~outwardDir & SectionFlags.getAdjacentMask(flags);
 
 		// Y
 		if (renderThisFrame(section.adjacentDown, dirSet, Direction.DOWN, frame)) {
@@ -264,19 +246,19 @@ public class BFSCuller {
 		distX += (distX >>> 27); // ... >>> 31) << 4
 		distY += (distY >>> 27); // ... >>> 31) << 4
 		distZ += (distZ >>> 27); // ... >>> 31) << 4
-		return (distX * distX) + (distY * distY) + (distZ * distZ);
+		return MathExt.square(distX) + MathExt.square(distY) + MathExt.square(distZ);
 	}
 
-	private static final int MAX_PRECISION_OFFSET = MAX_PRECISION * 8;
+	private static final int MAX_SCALE = (1 << 25);
 
 	/**
 	 * Traces a ray from the section to the camera and tries to find obstruction in the way using the visited
 	 * section current frame.
 	 */
-	private static boolean visibleByRayCast(SectionRender section, int frame, int dx, int dy, int dz) {
-		int tMaxX = MAX_PRECISION_OFFSET / (Math.abs(dx) | 1);
-		int tMaxY = MAX_PRECISION_OFFSET / (Math.abs(dy) | 1);
-		int tMaxZ = MAX_PRECISION_OFFSET / (Math.abs(dz) | 1);
+	private static boolean rayVisible(SectionRender section, int frame, int dx, int dy, int dz) {
+		int tMaxX = MAX_SCALE / (Math.abs(dx) | 1);
+		int tMaxY = MAX_SCALE / (Math.abs(dy) | 1);
+		int tMaxZ = MAX_SCALE / (Math.abs(dz) | 1);
 
 		int tDeltaX = tMaxX << 1;
 		int tDeltaY = tMaxY << 1;
