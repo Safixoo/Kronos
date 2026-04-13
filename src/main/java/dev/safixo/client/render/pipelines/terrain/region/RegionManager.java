@@ -20,8 +20,7 @@ public class RegionManager {
 	private double lastUpdateZ;
 
 	public RegionManager() {
-		// TODO: Disable indirect drawing in Intel if it destroys performance, with my draw batching approach
-		//  it shouldn't suffer so much in theory.
+		// TODO: Test the performance of indirect draws in Intel drivers.
 		// String vendor = GL11.glGetString(GL11.GL_VENDOR);
 		SUPPORT_INDIRECT = GLContext.getCapabilities().GL_ARB_multi_draw_indirect; // && !vendor.contains("Intel");
 	}
@@ -60,7 +59,7 @@ public class RegionManager {
 		this.regionMap.clear();
 	}
 
-	private RegionRender[] getRegionSorted(CameraData camera) {
+	private RegionRender[] getRegionsSorted(CameraData camera) {
 		if (this.regionMap.isEmpty()) {
 			return null;
 		}
@@ -123,7 +122,7 @@ public class RegionManager {
 		double diffX = Math.abs(camera.cameraXD() - this.lastUpdateX);
 		double diffZ = Math.abs(camera.cameraZD() - this.lastUpdateZ);
 
-		if (diffX + diffZ >= 80) {
+		if (Math.max(diffX, diffZ) >= 16) {
 			this.lastUpdateX = camera.cameraXD();
 			this.lastUpdateZ = camera.cameraZD();
 
@@ -138,7 +137,7 @@ public class RegionManager {
 		LongArrayList removedList = new LongArrayList();
 
 		for (RegionRender region : regions) {
-			if (MathExt.euclideanDistance(region, camera) > MathExt.square(renderDistanceBlocks) || region.activeSections == 0) {
+			if (region.sectionIndex == 0 && (MathExt.euclideanDistance(region, camera) > MathExt.square(renderDistanceBlocks) || region.activeSections == 0)) {
 				long regionPos = MathExt.asLong(region.regionX, region.regionY, region.regionZ);
 
 				removedList.add(regionPos);
@@ -152,7 +151,7 @@ public class RegionManager {
 	}
 
 	public void drawAllRegions(TerrainProgram shader, BFSQueue queue, CameraData camera, int pass) {
-		RegionRender[] regionRenders = this.getRegionSorted(camera);
+		RegionRender[] regionRenders = this.getRegionsSorted(camera);
 
 		if (regionRenders == null) {
 			return;
