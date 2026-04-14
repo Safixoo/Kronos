@@ -1,53 +1,35 @@
 #version 330
-#extension GL_ARB_gpu_shader5 : enable
 
-// Not specifying the layout seems to break 7520U APU.
-layout(location = 0) in uvec2 a_Position;
-layout(location = 1) in vec2 a_Uv;
-layout(location = 2) in vec3 a_Color;
-layout(location = 3) in uint a_Lightmap;
+layout (location = 0) in uvec2 a_Position;
+layout (location = 1) in vec2 a_Uv;
+layout (location = 2) in uvec4 a_ColorAndLight;
 
 out vec3 v_Color;
 out vec2 v_TextureUv;
-out float v_Distance;
 
 uniform vec3 u_RegionPos;
-uniform mat4 u_ProjMat;
-uniform mat4 u_ModelViewMat;
+uniform mat4 u_ProjModelViewMat;
 
 uniform sampler2D u_LightTex;
 
-const float POSITION_SCALE = float(1u << 20u);
-const float RADIUS = 0.5;
-
-const float REGION_SIZE_X = 128.0 + RADIUS * 2;
-const float REGION_SIZE_Y = 128.0 + RADIUS * 2;
-const float REGION_SIZE_Z = 128.0 + RADIUS * 2;
-
-const float REGION_SCALE_X = REGION_SIZE_X / POSITION_SCALE;
-const float REGION_SCALE_Y = REGION_SIZE_Y / POSITION_SCALE;
-const float REGION_SCALE_Z = REGION_SIZE_Z / POSITION_SCALE;
-
-#define REGION_SCALE vec3(REGION_SCALE_X, REGION_SCALE_Y, REGION_SCALE_Z)
-
 vec3 extractBlockPos(uvec2 atPosition) {
-    uvec3 lowHalf = (uvec3(atPosition.x) >> uvec3(0u, 10u, 20u)) & 0x3FFu;
-    uvec3 topHalf = (uvec3(atPosition.y) >> uvec3(0u, 10u, 20u)) & 0x3FFu;
+    uvec2 xy = atPosition & 0x1FFFFFu;
+    uvec2 z = atPosition >> 21u;
 
-    #if GL_ARB_gpu_shader5
-        return fma(vec3(fma(topHalf, uvec3(1u << 10u), lowHalf)), REGION_SCALE, u_RegionPos);
-    #else
-        return (lowHalf | topHalf << 10u) * REGION_SCALE + u_RegionPos;
-    #endif
+    return vec3(xy, z.x | z.y << 11u) + u_RegionPos;
+}
+
+ivec2 lightmapTexelCoord(uint light) {
+    return ivec2(light) >> ivec2(4, 0) & 0xF;
 }
 
 void main() {
     vec3 blockPosition = extractBlockPos(a_Position);
-    vec4 position = u_ModelViewMat * vec4(blockPosition, 1.0);
+    gl_Position = u_ProjModelViewMat * vec4(blockPosition, 1.0);
 
-    gl_Position = u_ProjMat * position;
+    vec3 color = vec3(a_ColorAndLight.xyz) * (1.0 / 255.0);
+    uint light = a_ColorAndLight.w;
 
-    v_Distance = length(position);
-    v_Color = a_Color * texelFetch(u_LightTex, ivec2(a_Lightmap) >> ivec2(4, 0) & 0xF, 0).rgb;
+    v_Color = color * texelFetch(u_LightTex, lightmapTexelCoord(light), 0).rgb;
     v_TextureUv = a_Uv * (1.0 / 65536.0);
 }

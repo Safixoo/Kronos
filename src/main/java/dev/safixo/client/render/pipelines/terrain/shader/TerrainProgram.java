@@ -2,18 +2,22 @@ package dev.safixo.client.render.pipelines.terrain.shader;
 
 import dev.safixo.client.render.gfx.shader.GlProgram;
 import dev.safixo.client.util.data.PrimitivesFlags;
+import dev.safixo.client.util.memory.NativeBuffer;
 import dev.safixo.core.hooks.GlStateTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiNewChat;
+import org.joml.Matrix4f;
 import org.lwjgl.opengl.GL20;
 import dev.safixo.client.render.pipelines.terrain.cull.FrustumCuller;
 import dev.safixo.client.util.data.CameraData;
 import dev.safixo.client.render.vertex.writers.TerrainFormat;
 
+import java.nio.FloatBuffer;
+
 public class TerrainProgram extends GlProgram {
 	private int u_RegionPos;
 	private int u_TexId, u_LightTex;
-	private int u_ProjMat, u_ModelViewMat;
+	private int u_ProjModelViewMat, u_FogMat;
 	public int u_FogColor;
 
 	public TerrainProgram() {
@@ -32,13 +36,26 @@ public class TerrainProgram extends GlProgram {
 		this.u_LightTex = GL20.glGetUniformLocation(this.getHandle(), "u_LightTex");
 		this.u_FogColor = GL20.glGetUniformLocation(this.getHandle(), "u_FogColor");
 
-		this.u_ProjMat = GL20.glGetUniformLocation(this.getHandle(), "u_ProjMat");
-		this.u_ModelViewMat = GL20.glGetUniformLocation(this.getHandle(), "u_ModelViewMat");
+		this.u_ProjModelViewMat = GL20.glGetUniformLocation(this.getHandle(), "u_ProjModelViewMat");
+		this.u_FogMat = GL20.glGetUniformLocation(this.getHandle(), "u_FogMat");
 	}
 
+	private static final FloatBuffer MATRIX = NativeBuffer.memAllocFloat(16);
+
 	public void setupUniforms(boolean noFog) {
-		GL20.glUniformMatrix4(this.u_ProjMat, false, FrustumCuller.projectionBuff);
-		GL20.glUniformMatrix4(this.u_ModelViewMat, false, FrustumCuller.modelViewBuff);
+		Matrix4f projMvp = FrustumCuller.projectionMatrix.mul(FrustumCuller.modelViewMatrix, new Matrix4f());
+
+		float width = Minecraft.getMinecraft().displayWidth;
+		float height = Minecraft.getMinecraft().displayHeight;
+
+		final Matrix4f fragToNDC = new Matrix4f()
+			.translation(-1, -1, -1)
+			.scale(2.0f / width, 2.0f / height, 2.0f);
+
+		Matrix4f fogMat = projMvp.invert(new Matrix4f()).mul(fragToNDC);
+
+		GL20.glUniformMatrix4(this.u_ProjModelViewMat, false, projMvp.scale((float) (1.0 / TerrainFormat.SCALE)).get(MATRIX));
+		GL20.glUniformMatrix4(this.u_FogMat, false, fogMat.get(MATRIX));
 
 		GL20.glUniform1i(this.u_TexId, 0);
 		GL20.glUniform1i(this.u_LightTex, 1);
@@ -52,7 +69,8 @@ public class TerrainProgram extends GlProgram {
 		float offsetZ = (regionZ - camera.intZ) - camera.fractZ;
 
 		float radius = TerrainFormat.RADIUS;
+		float scale = TerrainFormat.SCALE;
 
-		GL20.glUniform3f(this.u_RegionPos, offsetX - radius, offsetY - radius, offsetZ - radius);
+		GL20.glUniform3f(this.u_RegionPos, (offsetX - radius) * scale, (offsetY - radius) * scale, (offsetZ - radius) * scale);
 	}
 }

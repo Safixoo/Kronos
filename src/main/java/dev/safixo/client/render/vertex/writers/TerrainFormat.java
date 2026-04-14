@@ -12,16 +12,14 @@ import static dev.safixo.client.render.pipelines.terrain.region.RegionRender.*;
 public class TerrainFormat extends GlVertexFormat {
 	public static final int STRIDE = 16;
 
-	static final int POSITION_BITS = 20;
+	public static final int POSITION_BITS = 21;
 	static final int UV_BITS = 16;
 	static final float UV_PRECISION = (1 << UV_BITS);
 
 	public static final float RADIUS = 0.5f;
 	static final float DIAMETER = RADIUS * 2.0f;
 
-	static final float FACT_X = (1 << POSITION_BITS) / (DIAMETER_X + DIAMETER);
-	static final float FACT_Y = (1 << POSITION_BITS) / (DIAMETER_Y + DIAMETER);
-	static final float FACT_Z = (1 << POSITION_BITS) / (DIAMETER_Z + DIAMETER);
+	public static final float SCALE = (1 << POSITION_BITS) / (DIAMETER_X + DIAMETER);
 
 	public TerrainFormat(ImmutableList<GlVertexAttribute> vertexProperties) {
 		super(vertexProperties);
@@ -39,7 +37,7 @@ public class TerrainFormat extends GlVertexFormat {
 	}
 
 	private static int extractPos(double pos, double scale) {
-		return (int) ((pos + RADIUS) * scale) & 0xFFFFF;
+		return (int) ((pos + RADIUS) * scale) & 0x1FFFFF;
 	}
 
 	private static long processUv(double u, double v) {
@@ -56,26 +54,17 @@ public class TerrainFormat extends GlVertexFormat {
 	}
 
 	// Uses the same encoding as Sodium 20-bit vertex positions.
-	private static long processPosition(int x, int y, int z) {
-		int lowHalf = 0;
+	private static long processPosition(long x, long y, long z) {
+		long topHalf = y | (z >> 11L) << 21L;
+		long lowHalf = x | (z & 0x7FFL) << 21L;
 
-		lowHalf |= (x & 0x3FF);
-		lowHalf |= (y & 0x3FF) << 10;
-		lowHalf |= (z & 0x3FF) << 20;
-
-		int topHalf = 0;
-
-		topHalf |= (x >>> 10 & 0x3FF);
-		topHalf |= (y >>> 10 & 0x3FF) << 10;
-		topHalf |= (z >>> 10 & 0x3FF) << 20;
-
-		return lowHalf | ((long) topHalf << 32L);
+		return topHalf << 32L | lowHalf;
 	}
 
 	public static void writeTerrainVertex(long ptr, float x, float y, float z, float u, float v, int color, int lightMap) {
-		int intX = extractPos(x, FACT_X);
-		int intY = extractPos(y, FACT_Y);
-		int intZ = extractPos(z, FACT_Z);
+		int intX = extractPos(x, SCALE);
+		int intY = extractPos(y, SCALE);
+		int intZ = extractPos(z, SCALE);
 
 		long position = processPosition(intX, intY, intZ);
 
