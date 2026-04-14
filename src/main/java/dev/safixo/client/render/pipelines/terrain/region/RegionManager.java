@@ -137,7 +137,7 @@ public class RegionManager {
 		LongArrayList removedList = new LongArrayList();
 
 		for (RegionRender region : regions) {
-			if (region.sectionIndex == 0 && (MathExt.euclideanDistance(region, camera) > MathExt.square(renderDistanceBlocks) || region.activeSections == 0)) {
+			if (region.sectionsToRender == 0 && (MathExt.euclideanDistance(region, camera) > MathExt.square(renderDistanceBlocks) || region.activeSections == 0)) {
 				long regionPos = MathExt.asLong(region.regionX, region.regionY, region.regionZ);
 
 				removedList.add(regionPos);

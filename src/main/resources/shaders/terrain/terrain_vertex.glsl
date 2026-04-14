@@ -41,11 +41,6 @@ vec3 extractBlockPos(uvec2 atPosition) {
     #endif
 }
 
-vec2 lightmapUv(uint lightmap) {
-    uvec2 uv = (uvec2(a_Lightmap) >> uvec2(4, 0)) & 0xF;
-    return max(vec2(1.0), uv - 0.5) * (1.0 / 15.0);
-}
-
 void main() {
     vec3 blockPosition = extractBlockPos(a_Position);
     vec4 position = u_ModelViewMat * vec4(blockPosition, 1.0);
@@ -53,6 +48,6 @@ void main() {
     gl_Position = u_ProjMat * position;
 
     v_Distance = length(position);
-    v_Color = a_Color * texture(u_LightTex, lightmapUv(a_Lightmap)).rgb;
+    v_Color = a_Color * texelFetch(u_LightTex, ivec2(a_Lightmap) >> ivec2(4, 0) & 0xF, 0).rgb;
     v_TextureUv = a_Uv * (1.0 / 65536.0);
 }

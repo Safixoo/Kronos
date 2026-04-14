@@ -16,8 +16,8 @@ uniform vec3 u_CloudOffset;
 #define CLOUD_SCALE vec3(CLOUD_WIDTH, 1.0, CLOUD_WIDTH)
 
 void main() {
-    vec4 position = gl_ModelViewMatrix * vec4((a_Position + u_CloudOffset) * CLOUD_SCALE, 1.0);
-    gl_Position = gl_ProjectionMatrix * position;
+    vec4 position = vec4((a_Position + u_CloudOffset) * CLOUD_SCALE, 1.0);
+    gl_Position = gl_ModelViewProjectionMatrix * position;
 
     vec3 color = vec3(ivec3(u_CloudData) >> ivec3(0, 8, 16) & 0xFF) / 255.0;
 
