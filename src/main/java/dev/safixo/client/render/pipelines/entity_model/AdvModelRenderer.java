@@ -1,7 +1,7 @@
 package dev.safixo.client.render.pipelines.entity_model;
 
 import dev.safixo.client.render.gfx.buffer.GlVertexBuffer;
-import dev.safixo.client.render.gfx.util.GlBufferUtil;
+import dev.safixo.client.render.gfx.util.GlBufferHelper;
 import dev.safixo.client.render.gfx.vertex.GlVertexArrayObject;
 import dev.safixo.client.render.vertex.DefaultVertexFormats;
 import dev.safixo.client.render.vertex.VertexWriter;
@@ -10,15 +10,13 @@ import dev.safixo.client.util.Direction;
 import dev.safixo.client.util.Matrix4Stack;
 import dev.safixo.client.util.memory.NativeBuffer;
 import dev.safixo.client.util.memory.UnsafeUtil;
-import dev.safixo.core.hooks.GLFunctions;
 import dev.safixo.core.hooks.GlStateTracker;
+import dev.safixo.core.hooks.MinecraftHook;
 import it.unimi.dsi.fastutil.objects.ReferenceArrayList;
 import net.minecraft.client.model.ModelBox;
 import net.minecraft.client.model.ModelRenderer;
 import net.minecraft.client.renderer.Tessellator;
-import net.minecraftforge.client.model.obj.Vertex;
 import org.joml.Matrix4f;
-import org.lwjgl.MemoryUtil;
 import org.lwjgl.opengl.*;
 
 import java.nio.Buffer;
@@ -32,13 +30,14 @@ public class AdvModelRenderer {
 	private static final long DISPLAY_LIST_OFFSET;
 	private static final long COMPILED;
 
-	private static final long PTR_BUFFER = NativeBuffer.nmemAlloc(16 * 4) - Matrix4Stack.M00_OFFSET;
-	private static final FloatBuffer BUFFER = NativeBuffer.wrap(PTR_BUFFER + Matrix4Stack.M00_OFFSET).asFloatBuffer();
+	private static final long PTR_BUFFER = NativeBuffer.nmemAlloc(16 * 4);
+	private static final FloatBuffer BUFFER = NativeBuffer.wrap(PTR_BUFFER).asFloatBuffer();
 	private static final Matrix4f MATRIX = new Matrix4f();
 
 	// Global vertex buffer/array for model rendering.
-	private static GlVertexBuffer VERTEX_BUFFER;
-	private static GlVertexArrayObject VERTEX_ARRAY;
+	public static GlVertexBuffer VERTEX_BUFFER;
+	public static GlVertexArrayObject VERTEX_ARRAY_FPP;
+	public static GlVertexArrayObject VERTEX_ARRAY_GL20;
 
 	// Current offset for writing in the vertex buffer.
 	private static int OFFSET = 0;
@@ -60,19 +59,19 @@ public class AdvModelRenderer {
 		COMPILED = compiled;
 	}
 
-	public static boolean isCompiled(ModelRenderer model) {
+	private static boolean isCompiled(ModelRenderer model) {
 		return UnsafeUtil.UNSAFE.getBoolean(model, COMPILED);
 	}
 
-	public static void setCompiled(ModelRenderer model, boolean cond) {
+	private static void setCompiled(ModelRenderer model, boolean cond) {
 		UnsafeUtil.UNSAFE.putBoolean(model, COMPILED, cond);
 	}
 
-	public static int getDisplayList(ModelRenderer model) {
+	private static int getDisplayList(ModelRenderer model) {
 		return UnsafeUtil.UNSAFE.getInt(model, DISPLAY_LIST_OFFSET);
 	}
 
-	public static void setDisplayList(ModelRenderer model, int displayList) {
+	private static void setDisplayList(ModelRenderer model, int displayList) {
 		UnsafeUtil.UNSAFE.putInt(model, DISPLAY_LIST_OFFSET, displayList);
 	}
 
@@ -89,7 +88,11 @@ public class AdvModelRenderer {
 		float offY = model.offsetY + model.rotationPointY * scale;
 		float offZ = model.offsetZ + model.rotationPointZ * scale;
 
-		renderModel(model, scale, offX, offY, offZ);
+		if (MinecraftHook.FAST_ENTITY_PATH) {
+			queueModel(model, scale, offX, offY, offZ);
+		} else {
+			renderModelDirect(model, scale, offX, offY, offZ);
+		}
 	}
 
 	public static void renderWithRotation(ModelRenderer model, float scale) {
@@ -105,15 +108,76 @@ public class AdvModelRenderer {
 		float offY = model.rotationPointY * scale;
 		float offZ = model.rotationPointZ * scale;
 
-		renderModel(model, scale, offX, offY, offZ);
+		if (MinecraftHook.FAST_ENTITY_PATH) {
+			queueModel(model, scale, offX, offY, offZ);
+		} else {
+			renderModelDirect(model, scale, offX, offY, offZ);
+		}
 	}
 
-	public static void renderModel(ModelRenderer model, float scale, float offX, float offY, float offZ) {
+	private static void queueModel(ModelRenderer model, float scale, float offX, float offY, float offZ) {
+		int displayList = getDisplayList(model);
+
+		boolean rotY = model.rotateAngleY != 0.0F;
+		boolean rotX = model.rotateAngleX != 0.0F;
+		boolean rotZ = model.rotateAngleZ != 0.0F;
+
+		Matrix4Stack matStack = GlStateTracker.MODEL_VIEW_STACK;
+
+		if (!rotX && !rotY && !rotZ) {
+			boolean notNullTranslation = offX != 0 || offY != 0 || offZ != 0;
+
+			if (notNullTranslation) {
+				matStack.top().translate(offX, offY, offZ);
+			}
+
+			ModelQueue.MODEL_QUEUE.addToQueue(GlStateTracker.TEXTURE_PER_UNIT[0], displayList);
+
+			if (model.childModels != null) {
+				for (int i = 0; i < model.childModels.size(); i++) {
+					((ModelRenderer) model.childModels.get(i)).render(scale);
+				}
+			}
+
+			if (notNullTranslation) {
+				matStack.top().translate(-offX, -offY, -offZ);
+			}
+		} else {
+			Matrix4f modelView = MATRIX.identity();
+			modelView.translation(offX, offY, offZ);
+
+			if (rotX && rotY && rotZ) {
+				modelView.rotateZYX(model.rotateAngleZ, model.rotateAngleY, model.rotateAngleX);
+			} else {
+				if (rotY) {
+					modelView.rotateY(model.rotateAngleY);
+				}
+				if (rotX) {
+					modelView.rotateX(model.rotateAngleX);
+				}
+				if (rotZ) {
+					modelView.rotateZ(model.rotateAngleZ);
+				}
+			}
+			matStack.push();
+			matStack.top().mul(modelView);
+
+			ModelQueue.MODEL_QUEUE.addToQueue(GlStateTracker.TEXTURE_PER_UNIT[0], displayList);
+
+			if (model.childModels != null) {
+				for (int i = 0; i < model.childModels.size(); i++) {
+					((ModelRenderer) model.childModels.get(i)).render(scale);
+				}
+			}
+
+			matStack.pop();
+		}
+	}
+
+	private static void renderModelDirect(ModelRenderer model, float scale, float offX, float offY, float offZ) {
 		int displayList = getDisplayList(model);
 		int vertices = displayList & 0xFFFF;
 		int offset = displayList >>> 16;
-
-		Matrix4f modelView = MATRIX.identity();
 
 		boolean rotY = model.rotateAngleY != 0.0F;
 		boolean rotX = model.rotateAngleX != 0.0F;
@@ -126,7 +190,7 @@ public class AdvModelRenderer {
 				GL11.glTranslatef(offX, offY, offZ);
 			}
 
-			GL30.glBindVertexArray(VERTEX_ARRAY.getHandle());
+			GL30.glBindVertexArray(VERTEX_ARRAY_FPP.getHandle());
 			draw(GL11.GL_QUADS, offset, vertices);
 
 			if (model.childModels != null) {
@@ -139,6 +203,7 @@ public class AdvModelRenderer {
 				GL11.glTranslatef(-offX, -offY, -offZ);
 			}
 		} else {
+			Matrix4f modelView = MATRIX.identity();
 			modelView.translation(offX, offY, offZ);
 
 			if (rotX && rotY && rotZ) {
@@ -159,7 +224,7 @@ public class AdvModelRenderer {
 			Matrix4Stack.copyMat(modelView, PTR_BUFFER);
 			GL11.glMultMatrix(BUFFER);
 
-			GL30.glBindVertexArray(VERTEX_ARRAY.getHandle());
+			GL30.glBindVertexArray(VERTEX_ARRAY_FPP.getHandle());
 			draw(GL11.GL_QUADS, offset, vertices);
 
 			if (model.childModels != null) {
@@ -182,7 +247,7 @@ public class AdvModelRenderer {
 	// know if it is possible to cull back-faces without changing visuals.
 	private static final boolean BACK_FACE_CULLING = false;
 
-	public static void draw(int mode, int offset, int vertices) {
+	private static void draw(int mode, int offset, int vertices) {
 		if (!BACK_FACE_CULLING) {
 			GL11.glDrawArrays(mode, offset, vertices);
 			return;
@@ -248,10 +313,13 @@ public class AdvModelRenderer {
 		}
 	}
 
+	public static boolean BUFFER_CHANGED = true;
+
 	private static void compileDisplayList(ModelRenderer model, float scale) {
 		VertexWriter writer = new VertexWriter(512);
 
 		REDIRECT_DRAWING = true;
+		BUFFER_CHANGED = true;
 		MODELS.add(model);
 
 		writer.startDrawing();
@@ -270,16 +338,17 @@ public class AdvModelRenderer {
 
 		if (writer.offset + OFFSET >= VERTEX_BUFFER.getCapacity()) {
 			GlVertexBuffer newBuffer = new GlVertexBuffer(VERTEX_BUFFER.getCapacity() * 2, GL15.GL_STATIC_DRAW);
-			GlBufferUtil.copyBufferToBuffer(VERTEX_BUFFER, newBuffer, 0, 0, OFFSET);
+			GlBufferHelper.copyBufferToBuffer(VERTEX_BUFFER, newBuffer, 0, 0, OFFSET);
 			VERTEX_BUFFER.delete();
 			VERTEX_BUFFER = newBuffer;
 		}
 
-		if (VERTEX_ARRAY == null) {
-			VERTEX_ARRAY = new GlVertexArrayObject(null);
+		if (VERTEX_ARRAY_GL20 == null) {
+			VERTEX_ARRAY_GL20 = new GlVertexArrayObject(DefaultVertexFormats.ENTITY_FORMAT);
+			VERTEX_ARRAY_FPP = new GlVertexArrayObject(null);
 		}
 
-		VERTEX_ARRAY.bind(null);
+		VERTEX_ARRAY_FPP.bind(null);
 		VERTEX_BUFFER.bind();
 		GL11.glVertexPointer(3, GL11.GL_FLOAT, 24, 0);
 		GL11.glEnableClientState(GL11.GL_VERTEX_ARRAY);
@@ -289,7 +358,7 @@ public class AdvModelRenderer {
 
 		GL11.glNormalPointer(GL11.GL_BYTE, 24, 20);
 		GL11.glEnableClientState(GL11.GL_NORMAL_ARRAY);
-		VERTEX_ARRAY.unbind();
+		VERTEX_ARRAY_FPP.unbind();
 		VERTEX_BUFFER.unbind();
 
 		analyzeModel(writer);
@@ -376,9 +445,11 @@ public class AdvModelRenderer {
 
 	public static void cleanupEntityModelPool() {
 		if (VERTEX_BUFFER != null) VERTEX_BUFFER.delete();
-		if (VERTEX_ARRAY != null) VERTEX_ARRAY.delete();
+		if (VERTEX_ARRAY_FPP != null) VERTEX_ARRAY_FPP.delete();
+		if (VERTEX_ARRAY_GL20 != null) VERTEX_ARRAY_GL20.delete();
 
-		VERTEX_ARRAY = null;
+		VERTEX_ARRAY_FPP = null;
+		VERTEX_ARRAY_GL20 = null;
 		VERTEX_BUFFER = null;
 		OFFSET = 0;
 

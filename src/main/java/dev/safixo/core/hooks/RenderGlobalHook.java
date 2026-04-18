@@ -86,6 +86,8 @@ public  class RenderGlobalHook {
 		double cameraY = MathExt.lerp(player.lastTickPosY, player.posY, PARTIAL_TICK);
 		double cameraZ = MathExt.lerp(player.lastTickPosZ, player.posZ, PARTIAL_TICK);
 
+		MinecraftHook.MAIN_THREAD = Thread.currentThread();
+
 		Minecraft minecraft = Minecraft.getMinecraft();
 		int realRenderDistance = MathExt.getCanonicalRenderDistance(minecraft.gameSettings);
 

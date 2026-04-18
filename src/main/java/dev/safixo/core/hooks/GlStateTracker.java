@@ -1,12 +1,8 @@
 package dev.safixo.core.hooks;
 
 import dev.safixo.client.render.ImprovedTessellator;
-import dev.safixo.client.render.gfx.util.GpuFlags;
 import dev.safixo.client.util.ColorBGRManager;
 import dev.safixo.client.util.Matrix4Stack;
-import dev.safixo.core.HookUtils;
-import net.minecraft.client.Minecraft;
-import net.minecraft.profiler.Profiler;
 import org.joml.Matrix4f;
 import org.lwjgl.opengl.*;
 import org.lwjgl.util.glu.Project;
@@ -15,7 +11,6 @@ import java.nio.Buffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.util.Arrays;
-import java.util.List;
 
 @SuppressWarnings("unused")
 public class GlStateTracker {
@@ -33,7 +28,7 @@ public class GlStateTracker {
 	public static int LAST_DEPTH_FUNC = -1;
 
 	public static int CURRENT_UNIT = -1;
-	private static final int[] TEXTURE_PER_UNIT = new int[GL13.GL_TEXTURE31 - GL13.GL_TEXTURE0 + 1];
+	public static final int[] TEXTURE_PER_UNIT = new int[GL13.GL_TEXTURE31 - GL13.GL_TEXTURE0 + 1];
 
 	public static int FOG_MODE;
 	public static float FOG_START, FOG_END, FOG_DENSITY;
@@ -47,6 +42,9 @@ public class GlStateTracker {
 	public static Matrix4Stack CURRENT_STACK = PROJECTION_STACK;
 	public static String VENDOR;
 	public static int MAT_MODE = GL11.GL_PROJECTION_MATRIX;
+
+	public static int LAST_MUNIT = -1;
+	public static float MU, MV;
 
 	private static final Matrix4f MATRIX = new Matrix4f();
 
@@ -105,7 +103,7 @@ public class GlStateTracker {
 		int color = ColorBGRManager.packColor(red, green, blue) | LAST_COLOR & 0xFF_000000;
 
 		if (color != LAST_COLOR || SKIP_CACHE) {
-			LAST_COLOR = color;
+			LAST_COLOR = color | LAST_COLOR & 0xFF_000000;
 			flushDrawState();
 			GL11.glColor3f(red, green, blue);
 		}
@@ -195,10 +193,7 @@ public class GlStateTracker {
 	public static void glPushMatrix() {
 		flushDrawState();
 		CURRENT_STACK.push();
-
-		if (GpuFlags.EXT_DSA) {
-			EXTDirectStateAccess.glMatrixPushEXT(MAT_MODE);
-		} else {
+		if (true) {
 			GL11.glPushMatrix();
 		}
 	}
@@ -206,10 +201,7 @@ public class GlStateTracker {
 	public static void glPopMatrix() {
 		flushDrawState();
 		CURRENT_STACK.pop();
-
-		if (GpuFlags.EXT_DSA) {
-			EXTDirectStateAccess.glMatrixPopEXT(MAT_MODE);
-		} else {
+		if (true) {
 			GL11.glPopMatrix();
 		}
 	}
@@ -297,7 +289,9 @@ public class GlStateTracker {
 	public static void glActiveTexture(int activeTex) {
 		if (activeTex != CURRENT_UNIT || SKIP_CACHE) {
 			flushDrawState();
-			GL13.glActiveTexture(activeTex);
+			if (true) {
+				GL13.glActiveTexture(activeTex);
+			}
 			CURRENT_UNIT = activeTex - GL13.GL_TEXTURE0;
 		}
 	}
@@ -313,16 +307,15 @@ public class GlStateTracker {
 		GL30.glBindVertexArray(vao);
 	}
 
-	public static int LASTM = -1;
-	public static float MU, MV;
-
 	public static void glMultiTexCoord2f(int s, float u, float v) {
-		if (LASTM != s || MU != u || MV != v) {
-			LASTM = s;
+		if (LAST_MUNIT != s || MU != u || MV != v) {
+			LAST_MUNIT = s;
 			MU = u;
 			MV = v;
 
-			GL13.glMultiTexCoord2f(s, u, v);
+			if (true) {
+				GL13.glMultiTexCoord2f(s, u, v);
+			}
 		}
 	}
 
@@ -367,23 +360,13 @@ public class GlStateTracker {
 	public static void glLoadIdentity() {
 		flushDrawState();
 		CURRENT_STACK.top().identity();
-
-		if (GpuFlags.EXT_DSA) {
-			EXTDirectStateAccess.glMatrixLoadIdentityEXT(MAT_MODE);
-		} else {
-			GL11.glLoadIdentity();
-		}
+		GL11.glLoadIdentity();
 	}
 
 	public static void glLoadMatrix(FloatBuffer matrix) {
 		flushDrawState();
 		CURRENT_STACK.top().set(matrix);
-
-		if (GpuFlags.EXT_DSA) {
-			EXTDirectStateAccess.glMatrixLoadEXT(MAT_MODE, matrix);
-		} else {
-			GL11.glMultMatrix(matrix);
-		}
+		GL11.glLoadMatrix(matrix);
 	}
 
 	public static void glColorMaterial(int face, int mode) {
@@ -399,23 +382,14 @@ public class GlStateTracker {
 	public static void glMultMatrix(FloatBuffer matrix) {
 		flushDrawState();
 		CURRENT_STACK.top().mul(MATRIX.set(matrix));
-
-		if (GpuFlags.EXT_DSA) {
-			EXTDirectStateAccess.glMatrixMultEXT(MAT_MODE, matrix);
-		} else {
-			GL11.glMultMatrix(matrix);
-		}
+		GL11.glMultMatrix(matrix);
 	}
 
 	public static void glScalef(float x, float y, float z) {
 		flushDrawState();
-		CURRENT_STACK.top().scale(x, y, z);
 
-		if (GpuFlags.EXT_DSA) {
-			EXTDirectStateAccess.glMatrixScalefEXT(MAT_MODE, x, y, z);
-		} else {
-			GL11.glScalef(x, y, z);
-		}
+		CURRENT_STACK.top().scale(x, y, z);
+		GL11.glScalef(x, y, z);
 	}
 
 	public static void glShadeModel(int mode) {
@@ -444,24 +418,14 @@ public class GlStateTracker {
 
 		// the angle passed in glRotatef is in degrees but JOML accepts in radians.
 		CURRENT_STACK.top().rotate(angle * 3.14159265358979f / 180.0f, x, y, z);
-
-		if (GpuFlags.EXT_DSA) {
-			EXTDirectStateAccess.glMatrixRotatefEXT(MAT_MODE, angle, x, y, z);
-		} else {
-			GL11.glRotatef(angle, x, y, z);
-		}
+		GL11.glRotatef(angle, x, y, z);
 	}
 
 	public static void glTranslatef(float x, float y, float z) {
 		flushDrawState();
 
 		CURRENT_STACK.top().translate(x, y, z);
-
-		if (GpuFlags.EXT_DSA) {
-			EXTDirectStateAccess.glMatrixTranslatefEXT(MAT_MODE, x, y, z);
-		} else {
-			GL11.glTranslatef(x, y, z);
-		}
+		GL11.glTranslatef(x, y, z);
 	}
 
 	public static void glCallList(int list) {

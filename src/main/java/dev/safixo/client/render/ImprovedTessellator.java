@@ -185,7 +185,7 @@ public class ImprovedTessellator extends Tessellator {
 		this.vertexBuffer.allocate(UnsafeUtil.NULL, newCapacity);
 
 		UnsafeUtil.memCopy(this.vertexPtr, newVertexPtr, this.offset);
-		UnsafeUtil.nmemFree(this.vertexPtr);
+		NativeBuffer.nmemFree(this.vertexPtr);
 
 		this.vertexPtr = newVertexPtr;
 		this.vertexPtrNio = NativeBuffer.wrap(newVertexPtr);

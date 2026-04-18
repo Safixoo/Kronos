@@ -1,7 +1,7 @@
 package dev.safixo.client.render.pipelines.terrain.region.allocation;
 
 import dev.safixo.client.render.gfx.buffer.GlVertexBuffer;
-import dev.safixo.client.render.gfx.util.GlBufferUtil;
+import dev.safixo.client.render.gfx.util.GlBufferHelper;
 import dev.safixo.client.render.pipelines.terrain.SectionFlags;
 import dev.safixo.client.render.pipelines.terrain.SectionRender;
 import dev.safixo.client.render.pipelines.terrain.region.RegionBuffer;
@@ -231,9 +231,9 @@ public class NewRegionAllocator {
 				GlVertexBuffer regionBuffer = this.vertexBuffer.getVertexBuffer();
 				GlVertexBuffer spareBuffer = tempBuffer.getVertexBuffer();
 
-				GlBufferUtil.copyBufferToBuffer(regionBuffer, spareBuffer, 0, 0, (int) this.offset);
+				GlBufferHelper.copyBufferToBuffer(regionBuffer, spareBuffer, 0, 0, (int) this.offset);
 				this.vertexBuffer.allocateSpace((int) newSize, GL15.GL_STATIC_DRAW);
-				GlBufferUtil.copyBufferToBuffer(spareBuffer, regionBuffer, 0, 0, (int) this.offset);
+				GlBufferHelper.copyBufferToBuffer(spareBuffer, regionBuffer, 0, 0, (int) this.offset);
 
 				tempBuffer.delete();
 			}
@@ -242,9 +242,9 @@ public class NewRegionAllocator {
 			GlVertexBuffer regionBuffer = this.vertexBuffer.getVertexBuffer();
 			GlVertexBuffer spareBuffer = COPY_BUFFER;
 
-			GlBufferUtil.copyBufferToBuffer(regionBuffer, spareBuffer, 0, 0, (int) this.offset);
+			GlBufferHelper.copyBufferToBuffer(regionBuffer, spareBuffer, 0, 0, (int) this.offset);
 			this.vertexBuffer.allocateSpace((int) newSize, GL15.GL_STATIC_DRAW);
-			GlBufferUtil.copyBufferToBuffer(spareBuffer, regionBuffer, 0, 0, (int) this.offset);
+			GlBufferHelper.copyBufferToBuffer(spareBuffer, regionBuffer, 0, 0, (int) this.offset);
 
 			this.capacity = newSize;
 		}

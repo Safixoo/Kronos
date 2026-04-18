@@ -20,9 +20,7 @@ public class DefaultVertexFormats {
 	public static final GlVertexAttribute COLOR_AND_LIGHTMAP = new GlVertexAttribute(4, false, GlVertexAttribute.Type.UBYTE, GlVertexAttributeType.INTEGER);
 
 	public static final GlVertexAttribute LIGHTMAP = new GlVertexAttribute(1, false, GlVertexAttribute.Type.UBYTE, GlVertexAttributeType.INTEGER);
-	public static final GlVertexAttribute NORMAL = new GlVertexAttribute(3, false, GlVertexAttribute.Type.BYTE, GlVertexAttributeType.FLOAT);
-
-
+	public static final GlVertexAttribute NORMAL = new GlVertexAttribute(3, true, GlVertexAttribute.Type.BYTE, GlVertexAttributeType.FLOAT);
 
 	public static final GlVertexFormat TERRAIN_FORMAT = new TerrainFormat(
 		new ImmutableList.Builder<GlVertexAttribute>()

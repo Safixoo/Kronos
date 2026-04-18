@@ -2,6 +2,7 @@ package dev.safixo.client.util;
 
 import dev.safixo.client.util.memory.UnsafeUtil;
 import org.joml.Matrix4f;
+import org.lwjgl.MemoryUtil;
 import sun.misc.Unsafe;
 
 import java.lang.reflect.Field;
@@ -91,9 +92,32 @@ public class Matrix4Stack {
 		unsafe.putLong(to, offset, unsafe.getLong(from, offset));
 	}
 
+	public static void copyMat(long from, long to) {
+		Unsafe unsafe = UnsafeUtil.UNSAFE;
+		long offset = 0;
+
+		unsafe.putLong(null, offset + to, unsafe.getLong(null, from + offset));
+		offset += 8;
+		unsafe.putLong(null, offset + to, unsafe.getLong(null, from + offset));
+		offset += 8;
+		unsafe.putLong(null, offset + to, unsafe.getLong(null, from + offset));
+		offset += 8;
+		unsafe.putLong(null, offset + to, unsafe.getLong(null, from + offset));
+		offset += 8;
+
+		unsafe.putLong(null, offset + to, unsafe.getLong(null, from + offset));
+		offset += 8;
+		unsafe.putLong(null, offset + to, unsafe.getLong(null, from + offset));
+		offset += 8;
+		unsafe.putLong(null, offset + to, unsafe.getLong(null, from + offset));
+		offset += 8;
+		unsafe.putLong(null, offset + to, unsafe.getLong(null, from + offset));
+	}
+
 	public static void copyMat(Matrix4f from, long to) {
 		Unsafe unsafe = UnsafeUtil.UNSAFE;
 		long offset = M00_OFFSET;
+		to -= M00_OFFSET;
 
 		unsafe.putLong(null, offset + to, unsafe.getLong(from, offset));
 		offset += 8;

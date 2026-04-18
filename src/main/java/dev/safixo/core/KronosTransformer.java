@@ -2,6 +2,7 @@ package dev.safixo.core;
 
 import dev.safixo.client.util.data.PrimitivesFlags;
 import dev.safixo.core.hooks.LongHashMapHook;
+import dev.safixo.core.hooks.MinecraftHook;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.ClassWriter;
 import net.minecraft.launchwrapper.IClassTransformer;
@@ -25,6 +26,7 @@ public class KronosTransformer implements IClassTransformer {
 	static final String REBUILD_LISTENER = "dev/safixo/client/render/pipelines/terrain/meshing/RebuildListener";
 	static final String VANILLA_MESHER = "dev/safixo/client/render/pipelines/terrain/meshing/builders/VanillaBlockMesher";
 
+	static final String PROFILER = "net.minecraft.profiler.Profiler";
 	static final String RENDER_BLOCKS = "net.minecraft.client.renderer.RenderBlocks";
 	static final String BLOCK_SNOW = "net.minecraft.block.BlockSnow";
 	static final String RENDER_GLOBAL = "net.minecraft.client.renderer.RenderGlobal";
@@ -34,8 +36,6 @@ public class KronosTransformer implements IClassTransformer {
 	static final String CLIPPING_HELPER = "net.minecraft.client.renderer.culling.ClippingHelper";
 	static final String FONT_RENDERER = "net.minecraft.client.gui.FontRenderer";
 	static final String MINECRAFT = "net.minecraft.client.Minecraft";
-	static final String ACTIVE_RENDER_INFO = "net.minecraft.client.renderer.ActiveRenderInfo";
-	static final String BIOME_GEN_BASE = "net.minecraft.world.biome.BiomeGenBase";
 	static final String LONG_HASH_MAP = "net.minecraft.util.LongHashMap";
 	static final String WORLD_CLIENT = "net.minecraft.client.multiplayer.WorldClient";
 	static final String MODEL_RENDERER = "net.minecraft.client.model.ModelRenderer";
@@ -55,11 +55,18 @@ public class KronosTransformer implements IClassTransformer {
 		// Overwrites classes methods completely with a function call with the same
 		// args and with the instance of the original class.
 		switch (transformedName) {
+			case PROFILER:
+				setFieldInProfiling(reference, "", "");
+				break;
 			case ENTITY_RENDERER:
 				replaceClassMethod(MINECRAFT_HOOK, "disableLightmap", "a", "(D)V", reference, true);
 				replaceClassMethod(MINECRAFT_HOOK, "enableLightmap", "b", "(D)V", reference, true);
+
+				avoidDoublePassBullshit(reference);
+				break;
 			case BLOCK_SNOW:
 				replaceClassMethod(MINECRAFT_HOOK, "shouldSideBeRendered", "a", "(Lacf;IIII)Z", reference, false);
+				break;
 			case RENDER_BLOCKS:
 				replaceClassMethod(VANILLA_MESHER, "renderStandardBlock", "p", "(Laqz;III)Z", reference, false);
 				break;
@@ -117,12 +124,6 @@ public class KronosTransformer implements IClassTransformer {
 				// In many drivers in make stalls the GPU too soon in the tick loop.
 				replaceClassMethod(MINECRAFT_HOOK, "checkGLError", "c", "(Ljava/lang/String;)V", reference, true);
 				break;
-			case BIOME_GEN_BASE:
-				// TODO: Save a event instance per-thread to avoid creating events for every-biome fetched
-				//  in meshing which is stupid slow thanks to Forge.
-			case ACTIVE_RENDER_INFO:
-				// TODO: this is not even verified to help even, to avoid this mess the best option is to backport
-				//  Angelica's ASM GlStateTracker or hooking to the matrices setup which is ugly.
 		}
 
 		fillStateMachineFunctions();
@@ -131,11 +132,11 @@ public class KronosTransformer implements IClassTransformer {
 			redirectGlCalls(reference);
 		}
 
-		if (transformedName.equals("net.minecraft.client.renderer.EntityRenderer")) {
-			avoidDoublePassBullshit(reference);
-		}
-
 		return reference[0];
+	}
+
+	static void addTarget(String target) {
+		MinecraftHook.PROFILING_TARGET = target;
 	}
 
 	static void fillStateMachineFunctions() {
@@ -345,6 +346,29 @@ public class KronosTransformer implements IClassTransformer {
 			}
 
 			method.instructions.add(inject);
+		}
+
+		ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+		classNode.accept(writer);
+
+		basicClass[0] = writer.toByteArray();
+	}
+
+	static void setFieldInProfiling(byte[][] basicClass, String runtimeName, String descriptor) {
+		ClassReader reader = new ClassReader(basicClass[0]);
+
+		ClassNode classNode = new ClassNode();
+		reader.accept(classNode, 0);
+
+		for (int i = 0; i < classNode.methods.size(); i++) {
+			MethodNode method = (MethodNode) classNode.methods.get(i);
+
+			if ((!method.name.equals("startSection") && ((!method.name.equals(runtimeName)) || !method.desc.contains(descriptor)))) {
+				continue;
+			}
+
+			method.instructions.insertBefore(method.instructions.getFirst(), new MethodInsnNode(INVOKESTATIC, MINECRAFT_HOOK, "setProfilerTarget", "(Ljava/lang/String;)V"));
+			method.instructions.insertBefore(method.instructions.getFirst(), new VarInsnNode(ALOAD, 1));
 		}
 
 		ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);

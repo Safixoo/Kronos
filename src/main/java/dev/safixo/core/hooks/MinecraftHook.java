@@ -1,11 +1,11 @@
 package dev.safixo.core.hooks;
 
 import dev.safixo.client.render.ImprovedTessellator;
+import dev.safixo.client.render.pipelines.entity_model.ModelQueue;
 import dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache;
 import dev.safixo.client.util.ClientChunkListener;
 import dev.safixo.client.util.Direction;
 import dev.safixo.client.util.MathExt;
-import dev.safixo.client.util.Matrix4Stack;
 import dev.safixo.client.util.data.PrimitivesFlags;
 import dev.safixo.client.util.memory.UnsafeUtil;
 import dev.safixo.core.HookUtils;
@@ -14,10 +14,11 @@ import net.minecraft.block.BlockSnow;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.WorldClient;
 import net.minecraft.client.renderer.EntityRenderer;
+import net.minecraft.client.renderer.GLAllocation;
 import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.util.ResourceLocation;
-import net.minecraft.world.EnumSkyBlock;
+import net.minecraft.util.Vec3;
 import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
@@ -27,6 +28,7 @@ import org.joml.Matrix4f;
 import org.lwjgl.opengl.GL11;
 
 import java.lang.reflect.Field;
+import java.nio.FloatBuffer;
 
 @SuppressWarnings("unused")
 public class MinecraftHook {
@@ -34,12 +36,36 @@ public class MinecraftHook {
 	public static final Field LIGHTMAP_RESOURCE = HookUtils.getField(EntityRenderer.class,
 		"locationLightMap", "field_110922_T");
 
+	public static String PROFILING_TARGET;
+	public static boolean FAST_ENTITY_PATH = false;
+
+	public static Thread MAIN_THREAD;
+
 	public static void checkGLError(Minecraft minecraft, String str) {
 		if (!PrimitivesFlags.DETECTED) {
 			PrimitivesFlags.processDevInfo();
 		}
 
 		// NO-OP
+	}
+
+	public static void setProfilerTarget(String prof) {
+		if (Thread.currentThread() != MAIN_THREAD) {
+			return;
+		}
+
+		boolean fastPath = FAST_ENTITY_PATH;
+
+		FAST_ENTITY_PATH = prof.equals("entities") && PROFILING_TARGET.equals("global");
+		PROFILING_TARGET = prof;
+
+		if (fastPath && !FAST_ENTITY_PATH) {
+			ModelQueue.MODEL_QUEUE.drawAllQueue();
+		}
+
+		if (!fastPath && FAST_ENTITY_PATH) {
+			ModelQueue.MODEL_QUEUE.viewMatrix = new Matrix4f(GlStateTracker.MODEL_VIEW_STACK.top()).invert();
+		}
 	}
 
 	private static final int TOP_NORMAL = MathExt.packedNormal(0.0F, 1.0F, 0.0F);
