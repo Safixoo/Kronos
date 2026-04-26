@@ -263,7 +263,7 @@ public class NewRegionAllocator {
 		private NewAllocation() {}
 
 		public static long getId(SectionRender section, int pass) {
-			return section.sectionPos << 1 | pass;
+			return section.globalSectionPos << 1 | pass;
 		}
 
 		public void addFacingOffsets(int[] offsets) {

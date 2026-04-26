@@ -70,8 +70,8 @@ public class BFSCuller {
 
 	/**
 	 * Does a BFS search based in the <a href="https://tomcc.github.io/2014/08/31/visibility-1.html">Advanced Cave Culling</a>
-	 * by tomcc, with many differences, as it doesn't try to find connectivity 100% and uses some more ideas to avoid section
-	 * queueing during the search.
+	 * by tomcc and Sodium implementation, with many differences as it doesn't try to find connectivity 100% and uses different
+	 * ideas to avoid section queueing during the search.
 	 */
 	private static void search(BFSQueue bfsQueue, int playerX, int playerY, int playerZ,
 							   int renderDistance, int frame) {
@@ -100,7 +100,7 @@ public class BFSCuller {
 			int gridFactor = node.gridFactor = processGridIndex(node, flags, distChunkX, distChunkY, distChunkZ, outwardMask, frame);
 
 			if (gridFactor < TOLERANCE ||
-				(distance >= 112 * 112 && SectionFlags.hasDrawableFaces(flags) && !rayVisible(node, frame, -distX - 8, -distY - 8, -distZ - 8))) {
+				(distance >= 112 * 112 && SectionFlags.hasPassesNonEmpty(flags) && !rayVisible(node, frame, -distX - 8, -distY - 8, -distZ - 8))) {
 				continue;
 			}
 
@@ -117,7 +117,7 @@ public class BFSCuller {
 	}
 
 	/**
-	 * Generates a mask to discard invariants directions early in the search.
+	 * Generates a mask to discard invariants inward directions early in the search.
 	 */
 	private static int getOutwardDirections(int diffChunkX, int diffChunkY, int diffChunkZ) {
 		int planes = 0;
@@ -130,8 +130,8 @@ public class BFSCuller {
 	}
 
 	/**
-	 * For non-empty sections that has been visited by the graph, their indices are saved in their respective
-	 * region.
+	 * For non-empty renderable sections that has been visited by the graph, their indices are saved in their respective
+	 * region to later be rendered in order.
 	 */
 	private static void queueRegionNode(SectionRender section, int flags) {
 		if (SectionFlags.hasPassesNonEmpty(flags)) {
@@ -141,8 +141,8 @@ public class BFSCuller {
 	}
 
 	/**
-	 * Searches outwards from the player possible visitable sections, based in solidness in the section and faces,
-	 * also avoids visiting sections if they were already visited in the current frame.
+	 * Searches outwards from the player position for possible visitable sections, based of the occlusion from the section faces,
+	 * skips visiting sections if they were already visited in the active frame.
 	 */
 	private static void searchNeighbors(BFSQueue queue, SectionRender fatherNode, int directions, int activeFrame) {
 		if (directions == 0b0) {
@@ -152,53 +152,49 @@ public class BFSCuller {
 		queue.verifyCapacity(Direction.COUNT);
 
 		SectionRender render;
+		int index = queue.bfsIndex;
 
-		if (Direction.hasSet(directions, Direction.DOWN) && (render = fatherNode.adjacentDown).currentFrame < activeFrame) {
-			queue.addSectionToQueue(render);
+		if (Direction.hasSet(directions, Direction.DOWN) && (render = fatherNode.adjacentDown).currentFrame != activeFrame) {
+			queue.sectionRenders[index++] = render;
 			render.currentFrame = activeFrame;
 		}
 
-		if (Direction.hasSet(directions, Direction.UP) && (render = fatherNode.adjacentUp).currentFrame < activeFrame) {
-			queue.addSectionToQueue(render);
+		if (Direction.hasSet(directions, Direction.UP) && (render = fatherNode.adjacentUp).currentFrame != activeFrame) {
+			queue.sectionRenders[index++] = render;
 			render.currentFrame = activeFrame;
 		}
 
-		if (Direction.hasSet(directions, Direction.NORTH) && (render = fatherNode.adjacentNorth).currentFrame < activeFrame) {
-			queue.addSectionToQueue(render);
+		if (Direction.hasSet(directions, Direction.NORTH) && (render = fatherNode.adjacentNorth).currentFrame != activeFrame) {
+			queue.sectionRenders[index++] = render;
 			render.currentFrame = activeFrame;
 		}
 
-		if (Direction.hasSet(directions, Direction.SOUTH) && (render = fatherNode.adjacentSouth).currentFrame < activeFrame) {
-			queue.addSectionToQueue(render);
+		if (Direction.hasSet(directions, Direction.SOUTH) && (render = fatherNode.adjacentSouth).currentFrame != activeFrame) {
+			queue.sectionRenders[index++] = render;
 			render.currentFrame = activeFrame;
 		}
 
-		if (Direction.hasSet(directions, Direction.WEST) && (render = fatherNode.adjacentWest).currentFrame < activeFrame) {
-			queue.addSectionToQueue(render);
+		if (Direction.hasSet(directions, Direction.WEST) && (render = fatherNode.adjacentWest).currentFrame != activeFrame) {
+			queue.sectionRenders[index++] = render;
 			render.currentFrame = activeFrame;
 		}
 
-		if (Direction.hasSet(directions, Direction.EAST) && (render = fatherNode.adjacentEast).currentFrame < activeFrame) {
-			queue.addSectionToQueue(render);
+		if (Direction.hasSet(directions, Direction.EAST) && (render = fatherNode.adjacentEast).currentFrame != activeFrame) {
+			queue.sectionRenders[index++] = render;
 			render.currentFrame = activeFrame;
 		}
+
+		queue.bfsIndex = index;
 	}
-
 
 	private static boolean renderThisFrame(SectionRender section, int dirSet, int direction, int frame) {
 		return (dirSet & (1 << direction)) != 0 && section.currentFrame == frame;
 	}
 
-	private static boolean isIntersectingAxis(int dir) {
-		int dir0 = dir & 0b110011;
-		int dir1 = dir & 0b001100;
-		return (dir0 & (dir0 >> 1)) != 0 || dir1 == 0b001100;
-	}
-
 	/**
 	 * Uses the key idea from the article of <a href ="https://towardsdatascience.com/a-quick-and-clear-look-at-grid-based-visibility-bf63769fbc78">Grid Based Visibility</a>
-	 * to determine the factor of grid visibility in 3D for the current visited section of the graph.
-	 * As it stands right now is poorly optimized, but it rewards in all the works it skips are sections that it avoids.
+	 * to determine the factor of grid visibility in 3D for the current visited section of the graph. It might not be perfectly
+	 * optimized but it helps a ton when there's a lot of occluders.
 	 * @return Grid visibility factor
 	 */
 	private static int processGridIndex(SectionRender section, int flags, int diffX, int diffY, int diffZ, int outwardDir, int frame) {
@@ -239,8 +235,8 @@ public class BFSCuller {
 	}
 
 	/**
-	 * Squared sphere distance from the nearest corner, which almost always returns the nearest point
-	 * in cases where an axis is not intersecting with the player.
+	 * Squared Euclidean distance to the nearest section corner, which should return
+	 * the nearest point in cases where an axis is not intersecting with the player.
 	 */
 	private static int getDistance(int distX, int distY, int distZ) {
 		distX += (distX >>> 27); // ... >>> 31) << 4
@@ -252,8 +248,8 @@ public class BFSCuller {
 	private static final int MAX_SCALE = (1 << 25);
 
 	/**
-	 * Traces a ray from the section to the camera and tries to find obstruction in the way using the visited
-	 * section current frame.
+	 * Traces a ray from the section to the camera and tries to find obstruction in the way using the section
+	 * current frame.
 	 */
 	private static boolean rayVisible(SectionRender section, int frame, int dx, int dy, int dz) {
 		int tMaxX = MAX_SCALE / (Math.abs(dx) | 1);

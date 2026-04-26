@@ -45,8 +45,7 @@ public class KronosTransformer implements IClassTransformer {
 
 	@Override
 	public byte[] transform(String name, String transformedName, byte[] basicClass) {
-		byte[][] reference = new byte[1][];
-		reference[0] = basicClass;
+		byte[][] reference = new byte[][] { basicClass };
 
 		if (DISABLE_INJECTION) {
 			transformedName = "";

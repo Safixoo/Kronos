@@ -18,7 +18,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderBlocks;
 import net.minecraft.client.renderer.WorldRenderer;
 import net.minecraft.client.renderer.tileentity.TileEntityRenderer;
-import net.minecraft.profiler.Profiler;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
@@ -133,18 +132,8 @@ public class SectionMesher {
 		int nonEmptyTranslucent = (translucentDrawMask << 1) & 0b10;
 		int nonEmptySolid = solidDrawMask != 0 ? 0b01 : 0;
 
-		boolean emptySolid = (SectionFlags.getCullFaces(section.flags) & 0b111_111) == 0b111_111 && sumVertices == 0;
-
 		section.flags = SectionFlags.setDirty(section.flags, false);
-		section.flags = SectionFlags.setEmptySolid(section.flags, emptySolid);
 		section.flags = SectionFlags.setPassesNonEmpty(section.flags, nonEmptyTranslucent | nonEmptySolid);
-		section.flags = SectionFlags.setDrawableFaces(section.flags, solidDrawMask);
-
-		if (emptySolid) {
-			section.currentFrame = Integer.MAX_VALUE;
-		} else {
-			section.currentFrame = Integer.MIN_VALUE;
-		}
 
 		for (int dir = 0; dir < MeshDirection.COUNT; dir++) {
 			VertexWriter.SOLID[dir].stopDrawing();

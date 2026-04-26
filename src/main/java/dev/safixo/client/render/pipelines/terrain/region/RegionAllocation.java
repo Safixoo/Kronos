@@ -122,7 +122,6 @@ public class RegionAllocation {
 			int flags = alloc.render.flags;
 
 			flags = SectionFlags.setPassesNonEmpty(flags, 0b00);
-			flags = SectionFlags.setDrawableFaces(flags, 0b0);
 
 			alloc.render.flags = flags;
 			alloc.render.markDirty(true);
@@ -343,7 +342,7 @@ public class RegionAllocation {
 		public int vertices;
 
 		public static long sectionId(SectionRender render, int side) {
-			return render.sectionPos << 4 | side;
+			return render.globalSectionPos << 4 | side;
 		}
 	}
 }

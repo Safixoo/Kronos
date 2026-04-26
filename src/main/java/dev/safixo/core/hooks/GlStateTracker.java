@@ -31,6 +31,7 @@ public class GlStateTracker {
 	public static int LAST_UNIT = -1;
 	public static int LAST_COLOR = -1;
 	public static int LAST_DEPTH_FUNC = -1;
+	public static int LAST_CLEAR_COLOR = 0;
 
 	public static int CURRENT_UNIT = -1;
 	private static final int[] TEXTURE_PER_UNIT = new int[GL13.GL_TEXTURE31 - GL13.GL_TEXTURE0 + 1];
@@ -158,12 +159,16 @@ public class GlStateTracker {
 
 	public static void glClear(int mask) {
 		flushDrawState();
-
 		GL11.glClear(mask);
 	}
 
 	public static void glClearColor(float red, float green, float blue, float alpha) {
-		GL11.glClearColor(red, green, blue, alpha);
+		int clearColor = ColorBGRManager.packColor(red, green, blue) | (int) (alpha * 255.0f) << 24;
+
+		if (LAST_CLEAR_COLOR != clearColor) {
+			LAST_CLEAR_COLOR = clearColor;
+			GL11.glClearColor(red, green, blue, alpha);
+		}
 	}
 
 	public static void reset() {
