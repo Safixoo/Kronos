@@ -99,28 +99,24 @@ public class MathExt {
 		return MathExt.square(distX) + MathExt.square(distZ);
 	}
 
-	public static int chunkX(long position) {
-		return (int) (position & 0xFFFFFFFFL);
+	private static final int X_BITS = 22;
+	private static final int Z_BITS = 22;
+	private static final int Y_BITS = 12;
+
+	public static int decodeX(long pos) {
+		return (int) (pos << (64 - X_BITS - 34) >> (64 - X_BITS));
 	}
 
-	public static int chunkZ(long position) {
-		return (int) (position >>> 32L);
+	public static int decodeZ(long pos) {
+		return (int) (pos << (64 - Z_BITS - 12) >> (64 - Z_BITS));
 	}
 
-	public static int sectionX(long position) {
-		return (int) ((position >>> 12) & 0x3FFFFFF);
-	}
-
-	public static int sectionY(long position) {
-		return (int) (position & 0xFFFL);
-	}
-
-	public static int sectionZ(long position) {
-		return (int) ((position >>> 38) & 0x3FFFFFF);
+	public static int decodeY(long pos) {
+		return (int) (pos << (64 - Y_BITS) >> (64 - Y_BITS));
 	}
 
 	public static long asLong(int x, int y, int z) {
-		return (x & 0x3FFFFFL) << 34 | (z & 0x3FFFFFL) << 12 | (y & 0xFFFL);
+		return (x & 0x3FFFFFL) << (Z_BITS + Y_BITS) | (z & 0x3FFFFFL) << Y_BITS | (y & 0xFFFL);
 	}
 
 	public static long asLong(int x, int z) {

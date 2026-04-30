@@ -9,10 +9,10 @@ import dev.safixo.client.render.pipelines.terrain.SectionRender;
  * the origin.
  */
 public class RebuildList {
-	private static final SectionRender[] UPDATE_QUEUE_BFS = new SectionRender[SectionManager.MAX_UPDATES_TRIES];
+	private static final long[] UPDATE_QUEUE_BFS = new long[SectionManager.MAX_UPDATES_TRIES];
 	private static int UPDATE_POSITION = 0;
 
-	public static void addToList(SectionRender render) {
+	public static void addToList(long render) {
 		if (UPDATE_POSITION >= SectionManager.MAX_UPDATES_TRIES) {
 			return;
 		}
@@ -24,7 +24,7 @@ public class RebuildList {
 		UPDATE_POSITION = 0;
 	}
 
-	public static SectionRender[] getBackedArray() {
+	public static long[] getBackedArray() {
 		return UPDATE_QUEUE_BFS;
 	}
 

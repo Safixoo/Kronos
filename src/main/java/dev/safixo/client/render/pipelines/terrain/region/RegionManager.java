@@ -150,7 +150,7 @@ public class RegionManager {
 		}
 	}
 
-	public void drawAllRegions(TerrainProgram shader, BFSQueue queue, CameraData camera, int pass) {
+	public void drawAllRegions(TerrainProgram shader, CameraData camera, int pass) {
 		RegionRender[] regionRenders = this.getRegionsSorted(camera);
 
 		if (regionRenders == null) {

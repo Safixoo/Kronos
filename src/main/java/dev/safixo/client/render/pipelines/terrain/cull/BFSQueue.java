@@ -1,17 +1,16 @@
 package dev.safixo.client.render.pipelines.terrain.cull;
 
-import dev.safixo.client.render.pipelines.terrain.SectionRender;
-
-import java.util.Arrays;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
 
 public class BFSQueue {
-	public SectionRender[] sectionRenders;
+	public LongArrayList renderList = new LongArrayList(512);
+	public int[] indices;
 
 	public int capacity;
 	public int bfsIndex;
 
 	public BFSQueue(int size) {
-		this.sectionRenders = new SectionRender[size];
+		this.indices = new int[size];
 		this.capacity = size;
 	}
 
@@ -20,9 +19,9 @@ public class BFSQueue {
 	}
 
 	public void resize() {
-		SectionRender[] newArray = new SectionRender[this.capacity *= 2];
-		System.arraycopy(this.sectionRenders, 0, newArray, 0, this.bfsIndex);
-		this.sectionRenders = newArray;
+		int[] newArray = new int[this.capacity *= 2];
+		System.arraycopy(this.indices, 0, newArray, 0, this.bfsIndex);
+		this.indices = newArray;
 	}
 
 	public void verifyCapacity(int offset) {
@@ -31,27 +30,17 @@ public class BFSQueue {
 		}
 	}
 
+	public void addToRenderList(long position) {
+		this.renderList.add(position);
+	}
+
 	public void clear() {
-		for (int i = 0; i < this.bfsIndex; i++) {
-			this.sectionRenders[i] = null;
-		}
 		this.bfsIndex = 0;
+		this.renderList.clear();
 	}
 
-	public SectionRender get(int position) {
-		return this.sectionRenders[position];
-	}
-
-	public void addSectionToQueue(SectionRender render) {
-		this.sectionRenders[this.bfsIndex++] = render;
-	}
-
-	public void addToQueue(SectionRender render) {
-		if (this.bfsIndex >= this.capacity) {
-			this.resize();
-		}
-
-		this.sectionRenders[this.bfsIndex++] = render;
+	public int get(int position) {
+		return this.indices[position];
 	}
 
 	public int size() {

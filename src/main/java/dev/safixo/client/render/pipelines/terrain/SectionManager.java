@@ -29,6 +29,7 @@ import dev.safixo.client.util.Direction;
 import dev.safixo.client.util.MathExt;
 import org.lwjgl.opengl.GL11;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 
@@ -40,16 +41,17 @@ public class SectionManager {
 
 	public static final int MAX_FULL_UPDATES = 3;
 	public static final int MAX_UPDATES_TRIES = 32;
-
 	private static final Item DEBUG_ITEM = null;
 
 	private final Long2ReferenceOpenHashMap<SectionRender> sectionMap = new Long2ReferenceOpenHashMap<>(4096);
 
-	private static SectionManager INSTANCE;
+	public int[] sectionFlags;
+	public short[] visibilitySet;
 
 	private LinearFogProgram linearFogProgram;
 	private ExpFogProgram expFogProgram;
 
+	private final ReferenceOpenHashSet<TileEntity> tileEntitiesSet = new ReferenceOpenHashSet<>();
 	private final BFSCuller bfsCuller = new BFSCuller();
 	private final RegionManager regionManager = new RegionManager();
 	private World worldObj;
@@ -61,7 +63,7 @@ public class SectionManager {
 
 	private boolean terrainDirty;
 
-	private final ReferenceOpenHashSet<TileEntity> tileEntitiesSet = new ReferenceOpenHashSet<>();
+	private static SectionManager INSTANCE;
 
 	public SectionManager(WorldClient world) {
 		INSTANCE = this;
@@ -200,6 +202,11 @@ public class SectionManager {
 		EntityClientPlayerMP playerLocal = Minecraft.getMinecraft().thePlayer;
 		InventoryPlayer inventory = playerLocal.inventory;
 
+		profiler.endStartSection("prepareCulling");
+
+		this.initializeFlagData(renderDistance);
+		this.resetVisibilityState();
+
 		profiler.endStartSection("culling");
 
 		Item playerItem = null;
@@ -230,6 +237,55 @@ public class SectionManager {
 		profiler.endStartSection("updatechunks");
 	}
 
+	private static final int FLAG_NULL = SectionFlags.setCullFaces(0b0, 0b111_111);
+
+	private void initializeFlagData(int renderDistance) {
+		int size = MathExt.square(renderDistance * 2 + 1) * 16;
+
+		if (this.sectionFlags == null || this.sectionFlags.length != size){
+			this.sectionFlags = new int[size];
+		}
+
+		Arrays.fill(this.sectionFlags, FLAG_NULL);
+		CameraData camera = this.camera;
+
+		for (SectionRender section : this.sectionMap.values()) {
+			int diffChunkX = (section.blockX >> 4) - (camera.intX >> 4);
+			int diffChunkZ = (section.blockZ >> 4) - (camera.intZ >> 4);
+
+			if (Math.abs(diffChunkX) > renderDistance || Math.abs(diffChunkZ) > renderDistance) {
+				continue;
+			}
+
+			this.updateFlag(diffChunkX + renderDistance, section.blockY >> 4, diffChunkZ + renderDistance, section.flags);
+		}
+	}
+
+	private void resetVisibilityState() {
+		int rd = this.renderDistance;
+		int size = MathExt.square(rd * 2 + 1) * 16;
+
+		if (this.visibilitySet == null || this.visibilitySet.length != size){
+			this.visibilitySet = new short[size];
+		}
+
+		Arrays.fill(this.visibilitySet, (short) 0);
+	}
+
+	public static int getFlagIndex(int offsetX, int sectionY, int offsetZ, int renderDistance) {
+		int rd = (renderDistance * 2 + 1);
+		return offsetX + (sectionY * rd) + (offsetZ * rd * 16);
+	}
+
+	public void updateFlag(int offsetX, int sectionY, int offsetZ, int flag) {
+		if (this.sectionFlags == null) {
+			return;
+		}
+
+		int flagIndex = getFlagIndex(offsetX, sectionY, offsetZ, this.camera.renderDistance);
+		this.sectionFlags[flagIndex] = flag;
+	}
+
 	private static CameraData extractCameraData(double cameraX, double cameraY, double cameraZ, int renderDistance) {
 		int playerX = MathExt.floor(cameraX);
 		int playerY = MathExt.floor(cameraY);
@@ -250,16 +306,16 @@ public class SectionManager {
 			this.terrainDirty = false;
 		}
 
-		SectionRender[] updateArray = RebuildList.getBackedArray();
+		long[] sectionPositions = RebuildList.getBackedArray();
 		PrimitivesFlags.processLeavesSolid();
 		PrimitivesFlags.REDIRECT_DRAWING = true;
 
 		int i = 0, j = 0;
 
 		while (i < maxSize && j < SectionManager.MAX_FULL_UPDATES) {
-			SectionRender section = updateArray[i++];
+			SectionRender section = this.sectionMap.get(sectionPositions[i++]);
 
-			if (section.currentFrame == this.bfsCuller.getActiveFrame() && section.isDirty()) {
+			if (section != null && section.isDirty()) {
 				boolean nonEmpty = SectionMesher.rebuild(section, this.camera, this, this.worldObj, tileSet);
 
 				if (nonEmpty) {
@@ -322,7 +378,7 @@ public class SectionManager {
 		terrainShader.useProgram();
 		terrainShader.setupUniforms(noFog);
 
-		this.regionManager.drawAllRegions(terrainShader, this.bfsCuller.bfsQueue, this.camera, renderPass);
+		this.regionManager.drawAllRegions(terrainShader, this.camera, renderPass);
 		terrainShader.disableProgram();
 	}
 
@@ -330,7 +386,7 @@ public class SectionManager {
 
 	public void connectNeighbors(SectionRender render) {
 		for (int dir = 0; dir < Direction.COUNT; dir++) {
-			SectionRender adjacent = this.getSection(render, dir);
+			SectionRender adjacent = this.getAdjacent(render, dir);
 
 			if (adjacent != null) {
 				adjacent.setAdjacentNeighbor(render, Direction.opposite(dir));
@@ -342,7 +398,7 @@ public class SectionManager {
 
 	public void disconnectNeighbors(SectionRender render) {
 		for (int dir = 0; dir < Direction.COUNT; dir++) {
-			SectionRender renderer = this.getSection(render, dir);
+			SectionRender renderer = this.getAdjacent(render, dir);
 
 			if (renderer != null) {
 				renderer.setAdjacentNeighbor(null, Direction.opposite(dir));
@@ -352,7 +408,7 @@ public class SectionManager {
 		}
 	}
 
-	private SectionRender getSection(SectionRender section, int direction) {
+	private SectionRender getAdjacent(SectionRender section, int direction) {
 		int chunkX = (section.blockX >> 4) + Direction.x(direction);
 		int chunkY = (section.blockY >> 4) + Direction.y(direction);
 		int chunkZ = (section.blockZ >> 4) + Direction.z(direction);
