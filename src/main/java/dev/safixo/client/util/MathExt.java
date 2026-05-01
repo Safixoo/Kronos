@@ -7,18 +7,20 @@ import dev.safixo.core.HookUtils;
 import dev.safixo.core.hooks.RenderGlobalHook;
 import net.minecraft.client.settings.GameSettings;
 
+import java.lang.reflect.Field;
+
 public class MathExt {
+	private static final Field OF_DISTANCE = HookUtils.getField(GameSettings.class, "ofRenderDistanceFine", "ofRenderDistanceFine");
+
 	public static int getCanonicalRenderDistance(GameSettings gameSettings) {
 		int realRenderDistance;
 
 		if (!RenderGlobalHook.OPTIFINE_ACTIVE) {
 			// This is more or less the real metric for chunk distance that the game uses.
 			// 0 - Far, 1 - Normal, 2 - Short, 3 - Tiny.
-			// In the future would be productive replace add a bigger slider for render distance,
-			// like optifine.
-			realRenderDistance = ((64 << (3 - gameSettings.renderDistance)) >> 5) + 2;
+			realRenderDistance = Math.min(400, (64 << (3 - gameSettings.renderDistance))) >> 5;
 		} else {
-			realRenderDistance = (Integer) HookUtils.getFieldObj(gameSettings, "ofRenderDistanceFine", "ofRenderDistanceFine") >> 4;
+			realRenderDistance = (Integer) HookUtils.getFieldValue(OF_DISTANCE, gameSettings) >> 4;
 		}
 
 		return realRenderDistance;

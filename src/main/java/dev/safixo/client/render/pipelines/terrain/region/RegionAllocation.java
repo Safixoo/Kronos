@@ -13,6 +13,9 @@ public class RegionAllocation {
 	private static final int MIN_ALLOC = 1024 * 1024 * 4;
 	private static final int STRIDE = TerrainFormat.STRIDE;
 
+	private static final int TRANSLUCENT_MIN_ALLOC = 1024 * 512;
+	private static final int SOLID_MIN_ALLOC = 4 * 1024 * 1024;
+
 	public RegionBuffer vertexBuffer;
 
 	public long offset;
@@ -27,16 +30,18 @@ public class RegionAllocation {
 		this(MIN_ALLOC);
 	}
 
-	public RegionAllocation(int size) {
-		int newCapacity = Math.max(MIN_ALLOC, size);
+	public RegionAllocation(int size, int pass) {
+		this(Math.max(size, pass == 0 ? SOLID_MIN_ALLOC : TRANSLUCENT_MIN_ALLOC));
+	}
 
+	public RegionAllocation(int size) {
 		if (SPARE_BUFFER == null) {
 			SPARE_BUFFER = new GlVertexBuffer(SPARE_BUFFER_ALLOC, GL15.GL_STREAM_COPY);
 		}
 
-		SectionManager.getCurrentInstance().addMemory(newCapacity);
-		this.vertexBuffer = new RegionBuffer(newCapacity, GL15.GL_STATIC_DRAW);
-		this.capacity = newCapacity;
+		SectionManager.getCurrentInstance().addMemory(size);
+		this.vertexBuffer = new RegionBuffer(size, GL15.GL_STATIC_DRAW);
+		this.capacity = size;
 	}
 
 	private long getAmplification(long size) {

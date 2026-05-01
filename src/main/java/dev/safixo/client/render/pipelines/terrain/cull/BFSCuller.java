@@ -122,8 +122,6 @@ public class BFSCuller {
 		short[] visibilitySet = sectionManager.visibilitySet;
 
 		int renderDiameter = renderDistance * 2 + 1;
-		int renderDivisor = ((1 << 16) / renderDiameter) + 1;
-
 		int readIndex = 0;
 
 		while (readIndex < bfsQueue.bfsIndex) {
@@ -131,10 +129,11 @@ public class BFSCuller {
 			int flags = MathExt.byteToUnsigned(sectionFlags[sectionIndex]);
 
 			int offsetX = sectionIndex;
-			int sectionY = (offsetX * renderDivisor) >> 16;
-			int offsetZ = sectionY >> 4;
 
-			offsetX = offsetX - sectionY * renderDiameter;
+			int sectionY = offsetX / renderDiameter;
+			offsetX %= renderDiameter;
+
+			int offsetZ = sectionY >> 4;
 			sectionY &= 15;
 
 			int distChunkX = offsetX - renderDistance;

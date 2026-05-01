@@ -175,7 +175,7 @@ public class RegionRender {
 		this.shouldCachePass[SOLID_PASS] = false;
 
 		if (this.solidBuffer == null) {
-			this.solidBuffer = new RegionAllocation(manager.getVertices() * TerrainFormat.STRIDE);
+			this.solidBuffer = new RegionAllocation(manager.getVertices() * TerrainFormat.STRIDE, RegionRender.SOLID_PASS);
 		}
 
 		if (this.solidFirst == UnsafeUtil.NULL) {
@@ -196,7 +196,7 @@ public class RegionRender {
 		this.shouldCachePass[TRANSLUCENT_PASS] = false;
 
 		if (this.translucentBuffer == null) {
-			this.translucentBuffer = new RegionAllocation(manager.getVertices() * TerrainFormat.STRIDE);
+			this.translucentBuffer = new RegionAllocation(manager.getVertices() * TerrainFormat.STRIDE, RegionRender.TRANSLUCENT_PASS);
 		}
 
 		if (this.translucentFirst == UnsafeUtil.NULL) {

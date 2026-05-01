@@ -378,9 +378,10 @@ public class SectionManager {
 	private void processQueuedFlagChanges(CameraData camera) {
 		int cameraChunkX = camera.intX >> 4;
 		int cameraChunkZ = camera.intZ >> 4;
+		int renderDistance = camera.renderDistance;
 
 		for (SectionRender section : this.queuedFlags) {
-			int flag = CompressedFlags.sectionToCompressed(section.flags);
+			int flags = CompressedFlags.sectionToCompressed(section.flags);
 
 			int sectionX = section.blockX >> 4;
 			int sectionY = section.blockY >> 4;
@@ -393,7 +394,7 @@ public class SectionManager {
 				continue;
 			}
 
-			this.updateFlag(diffChunkX + renderDistance, sectionY, diffChunkZ + renderDistance, flag);
+			this.updateFlag(diffChunkX + renderDistance, sectionY, diffChunkZ + renderDistance, flags);
 		}
 
 		this.queuedFlags.clear();
