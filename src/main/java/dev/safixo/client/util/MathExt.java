@@ -103,6 +103,22 @@ public class MathExt {
 	private static final int Z_BITS = 22;
 	private static final int Y_BITS = 12;
 
+	public static void arrayFill(byte[] array, int value) {
+		array[0] = (byte) value;
+
+		for (int i = 1; i < array.length; i += i) {
+			System.arraycopy(array, 0, array, i, Math.min(i, array.length - i));
+		}
+	}
+
+	public static void arrayFill(short[] array, int value) {
+		array[0] = (short) value;
+
+		for (int i = 1; i < array.length; i += i) {
+			System.arraycopy(array, 0, array, i, Math.min(i, array.length - i));
+		}
+	}
+
 	public static int decodeX(long pos) {
 		return (int) (pos << (64 - X_BITS - 34) >> (64 - X_BITS));
 	}
@@ -116,7 +132,7 @@ public class MathExt {
 	}
 
 	public static long asLong(int x, int y, int z) {
-		return (x & 0x3FFFFFL) << (Z_BITS + Y_BITS) | (z & 0x3FFFFFL) << Y_BITS | (y & 0xFFFL);
+		return (x & 0x3FFFFFL) << (Z_BITS + Y_BITS) | (z & 0x3FFFFFL) << Y_BITS | y & 0xFFFL;
 	}
 
 	public static long asLong(int x, int z) {

@@ -220,7 +220,7 @@ public class NewRegionAllocator {
 				while (alloc != null) {
 					int flags = alloc.section.flags;
 					flags = SectionFlags.setPassesNonEmpty(flags, 0b00);
-					alloc.section.flags = flags;
+					alloc.section.setFlags(flags);
 					alloc.section.markDirty(true);
 					alloc = alloc.nextNode;
 				}
@@ -263,7 +263,7 @@ public class NewRegionAllocator {
 		private NewAllocation() {}
 
 		public static long getId(SectionRender section, int pass) {
-			return section.globalSectionPos << 1 | pass;
+			return section.globalPosition << 1 | pass;
 		}
 
 		public void addFacingOffsets(int[] offsets) {

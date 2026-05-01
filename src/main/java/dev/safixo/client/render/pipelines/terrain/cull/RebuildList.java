@@ -1,7 +1,8 @@
 package dev.safixo.client.render.pipelines.terrain.cull;
 
 import dev.safixo.client.render.pipelines.terrain.SectionManager;
-import dev.safixo.client.render.pipelines.terrain.SectionRender;
+import dev.safixo.client.util.MathExt;
+import dev.safixo.client.util.data.CameraData;
 
 /**
 *  Saves a list of dirty to update sections, the list can be saved somewhat random but when retrieving the
@@ -9,7 +10,7 @@ import dev.safixo.client.render.pipelines.terrain.SectionRender;
  * the origin.
  */
 public class RebuildList {
-	private static final long[] UPDATE_QUEUE_BFS = new long[SectionManager.MAX_UPDATES_TRIES];
+	private static final long[] UPDATE_QUEUE = new long[SectionManager.MAX_UPDATES_TRIES];
 	private static int UPDATE_POSITION = 0;
 
 	public static void addToList(long render) {
@@ -17,15 +18,21 @@ public class RebuildList {
 			return;
 		}
 
-		UPDATE_QUEUE_BFS[UPDATE_POSITION++] = render;
+		UPDATE_QUEUE[UPDATE_POSITION++] = render;
 	}
 
 	public static void clear() {
 		UPDATE_POSITION = 0;
 	}
 
-	public static long[] getBackedArray() {
-		return UPDATE_QUEUE_BFS;
+	public static long getSectionPos(CameraData camera, int index) {
+		long relativePos = UPDATE_QUEUE[index];
+
+		int posX = MathExt.decodeX(relativePos) + (camera.intX >> 4);
+		int posY = MathExt.decodeY(relativePos) + (camera.intY >> 4);
+		int posZ = MathExt.decodeZ(relativePos) + (camera.intZ >> 4);
+
+		return MathExt.asLong(posX, posY, posZ);
 	}
 
 	public static int size() {

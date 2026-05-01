@@ -1,16 +1,17 @@
 package dev.safixo.client.render.pipelines.terrain.cull;
 
-import it.unimi.dsi.fastutil.longs.LongArrayList;
-
 public class BFSQueue {
-	public LongArrayList renderList = new LongArrayList(512);
-	public int[] indices;
+	public long[] renderIndices;
+	public int[] graphIndices;
 
 	public int capacity;
+
 	public int bfsIndex;
+	public int renderListIndex;
 
 	public BFSQueue(int size) {
-		this.indices = new int[size];
+		this.graphIndices = new int[size];
+		this.renderIndices = new long[size];
 		this.capacity = size;
 	}
 
@@ -19,9 +20,16 @@ public class BFSQueue {
 	}
 
 	public void resize() {
-		int[] newArray = new int[this.capacity *= 2];
-		System.arraycopy(this.indices, 0, newArray, 0, this.bfsIndex);
-		this.indices = newArray;
+		int capacity = this.capacity *= 2;
+
+		int[] newIndices = new int[capacity];
+		long[] newRender = new long[capacity];
+
+		System.arraycopy(this.graphIndices, 0, newIndices, 0, this.bfsIndex);
+		this.graphIndices = newIndices;
+
+		System.arraycopy(this.renderIndices, 0, newRender, 0, this.renderListIndex);
+		this.renderIndices = newRender;
 	}
 
 	public void verifyCapacity(int offset) {
@@ -30,17 +38,17 @@ public class BFSQueue {
 		}
 	}
 
-	public void addToRenderList(long position) {
-		this.renderList.add(position);
+	public void addToRenderList(long sectionIndex) {
+		this.renderIndices[this.renderListIndex++] = sectionIndex;
 	}
 
 	public void clear() {
 		this.bfsIndex = 0;
-		this.renderList.clear();
+		this.renderListIndex = 0;
 	}
 
 	public int get(int position) {
-		return this.indices[position];
+		return this.graphIndices[position];
 	}
 
 	public int size() {

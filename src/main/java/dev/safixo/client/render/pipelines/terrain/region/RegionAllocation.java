@@ -70,7 +70,7 @@ public class RegionAllocation {
 
 					flags = SectionFlags.setPassesNonEmpty(flags, 0b00);
 
-					alloc.render.flags = flags;
+					alloc.render.setFlags(flags);
 					alloc.render.markDirty(true);
 					alloc = alloc.next;
 				}
@@ -123,7 +123,7 @@ public class RegionAllocation {
 
 			flags = SectionFlags.setPassesNonEmpty(flags, 0b00);
 
-			alloc.render.flags = flags;
+			alloc.render.setFlags(flags);
 			alloc.render.markDirty(true);
 			alloc.render.clearAllocations();
 
@@ -342,7 +342,7 @@ public class RegionAllocation {
 		public int vertices;
 
 		public static long sectionId(SectionRender render, int side) {
-			return render.globalSectionPos << 4 | side;
+			return render.globalPosition << 4 | side;
 		}
 	}
 }

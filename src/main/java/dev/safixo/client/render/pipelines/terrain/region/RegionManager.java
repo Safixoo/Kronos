@@ -41,6 +41,39 @@ public class RegionManager {
 		return region;
 	}
 
+	// Creates a mapping between position and regions, useful for BFS only.
+	public RegionRender[] getIndexedRegions(CameraData camera) {
+		int regionCameraX = camera.intX >> RegionRender.BLOCK_SHIFT_X;
+		int regionCameraZ = camera.intZ >> RegionRender.BLOCK_SHIFT_Z;
+
+		int renderDiameter = camera.renderDistance * 2 + 1;
+
+		int factorXZ = renderDiameter >> 1;
+		int factorY = 256 >> RegionRender.BLOCK_SHIFT_Y;
+
+		RegionRender[] indexedRegions = new RegionRender[MathExt.square(factorXZ * 2 + 1) * factorY];
+
+		for (RegionRender region : this.regionMap.values()) {
+			int regionX = region.regionX - regionCameraX + factorXZ;
+			int regionY = region.regionY;
+			int regionZ = region.regionZ - regionCameraZ + factorXZ;
+
+			indexedRegions[regionX + (regionY + regionZ * factorY) * factorXZ] = region;
+		}
+
+		return indexedRegions;
+	}
+
+	public static RegionRender getRegionFromIndexed(RegionRender[] indexedRegions, int renderDiameter, int regionX, int regionY, int regionZ) {
+		int factorXZ = renderDiameter >> 1;
+		int factorY = 256 >> RegionRender.BLOCK_SHIFT_Y;
+
+		regionX += factorXZ;
+		regionZ += factorXZ;
+
+		return indexedRegions[regionX + (regionY + regionZ * factorY) * factorXZ];
+	}
+
 	public void clear() {
 		for (RegionRender region : this.regionMap.values()) {
 			region.clear();

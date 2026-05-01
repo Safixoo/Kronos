@@ -45,8 +45,10 @@ public class SectionManager {
 
 	private final Long2ReferenceOpenHashMap<SectionRender> sectionMap = new Long2ReferenceOpenHashMap<>(4096);
 
-	public int[] sectionFlags;
-	public short[] visibilitySet;
+	public byte[] sectionFlags;
+	public byte[] tempSectionFlags;
+
+	public byte[] visibilitySet;
 
 	private LinearFogProgram linearFogProgram;
 	private ExpFogProgram expFogProgram;
@@ -190,7 +192,9 @@ public class SectionManager {
 
 			this.tileEntitiesSet.clear();
 			this.sectionMap.clear();
+
 			this.generateWholeVolume(cameraX, cameraZ);
+			this.initializeFlagData();
 		}
 
 		IChunkProvider provider = world.getChunkProvider();
@@ -204,7 +208,7 @@ public class SectionManager {
 
 		profiler.endStartSection("prepareCulling");
 
-		this.initializeFlagData(renderDistance);
+		this.updateAllFlags();
 		this.resetVisibilityState();
 
 		profiler.endStartSection("culling");
@@ -237,17 +241,18 @@ public class SectionManager {
 		profiler.endStartSection("updatechunks");
 	}
 
-	private static final int FLAG_NULL = SectionFlags.setCullFaces(0b0, 0b111_111);
+	private static final int FLAG_NULL = CompressedFlags.setTraversableFaces(0b0, 0b0);
 
-	private void initializeFlagData(int renderDistance) {
-		int size = MathExt.square(renderDistance * 2 + 1) * 16;
+	private void initializeFlagData() {
+		int size = MathExt.square(this.renderDistance * 2 + 1) * 16;
 
-		if (this.sectionFlags == null || this.sectionFlags.length != size){
-			this.sectionFlags = new int[size];
+		if (this.sectionFlags == null || this.sectionFlags.length != size) {
+			this.sectionFlags = new byte[size];
 		}
 
-		Arrays.fill(this.sectionFlags, FLAG_NULL);
+		Arrays.fill(this.sectionFlags, (byte) FLAG_NULL);
 		CameraData camera = this.camera;
+		int renderDistance = camera.renderDistance;
 
 		for (SectionRender section : this.sectionMap.values()) {
 			int diffChunkX = (section.blockX >> 4) - (camera.intX >> 4);
@@ -257,19 +262,30 @@ public class SectionManager {
 				continue;
 			}
 
-			this.updateFlag(diffChunkX + renderDistance, section.blockY >> 4, diffChunkZ + renderDistance, section.flags);
+			int compressedFlags = CompressedFlags.sectionToCompressed(section.flags);
+			this.updateFlag(diffChunkX + renderDistance, section.blockY >> 4, diffChunkZ + renderDistance, compressedFlags);
 		}
+
+		this.queuedFlags.clear();
 	}
 
+	private static final byte[] EMPTY_ARRAY = new byte[4096];
+
 	private void resetVisibilityState() {
-		int rd = this.renderDistance;
-		int size = MathExt.square(rd * 2 + 1) * 16;
+		int size = MathExt.square(this.renderDistance * 2 + 1) * 16;
 
 		if (this.visibilitySet == null || this.visibilitySet.length != size){
-			this.visibilitySet = new short[size];
+			this.visibilitySet = new byte[size];
 		}
 
-		Arrays.fill(this.visibilitySet, (short) 0);
+		byte[] array = this.visibilitySet;
+		int length = array.length;
+
+		System.arraycopy(EMPTY_ARRAY, 0, array, 0, Math.min(4096, length));
+
+		for (int i = 4096; i < length; i += i) {
+			System.arraycopy(array, 0, array, i, Math.min(i, length - i));
+		}
 	}
 
 	public static int getFlagIndex(int offsetX, int sectionY, int offsetZ, int renderDistance) {
@@ -277,13 +293,120 @@ public class SectionManager {
 		return offsetX + (sectionY * rd) + (offsetZ * rd * 16);
 	}
 
-	public void updateFlag(int offsetX, int sectionY, int offsetZ, int flag) {
+	private int lastCameraChunkX = Integer.MIN_VALUE, lastCameraChunkZ = Integer.MIN_VALUE;
+	private final ReferenceOpenHashSet<SectionRender> queuedFlags = new ReferenceOpenHashSet<>();
+
+	private SectionRender lastSection;
+
+	public void queueFlagChange(SectionRender section) {
+		if (this.lastSection == section) {
+			return;
+		}
+
+		this.queuedFlags.add(section);
+		this.lastSection = section;
+	}
+
+	private void updateAllFlags() {
+		int size = MathExt.square(this.renderDistance * 2 + 1) * 16;
+
+		if (this.sectionFlags == null || this.sectionFlags.length != size) {
+			this.initializeFlagData();
+			return;
+		}
+
+		if (this.tempSectionFlags == null || this.tempSectionFlags.length != size) {
+			this.tempSectionFlags = new byte[size];
+		}
+
+		CameraData camera = this.camera;
+
+		if (this.lastCameraChunkX == Integer.MIN_VALUE || this.lastCameraChunkZ == Integer.MIN_VALUE) {
+			this.lastCameraChunkX = camera.intX >> 4;
+			this.lastCameraChunkZ = camera.intZ >> 4;
+			return;
+		}
+
+		int renderDistance = this.renderDistance;
+
+		int lastCameraChunkX = this.lastCameraChunkX;
+		int lastCameraChunkZ = this.lastCameraChunkZ;
+
+		int cameraChunkX = camera.intX >> 4;
+		int cameraChunkZ = camera.intZ >> 4;
+
+		int diffCameraX = cameraChunkX - lastCameraChunkX;
+		int diffCameraZ = cameraChunkZ - lastCameraChunkZ;
+
+		if (diffCameraX == 0 && diffCameraZ == 0) {
+			this.processQueuedFlagChanges(camera);
+			return;
+		}
+
+		// 1D : X
+		// 2D : Y
+		// 3D : Z
+		for (int x = -renderDistance; x <= renderDistance; x++) {
+			for (int z = -renderDistance; z <= renderDistance; z++) {
+				int chunkX = x + cameraChunkX;
+				int chunkZ = z + cameraChunkZ;
+
+				if (!(Math.abs(chunkX - lastCameraChunkX) <= renderDistance && Math.abs(chunkZ - lastCameraChunkZ) <= renderDistance)) {
+					continue;
+				}
+
+				for (int y = 0; y < 16; y++) {
+					int lastFlagIndex = getFlagIndex(x + diffCameraX + renderDistance, y, z + diffCameraZ + renderDistance, renderDistance);
+					int flagIndex = getFlagIndex(x + renderDistance, y, z + renderDistance, renderDistance);
+
+					this.tempSectionFlags[flagIndex] = this.sectionFlags[lastFlagIndex];
+				}
+			}
+		}
+
+		// swap arrays.
+		byte[] newFlags = this.tempSectionFlags;
+		this.tempSectionFlags = this.sectionFlags;
+		this.sectionFlags = newFlags;
+
+		this.processQueuedFlagChanges(camera);
+
+		this.lastCameraChunkX = cameraChunkX;
+		this.lastCameraChunkZ = cameraChunkZ;
+	}
+
+	private void processQueuedFlagChanges(CameraData camera) {
+		int cameraChunkX = camera.intX >> 4;
+		int cameraChunkZ = camera.intZ >> 4;
+
+		for (SectionRender section : this.queuedFlags) {
+			int flag = CompressedFlags.sectionToCompressed(section.flags);
+
+			int sectionX = section.blockX >> 4;
+			int sectionY = section.blockY >> 4;
+			int sectionZ = section.blockZ >> 4;
+
+			int diffChunkX = sectionX - cameraChunkX;
+			int diffChunkZ = sectionZ - cameraChunkZ;
+
+			if (Math.abs(diffChunkX) > renderDistance || Math.abs(diffChunkZ) > renderDistance) {
+				continue;
+			}
+
+			this.updateFlag(diffChunkX + renderDistance, sectionY, diffChunkZ + renderDistance, flag);
+		}
+
+		this.queuedFlags.clear();
+		this.lastSection = null;
+	}
+
+	private void updateFlag(int offsetX, int sectionY, int offsetZ, int flag) {
 		if (this.sectionFlags == null) {
 			return;
 		}
 
 		int flagIndex = getFlagIndex(offsetX, sectionY, offsetZ, this.camera.renderDistance);
-		this.sectionFlags[flagIndex] = flag;
+		this.sectionFlags[flagIndex] = (byte) flag;
 	}
 
 	private static CameraData extractCameraData(double cameraX, double cameraY, double cameraZ, int renderDistance) {
@@ -306,14 +429,13 @@ public class SectionManager {
 			this.terrainDirty = false;
 		}
 
-		long[] sectionPositions = RebuildList.getBackedArray();
 		PrimitivesFlags.processLeavesSolid();
 		PrimitivesFlags.REDIRECT_DRAWING = true;
 
 		int i = 0, j = 0;
 
 		while (i < maxSize && j < SectionManager.MAX_FULL_UPDATES) {
-			SectionRender section = this.sectionMap.get(sectionPositions[i++]);
+			SectionRender section = this.sectionMap.get(RebuildList.getSectionPos(this.camera, i++));
 
 			if (section != null && section.isDirty()) {
 				boolean nonEmpty = SectionMesher.rebuild(section, this.camera, this, this.worldObj, tileSet);

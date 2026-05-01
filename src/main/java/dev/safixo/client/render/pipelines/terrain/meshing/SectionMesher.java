@@ -13,6 +13,7 @@ import dev.safixo.client.render.vertex.VertexWriter;
 import dev.safixo.client.util.MeshDirection;
 import dev.safixo.client.util.data.CameraData;
 import dev.safixo.client.util.data.PrimitivesFlags;
+import it.unimi.dsi.fastutil.objects.ReferenceArrayList;
 import net.minecraft.block.Block;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderBlocks;
@@ -51,10 +52,12 @@ public class SectionMesher {
 		}
 		prepareWriterForTerrain(section, translucentWriter);
 
-		for (int i = 0; i < section.tileEntities.size(); i++) {
-			tileSet.remove(section.tileEntities.get(i));
+		if (section.tileEntities != null && !section.tileEntities.isEmpty()) {
+			for (int i = 0; i < section.tileEntities.size(); i++) {
+				tileSet.remove(section.tileEntities.get(i));
+			}
+			section.tileEntities.clear();
 		}
-		section.tileEntities.clear();
 
 		int cameraChunkX = camera.intX >> 4, cameraChunkY = camera.intY >> 4, cameraChunkZ = camera.intZ >> 4;
 		int sectionX = section.blockX >> 4, sectionY = section.blockY >> 4, sectionZ = section.blockZ >> 4;
@@ -64,7 +67,7 @@ public class SectionMesher {
 		boolean insideSection = cameraChunkX == sectionX && cameraChunkY == sectionY && cameraChunkZ == sectionZ;
 
 		if (!airEmpty) {
-			section.flags = SectionFlags.setCullFaces(section.flags, CullSetGenerator.floodFillSection(section, camera));
+			section.setFlags(SectionFlags.setCullFaces(section.flags, CullSetGenerator.floodFillSection(section, camera)));
 
 			// +-X face
 			for (int y = 0; y < 16; y++) {
@@ -112,9 +115,11 @@ public class SectionMesher {
 					}
 				}
 			}
-			tileSet.addAll(section.tileEntities);
+			if (section.tileEntities != null && !section.tileEntities.isEmpty()) {
+				tileSet.addAll(section.tileEntities);
+			}
 		} else {
-			section.flags = SectionFlags.setCullFaces(section.flags, 0b0);
+			section.setFlags(SectionFlags.setCullFaces(section.flags, 0b0));
 		}
 
 		int sumVertices = sumAllSolidVertices();
@@ -132,8 +137,8 @@ public class SectionMesher {
 		int nonEmptyTranslucent = (translucentDrawMask << 1) & 0b10;
 		int nonEmptySolid = solidDrawMask != 0 ? 0b01 : 0;
 
-		section.flags = SectionFlags.setDirty(section.flags, false);
-		section.flags = SectionFlags.setPassesNonEmpty(section.flags, nonEmptyTranslucent | nonEmptySolid);
+		section.setFlags(SectionFlags.setDirty(section.flags, false));
+		section.setFlags(SectionFlags.setPassesNonEmpty(section.flags, nonEmptyTranslucent | nonEmptySolid));
 
 		for (int dir = 0; dir < MeshDirection.COUNT; dir++) {
 			VertexWriter.SOLID[dir].stopDrawing();
@@ -174,6 +179,9 @@ public class SectionMesher {
 				TileEntity tileEntity = cache.getBlockTileEntity(blockX, blockY, blockZ);
 
 				if (TileEntityRenderer.instance.hasSpecialRenderer(tileEntity)) {
+					if (section.tileEntities == null) {
+						section.tileEntities = new ReferenceArrayList<>();
+					}
 					section.tileEntities.add(tileEntity);
 				}
 			}
@@ -222,6 +230,9 @@ public class SectionMesher {
 				TileEntity tileEntity = cache.getBlockTileEntity(blockX, blockY, blockZ);
 
 				if (TileEntityRenderer.instance.hasSpecialRenderer(tileEntity)) {
+					if (section.tileEntities == null) {
+						section.tileEntities = new ReferenceArrayList<>();
+					}
 					section.tileEntities.add(tileEntity);
 				}
 			}
@@ -274,7 +285,7 @@ public class SectionMesher {
 			}
 		}
 
-		section.flags = SectionFlags.setCullFaces(section.flags, solidFacesMask);
+		section.setFlags(SectionFlags.setCullFaces(section.flags, solidFacesMask));
 	}
 
 	private static int sumAllSolidVertices() {
