@@ -46,9 +46,9 @@ public class RegionManager {
 		int regionCameraX = camera.intX >> RegionRender.BLOCK_SHIFT_X;
 		int regionCameraZ = camera.intZ >> RegionRender.BLOCK_SHIFT_Z;
 
-		int renderDiameter = camera.renderDistance * 2 + 1;
+		int renderDiameter = Math.min(3 << 3, camera.renderDistance * 2 + 1);
 
-		int factorXZ = renderDiameter >> 1;
+		int factorXZ = renderDiameter >> 2;
 		int factorY = 256 >> RegionRender.BLOCK_SHIFT_Y;
 
 		RegionRender[] indexedRegions = new RegionRender[MathExt.square(factorXZ * 2 + 1) * factorY];
@@ -65,7 +65,7 @@ public class RegionManager {
 	}
 
 	public static RegionRender getRegionFromIndexed(RegionRender[] indexedRegions, int renderDiameter, int regionX, int regionY, int regionZ) {
-		int factorXZ = renderDiameter >> 1;
+		int factorXZ = renderDiameter >> 2;
 		int factorY = 256 >> RegionRender.BLOCK_SHIFT_Y;
 
 		regionX += factorXZ;

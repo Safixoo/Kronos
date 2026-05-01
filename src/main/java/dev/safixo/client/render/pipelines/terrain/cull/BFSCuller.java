@@ -56,10 +56,13 @@ public class BFSCuller {
 		int renderDiameter = renderDistance * 2 + 1;
 		int sectionIndex = SectionManager.getFlagIndex(renderDistance, blockY >> 4, renderDistance, renderDistance);
 
+		short[] visibilitySet = SectionManager.getCurrentInstance().visibilitySet;
+
 		if (origin != null) {
 			int flags = origin.flags;
 
-			traverseNeighbors(this.bfsQueue, sectionIndex, renderDiameter, SectionFlags.getAdjacentMask(flags));
+			visibilitySet[sectionIndex] = MAX_GRID_FACTOR;
+			traverseNeighbors(this.bfsQueue, visibilitySet, sectionIndex, renderDiameter, SectionFlags.getAdjacentMask(flags));
 
 			if (SectionFlags.isDirty(flags)) {
 				RebuildList.addToList(0);
@@ -78,7 +81,7 @@ public class BFSCuller {
 		RegionManager regionManager = SectionManager.getRegionManager();
 		RegionRender[] regions = regionManager.getIndexedRegions(camera);
 
-		int renderDiameter = camera.renderDistance * 2 + 1;
+		int renderDiameter = Math.min(3 << 3, camera.renderDistance * 2 + 1);
 		int regionCameraX = camera.intX >> RegionRender.BLOCK_SHIFT_X;
 		int regionCameraZ = camera.intZ >> RegionRender.BLOCK_SHIFT_Z;
 
@@ -116,9 +119,10 @@ public class BFSCuller {
 		SectionManager sectionManager = SectionManager.getCurrentInstance();
 
 		byte[] sectionFlags = sectionManager.sectionFlags;
-		byte[] visibilitySet = sectionManager.visibilitySet;
+		short[] visibilitySet = sectionManager.visibilitySet;
 
 		int renderDiameter = renderDistance * 2 + 1;
+		int renderDivisor = ((1 << 16) / renderDiameter) + 1;
 
 		int readIndex = 0;
 
@@ -126,16 +130,16 @@ public class BFSCuller {
 			int sectionIndex = bfsQueue.get(readIndex++);
 			int flags = MathExt.byteToUnsigned(sectionFlags[sectionIndex]);
 
-			int xi = sectionIndex;
-			int yi = xi / renderDiameter;
-			int zi = yi >> 4;
+			int offsetX = sectionIndex;
+			int sectionY = (offsetX * renderDivisor) >> 16;
+			int offsetZ = sectionY >> 4;
 
-			xi %= renderDiameter;
-			yi &= 15;
+			offsetX = offsetX - sectionY * renderDiameter;
+			sectionY &= 15;
 
-			int distChunkX = xi - renderDistance;
-			int distChunkY = yi - (playerY >> 4);
-			int distChunkZ = zi - renderDistance;
+			int distChunkX = offsetX - renderDistance;
+			int distChunkY = sectionY - (playerY >> 4);
+			int distChunkZ = offsetZ - renderDistance;
 
 			int distX = (distChunkX << 4) - (playerX & 15);
 			int distY = (distChunkY << 4) - (playerY & 15);
@@ -147,20 +151,15 @@ public class BFSCuller {
 				continue;
 			}
 
-// 			TODO: Fix GBV not working correctly.
-//			int gridFactor = MAX_GRID_FACTOR;
-//
-//			if (distChunkX != 0 && distChunkY != 0 && distChunkZ != 0) {
-//				gridFactor = processGridIndex(visibilitySet, sectionIndex, renderDiameter, distChunkX, distChunkY, distChunkZ);
-//				visibilitySet[sectionIndex] = (short) Math.max(1, gridFactor);
-//			}
-//
-//			if (gridFactor < TOLERANCE) {
-//				continue;
-//			}
+			int gridFactor = MAX_GRID_FACTOR;
 
-			if ((distance >= 112 * 112 && CompressedFlags.hasPassesNonEmpty(flags) &&
-					!rayVisible(visibilitySet, sectionIndex, renderDiameter, -distX - 8, -distY - 8, -distZ - 8))) {
+			if (distChunkX != 0 && distChunkY != 0 && distChunkZ != 0) {
+				gridFactor = processGridIndex(visibilitySet, sectionIndex, renderDiameter, distChunkX, distChunkY, distChunkZ);
+				visibilitySet[sectionIndex] = (short) gridFactor;
+			}
+
+			if (gridFactor < TOLERANCE || (distance >= 112 * 112 && CompressedFlags.hasPassesNonEmpty(flags) &&
+				!rayVisible(visibilitySet, sectionIndex, renderDiameter, -distX - 8, -distY - 8, -distZ - 8))) {
 				continue;
 			}
 
@@ -175,7 +174,7 @@ public class BFSCuller {
 				bfsQueue.addToRenderList(MathExt.asLong(distChunkX, distChunkY, distChunkZ));
 			}
 
-			traverseNeighbors(bfsQueue, sectionIndex, renderDiameter, directions);
+			traverseNeighbors(bfsQueue, visibilitySet, sectionIndex, renderDiameter, directions);
 		}
 	}
 
@@ -207,15 +206,12 @@ public class BFSCuller {
 	 * Searches outwards from the player position for possible visitable sections, based of the occlusion from the section faces,
 	 * skips visiting sections if they were already visited in the active frame.
 	 */
-	private static void traverseNeighbors(BFSQueue queue, int sectionIndex, int renderDiameter, int directions) {
+	private static void traverseNeighbors(BFSQueue queue, short[] visSet, int sectionIndex, int renderDiameter, int directions) {
 		if (directions == 0b0) {
 			return;
 		}
 
 		queue.verifyCapacity(Direction.COUNT);
-
-		SectionManager sectionManager = SectionManager.getCurrentInstance();
-		byte[] visSet = sectionManager.visibilitySet;
 
 		int offsetX = 1;
 		int offsetY = renderDiameter;
@@ -225,45 +221,45 @@ public class BFSCuller {
 
 		if (Direction.hasSet(directions, Direction.DOWN) && visSet[sectionIndex - offsetY] == 0) {
 			queue.graphIndices[index++] = sectionIndex - offsetY;
-			visSet[sectionIndex - offsetY] = -1;
+			visSet[sectionIndex - offsetY] = MAX_GRID_FACTOR;
 		}
 
 		if (Direction.hasSet(directions, Direction.UP) && visSet[sectionIndex + offsetY] == 0) {
 			queue.graphIndices[index++] = sectionIndex + offsetY;
-			visSet[sectionIndex + offsetY] = -1;
+			visSet[sectionIndex + offsetY] = MAX_GRID_FACTOR;
 		}
 
 		if (Direction.hasSet(directions, Direction.NORTH) && visSet[sectionIndex - offsetZ] == 0) {
 			queue.graphIndices[index++] = sectionIndex - offsetZ;
-			visSet[sectionIndex - offsetZ] = -1;
+			visSet[sectionIndex - offsetZ] = MAX_GRID_FACTOR;
 		}
 
 		if (Direction.hasSet(directions, Direction.SOUTH) && visSet[sectionIndex + offsetZ] == 0) {
 			queue.graphIndices[index++] = sectionIndex + offsetZ;
-			visSet[sectionIndex + offsetZ] = -1;
+			visSet[sectionIndex + offsetZ] = MAX_GRID_FACTOR;
 		}
 
 		if (Direction.hasSet(directions, Direction.WEST) && visSet[sectionIndex - offsetX] == 0) {
 			queue.graphIndices[index++] = sectionIndex - offsetX;
-			visSet[sectionIndex - offsetX] = -1;
+			visSet[sectionIndex - offsetX] = MAX_GRID_FACTOR;
 		}
 
 		if (Direction.hasSet(directions, Direction.EAST) && visSet[sectionIndex + offsetX] == 0) {
 			queue.graphIndices[index++] = sectionIndex + offsetX;
-			visSet[sectionIndex + offsetX] = -1;
+			visSet[sectionIndex + offsetX] = MAX_GRID_FACTOR;
 		}
 
 		queue.bfsIndex = index;
 	}
 
 	private static int sign(int a) {
-		return a >> 31 | 1;
+		return (a >> 31) | 1;
 	}
 
-//	// Copies sign from b to a.
-//	private static int copySign(int a, int b) {
-//
-//	}
+	private static int mulSign(int a, int b) {
+		int mask = b >> 31;
+		return (a ^ mask) - mask;
+	}
 
 	/**
 	 * Uses the key idea from the article of <a href ="https://towardsdatascience.com/a-quick-and-clear-look-at-grid-based-visibility-bf63769fbc78">Grid Based Visibility</a>
@@ -271,25 +267,22 @@ public class BFSCuller {
 	 * optimized, but it helps a ton when there's a lot of occluders.
 	 * @return Grid visibility factor
 	 */
-	private static int processGridIndex(short[] visSet, int sectionIndex, int renderDiameter, int diffChunkX, int diffChunkY, int diffChunkZ) {
+	private static int processGridIndex(short[] visSet, int sectionIndex, int renderDiameter, int diffX, int diffY, int diffZ) {
 		int gradInd = 0;
 
-		int signX = sign(diffChunkX);
-		int signY = sign(diffChunkY) * renderDiameter;
-		int signZ = sign(diffChunkZ) * renderDiameter * 16;
+		int signX = sign(diffX);
+		int signY = mulSign(renderDiameter, diffY);
+		int signZ = mulSign(renderDiameter << 4, diffZ);
 
-		diffChunkX = Math.abs(diffChunkX);
-		diffChunkY = Math.abs(diffChunkY);
-		diffChunkZ = Math.abs(diffChunkZ);
+		diffX = Math.abs(diffX);
+		diffY = Math.abs(diffY);
+		diffZ = Math.abs(diffZ);
 
-		// X
-		gradInd += diffChunkX * visSet[sectionIndex + signX];
-		// Y
-		gradInd += diffChunkY * visSet[sectionIndex + signY];
-		// Z
-		gradInd += diffChunkZ * visSet[sectionIndex + signZ];
+		gradInd += diffX * (visSet[sectionIndex - signX]);
+		gradInd += diffY * (visSet[sectionIndex - signY]);
+		gradInd += diffZ * (visSet[sectionIndex - signZ]);
 
-		return gradInd / (diffChunkX + diffChunkY + diffChunkZ);
+		return (int) ((gradInd * INV_DIVS[diffX + diffY + diffZ]) >> PRECISION_BITS);
 	}
 
 	/**
@@ -309,7 +302,7 @@ public class BFSCuller {
 	 * Traces a ray from the section to the camera and tries to find obstruction in the way using the section
 	 * current frame.
 	 */
-	private static boolean rayVisible(byte[] visSet, int sectionIndex, int renderDiameter, int dx, int dy, int dz) {
+	private static boolean rayVisible(short[] visSet, int sectionIndex, int renderDiameter, int dx, int dy, int dz) {
 		int tMaxX = MAX_SCALE / (Math.abs(dx) | 1);
 		int tMaxY = MAX_SCALE / (Math.abs(dy) | 1);
 		int tMaxZ = MAX_SCALE / (Math.abs(dz) | 1);
@@ -321,8 +314,8 @@ public class BFSCuller {
 		int valid = 0;
 
 		int signX = sign(dx);
-		int signY = sign(dy) * renderDiameter;
-		int signZ = sign(dz) * renderDiameter * 16;
+		int signY = mulSign(renderDiameter, dy);
+		int signZ = mulSign(renderDiameter << 4, dz);
 
 		for (int i = 0; i < 4; i++) {
 			if (tMaxX < tMaxY) {

@@ -48,7 +48,7 @@ public class SectionManager {
 	public byte[] sectionFlags;
 	public byte[] tempSectionFlags;
 
-	public byte[] visibilitySet;
+	public short[] visibilitySet;
 
 	private LinearFogProgram linearFogProgram;
 	private ExpFogProgram expFogProgram;
@@ -269,16 +269,16 @@ public class SectionManager {
 		this.queuedFlags.clear();
 	}
 
-	private static final byte[] EMPTY_ARRAY = new byte[4096];
+	private static final short[] EMPTY_ARRAY = new short[4096];
 
 	private void resetVisibilityState() {
 		int size = MathExt.square(this.renderDistance * 2 + 1) * 16;
 
-		if (this.visibilitySet == null || this.visibilitySet.length != size){
-			this.visibilitySet = new byte[size];
+		if (this.visibilitySet == null || this.visibilitySet.length != size) {
+			this.visibilitySet = new short[size];
 		}
 
-		byte[] array = this.visibilitySet;
+		short[] array = this.visibilitySet;
 		int length = array.length;
 
 		System.arraycopy(EMPTY_ARRAY, 0, array, 0, Math.min(4096, length));
