@@ -156,8 +156,8 @@ public class BFSCuller {
 					gridFactor = processGridFactor(visibilitySet, sectionIndex, diameter, distChunkX, distChunkY, distChunkZ);
 				}
 
-				if (gridFactor < TOLERANCE || (distance >= 112 * 112 && CompressedFlags.hasPassesNonEmpty(flags) &&
-					!rayVisible(visibilitySet, sectionIndex, diameter, -distX - 8, -distY - 8, -distZ - 8))) {
+				if (gridFactor < TOLERANCE || (distance >= 80 * 80 && CompressedFlags.hasPassesNonEmpty(flags) &&
+					rayNotVisible(visibilitySet, sectionIndex, diameter, -distX - 8, -distY - 8, -distZ - 8))) {
 					continue;
 				}
 			}
@@ -300,20 +300,18 @@ public class BFSCuller {
 	 * Traces a ray from the section to the camera and tries to find obstruction in the way using the section
 	 * current frame.
 	 */
-	private static boolean rayVisible(short[] visSet, int sectionIndex, int renderDiameter, int dx, int dy, int dz) {
-		int tMaxX = MAX_SCALE / (Math.abs(dx) | 1);
-		int tMaxY = MAX_SCALE / (Math.abs(dy) | 1);
-		int tMaxZ = MAX_SCALE / (Math.abs(dz) | 1);
+	private static boolean rayNotVisible(short[] visSet, int sectionIndex, int renderDiameter, int dX, int dY, int dZ) {
+		int tMaxX = MAX_SCALE / (Math.abs(dX) | 1);
+		int tMaxY = MAX_SCALE / (Math.abs(dY) | 1);
+		int tMaxZ = MAX_SCALE / (Math.abs(dZ) | 1);
 
 		int tDeltaX = tMaxX << 1;
 		int tDeltaY = tMaxY << 1;
 		int tDeltaZ = tMaxZ << 1;
 
-		int valid = 0;
-
-		int signX = MathExt.sign(dx);
-		int signY = MathExt.mulSign(renderDiameter, dy);
-		int signZ = MathExt.mulSign(renderDiameter << 4, dz);
+		int signX = MathExt.sign(dX);
+		int signY = MathExt.mulSign(renderDiameter, dY);
+		int signZ = MathExt.mulSign(renderDiameter << 4, dZ);
 
 		for (int i = 0; i < 4; i++) {
 			if (tMaxX < tMaxY) {
@@ -334,11 +332,11 @@ public class BFSCuller {
 				}
 			}
 
-			if (visSet[sectionIndex] == 0 && valid++ > 2) {
-				break;
+			if (visSet[sectionIndex] > TOLERANCE) {
+				return false;
 			}
 		}
 
-		return valid <= 2;
+		return true;
 	}
 }
