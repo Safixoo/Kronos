@@ -46,8 +46,8 @@ public class BFSCuller {
 		SectionRender origin = manager.getSectionMap().get(MathExt.asLong(blockX >> 4, blockY >> 4, blockZ >> 4));
 		SectionSet sectionSet = manager.getSectionSet();
 
-		int renderDistance = camera.renderDistance;
-		int sectionIndex = SectionSet.getFlagIndex(renderDistance, blockY >> 4, renderDistance, renderDistance);
+		int radius = sectionSet.getRadius();
+		int sectionIndex = SectionSet.getFlagIndex(radius, blockY >> 4, radius, sectionSet.getRadius());
 
 		short[] visibilitySet = sectionSet.visibilitySet;
 
@@ -55,8 +55,8 @@ public class BFSCuller {
 			int flags = origin.flags;
 
 			visibilitySet[sectionIndex] = MAX_GRID_FACTOR;
-			int renderDiameter = renderDistance * 2 + 1;
-			traverseNeighbors(this.bfsQueue, visibilitySet, sectionIndex, renderDiameter, SectionFlags.getAdjacentMask(flags));
+			int diameter = radius * 2 + 1;
+			traverseNeighbors(this.bfsQueue, visibilitySet, sectionIndex, diameter, SectionFlags.getAdjacentMask(flags));
 
 			if (SectionFlags.isDirty(flags)) {
 				RebuildList.addToList(0b0);
@@ -65,8 +65,8 @@ public class BFSCuller {
 			queueRegionNode(origin, flags);
 		}
 
-		int maxDistSquared = (int) MathExt.square(Math.max(3 << 4, Math.min(GlStateTracker.FOG_END, renderDistance << 4)));
-		iterateGraph(this.bfsQueue, sectionSet, camera.intX, camera.intY, camera.intZ, maxDistSquared, renderDistance);
+		int maxDistSquared = (int) MathExt.square(Math.max(3 << 4, Math.min(GlStateTracker.FOG_END, (camera.renderDistance << 4) - 8)));
+		iterateGraph(this.bfsQueue, sectionSet, camera.intX, camera.intY, camera.intZ, maxDistSquared);
 
 		this.enqueueRegionData(camera);
 	}
@@ -114,12 +114,12 @@ public class BFSCuller {
 	 *  different ideas to avoid section queueing during the search.
 	 */
 	private static void iterateGraph(BFSQueue bfsQueue, SectionSet sectionSet,
-									 int playerX, int playerY, int playerZ,
-									 int maxDistSquared, int renderDistance) {
+									 int playerX, int playerY, int playerZ, int maxDistSquared) {
 		byte[] sectionFlags = sectionSet.sectionFlags;
 		short[] visibilitySet = sectionSet.visibilitySet;
 
-		int renderDiameter = renderDistance * 2 + 1;
+		int radius = sectionSet.getRadius();
+		int diameter = radius * 2 + 1;
 		int readIndex = 0;
 
 		while (readIndex < bfsQueue.bfsIndex) {
@@ -129,15 +129,15 @@ public class BFSCuller {
 			// kind of ugly indexing but it works fine.
 			int offsetX = sectionIndex;
 
-			int sectionY = offsetX / renderDiameter;
-			offsetX %= renderDiameter;
+			int sectionY = offsetX / diameter;
+			offsetX %= diameter;
 
 			int offsetZ = sectionY >> 4;
 			sectionY &= 15;
 
-			int distChunkX = offsetX - renderDistance;
+			int distChunkX = offsetX - radius;
 			int distChunkY = sectionY - (playerY >> 4);
-			int distChunkZ = offsetZ - renderDistance;
+			int distChunkZ = offsetZ - radius;
 
 			int distX = (distChunkX << 4) - (playerX & 15);
 			int distY = (distChunkY << 4) - (playerY & 15);
@@ -153,11 +153,11 @@ public class BFSCuller {
 				short gridFactor = MAX_GRID_FACTOR;
 
 				if (distChunkX != 0 && distChunkY != 0 && distChunkZ != 0) {
-					gridFactor = processGridFactor(visibilitySet, sectionIndex, renderDiameter, distChunkX, distChunkY, distChunkZ);
+					gridFactor = processGridFactor(visibilitySet, sectionIndex, diameter, distChunkX, distChunkY, distChunkZ);
 				}
 
 				if (gridFactor < TOLERANCE || (distance >= 112 * 112 && CompressedFlags.hasPassesNonEmpty(flags) &&
-					!rayVisible(visibilitySet, sectionIndex, renderDiameter, -distX - 8, -distY - 8, -distZ - 8))) {
+					!rayVisible(visibilitySet, sectionIndex, diameter, -distX - 8, -distY - 8, -distZ - 8))) {
 					continue;
 				}
 			}
@@ -169,7 +169,7 @@ public class BFSCuller {
 			queueRenderTasks(bfsQueue, flags, distChunkX, distChunkY, distChunkZ);
 
 			if (directions != 0b0) {
-				traverseNeighbors(bfsQueue, visibilitySet, sectionIndex, renderDiameter, directions);
+				traverseNeighbors(bfsQueue, visibilitySet, sectionIndex, diameter, directions);
 			}
 		}
 	}
