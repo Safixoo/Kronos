@@ -107,10 +107,11 @@ public class HookUtils {
 
 			return mcField;
 		} catch (Exception e) {
-			e.printStackTrace();
+			System.err.println("Couldn't find field with name: " + fieldName);
 		}
 
-		throw new RuntimeException("Couldn't find object");
+		// Couldn't find field with the name.
+		return null;
 	}
 
 	public static Field getField(Object instance, String fieldName, String fieldNotch) {

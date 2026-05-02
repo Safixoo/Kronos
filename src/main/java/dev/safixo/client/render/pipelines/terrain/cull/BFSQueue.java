@@ -47,10 +47,6 @@ public class BFSQueue {
 		this.renderListIndex = 0;
 	}
 
-	public int get(int position) {
-		return this.graphIndices[position];
-	}
-
 	public int size() {
 		return this.bfsIndex;
 	}

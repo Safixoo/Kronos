@@ -48,36 +48,6 @@ public class MathExt {
 		return r;
 	}
 
-	public static float squaredDistanceXYZ(SectionRender render, CameraData cameraData) {
-		float distX = (render.blockX - cameraData.intX + 8) - cameraData.fractX;
-		float distY = (render.blockY - cameraData.intY + 8) - cameraData.fractY;
-		float distZ = (render.blockZ - cameraData.intZ + 8) - cameraData.fractZ;
-
-		return MathExt.square(distX) + MathExt.square(distY) + MathExt.square(distZ);
-	}
-
-	public static int manhattanDistanceXYZFast(SectionRender render, int pX, int pY, int pZ) {
-		int distX = Math.abs(render.blockX - pX);
-		int distY = Math.abs(render.blockY - pY);
-		int distZ = Math.abs(render.blockZ - pZ);
-
-		return distX + distY + distZ;
-	}
-
-	public static float squaredDistanceXZ(SectionRender render, CameraData cameraData) {
-		float distX = (render.blockX - cameraData.intX + 8) - cameraData.fractX;
-		float distZ = (render.blockZ - cameraData.intZ + 8) - cameraData.fractZ;
-
-		return MathExt.square(distX) + MathExt.square(distZ);
-	}
-
-	public static float squaredDistanceXZ(int posX, int posZ, CameraData cameraData) {
-		float distX = (posX - cameraData.intX + 8) - cameraData.fractX;
-		float distZ = (posZ - cameraData.intZ + 8) - cameraData.fractZ;
-
-		return MathExt.square(distX) + MathExt.square(distZ);
-	}
-
 	public static int getLightmapCoord(int skyLight, int blockLight) {
 		return skyLight << 20 | blockLight << 4;
 	}
@@ -159,6 +129,15 @@ public class MathExt {
 		return num * num;
 	}
 
+	public static int sign(int a) {
+		return (a >> 31) | 1;
+	}
+
+	public static int mulSign(int a, int b) {
+		int mask = b >> 31;
+		return (a ^ mask) - mask;
+	}
+
 	public static int square(int num) {
 		return num * num;
 	}
@@ -182,15 +161,6 @@ public class MathExt {
 
 		return (nX & 0xFF) << 0 | (nY & 0xFF) << 8 | (nZ & 0xFF) << 16;
 	}
-
-	public static int byteToUnsignedInt(byte x) {
-		return x & 0xFF;
-	}
-
-	public static int byteToUnsignedInt(int x) {
-		return (byte) x & 0xFF;
-	}
-
 
 	public static int posToSectionIntegral(double position) {
 		return MathExt.floor(position) >> 4;

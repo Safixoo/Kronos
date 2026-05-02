@@ -1,11 +1,7 @@
 package dev.safixo.client.render.pipelines.terrain.cull;
 
-import dev.safixo.client.render.pipelines.terrain.CompressedFlags;
-import dev.safixo.client.render.pipelines.terrain.SectionManager;
+import dev.safixo.client.render.pipelines.terrain.*;
 import dev.safixo.core.hooks.GlStateTracker;
-import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
-import dev.safixo.client.render.pipelines.terrain.SectionFlags;
-import dev.safixo.client.render.pipelines.terrain.SectionRender;
 import dev.safixo.client.util.data.CameraData;
 import dev.safixo.client.render.pipelines.terrain.region.RegionManager;
 import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
@@ -13,11 +9,6 @@ import dev.safixo.client.util.Direction;
 import dev.safixo.client.util.MathExt;
 
 public class BFSCuller {
-	public final BFSQueue bfsQueue = new BFSQueue();
-	private int activeFrame;
-
-	// The max denominator would always be a renderDistance * 3 worst case, and should always
-	// be accessed in a linear way, so it shouldn't mean a problem for the cache.
 	private static final long[] INV_DIVS = new long[256];
 
 	public static final int PRECISION_BITS = 25;
@@ -25,6 +16,8 @@ public class BFSCuller {
 
 	public static final int MAX_GRID_FACTOR = 1 << 12;
 	private static final int TOLERANCE = (int) (0.15f * MAX_GRID_FACTOR);
+
+	public final BFSQueue bfsQueue = new BFSQueue();
 
 	static {
 		for (int i = 0; i < 256; i++) {
@@ -37,46 +30,51 @@ public class BFSCuller {
 			render.sectionsToRender = 0;
 		}
 
+		RebuildList.clear();
 		this.bfsQueue.clear();
-		this.activeFrame++;
 	}
 
 	/**
 	 * Gets the first sections of the search, prepares the graph-search max distance and queues the first couple
 	 * of sections to start the search afterward.
 	 */
-	public void updateRenderList(Long2ReferenceOpenHashMap<SectionRender> sectionMap, CameraData camera) {
+	public void updateRenderList(SectionManager manager, CameraData camera) {
 		int blockX = camera.intX;
 		int blockY = MathExt.clamp(camera.intY, 0, 255);
 		int blockZ = camera.intZ;
 
-		SectionRender origin = sectionMap.get(MathExt.asLong(blockX >> 4, blockY >> 4, blockZ >> 4));
+		SectionRender origin = manager.getSectionMap().get(MathExt.asLong(blockX >> 4, blockY >> 4, blockZ >> 4));
+		SectionSet sectionSet = manager.getSectionSet();
 
 		int renderDistance = camera.renderDistance;
-		int renderDiameter = renderDistance * 2 + 1;
-		int sectionIndex = SectionManager.getFlagIndex(renderDistance, blockY >> 4, renderDistance, renderDistance);
+		int sectionIndex = SectionSet.getFlagIndex(renderDistance, blockY >> 4, renderDistance, renderDistance);
 
-		short[] visibilitySet = SectionManager.getCurrentInstance().visibilitySet;
+		short[] visibilitySet = sectionSet.visibilitySet;
 
 		if (origin != null) {
 			int flags = origin.flags;
 
 			visibilitySet[sectionIndex] = MAX_GRID_FACTOR;
+			int renderDiameter = renderDistance * 2 + 1;
 			traverseNeighbors(this.bfsQueue, visibilitySet, sectionIndex, renderDiameter, SectionFlags.getAdjacentMask(flags));
 
 			if (SectionFlags.isDirty(flags)) {
-				RebuildList.addToList(0);
+				RebuildList.addToList(0b0);
 			}
 
 			queueRegionNode(origin, flags);
 		}
 
-		double maxDistance = Math.max(3 << 4, Math.min(GlStateTracker.FOG_END, renderDistance << 4));
-		iterateGraph(this.bfsQueue, camera.intX, camera.intY, camera.intZ, (int) MathExt.square(maxDistance), renderDistance);
+		int maxDistSquared = (int) MathExt.square(Math.max(3 << 4, Math.min(GlStateTracker.FOG_END, renderDistance << 4)));
+		iterateGraph(this.bfsQueue, sectionSet, camera.intX, camera.intY, camera.intZ, maxDistSquared, renderDistance);
 
 		this.enqueueRegionData(camera);
 	}
 
+	/**
+	 * Reads all the indices from the visible sections enqueued in the graph and write
+	 * their relative region indices in the region to later be used for drawing.
+	 */
 	private void enqueueRegionData(CameraData camera) {
 		RegionManager regionManager = SectionManager.getRegionManager();
 		RegionRender[] regions = regionManager.getIndexedRegions(camera);
@@ -115,19 +113,20 @@ public class BFSCuller {
 	 * by tomcc and the Sodium implementation, with many differences as it doesn't try to find connectivity 100% and uses some
 	 *  different ideas to avoid section queueing during the search.
 	 */
-	private static void iterateGraph(BFSQueue bfsQueue, int playerX, int playerY, int playerZ, int fogDistance, int renderDistance) {
-		SectionManager sectionManager = SectionManager.getCurrentInstance();
-
-		byte[] sectionFlags = sectionManager.sectionFlags;
-		short[] visibilitySet = sectionManager.visibilitySet;
+	private static void iterateGraph(BFSQueue bfsQueue, SectionSet sectionSet,
+									 int playerX, int playerY, int playerZ,
+									 int maxDistSquared, int renderDistance) {
+		byte[] sectionFlags = sectionSet.sectionFlags;
+		short[] visibilitySet = sectionSet.visibilitySet;
 
 		int renderDiameter = renderDistance * 2 + 1;
 		int readIndex = 0;
 
 		while (readIndex < bfsQueue.bfsIndex) {
-			int sectionIndex = bfsQueue.get(readIndex++);
+			int sectionIndex = bfsQueue.graphIndices[readIndex++];
 			int flags = MathExt.byteToUnsigned(sectionFlags[sectionIndex]);
 
+			// kind of ugly indexing but it works fine.
 			int offsetX = sectionIndex;
 
 			int sectionY = offsetX / renderDiameter;
@@ -146,34 +145,46 @@ public class BFSCuller {
 
 			int distance = getDistance(distX, distY, distZ);
 
-			if (distance >= fogDistance || !FrustumCuller.withinFrustumBounds(distX, distY, distZ)) {
-				continue;
-			}
+			{ // Calculates visibility per section.
+				if (distance >= maxDistSquared || !FrustumCuller.withinFrustumBounds(distX, distY, distZ)) {
+					continue;
+				}
 
-			int gridFactor = MAX_GRID_FACTOR;
+				short gridFactor = MAX_GRID_FACTOR;
 
-			if (distChunkX != 0 && distChunkY != 0 && distChunkZ != 0) {
-				gridFactor = processGridIndex(visibilitySet, sectionIndex, renderDiameter, distChunkX, distChunkY, distChunkZ);
-				visibilitySet[sectionIndex] = (short) gridFactor;
-			}
+				if (distChunkX != 0 && distChunkY != 0 && distChunkZ != 0) {
+					gridFactor = processGridFactor(visibilitySet, sectionIndex, renderDiameter, distChunkX, distChunkY, distChunkZ);
+				}
 
-			if (gridFactor < TOLERANCE || (distance >= 112 * 112 && CompressedFlags.hasPassesNonEmpty(flags) &&
-				!rayVisible(visibilitySet, sectionIndex, renderDiameter, -distX - 8, -distY - 8, -distZ - 8))) {
-				continue;
+				if (gridFactor < TOLERANCE || (distance >= 112 * 112 && CompressedFlags.hasPassesNonEmpty(flags) &&
+					!rayVisible(visibilitySet, sectionIndex, renderDiameter, -distX - 8, -distY - 8, -distZ - 8))) {
+					continue;
+				}
 			}
 
 			int directions = getOutwardDirections(distChunkX, distChunkY, distChunkZ);
 			directions &= CompressedFlags.getTraversableFaces(flags);
+			directions &= 0b111_111;
 
-			if (CompressedFlags.isDirty(flags)) {
-				RebuildList.addToList(MathExt.asLong(distChunkX, distChunkY, distChunkZ));
+			queueRenderTasks(bfsQueue, flags, distChunkX, distChunkY, distChunkZ);
+
+			if (directions != 0b0) {
+				traverseNeighbors(bfsQueue, visibilitySet, sectionIndex, renderDiameter, directions);
 			}
+		}
+	}
 
-			if (CompressedFlags.hasPassesNonEmpty(flags)) {
-				bfsQueue.addToRenderList(MathExt.asLong(distChunkX, distChunkY, distChunkZ));
-			}
+	/**
+	 * Based in the flag data and position relative to the camera, saves positions to be later
+	 * retrieved and processed for region rendering and meshing.
+	 */
+	private static void queueRenderTasks(BFSQueue queue, int flags, int distChunkX, int distChunkY, int distChunkZ) {
+		if (CompressedFlags.isDirty(flags)) {
+			RebuildList.addToList(MathExt.asLong(distChunkX, distChunkY, distChunkZ));
+		}
 
-			traverseNeighbors(bfsQueue, visibilitySet, sectionIndex, renderDiameter, directions);
+		if (CompressedFlags.hasPassesNonEmpty(flags)) {
+			queue.addToRenderList(MathExt.asLong(distChunkX, distChunkY, distChunkZ));
 		}
 	}
 
@@ -206,10 +217,6 @@ public class BFSCuller {
 	 * skips visiting sections if they were already visited in the active frame.
 	 */
 	private static void traverseNeighbors(BFSQueue queue, short[] visSet, int sectionIndex, int renderDiameter, int directions) {
-		if (directions == 0b0) {
-			return;
-		}
-
 		queue.verifyCapacity(Direction.COUNT);
 
 		int offsetX = 1;
@@ -217,61 +224,53 @@ public class BFSCuller {
 		int offsetZ = renderDiameter << 4;
 
 		int index = queue.bfsIndex;
+		int[] graphIndices = queue.graphIndices;
 
 		if (Direction.hasSet(directions, Direction.DOWN) && visSet[sectionIndex - offsetY] == 0) {
-			queue.graphIndices[index++] = sectionIndex - offsetY;
+			graphIndices[index++] = sectionIndex - offsetY;
 			visSet[sectionIndex - offsetY] = MAX_GRID_FACTOR;
 		}
 
 		if (Direction.hasSet(directions, Direction.UP) && visSet[sectionIndex + offsetY] == 0) {
-			queue.graphIndices[index++] = sectionIndex + offsetY;
+			graphIndices[index++] = sectionIndex + offsetY;
 			visSet[sectionIndex + offsetY] = MAX_GRID_FACTOR;
 		}
 
 		if (Direction.hasSet(directions, Direction.NORTH) && visSet[sectionIndex - offsetZ] == 0) {
-			queue.graphIndices[index++] = sectionIndex - offsetZ;
+			graphIndices[index++] = sectionIndex - offsetZ;
 			visSet[sectionIndex - offsetZ] = MAX_GRID_FACTOR;
 		}
 
 		if (Direction.hasSet(directions, Direction.SOUTH) && visSet[sectionIndex + offsetZ] == 0) {
-			queue.graphIndices[index++] = sectionIndex + offsetZ;
+			graphIndices[index++] = sectionIndex + offsetZ;
 			visSet[sectionIndex + offsetZ] = MAX_GRID_FACTOR;
 		}
 
 		if (Direction.hasSet(directions, Direction.WEST) && visSet[sectionIndex - offsetX] == 0) {
-			queue.graphIndices[index++] = sectionIndex - offsetX;
+			graphIndices[index++] = sectionIndex - offsetX;
 			visSet[sectionIndex - offsetX] = MAX_GRID_FACTOR;
 		}
 
 		if (Direction.hasSet(directions, Direction.EAST) && visSet[sectionIndex + offsetX] == 0) {
-			queue.graphIndices[index++] = sectionIndex + offsetX;
+			graphIndices[index++] = sectionIndex + offsetX;
 			visSet[sectionIndex + offsetX] = MAX_GRID_FACTOR;
 		}
 
 		queue.bfsIndex = index;
 	}
 
-	private static int sign(int a) {
-		return (a >> 31) | 1;
-	}
-
-	private static int mulSign(int a, int b) {
-		int mask = b >> 31;
-		return (a ^ mask) - mask;
-	}
-
 	/**
 	 * Uses the key idea from the article of <a href ="https://towardsdatascience.com/a-quick-and-clear-look-at-grid-based-visibility-bf63769fbc78">Grid Based Visibility</a>
 	 * to determine the factor of grid visibility in 3D for the current visited section of the graph. It might not be perfectly
 	 * optimized, but it helps a ton when there's a lot of occluders.
-	 * @return Grid visibility factor
+	 * @return Grid Visibility Factor
 	 */
-	private static int processGridIndex(short[] visSet, int sectionIndex, int renderDiameter, int diffX, int diffY, int diffZ) {
+	private static short processGridFactor(short[] visSet, int sectionIndex, int renderDiameter, int diffX, int diffY, int diffZ) {
 		int gradInd = 0;
 
-		int signX = sign(diffX);
-		int signY = mulSign(renderDiameter, diffY);
-		int signZ = mulSign(renderDiameter << 4, diffZ);
+		int signX = MathExt.sign(diffX);
+		int signY = MathExt.mulSign(renderDiameter, diffY);
+		int signZ = MathExt.mulSign(renderDiameter << 4, diffZ);
 
 		diffX = Math.abs(diffX);
 		diffY = Math.abs(diffY);
@@ -281,7 +280,7 @@ public class BFSCuller {
 		gradInd += diffY * (visSet[sectionIndex - signY]);
 		gradInd += diffZ * (visSet[sectionIndex - signZ]);
 
-		return (int) ((gradInd * INV_DIVS[diffX + diffY + diffZ]) >> PRECISION_BITS);
+		return visSet[sectionIndex] = ((short) ((gradInd * INV_DIVS[diffX + diffY + diffZ]) >> PRECISION_BITS));
 	}
 
 	/**
@@ -312,9 +311,9 @@ public class BFSCuller {
 
 		int valid = 0;
 
-		int signX = sign(dx);
-		int signY = mulSign(renderDiameter, dy);
-		int signZ = mulSign(renderDiameter << 4, dz);
+		int signX = MathExt.sign(dx);
+		int signY = MathExt.mulSign(renderDiameter, dy);
+		int signZ = MathExt.mulSign(renderDiameter << 4, dz);
 
 		for (int i = 0; i < 4; i++) {
 			if (tMaxX < tMaxY) {
@@ -341,9 +340,5 @@ public class BFSCuller {
 		}
 
 		return valid <= 2;
-	}
-
-	public int getActiveFrame() {
-		return this.activeFrame;
 	}
 }
