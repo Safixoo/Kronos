@@ -1,5 +1,6 @@
 package dev.safixo.client.render.pipelines.terrain;
 
+import dev.safixo.client.render.pipelines.terrain.cull.BFSCuller;
 import dev.safixo.client.render.pipelines.terrain.cull.BFSQueue;
 import dev.safixo.client.util.MathExt;
 import dev.safixo.client.util.data.CameraData;
@@ -19,6 +20,8 @@ public class SectionSet {
 	public short[] visibilitySet;
 
 	private int lastCameraChunkX = Integer.MIN_VALUE, lastCameraChunkZ = Integer.MIN_VALUE;
+	private float lastDistance;
+
 	private CameraData camera;
 	private int radius;
 
@@ -29,10 +32,42 @@ public class SectionSet {
 
 		this.resetVisibilityState();
 
+		float fogDistance = BFSCuller.getFogDistance(camera);
+
+		if (fogDistance != this.lastDistance) {
+			this.clampVisibilitySet(fogDistance);
+			this.lastDistance = fogDistance;
+		}
+
 		if (worldChanged || lastCamera == null || camera.renderDistance != lastCamera.renderDistance) {
 			this.initializeFlagData(manager);
 		} else {
 			this.updateAllFlags(manager);
+		}
+	}
+
+	private void clampVisibilitySet(float fogDistance) {
+		float squaredDistance = MathExt.square((fogDistance + 8) / 16.0f);
+		int radius = this.radius;
+
+		final short[] visibilitySet = this.visibilitySet;
+
+		for (int x = 0; x <= radius; x++) {
+			for (int z = 0; z <= radius; z++) {
+				if (MathExt.square(x) + MathExt.square(z) >= squaredDistance) {
+					for (int y = 0; y < 16; y++) {
+						int flagIndexPP = getFlagIndex(x + radius, y, z + radius, radius);
+						int flagIndexNP = getFlagIndex(-x + radius, y, z + radius, radius);
+						int flagIndexNN = getFlagIndex(-x + radius, y, -z + radius, radius);
+						int flagIndexPN = getFlagIndex(x + radius, y, -z + radius, radius);
+
+						visibilitySet[flagIndexPP] = 1;
+						visibilitySet[flagIndexNP] = 1;
+						visibilitySet[flagIndexNN] = 1;
+						visibilitySet[flagIndexPN] = 1;
+					}
+				}
+			}
 		}
 	}
 

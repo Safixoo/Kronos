@@ -62,10 +62,14 @@ public class BFSCuller {
 			queueRegionNode(origin, flags);
 		}
 
-		int maxDistSquared = (int) MathExt.square(Math.max(3 << 4, Math.min(GlStateTracker.FOG_END, (camera.renderDistance << 4) - 8)));
+		int maxDistSquared = (int) MathExt.square(getFogDistance(camera));
 		iterateGraph(sectionSet, camera.intX, camera.intY, camera.intZ, maxDistSquared);
 
 		this.enqueueRegionData(camera);
+	}
+
+	public static float getFogDistance(CameraData camera) {
+		return Math.max(3 << 4, Math.min(GlStateTracker.FOG_END, camera.renderDistance << 4));
 	}
 
 	/**
