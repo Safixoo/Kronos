@@ -10,15 +10,15 @@ import dev.safixo.client.util.data.CameraData;
  * the origin.
  */
 public class RebuildList {
-	private static final long[] UPDATE_QUEUE = new long[SectionManager.MAX_UPDATES_TRIES];
+	private static final int[] UPDATE_QUEUE = new int[SectionManager.MAX_UPDATES_TRIES];
 	private static int UPDATE_POSITION = 0;
 
-	public static void addToList(long render) {
+	public static void addToList(int section) {
 		if (UPDATE_POSITION >= SectionManager.MAX_UPDATES_TRIES) {
 			return;
 		}
 
-		UPDATE_QUEUE[UPDATE_POSITION++] = render;
+		UPDATE_QUEUE[UPDATE_POSITION++] = section;
 	}
 
 	public static void clear() {
@@ -26,10 +26,10 @@ public class RebuildList {
 	}
 
 	public static long getSectionPos(CameraData camera, int index) {
-		long relativePos = UPDATE_QUEUE[index];
+		int relativePos = UPDATE_QUEUE[index];
 
 		int posX = MathExt.decodeX(relativePos) + (camera.intX >> 4);
-		int posY = MathExt.decodeY(relativePos) + (camera.intY >> 4);
+		int posY = MathExt.decodeY(relativePos);
 		int posZ = MathExt.decodeZ(relativePos) + (camera.intZ >> 4);
 
 		return MathExt.asLong(posX, posY, posZ);

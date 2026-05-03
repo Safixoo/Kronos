@@ -17,8 +17,6 @@ public class BFSCuller {
 	public static final int MAX_GRID_FACTOR = 1 << 12;
 	private static final int TOLERANCE = (int) (0.15f * MAX_GRID_FACTOR);
 
-	public final BFSQueue bfsQueue = new BFSQueue();
-
 	static {
 		for (int i = 0; i < 256; i++) {
 			INV_DIVS[i] = (long) Math.ceil(MAX_PRECISION / (double) i);
@@ -31,7 +29,7 @@ public class BFSCuller {
 		}
 
 		RebuildList.clear();
-		this.bfsQueue.clear();
+		BFSQueue.clear();
 	}
 
 	/**
@@ -54,19 +52,18 @@ public class BFSCuller {
 		if (origin != null) {
 			int flags = origin.flags;
 
-			visibilitySet[sectionIndex] = MAX_GRID_FACTOR;
 			int diameter = radius * 2 + 1;
-			traverseNeighbors(this.bfsQueue, visibilitySet, sectionIndex, diameter, SectionFlags.getAdjacentMask(flags));
+			traverseNeighbors(visibilitySet, sectionIndex, diameter, SectionFlags.getAdjacentMask(flags));
 
 			if (SectionFlags.isDirty(flags)) {
-				RebuildList.addToList(0b0);
+				RebuildList.addToList(MathExt.asInt(0, blockY >> 4, 0));
 			}
 
 			queueRegionNode(origin, flags);
 		}
 
 		int maxDistSquared = (int) MathExt.square(Math.max(3 << 4, Math.min(GlStateTracker.FOG_END, (camera.renderDistance << 4) - 8)));
-		iterateGraph(this.bfsQueue, sectionSet, camera.intX, camera.intY, camera.intZ, maxDistSquared);
+		iterateGraph(sectionSet, camera.intX, camera.intY, camera.intZ, maxDistSquared);
 
 		this.enqueueRegionData(camera);
 	}
@@ -84,14 +81,13 @@ public class BFSCuller {
 		int regionCameraZ = camera.intZ >> RegionRender.BLOCK_SHIFT_Z;
 
 		int cameraChunkX = camera.intX >> 4;
-		int cameraChunkY = camera.intY >> 4;
 		int cameraChunkZ = camera.intZ >> 4;
 
-		for (int i = 0; i < this.bfsQueue.renderListIndex; i++) {
-			long position = this.bfsQueue.renderIndices[i];
+		for (int i = 0; i < BFSQueue.renderIndex; i++) {
+			int position = BFSQueue.RENDER_INDICES[i];
 
 			int sectionX = MathExt.decodeX(position) + cameraChunkX;
-			int sectionY = MathExt.decodeY(position) + cameraChunkY;
+			int sectionY = MathExt.decodeY(position);
 			int sectionZ = MathExt.decodeZ(position) + cameraChunkZ;
 
 			int distRegionX = (sectionX >> (RegionRender.BLOCK_SHIFT_X - 4)) - regionCameraX;
@@ -113,8 +109,7 @@ public class BFSCuller {
 	 * by tomcc and the Sodium implementation, with many differences as it doesn't try to find connectivity 100% and uses some
 	 *  different ideas to avoid section queueing during the search.
 	 */
-	private static void iterateGraph(BFSQueue bfsQueue, SectionSet sectionSet,
-									 int playerX, int playerY, int playerZ, int maxDistSquared) {
+	private static void iterateGraph(SectionSet sectionSet, int playerX, int playerY, int playerZ, int maxDistSquared) {
 		byte[] sectionFlags = sectionSet.sectionFlags;
 		short[] visibilitySet = sectionSet.visibilitySet;
 
@@ -122,8 +117,8 @@ public class BFSCuller {
 		int diameter = radius * 2 + 1;
 		int readIndex = 0;
 
-		while (readIndex < bfsQueue.bfsIndex) {
-			int sectionIndex = bfsQueue.graphIndices[readIndex++];
+		while (readIndex < BFSQueue.bfsIndex) {
+			int sectionIndex = BFSQueue.GRAPH_INDICES[readIndex++];
 			int flags = MathExt.byteToUnsigned(sectionFlags[sectionIndex]);
 
 			// kind of ugly indexing but it works fine.
@@ -135,41 +130,37 @@ public class BFSCuller {
 			int offsetZ = sectionY >> 4;
 			sectionY &= 15;
 
-			int distChunkX = offsetX - radius;
-			int distChunkY = sectionY - (playerY >> 4);
-			int distChunkZ = offsetZ - radius;
+			int diffChunkX = offsetX - radius;
+			int diffChunkY = sectionY - (playerY >> 4);
+			int diffChunkZ = offsetZ - radius;
 
-			int distX = (distChunkX << 4) - (playerX & 15);
-			int distY = (distChunkY << 4) - (playerY & 15);
-			int distZ = (distChunkZ << 4) - (playerZ & 15);
+			int diffX = (diffChunkX << 4) - (playerX & 15);
+			int diffY = (diffChunkY << 4) - (playerY & 15);
+			int diffZ = (diffChunkZ << 4) - (playerZ & 15);
 
-			int distance = getDistance(distX, distY, distZ);
+			int distance = getDistance(diffX, diffY, diffZ);
 
 			{ // Calculates visibility per section.
-				if (distance >= maxDistSquared || !FrustumCuller.withinFrustumBounds(distX, distY, distZ)) {
+				if (distance >= maxDistSquared || !FrustumCuller.withinFrustumBounds(diffX, diffY, diffZ)) {
 					continue;
 				}
 
-				short gridFactor = MAX_GRID_FACTOR;
-
-				if (distChunkX != 0 && distChunkY != 0 && distChunkZ != 0) {
-					gridFactor = processGridFactor(visibilitySet, sectionIndex, diameter, distChunkX, distChunkY, distChunkZ);
+				if (diffChunkX != 0 && diffChunkY != 0 && diffChunkZ != 0 &&
+					processGridFactor(visibilitySet, sectionIndex, diameter, diffChunkX, diffChunkY, diffChunkZ) < TOLERANCE) {
+					continue;
 				}
 
-				if (gridFactor < TOLERANCE || (distance >= 80 * 80 && CompressedFlags.hasPassesNonEmpty(flags) &&
-					rayNotVisible(visibilitySet, sectionIndex, diameter, -distX - 8, -distY - 8, -distZ - 8))) {
+				if ((distance >= 80 * 80 && CompressedFlags.hasPassesNonEmpty(flags) &&
+					rayNotVisible(visibilitySet, sectionIndex, diameter, -diffX - 8, -diffY - 8, -diffZ - 8))) {
 					continue;
 				}
 			}
 
-			int directions = getOutwardDirections(distChunkX, distChunkY, distChunkZ);
-			directions &= CompressedFlags.getTraversableFaces(flags);
-			directions &= 0b111_111;
-
-			queueRenderTasks(bfsQueue, flags, distChunkX, distChunkY, distChunkZ);
+			queueRenderTasks(flags, diffChunkX, sectionY, diffChunkZ);
+			int directions = getOutwardDirections(diffChunkX, diffChunkY, diffChunkZ) & CompressedFlags.getTraversableFaces(flags);
 
 			if (directions != 0b0) {
-				traverseNeighbors(bfsQueue, visibilitySet, sectionIndex, diameter, directions);
+				traverseNeighbors(visibilitySet, sectionIndex, diameter, directions);
 			}
 		}
 	}
@@ -178,13 +169,13 @@ public class BFSCuller {
 	 * Based in the flag data and position relative to the camera, saves positions to be later
 	 * retrieved and processed for region rendering and meshing.
 	 */
-	private static void queueRenderTasks(BFSQueue queue, int flags, int distChunkX, int distChunkY, int distChunkZ) {
+	private static void queueRenderTasks(int flags, int distChunkX, int sectionY, int distChunkZ) {
 		if (CompressedFlags.isDirty(flags)) {
-			RebuildList.addToList(MathExt.asLong(distChunkX, distChunkY, distChunkZ));
+			RebuildList.addToList(MathExt.asInt(distChunkX, sectionY, distChunkZ));
 		}
 
 		if (CompressedFlags.hasPassesNonEmpty(flags)) {
-			queue.addToRenderList(MathExt.asLong(distChunkX, distChunkY, distChunkZ));
+			BFSQueue.RENDER_INDICES[BFSQueue.renderIndex++] = MathExt.asInt(distChunkX, sectionY, distChunkZ);
 		}
 	}
 
@@ -198,7 +189,7 @@ public class BFSCuller {
 		planes |= (diffChunkY >> 31) & Direction.UP_BIT    | (-diffChunkY >> 31) & Direction.DOWN_BIT;
 		planes |= (diffChunkZ >> 31) & Direction.SOUTH_BIT | (-diffChunkZ >> 31) & Direction.NORTH_BIT;
 
-		return ~planes;
+		return planes ^ 0b111_111;
 	}
 
 	/**
@@ -216,15 +207,13 @@ public class BFSCuller {
 	 * Searches outwards from the player position for possible visitable sections, based of the occlusion from the section faces,
 	 * skips visiting sections if they were already visited in the active frame.
 	 */
-	private static void traverseNeighbors(BFSQueue queue, short[] visSet, int sectionIndex, int renderDiameter, int directions) {
-		queue.verifyCapacity(Direction.COUNT);
-
+	private static void traverseNeighbors(short[] visSet, int sectionIndex, int renderDiameter, int directions) {
 		int offsetX = 1;
 		int offsetY = renderDiameter;
 		int offsetZ = renderDiameter << 4;
 
-		int index = queue.bfsIndex;
-		int[] graphIndices = queue.graphIndices;
+		int index = BFSQueue.bfsIndex;
+		final int[] graphIndices = BFSQueue.GRAPH_INDICES;
 
 		if (Direction.hasSet(directions, Direction.DOWN) && visSet[sectionIndex - offsetY] == 0) {
 			graphIndices[index++] = sectionIndex - offsetY;
@@ -256,7 +245,7 @@ public class BFSCuller {
 			visSet[sectionIndex + offsetX] = MAX_GRID_FACTOR;
 		}
 
-		queue.bfsIndex = index;
+		BFSQueue.bfsIndex = index;
 	}
 
 	/**

@@ -91,6 +91,22 @@ public class MathExt {
 		return (x & 0x3FFFFFL) << (Z_BITS + Y_BITS) | (z & 0x3FFFFFL) << Y_BITS | y & 0xFFFL;
 	}
 
+	public static int decodeX(int pos) {
+		return (pos << 12) >> 22;
+	}
+
+	public static int decodeY(int pos) {
+		return pos & 0x3FF;
+	}
+
+	public static int decodeZ(int pos) {
+		return (pos << 2) >> 22;
+	}
+
+	public static int asInt(int x, int y, int z) {
+		return y | (x & 0x3FF) << 10 | z << 20;
+	}
+
 	public static long asLong(int x, int z) {
 		return (x & 0xFFFFFFFFL) << 0L | (z & 0xFFFFFFFFL) << 32L;
 	}

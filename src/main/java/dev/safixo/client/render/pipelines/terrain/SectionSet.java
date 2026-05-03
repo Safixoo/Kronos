@@ -1,5 +1,6 @@
 package dev.safixo.client.render.pipelines.terrain;
 
+import dev.safixo.client.render.pipelines.terrain.cull.BFSQueue;
 import dev.safixo.client.util.MathExt;
 import dev.safixo.client.util.data.CameraData;
 import it.unimi.dsi.fastutil.longs.Long2ReferenceMap;
@@ -71,15 +72,28 @@ public class SectionSet {
 
 		if (this.visibilitySet == null || this.visibilitySet.length != size) {
 			this.visibilitySet = new short[size];
+			return;
 		}
 
-		short[] array = this.visibilitySet;
-		int length = array.length;
+		final short[] visSet = this.visibilitySet;
+		final int[] graphIndices = BFSQueue.GRAPH_INDICES;
 
-		System.arraycopy(EMPTY_ARRAY, 0, array, 0, Math.min(8192, length));
+		int maxIndex = BFSQueue.bfsIndex;
 
-		for (int i = 8192; i < length; i += i) {
-			System.arraycopy(array, 0, array, i, Math.min(i, length - i));
+		for (int i = 0; i < maxIndex; i += 8) {
+			visSet[graphIndices[i + 0]] = 0;
+			visSet[graphIndices[i + 1]] = 0;
+			visSet[graphIndices[i + 2]] = 0;
+			visSet[graphIndices[i + 3]] = 0;
+
+			visSet[graphIndices[i + 4]] = 0;
+			visSet[graphIndices[i + 5]] = 0;
+			visSet[graphIndices[i + 6]] = 0;
+			visSet[graphIndices[i + 7]] = 0;
+		}
+
+		for (int i = maxIndex & -8; i < maxIndex; i++) {
+			visSet[graphIndices[i]] = 0;
 		}
 	}
 
