@@ -1,5 +1,6 @@
 package dev.safixo.client.util.data;
 
+import dev.safixo.client.render.pipelines.terrain.meshing.builders.VoxelMesher;
 import dev.safixo.client.render.pipelines.terrain.meshing.model.ModelColorizer;
 import dev.safixo.client.util.MathExt;
 import net.minecraft.block.*;
@@ -142,10 +143,16 @@ public class PrimitivesFlags {
 		Block.canBlockGrass[Block.waterMoving.blockID] = false;
 		Block.canBlockGrass[Block.waterStill.blockID] = false;
 
-		boolean solid = !Minecraft.getMinecraft().gameSettings.fancyGraphics;
+		boolean fastGraphics = !Minecraft.getMinecraft().gameSettings.fancyGraphics;
+
+		VoxelMesher.SIDE_GRASS_NON_OVERLAY = fastGraphics ? null : Block.grass.getIcon(5, 5);
+		VoxelMesher.OVERLAY_UVS[0] = BlockGrass.getIconSideOverlay().getMinU();
+		VoxelMesher.OVERLAY_UVS[1] = BlockGrass.getIconSideOverlay().getMinV();
+		VoxelMesher.OVERLAY_UVS[2] = BlockGrass.getIconSideOverlay().getMaxU();
+		VoxelMesher.OVERLAY_UVS[3] = BlockGrass.getIconSideOverlay().getMaxV();
 
 		for (int i = 0; i < LEAVES_TOP_INDEX; i++) {
-			SOLID_CULL_MASK[LEAVES_INDICES[i]] = (byte) (solid ? 1 : 0);
+			SOLID_CULL_MASK[LEAVES_INDICES[i]] = (byte) (fastGraphics ? 1 : 0);
 		}
 	}
 

@@ -32,18 +32,9 @@ public class SectionMesher {
 	private static final int AIR_ID = 0;
 
 	public static boolean rebuild(SectionRender section, CameraData camera, SectionManager sectionManager, World world, Set<TileEntity> tileSet) {
-		WorldRenderer.chunksUpdated++;
 		Chunk.isLit = false;
 
-		int minX = section.blockX;
-		int minY = section.blockY;
-		int minZ = section.blockZ;
-
-		int maxX = minX + 16;
-		int maxY = minY + 16;
-		int maxZ = minZ + 16;
-
-		SectionCache sectionCache = new SectionCache(world, minX - 1, minY - 1, minZ - 1, maxX + 1, maxY + 1, maxZ + 1);
+		SectionCache sectionCache = new SectionCache(world, section.blockX, section.blockY, section.blockZ);
 		RenderBlocks renderBlocks = new RenderBlocks(sectionCache);
 
 		VertexWriter translucentWriter = VertexWriter.TRANSLUCENT;
@@ -67,6 +58,7 @@ public class SectionMesher {
 		boolean insideSection = cameraChunkX == sectionX && cameraChunkY == sectionY && cameraChunkZ == sectionZ;
 
 		if (!airEmpty) {
+			WorldRenderer.chunksUpdated++;
 			section.setFlags(SectionFlags.setCullFaces(section.flags, CullSetGenerator.floodFillSection(section, camera)));
 
 			// +-X face
@@ -170,9 +162,10 @@ public class SectionMesher {
 			drawBitSet |= cache.isVoxelFullFromCenter(blockIndex + makeBlockIndex(0,0,1)) << SOUTH;
 			drawBitSet |= cache.isVoxelFullFromCenter(blockIndex - makeBlockIndex(1,0,0)) << WEST;
 			drawBitSet |= cache.isVoxelFullFromCenter(blockIndex + makeBlockIndex(1,0,0)) << EAST;
+			drawBitSet ^= 0x3F;
 
-			if (drawBitSet != 0b111_111) {
-				VoxelMesherCenter.meshVoxel(Block.blocksList[blockId], cache, blockX, blockY, blockZ, ambient, ~drawBitSet, blockId);
+			if (drawBitSet != 0b0) {
+				VoxelMesherCenter.meshVoxel(Block.blocksList[blockId], cache, blockX, blockY, blockZ, ambient, drawBitSet, blockId);
 			}
 		} else {
 			if (PrimitivesFlags.TILE_ENTITY[blockId]) {
@@ -221,9 +214,10 @@ public class SectionMesher {
 			drawBitSet |= cache.isVoxelFullRelative(rX, rY, rZ + 1) << SOUTH;
 			drawBitSet |= cache.isVoxelFullRelative(rX - 1, rY, rZ) << WEST;
 			drawBitSet |= cache.isVoxelFullRelative(rX + 1, rY, rZ) << EAST;
+			drawBitSet ^= 0x3F;
 
-			if (drawBitSet != 0b111_111) {
-				VoxelMesher.meshVoxel(Block.blocksList[blockId], cache, blockX, blockY, blockZ, ambient, ~drawBitSet, blockId);
+			if (drawBitSet != 0) {
+				VoxelMesher.meshVoxel(Block.blocksList[blockId], cache, blockX, blockY, blockZ, ambient, drawBitSet, blockId);
 			}
 		} else {
 			if (PrimitivesFlags.TILE_ENTITY[blockId]) {
@@ -274,18 +268,6 @@ public class SectionMesher {
 
 			section.region.addTranslucentMesh(section, translucentWriter);
 		}
-	}
-
-	private static void processCullFaces(SectionRender section, int[] cullFaces) {
-		int solidFacesMask = 0;
-
-		for (int dir = 0; dir < COUNT; dir++) {
-			if (cullFaces[dir] == 256) {
-				solidFacesMask |= 1 << dir;
-			}
-		}
-
-		section.setFlags(SectionFlags.setCullFaces(section.flags, solidFacesMask));
 	}
 
 	private static int sumAllSolidVertices() {

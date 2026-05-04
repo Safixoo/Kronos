@@ -115,16 +115,18 @@ public class SectionSet {
 
 		int maxIndex = BFSQueue.bfsIndex;
 
-		for (int i = 0; i < maxIndex; i += 8) {
-			visSet[graphIndices[i + 0]] = 0;
-			visSet[graphIndices[i + 1]] = 0;
-			visSet[graphIndices[i + 2]] = 0;
-			visSet[graphIndices[i + 3]] = 0;
+		for (int i = 0; i < maxIndex >> 3; i++) {
+			int j = i << 3;
 
-			visSet[graphIndices[i + 4]] = 0;
-			visSet[graphIndices[i + 5]] = 0;
-			visSet[graphIndices[i + 6]] = 0;
-			visSet[graphIndices[i + 7]] = 0;
+			visSet[graphIndices[j + 0]] = 0;
+			visSet[graphIndices[j + 1]] = 0;
+			visSet[graphIndices[j + 2]] = 0;
+			visSet[graphIndices[j + 3]] = 0;
+
+			visSet[graphIndices[j + 4]] = 0;
+			visSet[graphIndices[j + 5]] = 0;
+			visSet[graphIndices[j + 6]] = 0;
+			visSet[graphIndices[j + 7]] = 0;
 		}
 
 		for (int i = maxIndex & -8; i < maxIndex; i++) {

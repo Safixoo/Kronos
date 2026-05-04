@@ -88,7 +88,7 @@ public class CullSetGenerator {
 			}
 		}
 
-		return ~openFaces;
+		return openFaces ^ 0x3F;
 	}
 
 	public static void visitStartingEdges() {

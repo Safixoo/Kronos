@@ -1,7 +1,6 @@
 package dev.safixo.client.render.vertex.writers;
 
 import com.google.common.collect.ImmutableList;
-import dev.safixo.client.util.MathExt;
 import dev.safixo.client.util.memory.UnsafeUtil;
 import dev.safixo.client.render.vertex.VertexWriter;
 import dev.safixo.client.render.gfx.vertex.GlVertexFormat;
@@ -36,8 +35,8 @@ public class TerrainFormat extends GlVertexFormat {
 		writeTerrainVertex(ptr, posX, posY, posZ, man.u, man.v, man.color, man.lightMap);
 	}
 
-	private static int extractPos(double pos, double scale) {
-		return (int) ((pos + RADIUS) * scale) & 0x1FFFFF;
+	private static int extractPos(float pos) {
+		return (int) ((pos + RADIUS) * TerrainFormat.SCALE) & 0x1FFFFF;
 	}
 
 	private static long processUv(double u, double v) {
@@ -53,19 +52,17 @@ public class TerrainFormat extends GlVertexFormat {
 		return (intU | intV << 16);
 	}
 
-	// Uses the same encoding as Sodium 20-bit vertex positions.
 	private static long processPosition(long x, long y, long z) {
-		long topHalf = y | (z >> 11L) << 21L;
-		long lowHalf = x | (z & 0x7FFL) << 21L;
+		long topHalf = y | (z & ~0x7FFL) << 10L;
+		long lowHalf = x | (z &  0x7FFL) << 21L;
 
 		return topHalf << 32L | lowHalf;
 	}
 
 	public static void writeTerrainVertex(long ptr, float x, float y, float z, float u, float v, int color, int lightMap) {
-		int intX = extractPos(x, SCALE);
-		int intY = extractPos(y, SCALE);
-		int intZ = extractPos(z, SCALE);
-
+		int intX = extractPos(x);
+		int intY = extractPos(y);
+		int intZ = extractPos(z);
 		long position = processPosition(intX, intY, intZ);
 
 		UnsafeUtil.memPutLong(ptr, position);
@@ -74,8 +71,8 @@ public class TerrainFormat extends GlVertexFormat {
 
 	// skylight << 20 | blocklight << 4
 	private static int compressLightmap(int lightmap) {
-		int skyLight4 = lightmap >>> 20;
-		int blockLight4 = lightmap & 0xF0;
+		int skyLight4 = (lightmap >>> 20) & 0xF;
+		int blockLight4 = (lightmap & 0xF0);
 
 		return skyLight4 | blockLight4;
 	}

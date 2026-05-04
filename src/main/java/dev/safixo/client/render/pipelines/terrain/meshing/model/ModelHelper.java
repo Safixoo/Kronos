@@ -41,6 +41,7 @@ public class ModelHelper {
 		flag |= blocks.renderMinY >= 0.025f || blocks.renderMaxY <= 0.975f ? 0b111100 : 0;
 		flag |= blocks.renderMinX >= 0.025f || blocks.renderMaxX <= 0.975f ? 0b001111 : 0;
 		flag |= blocks.renderMinZ >= 0.025f || blocks.renderMaxZ <= 0.975f ? 0b110011 : 0;
+
 		return flag;
 	}
 
@@ -49,38 +50,14 @@ public class ModelHelper {
 		int solidBlock = PrimitivesFlags.SOLID_LIGHT_MASK[blockId];
 
 		if (solidBlock == 1) {
-			return solidBlock; // 0b1
+			return 1;
 		}
 
-		return cache.getLightBrightnessForSkyBlocks(x, y, z, 0) << 4;
-	}
-
-	public static int getBlockCacheLazily(IBlockAccess cache, int x, int y, int z) {
-		int blockId = cache.getBlockId(x, y, z);
-		int solidBlock = PrimitivesFlags.SOLID_LIGHT_MASK[blockId];
-
-		if (solidBlock == 1) {
-			return solidBlock; // 0b1
-		}
-
-		// used for corners as usually you don't always need the light value explicitly.
-		return ~1;
+		return cache.getLightBrightnessForSkyBlocks(x, y, z, 0);
 	}
 
 	public static int fullFace(int blockCache) {
 		return blockCache & 0b1;
-	}
-
-	public static int light(int blockCache) {
-		return blockCache >>> 4;
-	}
-
-	public static int light(IBlockAccess cache, int x, int y, int z, int blockCache) {
-		if (blockCache == ~1) {
-			return cache.getLightBrightnessForSkyBlocks(x, y, z, 0);
-		}
-
-		return blockCache >>> 4;
 	}
 
 	public static int ao(int side1, int side2, int corner) {
@@ -94,8 +71,14 @@ public class ModelHelper {
 	}
 
 	public static int avg(int a, int b) {
-		if (a == 0) return b;
-		if (b == 0) return a;
+		if (a <= 1) return b;
+		if (b <= 1) return a;
+
+		return (a + b) >>> 1;
+	}
+
+	public static int avgF(int a, int b) {
+		if (b <= 1) return a;
 
 		return (a + b) >>> 1;
 	}

@@ -1,6 +1,6 @@
 package dev.safixo.client.render.pipelines.terrain.meshing.builders;
 
-import dev.safixo.client.render.pipelines.terrain.meshing.data.FacingRender;
+import dev.safixo.client.render.pipelines.terrain.meshing.data.FacingData;
 import dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache;
 import dev.safixo.client.render.pipelines.terrain.meshing.model.ModelColorizer;
 import dev.safixo.client.util.MathExt;
@@ -26,9 +26,9 @@ public class VoxelMesher {
 	public static final int[] SHADE_FULL_COLOR = new int[Direction.COUNT];
 	public static final int[] SHADE_FULL_FACTOR = new int[Direction.COUNT];
 	protected static final float[] TEX_UVS = new float[4];
-	protected static final float[] OVERLAY_UVS = new float[4];
+	public static final float[] OVERLAY_UVS = new float[4];
 
-	protected static final Icon SIDE_GRASS_NON_OVERLAY = Block.grass.getIcon(5, 5);
+	public static Icon SIDE_GRASS_NON_OVERLAY = Block.grass.getIcon(5, 5);
 	public static final float[] SIDE_LIGHT_MULTIPLIER = new float[] { 0.5F, 1.0F, 0.8F, 0.8F, 0.6F, 0.6F };
 
 	protected static final int BLOCK_GRASS_ID = Block.grass.blockID;
@@ -51,7 +51,6 @@ public class VoxelMesher {
 				continue;
 			}
 
-			Icon tex = block.getBlockTexture(cache, x, y, z, dir);
 
 			int blockColor = SHADE_FULL_COLOR[dir];
 			int overlayColor = blockColor;
@@ -64,25 +63,27 @@ public class VoxelMesher {
 				}
 			}
 
+			Icon tex = block.getBlockTexture(cache, x, y, z, dir);
 			final float[] uvs = TEX_UVS;
+			boolean sideGrass = tex == SIDE_GRASS_NON_OVERLAY;
 
 			uvs[0] = tex.getMinU();
 			uvs[1] = tex.getMinV();
 			uvs[2] = tex.getMaxU();
 			uvs[3] = tex.getMaxV();
 
-			FacingRender render = FACE_RENDER[dir];
+			FacingData render = FACE_RENDER[dir];
 			VertexWriter writer = VertexWriter.SOLID[dir];
 
 			if (ambient) {
-				renderFace(writer, render, tex, cache, x, y, z, blockColor, overlayColor);
+				renderFace(writer, render, cache, x, y, z, blockColor, overlayColor, sideGrass);
 			} else {
-				renderFaceNoSmooth(render, dir, cache, x, y, z, blockColor);
+				renderFaceNoSmooth(writer, render, cache, x, y, z, dir, blockColor, overlayColor, sideGrass);
 			}
 		}
 	}
 
-	public static void renderFace(VertexWriter writer, FacingRender face, Icon tex, SectionCache cache, int x, int y, int z, int blockColor, int overlayColor) {
+	public static void renderFace(VertexWriter writer, FacingData face, SectionCache cache, int x, int y, int z, int blockColor, int overlayColor, boolean sideGrass) {
 		int p1X = face.aoCornerX0;
 		int p1Y = face.aoCornerY0;
 		int p1Z = face.aoCornerZ0;
@@ -108,44 +109,31 @@ public class VoxelMesher {
 		int pd12Y = p1Y - p2Y;
 		int pd12Z = p1Z - p2Z;
 
-		int cornerPP = isFullVoxel(cache, dirX + p12X, dirY + p12Y, dirZ + p12Z);
-		int cornerPN = isFullVoxel(cache, dirX + pd12X, dirY + pd12Y, dirZ + pd12Z);
-
-		int lightMap = cache.getLightmap(dirX, dirY, dirZ);
-
-		int lightPP = fullFace((posZ | posX) & ~cornerPP) == 0 ? cache.getLightmap(dirX + p12X, dirY + p12Y, dirZ + p12Z) : 0;
-		int lightPN = fullFace((negZ | posX) & ~cornerPN) == 0 ? cache.getLightmap(dirX + pd12X, dirY + pd12Y, dirZ + pd12Z) : 0;
-
-		int cornerNP = isFullVoxel(cache, dirX - pd12X, dirY - pd12Y, dirZ - pd12Z);
-		int cornerNN = isFullVoxel(cache, dirX - p12X, dirY - p12Y, dirZ - p12Z);
-
-		int lightNP = fullFace((posZ | negX) & ~cornerNP) == 0 ? cache.getLightmap(dirX - pd12X, dirY - pd12Y, dirZ - pd12Z) : 0;
-		int lightNN = fullFace((negZ | negX) & ~cornerNN) == 0 ? cache.getLightmap(dirX - p12X, dirY - p12Y, dirZ - p12Z) : 0;
+		int cornerPP = fullFace(posZ & posX) == 0 ? getBlockCached(cache, dirX + p12X, dirY + p12Y, dirZ + p12Z) : 1;
+		int cornerPN = fullFace(negZ & posX) == 0 ? getBlockCached(cache, dirX + pd12X, dirY + pd12Y, dirZ + pd12Z) : 1;
+		int cornerNP = fullFace(posZ & negX) == 0 ? getBlockCached(cache, dirX - pd12X, dirY - pd12Y, dirZ - pd12Z) : 1;
+		int cornerNN = fullFace(negZ & negX) == 0 ? getBlockCached(cache, dirX - p12X, dirY - p12Y, dirZ - p12Z) : 1;
 
 		int ao0 = ao(posZ, posX, cornerPP);
 		int ao1 = ao(negZ, posX, cornerPN);
 		int ao2 = ao(negZ, negX, cornerNN);
 		int ao3 = ao(posZ, negX, cornerNP);
 
-		int lightPZ = light(posZ);
-		int lightPX = light(posX);
-		int lightNZ = light(negZ);
-		int lightNX = light(negX);
-
-		int light0 = avg(avg(lightMap, lightPP), avg(lightPZ, lightPX)); // 0 vertex
-		int light1 = avg(avg(lightMap, lightPN), avg(lightPX, lightNZ)); // 1 vertex
-		int light2 = avg(avg(lightMap, lightNN), avg(lightNZ, lightNX)); // 2 vertex
-		int light3 = avg(avg(lightMap, lightNP), avg(lightNX, lightPZ)); // 3 vertex
-
-		int uv0 = face.uvData[0];
-		int uv1 = face.uvData[1];
-		int uv2 = face.uvData[2];
-		int uv3 = face.uvData[3];
-
 		int color0 = ColorBGRManager.multiplyColor(blockColor, ao0);
 		int color1 = ColorBGRManager.multiplyColor(blockColor, ao1);
 		int color2 = ColorBGRManager.multiplyColor(blockColor, ao2);
 		int color3 = ColorBGRManager.multiplyColor(blockColor, ao3);
+
+		int lightMap = cache.getLightmap(dirX, dirY, dirZ);
+		int light0 = avg(avgF(lightMap, cornerPP), avg(posZ, posX)); // 0 vertex
+		int light1 = avg(avgF(lightMap, cornerPN), avg(posX, negZ)); // 1 vertex
+		int light2 = avg(avgF(lightMap, cornerNN), avg(negZ, negX)); // 2 vertex
+		int light3 = avg(avgF(lightMap, cornerNP), avg(negX, posZ)); // 3 vertex
+
+		int uv0 = face.uv0;
+		int uv1 = face.uv1;
+		int uv2 = face.uv2;
+		int uv3 = face.uv3;
 
 		x &= RegionRender.BLOCK_BITS_X;
 		y &= RegionRender.BLOCK_BITS_Y;
@@ -168,7 +156,7 @@ public class VoxelMesher {
 			addVertex(writer, face, 2 * 12, x, y, z, texUv[uv2 & 0xFF], texUv[uv2 >>> 8], color2, light2);
 		}
 
-		if (tex == SIDE_GRASS_NON_OVERLAY) {
+		if (sideGrass) {
 			texUv = OVERLAY_UVS;
 			color0 = ColorBGRManager.multiplyColor(overlayColor, ao0);
 			color1 = ColorBGRManager.multiplyColor(overlayColor, ao1);
@@ -189,31 +177,38 @@ public class VoxelMesher {
 		}
 	}
 
-	public static void renderFaceNoSmooth(FacingRender facing, int dir, SectionCache cache, int x, int y, int z, int blockColor) {
+	public static void renderFaceNoSmooth(VertexWriter writer, FacingData face, SectionCache cache, int x, int y, int z, int dir, int blockColor, int overlayColor, boolean sideGrass) {
 		Vector3i dirVec = Direction.getDirection(dir);
-
 		int lightMap = cache.getLightBrightnessForSkyBlocks(x + dirVec.x, y + dirVec.y, z + dirVec.z, 0);
 
-		final float[] uvs = TEX_UVS;
-		int uv0 = facing.uvData[0];
-		int uv1 = facing.uvData[1];
-		int uv2 = facing.uvData[2];
-		int uv3 = facing.uvData[3];
+		float[] texUv = TEX_UVS;
+		int uv0 = face.uv0;
+		int uv1 = face.uv1;
+		int uv2 = face.uv2;
+		int uv3 = face.uv3;
 
 		x &= RegionRender.BLOCK_BITS_X;
 		y &= RegionRender.BLOCK_BITS_Y;
 		z &= RegionRender.BLOCK_BITS_Z;
 
-		VertexWriter writer = VertexWriter.getCurrentInstance();
 		writer.ensureCapacity(TerrainFormat.STRIDE * 4);
 
-		addVertex(writer, facing, 0, x, y, z, uvs[uv0 & 0xFF], uvs[uv0 >>> 8], blockColor, lightMap);
-		addVertex(writer, facing, 1, x, y, z, uvs[uv1 & 0xFF], uvs[uv1 >>> 8], blockColor, lightMap);
-		addVertex(writer, facing, 2, x, y, z, uvs[uv2 & 0xFF], uvs[uv2 >>> 8], blockColor, lightMap);
-		addVertex(writer, facing, 3, x, y, z, uvs[uv3 & 0xFF], uvs[uv3 >>> 8], blockColor, lightMap);
+		addVertex(writer, face, 0 * 12, x, y, z, texUv[uv0 & 0xFF], texUv[uv0 >>> 8], blockColor, lightMap);
+		addVertex(writer, face, 1 * 12, x, y, z, texUv[uv1 & 0xFF], texUv[uv1 >>> 8], blockColor, lightMap);
+		addVertex(writer, face, 2 * 12, x, y, z, texUv[uv2 & 0xFF], texUv[uv2 >>> 8], blockColor, lightMap);
+		addVertex(writer, face, 3 * 12, x, y, z, texUv[uv3 & 0xFF], texUv[uv3 >>> 8], blockColor, lightMap);
+
+		if (sideGrass) {
+			texUv = OVERLAY_UVS;
+
+			addVertex(writer, face, 0 * 12, x, y, z, texUv[uv0 & 0xFF], texUv[uv0 >>> 8], overlayColor, lightMap);
+			addVertex(writer, face, 1 * 12, x, y, z, texUv[uv1 & 0xFF], texUv[uv1 >>> 8], overlayColor, lightMap);
+			addVertex(writer, face, 2 * 12, x, y, z, texUv[uv2 & 0xFF], texUv[uv2 >>> 8], overlayColor, lightMap);
+			addVertex(writer, face, 3 * 12, x, y, z, texUv[uv3 & 0xFF], texUv[uv3 >>> 8], overlayColor, lightMap);
+		}
 	}
 
-	public static void addVertex(VertexWriter writer, FacingRender face, int vertInd, int x, int y, int z, float u, float v, int color, int lightMap) {
+	public static void addVertex(VertexWriter writer, FacingData face, int vertInd, int x, int y, int z, float u, float v, int color, int lightMap) {
 		int vertOff = (int) (face.quadVert >>> vertInd);
 
 		int relX = x + (vertOff & 0xF);
@@ -226,18 +221,6 @@ public class VoxelMesher {
 
 		TerrainFormat.writeTerrainVertex(ptr, relX, relY, relZ, u, v, color, lightMap);
 		writer.addVertexCounter(TerrainFormat.STRIDE);
-	}
-
-	public static int isFullVoxel(SectionCache cache, int x, int y, int z) {
-		int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
-
-		int blockX = x - cache.blockX;
-		int blockY = y - cache.blockY;
-		int blockZ = z - cache.blockZ;
-
-		int sectionIndex = SectionCache.sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
-
-		return PrimitivesFlags.SOLID_LIGHT_MASK[MathExt.byteToUnsigned(SectionCache.SECTION_BLOCKS[sectionIndex][blockIndex])];
 	}
 
 	public static int getBlockCached(SectionCache cache, int x, int y, int z) {
@@ -257,23 +240,23 @@ public class VoxelMesher {
 		int skyLight = SectionCache.getNibble(SectionCache.SKY_LIGHT[sectionIndex], blockIndex);
 		int blockLight = SectionCache.getNibble(SectionCache.BLOCK_LIGHT[sectionIndex], blockIndex);
 
-		return MathExt.getLightmapCoord(skyLight, blockLight) << 4;
+		return MathExt.getLightmapCoord(skyLight, blockLight);
 	}
 
 	private static Vector3i createVec3i(int x, int y, int z) {
 		return new Vector3i(x, y, z);
 	}
 
-	public static final FacingRender NEG_Y = new FacingRender();
-	public static final FacingRender POS_Y = new FacingRender();
+	public static final FacingData NEG_Y = new FacingData();
+	public static final FacingData POS_Y = new FacingData();
 
-	public static final FacingRender NEG_X = new FacingRender();
-	public static final FacingRender POS_X = new FacingRender();
+	public static final FacingData NEG_X = new FacingData();
+	public static final FacingData POS_X = new FacingData();
 
-	public static final FacingRender NEG_Z = new FacingRender();
-	public static final FacingRender POS_Z = new FacingRender();
+	public static final FacingData NEG_Z = new FacingData();
+	public static final FacingData POS_Z = new FacingData();
 
-	public static final FacingRender[] FACE_RENDER = new FacingRender[]{
+	public static final FacingData[] FACE_RENDER = new FacingData[]{
 		NEG_Y,
 		POS_Y,
 
@@ -295,11 +278,6 @@ public class VoxelMesher {
 
 	// minU - 0, minV - 1, maxU - 2, maxV - 3.
     static {
-		OVERLAY_UVS[0] = BlockGrass.getIconSideOverlay().getMinU();
-		OVERLAY_UVS[1] = BlockGrass.getIconSideOverlay().getMinV();
-		OVERLAY_UVS[2] = BlockGrass.getIconSideOverlay().getMaxU();
-		OVERLAY_UVS[3] = BlockGrass.getIconSideOverlay().getMaxV();
-
 		int minU = 0;
 		int minV = 1;
 		int maxU = 2;

@@ -7,13 +7,14 @@ import org.joml.Vector3i;
 import static dev.safixo.client.util.Direction.*;
 
 @SuppressWarnings("PointlessArithmeticExpression")
-public class FacingRender {
+public class FacingData {
 	public byte dirX, dirY, dirZ;
 	public byte aoCornerX0, aoCornerY0, aoCornerZ0;
 	public byte aoCornerX1, aoCornerY1, aoCornerZ1;
 
 	// (0b111 * 3) * 4
 	public long quadVert;
+	public short uv0, uv1, uv2, uv3;
 	public final short[] uvData = new short[16];
 	public byte[] weightIndices = new byte[8];
 	public byte bA, bB, bC, bD;
@@ -41,7 +42,7 @@ public class FacingRender {
 		ROTATION[3] = 2 * 4;
 	}
 
-	public FacingRender() {
+	public FacingData() {
 
 	}
 
@@ -98,6 +99,11 @@ public class FacingRender {
 			this.uvData[i * 4 + 2] = (short) VoxelMesher.MAP_ID_TO_UV[z + ROTATION[i]];
 			this.uvData[i * 4 + 3] = (short) VoxelMesher.MAP_ID_TO_UV[w + ROTATION[i]];
 		}
+
+		this.uv0 = this.uvData[0];
+		this.uv1 = this.uvData[1];
+		this.uv2 = this.uvData[2];
+		this.uv3 = this.uvData[3];
 	}
 
 	public void setBoundsTex(int a, int b, int c, int d) {

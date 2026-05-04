@@ -1,9 +1,11 @@
 package dev.safixo.client.render.pipelines.terrain.meshing.builders;
 
 import dev.safixo.client.render.pipelines.terrain.meshing.model.ModelColorizer;
-import dev.safixo.client.render.pipelines.terrain.meshing.data.FacingRender;
+import dev.safixo.client.render.pipelines.terrain.meshing.data.FacingData;
 import dev.safixo.client.render.pipelines.terrain.meshing.model.ModelHelper;
 import dev.safixo.client.render.pipelines.terrain.meshing.model.ModelLighter;
+import dev.safixo.client.render.vertex.VertexWriter;
+import dev.safixo.client.render.vertex.writers.TerrainFormat;
 import dev.safixo.client.util.AtlasSpriteUnsafe;
 import dev.safixo.client.util.Direction;
 import dev.safixo.client.util.data.PrimitivesFlags;
@@ -44,22 +46,22 @@ public class VanillaBlockMesher {
 		Tessellator tes = Tessellator.instance;
 
 		int drawSet = 0;
-		drawSet |= block.shouldSideBeRendered(cache, x, y - 1, z, 0) ? 1 << DOWN : 0;
-		drawSet |= block.shouldSideBeRendered(cache, x, y + 1, z, 1) ? 1 << UP : 0;
-		drawSet |= block.shouldSideBeRendered(cache, x, y, z - 1, 2) ? 1 << NORTH : 0;
+		if (block.shouldSideBeRendered(cache, x, y - 1, z, 0)) drawSet |= 1 << DOWN;
+		if (block.shouldSideBeRendered(cache, x, y + 1, z, 1)) drawSet |= 1 << UP;
+		if (block.shouldSideBeRendered(cache, x, y, z - 1, 2)) drawSet |= 1 << NORTH;
 
-		drawSet |= block.shouldSideBeRendered(cache, x, y, z + 1, 3) ? 1 << SOUTH : 0;
-		drawSet |= block.shouldSideBeRendered(cache, x - 1, y, z, 4) ? 1 << WEST : 0;
-		drawSet |= block.shouldSideBeRendered(cache, x + 1, y, z, 5) ? 1 << EAST : 0;
+		if (block.shouldSideBeRendered(cache, x, y, z + 1, 3)) drawSet |= 1 << SOUTH;
+		if (block.shouldSideBeRendered(cache, x - 1, y, z, 4)) drawSet |= 1 << WEST;
+		if (block.shouldSideBeRendered(cache, x + 1, y, z, 5)) drawSet |= 1 << EAST;
 
 		// Early exit.
-		if (drawSet == 0) {
+		if (drawSet == 0b0) {
 			return false;
 		}
 
 		int color = PrimitivesFlags.COLOR_MODULATOR[block.blockID] != ModelColorizer.DEFAULT_COLOR
 			? block.colorMultiplier(blocks.blockAccess, x, y, z)
-			: 0xFF_FF_FF_FF;
+			: 0xFFFFFF;
 
 		boolean ao = Minecraft.isAmbientOcclusionEnabled();
 		int flag = ModelHelper.processModel(blocks, BOUNDS, blocks.partialRenderBounds && ao);
@@ -91,7 +93,7 @@ public class VanillaBlockMesher {
 			float minV = AtlasSpriteUnsafe.minV(currentTex);
 			float maxU = AtlasSpriteUnsafe.maxU(currentTex) - minU;
 			float maxV = AtlasSpriteUnsafe.maxV(currentTex) - minV;
-			FacingRender face = FACE_RENDER[dir];
+			FacingData face = FACE_RENDER[dir];
 
 			// TODO: The methods names are incorrect and misleading, fix it.
 			UVS[0] = minU + maxU * face.minUInd(bounds);
@@ -111,9 +113,9 @@ public class VanillaBlockMesher {
 		return true;
 	}
 
-	public static void renderQuadNoAmbient(Tessellator tes, FacingRender face, IBlockAccess cache, float[] bounds,
-										   int dir, int x, int y, int z, int color, int uvRotate) {
-		int lightMap = cache.getLightBrightnessForSkyBlocks(x + Direction.x(dir), y + Direction.y(dir), z + Direction.z(dir), 0);
+	public static void renderQuadNoAmbient(Tessellator tes, FacingData face, IBlockAccess cache, float[] bounds,
+                                           int dir, int x, int y, int z, int color, int uvRotate) {
+		int lightMap = cache.getLightBrightnessForSkyBlocks(x + face.dirX, y + face.dirY, z + face.dirZ, 0);
 
 		uvRotate <<= 2;
 		final float[] uvs = UVS;
@@ -128,9 +130,9 @@ public class VanillaBlockMesher {
 		bufferVertex(tes, face, bounds, 3, x, y, z, uvs[uv3 & 0xFF], uvs[uv3 >>> 8], color, lightMap);
 	}
 
-	public static void renderQuadYesAmbient(Tessellator tes, FacingRender face, IBlockAccess cache, float[] bounds,
-											int dir, int x, int y, int z, int color, int uvRotate, int flag) {
-		ModelLighter.applyLighting(face, cache, BOUNDS, dir, x, y, z, AO, LIGHT, flag);
+	public static void renderQuadYesAmbient(Tessellator tes, FacingData face, IBlockAccess cache, float[] bounds,
+                                            int dir, int x, int y, int z, int color, int uvRotate, int flag) {
+		int ao = ModelLighter.applyLighting(face, cache, BOUNDS, dir, x, y, z, LIGHT, flag);
 
 		uvRotate <<= 2;
 		final float[] uvs = UVS;
@@ -139,15 +141,20 @@ public class VanillaBlockMesher {
 		int uv2 = face.uvData[uvRotate + 2];
 		int uv3 = face.uvData[uvRotate + 3];
 
-		bufferVertex(tes, face, bounds, 0, x, y, z, uvs[uv0 & 0xFF], uvs[uv0 >>> 8], multiplyColor(color, AO[0]), LIGHT[0]);
-		bufferVertex(tes, face, bounds, 1, x, y, z, uvs[uv1 & 0xFF], uvs[uv1 >>> 8], multiplyColor(color, AO[1]), LIGHT[1]);
-		bufferVertex(tes, face, bounds, 2, x, y, z, uvs[uv2 & 0xFF], uvs[uv2 >>> 8], multiplyColor(color, AO[2]), LIGHT[2]);
-		bufferVertex(tes, face, bounds, 3, x, y, z, uvs[uv3 & 0xFF], uvs[uv3 >>> 8], multiplyColor(color, AO[3]), LIGHT[3]);
+		int ao0 = ao & 0xFF;
+		int ao1 = ao >> 8 & 0xFF;
+		int ao2 = ao >> 16 & 0xFF;
+		int ao3 = ao >> 24 & 0xFF;
+
+		bufferVertex(tes, face, bounds, 0 * 12, x, y, z, uvs[uv0 & 0xFF], uvs[uv0 >>> 8], multiplyColor(color, ao0), LIGHT[0]);
+		bufferVertex(tes, face, bounds, 1 * 12, x, y, z, uvs[uv1 & 0xFF], uvs[uv1 >>> 8], multiplyColor(color, ao1), LIGHT[1]);
+		bufferVertex(tes, face, bounds, 2 * 12, x, y, z, uvs[uv2 & 0xFF], uvs[uv2 >>> 8], multiplyColor(color, ao2), LIGHT[2]);
+		bufferVertex(tes, face, bounds, 3 * 12, x, y, z, uvs[uv3 & 0xFF], uvs[uv3 >>> 8], multiplyColor(color, ao3), LIGHT[3]);
 	}
 
-	public static void bufferVertex(Tessellator tes, FacingRender face, float[] bounds, int vertInd,
-									int x, int y, int z, float u, float v, int color, int lightMap) {
-		int vertOff = (int) (face.quadVert >>> (12 * vertInd));
+	public static void bufferVertex(Tessellator tes, FacingData face, float[] bounds, int vertInd,
+                                    int x, int y, int z, float u, float v, int color, int lightMap) {
+		int vertOff = (int) (face.quadVert >>> vertInd);
 		float relX = x + bounds[vertOff & 0xF];
 		vertOff >>= 4;
 		float relY = y + bounds[vertOff & 0xF];
@@ -159,14 +166,14 @@ public class VanillaBlockMesher {
 		tes.addVertexWithUV(relX, relY, relZ, u, v);
 	}
 
-	public static final FacingRender NEG_Y = new FacingRender();
-	public static final FacingRender POS_Y = new FacingRender();
+	public static final FacingData NEG_Y = new FacingData();
+	public static final FacingData POS_Y = new FacingData();
 
-	public static final FacingRender NEG_X = new FacingRender();
-	public static final FacingRender POS_X = new FacingRender();
+	public static final FacingData NEG_X = new FacingData();
+	public static final FacingData POS_X = new FacingData();
 
-	public static final FacingRender NEG_Z = new FacingRender();
-	public static final FacingRender POS_Z = new FacingRender();
+	public static final FacingData NEG_Z = new FacingData();
+	public static final FacingData POS_Z = new FacingData();
 
 	public static final int NEG_Y_DIR = Direction.DOWN;
 	public static final int POS_Y_DIR = Direction.UP;
@@ -181,7 +188,7 @@ public class VanillaBlockMesher {
 		return new Vector3i(x, y, z);
 	}
 
-	public static final FacingRender[] FACE_RENDER = new FacingRender[]{
+	public static final FacingData[] FACE_RENDER = new FacingData[]{
 		NEG_Y,
 		POS_Y,
 

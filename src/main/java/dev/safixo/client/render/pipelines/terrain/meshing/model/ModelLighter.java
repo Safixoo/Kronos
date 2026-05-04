@@ -1,20 +1,35 @@
 package dev.safixo.client.render.pipelines.terrain.meshing.model;
 
-import dev.safixo.client.render.pipelines.terrain.meshing.data.FacingRender;
+import dev.safixo.client.render.pipelines.terrain.meshing.data.FacingData;
+import dev.safixo.client.util.MathExt;
 import net.minecraft.world.IBlockAccess;
 
+import static dev.safixo.client.render.pipelines.terrain.meshing.model.ModelHelper.*;
+
 public class ModelLighter {
-	public static void applyLighting(FacingRender face, IBlockAccess cache, float[] bounds,
-									 int dir, int x, int y, int z, int[] ao, int[] light, int partialSides)
+	public static int applyLighting(FacingData face, IBlockAccess cache, float[] bounds, int dir,
+									 int x, int y, int z, int[] light, int partialSides)
 	{
-		setupCornerLighting(face, cache, x, y, z, ao, light);
+		int dirX = x + face.dirX;
+		int dirY = y + face.dirY;
+		int dirZ = z + face.dirZ;
+
+		if (cache.isBlockOpaqueCube(dirX, dirY, dirZ)) {
+			dirX = x;
+			dirY = y;
+			dirZ = z;
+		}
+
+		int ao = setupCornerLighting(face, cache, dirX, dirY, dirZ, light);
 
 		if ((partialSides & (1 << dir)) != 0) {
-			processPartialAlignedLight(face, bounds, ao, light);
+			ao = processPartialAlignedLight(face, bounds, ao, light);
 		}
+
+		return ao;
 	}
 
-	public static void setupCornerLighting(FacingRender face, IBlockAccess cache, int x, int y, int z, int[] ao, int[] light) {
+	public static int setupCornerLighting(FacingData face, IBlockAccess cache, int x, int y, int z, int[] light) {
 		int p1X = face.aoCornerX0;
 		int p1Y = face.aoCornerY0;
 		int p1Z = face.aoCornerZ0;
@@ -23,14 +38,10 @@ public class ModelLighter {
 		int p2Y = face.aoCornerY1;
 		int p2Z = face.aoCornerZ1;
 
-		x += face.dirX;
-		y += face.dirY;
-		z += face.dirZ;
-
-		int posZ = ModelHelper.getBlockCached(cache, x + p2X, y + p2Y, z + p2Z);
-		int negZ = ModelHelper.getBlockCached(cache, x - p2X, y - p2Y, z - p2Z);
-		int posX = ModelHelper.getBlockCached(cache, x + p1X, y + p1Y, z + p1Z);
-		int negX = ModelHelper.getBlockCached(cache, x - p1X, y - p1Y, z - p1Z);
+		int posZ = getBlockCached(cache, x + p2X, y + p2Y, z + p2Z);
+		int negZ = getBlockCached(cache, x - p2X, y - p2Y, z - p2Z);
+		int posX = getBlockCached(cache, x + p1X, y + p1Y, z + p1Z);
+		int negX = getBlockCached(cache, x - p1X, y - p1Y, z - p1Z);
 
 		int p12X = p1X + p2X;
 		int p12Y = p1Y + p2Y;
@@ -40,42 +51,35 @@ public class ModelLighter {
 		int pd12Y = p1Y - p2Y;
 		int pd12Z = p1Z - p2Z;
 
-		int cornerPP = ModelHelper.getBlockCacheLazily(cache, x + p12X, y + p12Y, z + p12Z);
-		int cornerPN = ModelHelper.getBlockCacheLazily(cache, x + pd12X, y + pd12Y, z + pd12Z);
+		int cornerPP = fullFace(posZ & posX) == 0 ? getBlockCached(cache, x + p12X, y + p12Y, z + p12Z) : 1;
+		int cornerPN = fullFace(negZ & posX) == 0 ? getBlockCached(cache, x + pd12X, y + pd12Y, z + pd12Z) : 1;
+		int cornerNP = fullFace(posZ & negX) == 0 ? getBlockCached(cache, x - pd12X, y - pd12Y, z - pd12Z) : 1;
+		int cornerNN = fullFace(negZ & negX) == 0 ? getBlockCached(cache, x - p12X, y - p12Y, z - p12Z) : 1;
 
-		int lightPP = ModelHelper.fullFace(posZ | posX) == 0 ? ModelHelper.light(cache, x + p12X, y + p12Y, z + p12Z, cornerPP) : 0;
-		int lightPN = ModelHelper.fullFace(negZ | posX) == 0 ? ModelHelper.light(cache, x + pd12X, y + pd12Y, z + pd12Z, cornerPN) : 0;
-
-		int cornerNP = ModelHelper.getBlockCacheLazily(cache, x - pd12X, y - pd12Y, z - pd12Z);
-		int cornerNN = ModelHelper.getBlockCacheLazily(cache, x - p12X, y - p12Y, z - p12Z);
-
-		int lightNP = ModelHelper.fullFace(posZ | negX) == 0 ? ModelHelper.light(cache, x - pd12X, y - pd12Y, z - pd12Z, cornerNP) : 0;
-		int lightNN = ModelHelper.fullFace(negZ | negX) == 0 ? ModelHelper.light(cache, x - p12X, y - p12Y, z - p12Z, cornerNN) : 0;
-
-		ao[0] = ModelHelper.ao(posZ, posX, cornerPP);
-		ao[1] = ModelHelper.ao(negZ, posX, cornerPN);
-		ao[2] = ModelHelper.ao(negZ, negX, cornerNN);
-		ao[3] = ModelHelper.ao(posZ, negX, cornerNP);
+		int ao = ao(posZ, posX, cornerPP);
+		ao |= ao(negZ, posX, cornerPN) << 8;
+		ao |= ao(negZ, negX, cornerNN) << 16;
+		ao |= ao(posZ, negX, cornerNP) << 24;
 
 		int lightMap = cache.getLightBrightnessForSkyBlocks(x, y, z, 0);
+		light[0] = avg(avgF(lightMap, cornerPP), avg(posZ, posX)); // 0 vertex
+		light[1] = avg(avgF(lightMap, cornerPN), avg(posX, negZ)); // 1 vertex
+		light[2] = avg(avgF(lightMap, cornerNN), avg(negZ, negX)); // 2 vertex
+		light[3] = avg(avgF(lightMap, cornerNP), avg(negX, posZ)); // 3 vertex
 
-		int lightPZ = ModelHelper.light(posZ);
-		int lightPX = ModelHelper.light(posX);
-
-		int lightNZ = ModelHelper.light(negZ);
-		int lightNX = ModelHelper.light(negX);
-
-		light[0] = ModelHelper.avg(ModelHelper.avg(lightPP, lightMap), ModelHelper.avg(lightPZ, lightPX)); // 0 vertex
-		light[1] = ModelHelper.avg(ModelHelper.avg(lightPN, lightMap), ModelHelper.avg(lightPX, lightNZ)); // 1 vertex
-		light[2] = ModelHelper.avg(ModelHelper.avg(lightNN, lightMap), ModelHelper.avg(lightNZ, lightNX)); // 2 vertex
-		light[3] = ModelHelper.avg(ModelHelper.avg(lightNP, lightMap), ModelHelper.avg(lightNX, lightPZ)); // 3 vertex
+		return ao;
 	}
 
-	public static void processPartialAlignedLight(FacingRender face, float[] bounds, int[] ao, int[] light) {
-		long pack0 = light[0] | (long) ao[0] << 32L;
-		long pack1 = light[1] | (long) ao[1] << 32L;
-		long pack2 = light[2] | (long) ao[2] << 32L;
-		long pack3 = light[3] | (long) ao[3] << 32L;
+	public static int processPartialAlignedLight(FacingData face, float[] bounds, int ao, int[] light) {
+		int ao0 = ao & 0xFF;
+		int ao1 = ao >> 8 & 0xFF;
+		int ao2 = ao >> 16 & 0xFF;
+		int ao3 = ao >> 24 & 0xFF;
+
+		long pack0 = light[0] | (long) ao0 << 32L;
+		long pack1 = light[1] | (long) ao1 << 32L;
+		long pack2 = light[2] | (long) ao2 << 32L;
+		long pack3 = light[3] | (long) ao3 << 32L;
 
 		for (int i = 0; i < 4; i++) {
 			int ind = i << 1;
@@ -101,7 +105,9 @@ public class ModelLighter {
 			long sum = la0 + la1 + la2 + la3;
 
 			light[i] = (int) (sum >>> 16) & 0xF000F0;
-			ao[i] =    (int) (sum >>> 48);
+			ao |= (int) ((sum >>> 48) & 0xFF) << (i * 8);
 		}
+
+		return ao;
 	}
 }

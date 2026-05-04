@@ -62,99 +62,101 @@ public class SectionCache implements IBlockAccess {
 		Arrays.fill(BLOCK_LIGHT, DEFAULT_BYTE_ARRAY);
 	}
 
-	public SectionCache(World world, int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
+	public SectionCache(World world, int blockX, int blockY, int blockZ) {
 		this.worldObj = world;
 
-		this.blockX = minX & ~0b1111;
-		this.blockY = minY & ~0b1111;
-		this.blockZ = minZ & ~0b1111;
+		this.blockX = blockX - 16;
+		this.blockY = blockY - 16;
+		this.blockZ = blockZ - 16;
 
-		this.fillData(world, minX, minY, minZ, maxX, maxY, maxZ);
+		this.fillData(world, blockX, blockY, blockZ);
 	}
 
-	public void fillData(World world, int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
-		int maxChunkX = (maxX >> 4);
-		int maxChunkZ = (maxZ >> 4);
-		int maxChunkY = (maxY >> 4);
+	public void fillData(World world, int blockX, int blockY, int blockZ) {
+		int centerX = blockX >> 4, centerY = blockY >> 4, centerZ = blockZ >> 4;
 
-		int sectionX = this.blockX >> 4, sectionY = this.blockY >> 4, sectionZ = this.blockZ >> 4;
+		int minSectionX = centerX - 1;
+		int minSectionY = centerY - 1;
+		int minSectionZ = centerZ - 1;
 
-		for (int x = sectionX; x <= maxChunkX; x++) {
-			for (int z = sectionZ; z <= maxChunkZ; z++) {
-				int relX = x - sectionX;
-				int relZ = z - sectionZ;
+		int maxSectionX = centerX + 1;
+		int maxSectionY = centerY + 1;
+		int maxSectionZ = centerZ + 1;
 
-				Chunk chunk = world.getChunkFromChunkCoords(x, z);
+		Chunk centerChunk = world.getChunkFromChunkCoords(centerX, centerZ);
+		ExtendedBlockStorage centerSection = centerChunk.getBlockStorageArray()[centerY];
+
+		this.centerSectEmpty = centerSection == null || centerSection.isEmpty();
+
+		if (this.centerSectEmpty) {
+			return;
+		}
+
+		for (int sect = 0; sect < 27; sect++) {
+			SECTION_BLOCKS[sect] = DEFAULT_BYTE_ARRAY;
+			SECTION_DATA[sect] = DEFAULT_BYTE_ARRAY;
+			SKY_LIGHT[sect] = DEFAULT_FULL_BYTE_ARRAY;
+			BLOCK_LIGHT[sect] = DEFAULT_BYTE_ARRAY;
+		}
+
+		Arrays.fill(CHUNKS, null);
+
+		for (int x = minSectionX; x <= maxSectionX; x++) {
+			for (int z = minSectionZ; z <= maxSectionZ; z++) {
+				int relX = x - minSectionX;
+				int relZ = z - minSectionZ;
+
+				Chunk chunk = centerX == x && centerZ == z ? centerChunk : world.getChunkFromChunkCoords(x, z);
 				CHUNKS[sectionIndex(relX, 0, relZ)] = chunk;
 
-				for (int y = sectionY; y <= maxChunkY; y++) {
-					int relY = y - sectionY;
-
-					int yInd = (minY >> 4) + relY;
-
-					if (yInd < 0 || yInd > 15) {
+				for (int y = minSectionY; y <= maxSectionY; y++) {
+					if (y < 0 || y > 15) {
 						continue;
 					}
 
-					ExtendedBlockStorage section = chunk.getBlockStorageArray()[(minY >> 4) + relY];
+					ExtendedBlockStorage section = chunk.getBlockStorageArray()[y];
+					int relY = y - minSectionY;
 					int sectionIndex = sectionIndex(relX, relY, relZ);
 
-					if (sectionIndex(1, 1, 1) == sectionIndex) {
-						this.centerSectEmpty = section == null || section.isEmpty();
-
-						if (this.centerSectEmpty) {
-							return;
-						}
-					}
-
-					if (section != null && !section.isEmpty()) {
-						if (section.getBlockLSBArray() != null) {
-							SECTION_BLOCKS[sectionIndex] = section.getBlockLSBArray();
-						} else {
-							SECTION_BLOCKS[sectionIndex] = DEFAULT_BYTE_ARRAY;
+					if (section != null) {
+						if (!section.isEmpty()) {
+							if (section.getBlockLSBArray() != null) {
+								SECTION_BLOCKS[sectionIndex] = section.getBlockLSBArray();
+							}
+							if (section.getMetadataArray() != null) {
+								SECTION_DATA[sectionIndex] = section.getMetadataArray().data;
+							}
 						}
 
-						if (section.getMetadataArray() != null) {
-							SECTION_DATA[sectionIndex] = section.getMetadataArray().data;
-						} else {
-							SECTION_DATA[sectionIndex] = DEFAULT_BYTE_ARRAY;
-						}
-
-						if (section.getSkylightArray() == null) {
+						if (section.getSkylightArray() == null || this.worldObj.provider.hasNoSky) {
 							// Case where dimension doesn't support lighting (nether for example).
 							SKY_LIGHT[sectionIndex] = DEFAULT_BYTE_ARRAY;
-						} else if (section.getSkylightArray().data == null) {
-							// Case where the lighting is the default of the type (for the sky light-type is 15).
-							SKY_LIGHT[sectionIndex] = DEFAULT_FULL_BYTE_ARRAY;
-						} else {
+						} else if (section.getSkylightArray().data != null) {
 							// Base case, there is lighting and everybody is happy :).
 							SKY_LIGHT[sectionIndex] = section.getSkylightArray().data;
 						}
-
-						BLOCK_LIGHT[sectionIndex] = section.getBlocklightArray().data != null ? section.getBlocklightArray().data : DEFAULT_BYTE_ARRAY;
-					} else {
-						SECTION_BLOCKS[sectionIndex] = DEFAULT_BYTE_ARRAY;
-						SECTION_DATA[sectionIndex] = DEFAULT_BYTE_ARRAY;
-						SKY_LIGHT[sectionIndex] = DEFAULT_FULL_BYTE_ARRAY;
-						BLOCK_LIGHT[sectionIndex] = DEFAULT_BYTE_ARRAY;
+						if (section.getBlocklightArray() == null || section.getBlocklightArray().data != null) {
+							BLOCK_LIGHT[sectionIndex] = section.getBlocklightArray().data;
+						}
 					}
 				}
 			}
 
 			WorldChunkManager manager = this.worldObj.getWorldChunkManager();
 
-			int centerBlockX = this.blockX + 16;
-			int centerBlockZ = this.blockZ + 16;
+			int centerBlockX = centerX << 4;
+			int centerBlockZ = centerZ << 4;
+
 			BiomeGenBase biome = null;
 			boolean uniformed = true;
 
-			for (int blockX = centerBlockX - BIOME_RADIUS; blockX < centerBlockX + 16 + BIOME_RADIUS; blockX++) {
-				for (int blockZ = centerBlockZ - BIOME_RADIUS; blockZ < centerBlockZ + 16 + BIOME_RADIUS; blockZ++) {
-					int actChunkX = (blockX >> 4) - sectionX;
-					int actChunkZ = (blockZ >> 4) - sectionZ;
+			for (int biomeX = centerBlockX - BIOME_RADIUS; biomeX < centerBlockX + 16 + BIOME_RADIUS; biomeX++) {
+				for (int biomeZ = centerBlockZ - BIOME_RADIUS; biomeZ < centerBlockZ + 16 + BIOME_RADIUS; biomeZ++) {
+					int actChunkX = (biomeX >> 4) - minSectionX;
+					int actChunkZ = (biomeZ >> 4) - minSectionZ;
 
-					int relBiomeX = blockX - (centerBlockX - BIOME_RADIUS);
-					int relBiomeZ = blockZ - (centerBlockZ - BIOME_RADIUS);
+					int relBiomeX = biomeX - (centerBlockX - BIOME_RADIUS);
+					int relBiomeZ = biomeZ - (centerBlockZ - BIOME_RADIUS);
 
 					int chunkIndex = sectionIndex(actChunkX, 0, actChunkZ);
 
@@ -162,7 +164,7 @@ public class SectionCache implements IBlockAccess {
 					BiomeGenBase biomeGenBase = BiomeGenBase.plains;
 
 					if (chunk != null) {
-						biomeGenBase = chunk.getBiomeGenForWorldCoords(blockX & 15, blockZ & 15, manager);
+						biomeGenBase = chunk.getBiomeGenForWorldCoords(biomeX & 15, biomeZ & 15, manager);
 					}
 
 					if (biome == null || biome != biomeGenBase) {

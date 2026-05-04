@@ -38,7 +38,7 @@ public class SectionManager {
 		Minecraft.memoryReserve = null;
 	}
 
-	public static final int MAX_FULL_UPDATES = 3;
+	public static final int MAX_FULL_UPDATES = 2;
 	public static final int MAX_UPDATES_TRIES = 32;
 	private static final Item DEBUG_ITEM = null;
 
