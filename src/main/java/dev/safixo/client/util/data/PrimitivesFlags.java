@@ -2,6 +2,7 @@ package dev.safixo.client.util.data;
 
 import dev.safixo.client.render.pipelines.terrain.meshing.builders.VoxelMesher;
 import dev.safixo.client.render.pipelines.terrain.meshing.model.ModelColorizer;
+import dev.safixo.client.render.vertex.writers.TerrainFormat;
 import dev.safixo.client.util.MathExt;
 import net.minecraft.block.*;
 import net.minecraft.block.material.Material;
@@ -42,6 +43,8 @@ public class PrimitivesFlags {
 
 	public static final int[] LEAVES_COLOR = new int[256];
 	public static final int[] GRASS_COLOR = new int[256];
+
+	public static final byte[] FULL_FACES = new byte[4096];
 
 	public static void computeFlagArrays() {
 		LEAVES_TOP_INDEX = 0;
@@ -146,10 +149,10 @@ public class PrimitivesFlags {
 		boolean fastGraphics = !Minecraft.getMinecraft().gameSettings.fancyGraphics;
 
 		VoxelMesher.SIDE_GRASS_NON_OVERLAY = fastGraphics ? null : Block.grass.getIcon(5, 5);
-		VoxelMesher.OVERLAY_UVS[0] = BlockGrass.getIconSideOverlay().getMinU();
-		VoxelMesher.OVERLAY_UVS[1] = BlockGrass.getIconSideOverlay().getMinV();
-		VoxelMesher.OVERLAY_UVS[2] = BlockGrass.getIconSideOverlay().getMaxU();
-		VoxelMesher.OVERLAY_UVS[3] = BlockGrass.getIconSideOverlay().getMaxV();
+		VoxelMesher.OVERLAY_UVS[0] = TerrainFormat.deNormalizeTexCoordinate(BlockGrass.getIconSideOverlay().getMinU());
+		VoxelMesher.OVERLAY_UVS[1] = TerrainFormat.deNormalizeTexCoordinate(BlockGrass.getIconSideOverlay().getMinV());
+		VoxelMesher.OVERLAY_UVS[2] = TerrainFormat.deNormalizeTexCoordinate(BlockGrass.getIconSideOverlay().getMaxU());
+		VoxelMesher.OVERLAY_UVS[3] = TerrainFormat.deNormalizeTexCoordinate(BlockGrass.getIconSideOverlay().getMaxV());
 
 		for (int i = 0; i < LEAVES_TOP_INDEX; i++) {
 			SOLID_CULL_MASK[LEAVES_INDICES[i]] = (byte) (fastGraphics ? 1 : 0);

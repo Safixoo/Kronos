@@ -3,13 +3,17 @@ package dev.safixo.client.render.pipelines.terrain.meshing.model;
 import dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache;
 import dev.safixo.client.util.MathExt;
 import dev.safixo.client.util.data.PrimitivesFlags;
+import dev.safixo.client.util.memory.UnsafeUtil;
 import net.minecraft.block.Block;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.world.ColorizerFoliage;
 import net.minecraft.world.ColorizerGrass;
 import net.minecraft.world.biome.BiomeGenBase;
 import net.minecraft.world.biome.BiomeGenSwamp;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.terraingen.BiomeEvent;
+
+import java.lang.reflect.Field;
 
 public class ModelColorizer {
 	public static final int DYNAMIC_COLOR = 0;
@@ -22,9 +26,32 @@ public class ModelColorizer {
 
 	private static final int SAMPLE_SIZE = MathExt.square(SectionCache.BIOME_RADIUS * 2 + 1);
 
-	private BiomeEvent.GetGrassColor grassEvent;
-	private BiomeEvent.GetWaterColor waterEvent;
-	private BiomeEvent.GetFoliageColor foliageEvent;
+	private final BiomeEvent.GetGrassColor grassEvent = new BiomeEvent.GetGrassColor(null, 0);
+	private final BiomeEvent.GetWaterColor waterEvent = new BiomeEvent.GetWaterColor(null, 0);
+	private final BiomeEvent.GetFoliageColor foliageEvent = new BiomeEvent.GetFoliageColor(null, 0);
+
+	static final long ORIGINAL_COLOR_OFF;
+	static final long NEW_COLOR_OFF;
+	static final long BIOME_OFF;
+
+	static {
+		try {
+			Field originalColor = BiomeEvent.BiomeColor.class.getDeclaredField("originalColor");
+			Field newColor = BiomeEvent.BiomeColor.class.getDeclaredField("newColor");
+			Field biome = BiomeEvent.class.getDeclaredField("biome");
+			ORIGINAL_COLOR_OFF = UnsafeUtil.getFieldOffset(originalColor);
+			NEW_COLOR_OFF = UnsafeUtil.getFieldOffset(newColor);
+			BIOME_OFF = UnsafeUtil.getFieldOffset(biome);
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+	}
+
+	public static void populateEvent(BiomeEvent event, BiomeGenBase biome, int color) {
+		UnsafeUtil.UNSAFE.putObject(event, BIOME_OFF, biome);
+		UnsafeUtil.UNSAFE.putInt(event, ORIGINAL_COLOR_OFF, color);
+		UnsafeUtil.UNSAFE.putInt(event, NEW_COLOR_OFF, color);
+	}
 
 	public int getColor(SectionCache cache, int x, int y, int z, Block block) {
 		int colorizeType = PrimitivesFlags.COLOR_MODULATOR[block.blockID];
@@ -128,41 +155,20 @@ public class ModelColorizer {
 	}
 
 	private int getWaterColorEvent(BiomeGenBase biome) {
-		BiomeEvent.GetWaterColor event;
-
-		if (this.waterEvent == null || this.waterEvent.biome != biome) {
-			event = this.waterEvent = new BiomeEvent.GetWaterColor(biome, biome.waterColorMultiplier);
-		} else {
-			event = this.waterEvent;
-		}
-
-		MinecraftForge.EVENT_BUS.post(event);
-		return event.newColor;
+		populateEvent(this.waterEvent, biome, biome.waterColorMultiplier);
+		MinecraftForge.EVENT_BUS.post(this.waterEvent);
+		return this.waterEvent.newColor;
 	}
 
 	private int getGrassColorEvent(BiomeGenBase biome, int original) {
-		BiomeEvent.GetGrassColor event;
-
-		if (this.grassEvent == null || this.grassEvent.biome != biome || this.grassEvent.originalColor != original) {
-			event = this.grassEvent = new BiomeEvent.GetGrassColor(biome, original);
-		} else {
-			event = this.grassEvent;
-		}
-
-		MinecraftForge.EVENT_BUS.post(event);
-		return event.newColor;
+		populateEvent(this.grassEvent, biome, original);
+		MinecraftForge.EVENT_BUS.post(this.grassEvent);
+		return this.grassEvent.newColor;
 	}
 
 	private int getFoliageColorEvent(BiomeGenBase biome, int original) {
-		BiomeEvent.GetFoliageColor event;
-
-		if (this.foliageEvent == null || this.foliageEvent.biome != biome) {
-			event = this.foliageEvent = new BiomeEvent.GetFoliageColor(biome, original);
-		} else {
-			event = this.foliageEvent;
-		}
-
-		MinecraftForge.EVENT_BUS.post(event);
-		return event.newColor;
+		populateEvent(this.foliageEvent, biome, original);
+		MinecraftForge.EVENT_BUS.post(this.foliageEvent);
+		return this.foliageEvent.newColor;
 	}
 }

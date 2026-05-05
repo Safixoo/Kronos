@@ -39,17 +39,21 @@ public class TerrainFormat extends GlVertexFormat {
 		return (int) ((pos + RADIUS) * TerrainFormat.SCALE) & 0x1FFFFF;
 	}
 
-	private static long processUv(double u, double v) {
-		int roundU = (int) (u * UV_PRECISION);
-		int roundV = (int) (v * UV_PRECISION);
+	private static long processUv(float u, float v) {
+		int ui = deNormalizeTexCoordinate(u);
+		int vi = deNormalizeTexCoordinate(v);
+		return (ui | (long) vi << 16);
+	}
 
-		roundU -= (roundU & 0x10000) >>> 16;
-		roundV -= (roundV & 0x10000) >>> 16;
+	private static long processUv(int ui, int vi) {
+		return (ui | (long) vi << 16);
+	}
 
-		long intU = roundU & 0xFFFFL;
-		long intV = roundV & 0xFFFFL;
+	public static int deNormalizeTexCoordinate(float a) {
+		int round = (int) (a * UV_PRECISION);
+		round -= (round & 0x10000) >>> 16;
 
-		return (intU | intV << 16);
+		return round;
 	}
 
 	private static long processPosition(long x, long y, long z) {
@@ -63,10 +67,24 @@ public class TerrainFormat extends GlVertexFormat {
 		int intX = extractPos(x);
 		int intY = extractPos(y);
 		int intZ = extractPos(z);
+
 		long position = processPosition(intX, intY, intZ);
+		long uv = processUv(u, v);
 
 		UnsafeUtil.memPutLong(ptr, position);
-		UnsafeUtil.memPutLong(ptr + 8, processUv(u, v) | (long) color << 32 | (long) compressLightmap(lightMap) << 56);
+		UnsafeUtil.memPutLong(ptr + 8, uv | (long) color << 32 | (long) compressLightmap(lightMap) << 56);
+	}
+
+	public static void writeTerrainVertex(long ptr, float x, float y, float z, int u, int v, int color, int lightMap) {
+		int intX = extractPos(x);
+		int intY = extractPos(y);
+		int intZ = extractPos(z);
+
+		long position = processPosition(intX, intY, intZ);
+		long uv = processUv(u, v);
+
+		UnsafeUtil.memPutLong(ptr, position);
+		UnsafeUtil.memPutLong(ptr + 8, uv | (long) color << 32 | (long) compressLightmap(lightMap) << 56);
 	}
 
 	// skylight << 20 | blocklight << 4

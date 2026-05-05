@@ -124,10 +124,10 @@ public class VanillaBlockMesher {
 		int uv2 = face.uvData[uvRotate + 2];
 		int uv3 = face.uvData[uvRotate + 3];
 
-		bufferVertex(tes, face, bounds, 0, x, y, z, uvs[uv0 & 0xFF], uvs[uv0 >>> 8], color, lightMap);
-		bufferVertex(tes, face, bounds, 1, x, y, z, uvs[uv1 & 0xFF], uvs[uv1 >>> 8], color, lightMap);
-		bufferVertex(tes, face, bounds, 2, x, y, z, uvs[uv2 & 0xFF], uvs[uv2 >>> 8], color, lightMap);
-		bufferVertex(tes, face, bounds, 3, x, y, z, uvs[uv3 & 0xFF], uvs[uv3 >>> 8], color, lightMap);
+		bufferVertex(tes, face, bounds, 0 * 12, x, y, z, uvs[uv0 & 0xFF], uvs[uv0 >>> 8], color, lightMap);
+		bufferVertex(tes, face, bounds, 1 * 12, x, y, z, uvs[uv1 & 0xFF], uvs[uv1 >>> 8], color, lightMap);
+		bufferVertex(tes, face, bounds, 2 * 12, x, y, z, uvs[uv2 & 0xFF], uvs[uv2 >>> 8], color, lightMap);
+		bufferVertex(tes, face, bounds, 3 * 12, x, y, z, uvs[uv3 & 0xFF], uvs[uv3 >>> 8], color, lightMap);
 	}
 
 	public static void renderQuadYesAmbient(Tessellator tes, FacingData face, IBlockAccess cache, float[] bounds,

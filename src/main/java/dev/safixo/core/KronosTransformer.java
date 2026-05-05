@@ -23,10 +23,12 @@ public class KronosTransformer implements IClassTransformer {
 	static final String ADV_MODEL_RENDERER = "dev/safixo/client/render/pipelines/entity_model/AdvModelRenderer";
 
 	static final String REBUILD_LISTENER = "dev/safixo/client/render/pipelines/terrain/meshing/RebuildListener";
+	static final String SIDE_CULLER = "dev/safixo/client/render/pipelines/terrain/meshing/SideCuller";
 	static final String VANILLA_MESHER = "dev/safixo/client/render/pipelines/terrain/meshing/builders/VanillaBlockMesher";
 
 	static final String RENDER_BLOCKS = "net.minecraft.client.renderer.RenderBlocks";
 	static final String BLOCK_SNOW = "net.minecraft.block.BlockSnow";
+	static final String BLOCK = "net.minecraft.block.Block";
 	static final String RENDER_GLOBAL = "net.minecraft.client.renderer.RenderGlobal";
 	static final String ENTITY_RENDERER = "net.minecraft.client.renderer.EntityRenderer";
 	static final String ITEM_RENDERER = "net.minecraft.client.renderer.ItemRenderer";
@@ -57,8 +59,13 @@ public class KronosTransformer implements IClassTransformer {
 			case ENTITY_RENDERER:
 				replaceClassMethod(MINECRAFT_HOOK, "disableLightmap", "a", "(D)V", reference, true);
 				replaceClassMethod(MINECRAFT_HOOK, "enableLightmap", "b", "(D)V", reference, true);
+			case BLOCK:
+				replaceClassMethod(SIDE_CULLER, "shouldSideBeRendered", "a", "(Lacf;IIII)Z", reference, false);
+				catchBlockBounds(reference);
+				break;
 			case BLOCK_SNOW:
 				replaceClassMethod(MINECRAFT_HOOK, "shouldSideBeRendered", "a", "(Lacf;IIII)Z", reference, false);
+				break;
 			case RENDER_BLOCKS:
 				replaceClassMethod(VANILLA_MESHER, "renderStandardBlock", "p", "(Laqz;III)Z", reference, false);
 				break;
@@ -351,6 +358,39 @@ public class KronosTransformer implements IClassTransformer {
 
 		basicClass[0] = writer.toByteArray();
 	}
+
+	static void catchBlockBounds(byte[][] basicClass) {
+		ClassReader reader = new ClassReader(basicClass[0]);
+
+		ClassNode classNode = new ClassNode();
+		reader.accept(classNode, 0);
+
+		for (int i = 0; i < classNode.methods.size(); i++) {
+			MethodNode method = (MethodNode) classNode.methods.get(i);
+
+			if (!method.name.equals("setBlockBounds")) {
+				continue;
+			}
+
+			InsnList ins = method.instructions;
+
+			String argument = true ? "(Lnet/minecraft/block/Block;FFFFFF)V" : "(Laqz;FFFFFF)V";
+			method.instructions.insertBefore(ins.getFirst(), new MethodInsnNode(INVOKESTATIC, SIDE_CULLER, "calculateSolidSides", argument));
+			method.instructions.insertBefore(ins.getFirst(), new VarInsnNode(FLOAD, 6));
+			method.instructions.insertBefore(ins.getFirst(), new VarInsnNode(FLOAD, 5));
+			method.instructions.insertBefore(ins.getFirst(), new VarInsnNode(FLOAD, 4));
+			method.instructions.insertBefore(ins.getFirst(), new VarInsnNode(FLOAD, 3));
+			method.instructions.insertBefore(ins.getFirst(), new VarInsnNode(FLOAD, 2));
+			method.instructions.insertBefore(ins.getFirst(), new VarInsnNode(FLOAD, 1));
+			method.instructions.insertBefore(ins.getFirst(), new VarInsnNode(ALOAD, 0));
+		}
+
+		ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+		classNode.accept(writer);
+
+		basicClass[0] = writer.toByteArray();
+	}
+
 
 	static int processType(StringBuilder newDesc, Type type, InsnList inject, int offset) {
 		newDesc.append(type.getDescriptor());

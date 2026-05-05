@@ -25,8 +25,8 @@ public class VoxelMesher {
 
 	public static final int[] SHADE_FULL_COLOR = new int[Direction.COUNT];
 	public static final int[] SHADE_FULL_FACTOR = new int[Direction.COUNT];
-	protected static final float[] TEX_UVS = new float[4];
-	public static final float[] OVERLAY_UVS = new float[4];
+	protected static final int[] TEX_UVS = new int[4];
+	public static final int[] OVERLAY_UVS = new int[4];
 
 	public static Icon SIDE_GRASS_NON_OVERLAY = Block.grass.getIcon(5, 5);
 	public static final float[] SIDE_LIGHT_MULTIPLIER = new float[] { 0.5F, 1.0F, 0.8F, 0.8F, 0.6F, 0.6F };
@@ -64,16 +64,17 @@ public class VoxelMesher {
 			}
 
 			Icon tex = block.getBlockTexture(cache, x, y, z, dir);
-			final float[] uvs = TEX_UVS;
 			boolean sideGrass = tex == SIDE_GRASS_NON_OVERLAY;
 
-			uvs[0] = tex.getMinU();
-			uvs[1] = tex.getMinV();
-			uvs[2] = tex.getMaxU();
-			uvs[3] = tex.getMaxV();
+			TEX_UVS[0] = TerrainFormat.deNormalizeTexCoordinate(tex.getMinU());
+			TEX_UVS[1] = TerrainFormat.deNormalizeTexCoordinate(tex.getMinV());
+			TEX_UVS[2] = TerrainFormat.deNormalizeTexCoordinate(tex.getMaxU());
+			TEX_UVS[3] = TerrainFormat.deNormalizeTexCoordinate(tex.getMaxV());
 
 			FacingData render = FACE_RENDER[dir];
 			VertexWriter writer = VertexWriter.SOLID[dir];
+
+			writer.ensureCapacity(TerrainFormat.STRIDE * 8);
 
 			if (ambient) {
 				renderFace(writer, render, cache, x, y, z, blockColor, overlayColor, sideGrass);
@@ -139,41 +140,50 @@ public class VoxelMesher {
 		y &= RegionRender.BLOCK_BITS_Y;
 		z &= RegionRender.BLOCK_BITS_Z;
 
-		writer.ensureCapacity(TerrainFormat.STRIDE * 4);
+		long ptr = writer.getTotalOffset();
+		long quadOffs = face.quadVert;
 
 		boolean flip = ao0 > ao3 || ao2 > ao1;
-		float[] texUv = TEX_UVS;
 
 		if (flip) {
-			addVertex(writer, face, 0 * 12, x, y, z, texUv[uv0 & 0xFF], texUv[uv0 >>> 8], color0, light0);
-			addVertex(writer, face, 1 * 12, x, y, z, texUv[uv1 & 0xFF], texUv[uv1 >>> 8], color1, light1);
-			addVertex(writer, face, 2 * 12, x, y, z, texUv[uv2 & 0xFF], texUv[uv2 >>> 8], color2, light2);
-			addVertex(writer, face, 3 * 12, x, y, z, texUv[uv3 & 0xFF], texUv[uv3 >>> 8], color3, light3);
+			ptr = addVertex(ptr, quadOffs >> (0 * 12), x, y, z, uv0, color0, light0);
+			ptr = addVertex(ptr, quadOffs >> (1 * 12), x, y, z, uv1, color1, light1);
+			ptr = addVertex(ptr, quadOffs >> (2 * 12), x, y, z, uv2, color2, light2);
+			ptr = addVertex(ptr, quadOffs >> (3 * 12), x, y, z, uv3, color3, light3);
 		} else {
-			addVertex(writer, face, 3 * 12, x, y, z, texUv[uv3 & 0xFF], texUv[uv3 >>> 8], color3, light3);
-			addVertex(writer, face, 0 * 12, x, y, z, texUv[uv0 & 0xFF], texUv[uv0 >>> 8], color0, light0);
-			addVertex(writer, face, 1 * 12, x, y, z, texUv[uv1 & 0xFF], texUv[uv1 >>> 8], color1, light1);
-			addVertex(writer, face, 2 * 12, x, y, z, texUv[uv2 & 0xFF], texUv[uv2 >>> 8], color2, light2);
+			ptr = addVertex(ptr, quadOffs >> (3 * 12), x, y, z, uv3, color3, light3);
+			ptr = addVertex(ptr, quadOffs >> (0 * 12), x, y, z, uv0, color0, light0);
+			ptr = addVertex(ptr, quadOffs >> (1 * 12), x, y, z, uv1, color1, light1);
+			ptr = addVertex(ptr, quadOffs >> (2 * 12), x, y, z, uv2, color2, light2);
 		}
 
+		writer.offset += TerrainFormat.STRIDE * 4;
+		writer.vertices += 4;
+
 		if (sideGrass) {
-			texUv = OVERLAY_UVS;
+			TEX_UVS[0] = OVERLAY_UVS[0];
+			TEX_UVS[1] = OVERLAY_UVS[1];
+			TEX_UVS[2] = OVERLAY_UVS[2];
+			TEX_UVS[3] = OVERLAY_UVS[3];
+
 			color0 = ColorBGRManager.multiplyColor(overlayColor, ao0);
 			color1 = ColorBGRManager.multiplyColor(overlayColor, ao1);
 			color2 = ColorBGRManager.multiplyColor(overlayColor, ao2);
 			color3 = ColorBGRManager.multiplyColor(overlayColor, ao3);
 
 			if (flip) {
-				addVertex(writer, face, 0 * 12, x, y, z, texUv[uv0 & 0xFF], texUv[uv0 >>> 8], color0, light0);
-				addVertex(writer, face, 1 * 12, x, y, z, texUv[uv1 & 0xFF], texUv[uv1 >>> 8], color1, light1);
-				addVertex(writer, face, 2 * 12, x, y, z, texUv[uv2 & 0xFF], texUv[uv2 >>> 8], color2, light2);
-				addVertex(writer, face, 3 * 12, x, y, z, texUv[uv3 & 0xFF], texUv[uv3 >>> 8], color3, light3);
+				ptr = addVertex(ptr, quadOffs >> (0 * 12), x, y, z, uv0, color0, light0);
+				ptr = addVertex(ptr, quadOffs >> (1 * 12), x, y, z, uv1, color1, light1);
+				ptr = addVertex(ptr, quadOffs >> (2 * 12), x, y, z, uv2, color2, light2);
+				addVertex(ptr, quadOffs >> (3 * 12), x, y, z, uv3, color3, light3);
 			} else {
-				addVertex(writer, face, 3 * 12, x, y, z, texUv[uv3 & 0xFF], texUv[uv3 >>> 8], color3, light3);
-				addVertex(writer, face, 0 * 12, x, y, z, texUv[uv0 & 0xFF], texUv[uv0 >>> 8], color0, light0);
-				addVertex(writer, face, 1 * 12, x, y, z, texUv[uv1 & 0xFF], texUv[uv1 >>> 8], color1, light1);
-				addVertex(writer, face, 2 * 12, x, y, z, texUv[uv2 & 0xFF], texUv[uv2 >>> 8], color2, light2);
+				ptr = addVertex(ptr, quadOffs >> (3 * 12), x, y, z, uv3, color3, light3);
+				ptr = addVertex(ptr, quadOffs >> (0 * 12), x, y, z, uv0, color0, light0);
+				ptr = addVertex(ptr, quadOffs >> (1 * 12), x, y, z, uv1, color1, light1);
+				addVertex(ptr, quadOffs >> (2 * 12), x, y, z, uv2, color2, light2);
 			}
+			writer.offset += TerrainFormat.STRIDE * 4;
+			writer.vertices += 4;
 		}
 	}
 
@@ -181,7 +191,6 @@ public class VoxelMesher {
 		Vector3i dirVec = Direction.getDirection(dir);
 		int lightMap = cache.getLightBrightnessForSkyBlocks(x + dirVec.x, y + dirVec.y, z + dirVec.z, 0);
 
-		float[] texUv = TEX_UVS;
 		int uv0 = face.uv0;
 		int uv1 = face.uv1;
 		int uv2 = face.uv2;
@@ -191,25 +200,24 @@ public class VoxelMesher {
 		y &= RegionRender.BLOCK_BITS_Y;
 		z &= RegionRender.BLOCK_BITS_Z;
 
-		writer.ensureCapacity(TerrainFormat.STRIDE * 4);
+		long ptr = writer.getTotalOffset();
+		long quadOffs = face.quadVert;
 
-		addVertex(writer, face, 0 * 12, x, y, z, texUv[uv0 & 0xFF], texUv[uv0 >>> 8], blockColor, lightMap);
-		addVertex(writer, face, 1 * 12, x, y, z, texUv[uv1 & 0xFF], texUv[uv1 >>> 8], blockColor, lightMap);
-		addVertex(writer, face, 2 * 12, x, y, z, texUv[uv2 & 0xFF], texUv[uv2 >>> 8], blockColor, lightMap);
-		addVertex(writer, face, 3 * 12, x, y, z, texUv[uv3 & 0xFF], texUv[uv3 >>> 8], blockColor, lightMap);
+		ptr = addVertex(ptr, quadOffs >> (0 * 12), x, y, z, uv0, blockColor, lightMap);
+		ptr = addVertex(ptr, quadOffs >> (1 * 12), x, y, z, uv1, blockColor, lightMap);
+		ptr = addVertex(ptr, quadOffs >> (2 * 12), x, y, z, uv2, blockColor, lightMap);
+		ptr = addVertex(ptr, quadOffs >> (3 * 12), x, y, z, uv3, blockColor, lightMap);
 
 		if (sideGrass) {
-			texUv = OVERLAY_UVS;
-
-			addVertex(writer, face, 0 * 12, x, y, z, texUv[uv0 & 0xFF], texUv[uv0 >>> 8], overlayColor, lightMap);
-			addVertex(writer, face, 1 * 12, x, y, z, texUv[uv1 & 0xFF], texUv[uv1 >>> 8], overlayColor, lightMap);
-			addVertex(writer, face, 2 * 12, x, y, z, texUv[uv2 & 0xFF], texUv[uv2 >>> 8], overlayColor, lightMap);
-			addVertex(writer, face, 3 * 12, x, y, z, texUv[uv3 & 0xFF], texUv[uv3 >>> 8], overlayColor, lightMap);
+			ptr = addVertex(ptr, quadOffs >> (0 * 12), x, y, z, uv0, overlayColor, lightMap);
+			ptr = addVertex(ptr, quadOffs >> (1 * 12), x, y, z, uv1, overlayColor, lightMap);
+			ptr = addVertex(ptr, quadOffs >> (2 * 12), x, y, z, uv2, overlayColor, lightMap);
+			addVertex(ptr, quadOffs >> (3 * 12), x, y, z, uv3, overlayColor, lightMap);
 		}
 	}
 
-	public static void addVertex(VertexWriter writer, FacingData face, int vertInd, int x, int y, int z, float u, float v, int color, int lightMap) {
-		int vertOff = (int) (face.quadVert >>> vertInd);
+	public static long addVertex(long ptr, long quadVert, int x, int y, int z, int uvData, int color, int lightMap) {
+		int vertOff = (int) quadVert;
 
 		int relX = x + (vertOff & 0xF);
 		vertOff >>>= 4;
@@ -217,10 +225,8 @@ public class VoxelMesher {
 		vertOff >>>= 4;
 		int relZ = z + (vertOff & 0xF);
 
-		long ptr = writer.getTotalOffset();
-
-		TerrainFormat.writeTerrainVertex(ptr, relX, relY, relZ, u, v, color, lightMap);
-		writer.addVertexCounter(TerrainFormat.STRIDE);
+		TerrainFormat.writeTerrainVertex(ptr, relX, relY, relZ, TEX_UVS[uvData & 0xFF], TEX_UVS[uvData >>> 8], color, lightMap);
+		return ptr + TerrainFormat.STRIDE;
 	}
 
 	public static int getBlockCached(SectionCache cache, int x, int y, int z) {

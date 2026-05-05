@@ -51,14 +51,16 @@ public class VoxelMesherCenter  {
 			Icon tex = block.getBlockTexture(cache, x, y, z, dir);
 
 			boolean sideGrass = tex == SIDE_GRASS_NON_OVERLAY;
-			final float[] uvs = TEX_UVS;
-			uvs[0] = tex.getMinU();
-			uvs[1] = tex.getMinV();
-			uvs[2] = tex.getMaxU();
-			uvs[3] = tex.getMaxV();
 
-			VertexWriter writer = VertexWriter.SOLID[dir];
+			TEX_UVS[0] = TerrainFormat.deNormalizeTexCoordinate(tex.getMinU());
+			TEX_UVS[1] = TerrainFormat.deNormalizeTexCoordinate(tex.getMinV());
+			TEX_UVS[2] = TerrainFormat.deNormalizeTexCoordinate(tex.getMaxU());
+			TEX_UVS[3] = TerrainFormat.deNormalizeTexCoordinate(tex.getMaxV());
+
 			FacingData render = FACE_RENDER[dir];
+			VertexWriter writer = VertexWriter.SOLID[dir];
+
+			writer.ensureCapacity(TerrainFormat.STRIDE * 8);
 
 			if (ambient) {
 				renderFace(writer, render, cache, x, y, z, blockIndex, blockColor, overlayColor, sideGrass);
@@ -112,42 +114,52 @@ public class VoxelMesherCenter  {
 		y &= RegionRender.BLOCK_BITS_Y;
 		z &= RegionRender.BLOCK_BITS_Z;
 
-		writer.ensureCapacity(TerrainFormat.STRIDE * 4);
+		long ptr = writer.getTotalOffset();
+		long quadOffs = face.quadVert;
 
 		boolean flip = ao0 > ao3 || ao2 > ao1;
-		float[] texUv = TEX_UVS;
 
 		if (flip) {
-			addVertex(writer, face, 0 * 12, x, y, z, texUv[uv0 & 0xFF], texUv[uv0 >>> 8], color0, light0);
-			addVertex(writer, face, 1 * 12, x, y, z, texUv[uv1 & 0xFF], texUv[uv1 >>> 8], color1, light1);
-			addVertex(writer, face, 2 * 12, x, y, z, texUv[uv2 & 0xFF], texUv[uv2 >>> 8], color2, light2);
-			addVertex(writer, face, 3 * 12, x, y, z, texUv[uv3 & 0xFF], texUv[uv3 >>> 8], color3, light3);
+			ptr = addVertex(ptr, quadOffs >> (0 * 12), x, y, z, uv0, color0, light0);
+			ptr = addVertex(ptr, quadOffs >> (1 * 12), x, y, z, uv1, color1, light1);
+			ptr = addVertex(ptr, quadOffs >> (2 * 12), x, y, z, uv2, color2, light2);
+			ptr = addVertex(ptr, quadOffs >> (3 * 12), x, y, z, uv3, color3, light3);
 		} else {
-			addVertex(writer, face, 3 * 12, x, y, z, texUv[uv3 & 0xFF], texUv[uv3 >>> 8], color3, light3);
-			addVertex(writer, face, 0 * 12, x, y, z, texUv[uv0 & 0xFF], texUv[uv0 >>> 8], color0, light0);
-			addVertex(writer, face, 1 * 12, x, y, z, texUv[uv1 & 0xFF], texUv[uv1 >>> 8], color1, light1);
-			addVertex(writer, face, 2 * 12, x, y, z, texUv[uv2 & 0xFF], texUv[uv2 >>> 8], color2, light2);
+			ptr = addVertex(ptr, quadOffs >> (3 * 12), x, y, z, uv3, color3, light3);
+			ptr = addVertex(ptr, quadOffs >> (0 * 12), x, y, z, uv0, color0, light0);
+			ptr = addVertex(ptr, quadOffs >> (1 * 12), x, y, z, uv1, color1, light1);
+			ptr = addVertex(ptr, quadOffs >> (2 * 12), x, y, z, uv2, color2, light2);
 		}
 
+		writer.offset += TerrainFormat.STRIDE * 4;
+		writer.vertices += 4;
+
 		if (sideGrass) {
+			TEX_UVS[0] = OVERLAY_UVS[0];
+			TEX_UVS[1] = OVERLAY_UVS[1];
+			TEX_UVS[2] = OVERLAY_UVS[2];
+			TEX_UVS[3] = OVERLAY_UVS[3];
+
 			color0 = ColorBGRManager.multiplyColor(overlayColor, ao0);
 			color1 = ColorBGRManager.multiplyColor(overlayColor, ao1);
 			color2 = ColorBGRManager.multiplyColor(overlayColor, ao2);
 			color3 = ColorBGRManager.multiplyColor(overlayColor, ao3);
-			texUv = OVERLAY_UVS;
 
 			if (flip) {
-				addVertex(writer, face, 0 * 12, x, y, z, texUv[uv0 & 0xFF], texUv[uv0 >>> 8], color0, light0);
-				addVertex(writer, face, 1 * 12, x, y, z, texUv[uv1 & 0xFF], texUv[uv1 >>> 8], color1, light1);
-				addVertex(writer, face, 2 * 12, x, y, z, texUv[uv2 & 0xFF], texUv[uv2 >>> 8], color2, light2);
-				addVertex(writer, face, 3 * 12, x, y, z, texUv[uv3 & 0xFF], texUv[uv3 >>> 8], color3, light3);
+				ptr = addVertex(ptr, quadOffs >> (0 * 12), x, y, z, uv0, color0, light0);
+				ptr = addVertex(ptr, quadOffs >> (1 * 12), x, y, z, uv1, color1, light1);
+				ptr = addVertex(ptr, quadOffs >> (2 * 12), x, y, z, uv2, color2, light2);
+				addVertex(ptr, quadOffs >> (3 * 12), x, y, z, uv3, color3, light3);
 			} else {
-				addVertex(writer, face, 3 * 12, x, y, z, texUv[uv3 & 0xFF], texUv[uv3 >>> 8], color3, light3);
-				addVertex(writer, face, 0 * 12, x, y, z, texUv[uv0 & 0xFF], texUv[uv0 >>> 8], color0, light0);
-				addVertex(writer, face, 1 * 12, x, y, z, texUv[uv1 & 0xFF], texUv[uv1 >>> 8], color1, light1);
-				addVertex(writer, face, 2 * 12, x, y, z, texUv[uv2 & 0xFF], texUv[uv2 >>> 8], color2, light2);
+				ptr = addVertex(ptr, quadOffs >> (3 * 12), x, y, z, uv3, color3, light3);
+				ptr = addVertex(ptr, quadOffs >> (0 * 12), x, y, z, uv0, color0, light0);
+				ptr = addVertex(ptr, quadOffs >> (1 * 12), x, y, z, uv1, color1, light1);
+				addVertex(ptr, quadOffs >> (2 * 12), x, y, z, uv2, color2, light2);
 			}
+			writer.offset += TerrainFormat.STRIDE * 4;
+			writer.vertices += 4;
 		}
+
 	}
 
 	public static int getBlockCached(int blockIndex) {
