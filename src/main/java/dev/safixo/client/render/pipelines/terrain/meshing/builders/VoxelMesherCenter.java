@@ -60,7 +60,6 @@ public class VoxelMesherCenter  {
 			VertexWriter writer = VertexWriter.SOLID[dir];
 			FacingData render = FACE_RENDER[dir];
 
-
 			if (ambient) {
 				renderFace(writer, render, cache, x, y, z, blockIndex, blockColor, overlayColor, sideGrass);
 			} else {

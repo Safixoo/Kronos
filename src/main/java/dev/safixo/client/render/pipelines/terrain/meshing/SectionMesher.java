@@ -153,7 +153,7 @@ public class SectionMesher {
 		int blockRenderPass = PrimitivesFlags.RENDER_PASS[blockId];
 		int blockX = x + section.blockX, blockY = y + section.blockY, blockZ = z + section.blockZ;
 
-		if (cache.isVoxelFullFromCenter(blockIndex) == 1) {
+		if (cache.isVoxelFullFromCenter(blockIndex) == 1 || PrimitivesFlags.SOLID_LIGHT_MASK[blockId] == 1) {
 			int drawBitSet = 0;
 
 			drawBitSet |= cache.isVoxelFullFromCenter(blockIndex + makeBlockIndex(0,1,0)) << UP;
@@ -202,7 +202,7 @@ public class SectionMesher {
 		int blockY = y + section.blockY;
 		int blockZ = z + section.blockZ;
 
-		if (cache.isVoxelFullFromCenter(blockIndex) == 1) {
+		if (cache.isVoxelFullFromCenter(blockIndex) == 1 || PrimitivesFlags.SOLID_LIGHT_MASK[blockId] == 1) {
 			int rX = x + 16;
 			int rY = y + 16;
 			int rZ = z + 16;

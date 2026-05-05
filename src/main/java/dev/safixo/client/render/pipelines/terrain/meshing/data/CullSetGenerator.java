@@ -50,6 +50,7 @@ public class CullSetGenerator {
 			int z = (position >>> 4) & 0xF;
 			int y = (position >>> 8);
 
+
 			{
 				if (x == 15) {
 					openFaces |= 1 << EAST;
@@ -150,22 +151,7 @@ public class CullSetGenerator {
 	}
 
 	private static boolean isVisitable(byte[] blockData, int packed) {
-		return PrimitivesFlags.SOLID_CULL_MASK[blockData[packed] & 0xFF] == 0 && VISITED_CENTER_BLOCKS[packed] == 1;
-	}
-
-	private static int addOpenFaces(int x, int y, int z) {
-		int cullBits = 0;
-
-		if (x == 0) cullBits |= 1 << Direction.WEST;
-		else if (x == 15) cullBits |= 1 << Direction.EAST;
-
-		if (y == 0) cullBits |= 1 << Direction.DOWN;
-		else if (y == 15) cullBits |= 1 << Direction.UP;
-
-		if (z == 0) cullBits |= 1 << Direction.NORTH;
-		else if (z == 15) cullBits |= 1 << Direction.SOUTH;
-
-		return cullBits;
+		return VISITED_CENTER_BLOCKS[packed] == 1 && PrimitivesFlags.SOLID_CULL_MASK[blockData[packed] & 0xFF] == 0;
 	}
 
 	public static int pack(int x, int y, int z) {

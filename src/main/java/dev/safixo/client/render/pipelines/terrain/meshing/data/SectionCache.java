@@ -345,7 +345,7 @@ public class SectionCache implements IBlockAccess {
 			return this.isVoxelFullFromCenter(blockInd);
 		}
 
-		return PrimitivesFlags.SOLID_CULL_MASK[MathExt.byteToUnsigned(SECTION_BLOCKS[sectionIndex][blockInd])];
+		return PrimitivesFlags.SOLID_CULL_MASK[SECTION_BLOCKS[sectionIndex][blockInd] & 0xFF];
 	}
 
 	@Override
