@@ -50,7 +50,6 @@ public class VoxelMesher {
 				continue;
 			}
 
-
 			int blockColor = SHADE_FULL_COLOR[dir];
 			int overlayColor = blockColor;
 
@@ -78,7 +77,7 @@ public class VoxelMesher {
 			if (ambient) {
 				renderFace(writer, render, cache, x, y, z, blockColor, overlayColor, sideGrass);
 			} else {
-				renderFaceNoSmooth(writer, render, cache, x, y, z, dir, blockColor, overlayColor, sideGrass);
+				renderFaceNoSmooth(writer, render, cache, x, y, z, blockColor, overlayColor, sideGrass);
 			}
 		}
 	}
@@ -186,9 +185,8 @@ public class VoxelMesher {
 		}
 	}
 
-	public static void renderFaceNoSmooth(VertexWriter writer, FacingData face, SectionCache cache, int x, int y, int z, int dir, int blockColor, int overlayColor, boolean sideGrass) {
-		Vector3i dirVec = Direction.getDirection(dir);
-		int lightMap = cache.getLightBrightnessForSkyBlocks(x + dirVec.x, y + dirVec.y, z + dirVec.z, 0);
+	public static void renderFaceNoSmooth(VertexWriter writer, FacingData face, SectionCache cache, int x, int y, int z, int blockColor, int overlayColor, boolean sideGrass) {
+		int lightMap = cache.getLightmap(x + face.dirX, y + face.dirY, z + face.dirZ);
 
 		int uv0 = face.uv0;
 		int uv1 = face.uv1;
@@ -213,6 +211,9 @@ public class VoxelMesher {
 			ptr = addVertex(ptr, quadOffs >> (2 * 12), x, y, z, uv2, overlayColor, lightMap);
 			addVertex(ptr, quadOffs >> (3 * 12), x, y, z, uv3, overlayColor, lightMap);
 		}
+
+		writer.vertices += 4;
+		writer.offset += TerrainFormat.STRIDE * 4;
 	}
 
 	public static long addVertex(long ptr, long quadVert, int x, int y, int z, int uvData, int color, int lightMap) {
@@ -246,26 +247,6 @@ public class VoxelMesher {
 		int blockLight = SectionCache.getNibble(SectionCache.BLOCK_LIGHT[sectionIndex], blockIndex);
 
 		return MathExt.getLightmapCoord(skyLight, blockLight);
-	}
-
-	public static int getBlockCachedAvg(SectionCache cache, int x, int y, int z, int lightMap) {
-		int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
-
-		int blockX = x - cache.blockX;
-		int blockY = y - cache.blockY;
-		int blockZ = z - cache.blockZ;
-
-		int sectionIndex = SectionCache.sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
-		int solidBlock = PrimitivesFlags.SOLID_LIGHT_MASK[MathExt.byteToUnsigned(SectionCache.SECTION_BLOCKS[sectionIndex][blockIndex])];
-
-		if (solidBlock == 1) {
-			return lightMap | 1;
-		}
-
-		int skyLight = SectionCache.getNibble(SectionCache.SKY_LIGHT[sectionIndex], blockIndex);
-		int blockLight = SectionCache.getNibble(SectionCache.BLOCK_LIGHT[sectionIndex], blockIndex);
-
-		return (MathExt.getLightmapCoord(skyLight, blockLight) + lightMap) >>> 1;
 	}
 
 	private static Vector3i createVec3i(int x, int y, int z) {
@@ -333,7 +314,7 @@ public class VoxelMesher {
 		NEG_Y.setQuadVerts(1, createVec3i(0, 0, 0));
 		NEG_Y.setQuadVerts(2, createVec3i(1, 0, 0));
 		NEG_Y.setQuadVerts(3, createVec3i(1, 0, 1));
-		NEG_Y.setTexInd(0, 1, 2, 3);
+		NEG_Y.setTexInd(1, 0, 3, 2);
 
 		POS_Y.aoCorner0 = POS_X_DIR;
 		POS_Y.aoCorner1 = POS_Z_DIR;

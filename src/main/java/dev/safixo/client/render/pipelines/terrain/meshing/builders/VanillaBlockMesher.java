@@ -64,7 +64,7 @@ public class VanillaBlockMesher {
 			: 0xFFFFFF;
 
 		boolean ao = Minecraft.isAmbientOcclusionEnabled();
-		int flag = ModelHelper.processModel(blocks, BOUNDS, blocks.partialRenderBounds && ao);
+		int flag = ModelHelper.processModel(blocks, BOUNDS, blocks.partialRenderBounds);
 
 		byte[] uvRotate = ROTATIONS;
 		uvRotate[Direction.DOWN] = (byte) blocks.uvRotateBottom;

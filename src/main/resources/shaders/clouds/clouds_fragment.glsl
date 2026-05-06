@@ -11,6 +11,6 @@ uniform int u_Distance;
 void main() {
     float cellDistance = float(u_Distance);
 
-    float factor = 1.0 - smoothstep(cellDistance * 0.75, cellDistance, v_Distance);
+    float factor = 1.0 - smoothstep(cellDistance * 0.65, cellDistance, v_Distance);
     gl_FragColor = vec4(v_Color.rgb, v_Color.a * factor);
 }

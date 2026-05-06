@@ -90,7 +90,7 @@ public class CloudRenderer {
 			int cellZ = (cellData & 0xFF) - MAX_CELL_DISTANCE;
 			int cellX = (cellData >>> 8) - MAX_CELL_DISTANCE;
 
-			int distance = Math.min(MAX_CELL_DISTANCE, (int) (0.5D + Math.sqrt(MathExt.square(cellX) + MathExt.square(cellZ))));
+			int distance = Math.min(MAX_CELL_DISTANCE, (int) (0.25D + Math.sqrt(MathExt.square(cellX) + MathExt.square(cellZ))));
 			MAX_DISTANCE_INDEX[distance] = Math.max(MAX_DISTANCE_INDEX[distance], i);
 		}
 	}
@@ -141,7 +141,7 @@ public class CloudRenderer {
 
 		int renderDistance = MathExt.getCanonicalRenderDistance(mc.gameSettings);
 		int cellDistance = Math.max((int) (GlStateTracker.FOG_END / CLOUD_WIDTH), (renderDistance * 16) / CLOUD_WIDTH) - 1;
-		cellDistance = Math.min(cellDistance, MAX_CELL_DISTANCE);
+		cellDistance = Math.min(cellDistance + 3, MAX_CELL_DISTANCE);
 
 		// Prepare for rendering the clouds.
 		CloudRenderer.setupRender(world, mc.getResourceManager(), partialTick, cellDistance);

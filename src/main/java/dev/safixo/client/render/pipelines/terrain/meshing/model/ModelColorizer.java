@@ -155,20 +155,29 @@ public class ModelColorizer {
 	}
 
 	private int getWaterColorEvent(BiomeGenBase biome) {
-		populateEvent(this.waterEvent, biome, biome.waterColorMultiplier);
-		MinecraftForge.EVENT_BUS.post(this.waterEvent);
+		if (biome != this.waterEvent.biome) {
+			populateEvent(this.grassEvent, biome, biome.waterColorMultiplier);
+			MinecraftForge.EVENT_BUS.post(this.waterEvent);
+		}
+
 		return this.waterEvent.newColor;
 	}
 
 	private int getGrassColorEvent(BiomeGenBase biome, int original) {
-		populateEvent(this.grassEvent, biome, original);
-		MinecraftForge.EVENT_BUS.post(this.grassEvent);
+		if (biome != this.grassEvent.biome || original != this.grassEvent.originalColor) {
+			populateEvent(this.grassEvent, biome, original);
+			MinecraftForge.EVENT_BUS.post(this.grassEvent);
+		}
+
 		return this.grassEvent.newColor;
 	}
 
 	private int getFoliageColorEvent(BiomeGenBase biome, int original) {
-		populateEvent(this.foliageEvent, biome, original);
-		MinecraftForge.EVENT_BUS.post(this.foliageEvent);
+		if (biome != this.foliageEvent.biome || original != this.foliageEvent.originalColor) {
+			populateEvent(this.foliageEvent, biome, original);
+			MinecraftForge.EVENT_BUS.post(this.foliageEvent);
+		}
+
 		return this.foliageEvent.newColor;
 	}
 }

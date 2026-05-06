@@ -65,7 +65,7 @@ public class VoxelMesherCenter  {
 			if (ambient) {
 				renderFace(writer, render, cache, x, y, z, blockIndex, blockColor, overlayColor, sideGrass);
 			} else {
-				renderFaceNoSmooth(writer, render, cache, x, y, z, dir, blockColor, overlayColor, sideGrass);
+				renderFaceNoSmooth(writer, render, cache, x, y, z, blockColor, overlayColor, sideGrass);
 			}
 		}
 	}
