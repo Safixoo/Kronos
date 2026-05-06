@@ -1,7 +1,7 @@
 package dev.safixo.client.render.pipelines.terrain.meshing.model;
 
 import dev.safixo.client.render.pipelines.terrain.meshing.data.FacingData;
-import dev.safixo.client.util.MathExt;
+import dev.safixo.client.util.data.PrimitivesFlags;
 import net.minecraft.world.IBlockAccess;
 
 import static dev.safixo.client.render.pipelines.terrain.meshing.model.ModelHelper.*;
@@ -14,7 +14,7 @@ public class ModelLighter {
 		int dirY = y + face.dirY;
 		int dirZ = z + face.dirZ;
 
-		if (cache.isBlockOpaqueCube(dirX, dirY, dirZ)) {
+		if (PrimitivesFlags.SOLID_LIGHT_MASK[cache.getBlockId(dirX, dirY, dirZ)] == 1) {
 			dirX = x;
 			dirY = y;
 			dirZ = z;
@@ -62,10 +62,10 @@ public class ModelLighter {
 		ao |= ao(posZ, negX, cornerNP) << 24;
 
 		int lightMap = cache.getLightBrightnessForSkyBlocks(x, y, z, 0);
-		light[0] = avg(avgF(lightMap, cornerPP), avg(posZ, posX)); // 0 vertex
-		light[1] = avg(avgF(lightMap, cornerPN), avg(posX, negZ)); // 1 vertex
-		light[2] = avg(avgF(lightMap, cornerNN), avg(negZ, negX)); // 2 vertex
-		light[3] = avg(avgF(lightMap, cornerNP), avg(negX, posZ)); // 3 vertex
+		light[0] = avg(avgU(cornerPP, lightMap), avg(posZ, posX)); // 0 vertex
+		light[1] = avg(avgU(cornerPN, lightMap), avg(posX, negZ)); // 1 vertex
+		light[2] = avg(avgU(cornerNN, lightMap), avg(negZ, negX)); // 2 vertex
+		light[3] = avg(avgU(cornerNP, lightMap), avg(negX, posZ)); // 3 vertex
 
 		return ao;
 	}

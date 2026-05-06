@@ -60,7 +60,7 @@ public class PrimitivesFlags {
 			NORMAL_BLOCK[i] = ((block != null && block.blockMaterial.isOpaque() && block.renderAsNormalBlock() && !block.canProvidePower()));
 			MATERIAL[i] = (block == null || i == 0) ? Material.air : block.blockMaterial;
 			SOLID_CULL_MASK[i] = (byte) (((block != null && block.isOpaqueCube()) || block instanceof BlockLeaves) ? 1 : 0);
-			SOLID_LIGHT_MASK[i] = (byte) (((block != null && block.isOpaqueCube()) || block instanceof BlockLeaves) ? 1 : 0);
+			SOLID_LIGHT_MASK[i] = (byte) (((block != null && block.isOpaqueCube()) || block instanceof BlockLeaves || Block.lightOpacity[i] >= 14) ? 1 : 0);
 			TILE_ENTITY[i] = block != null && block.hasTileEntity(0);
 			RENDER_PASS[i] = block == null ? -777 : (short) block.getRenderBlockPass();
 		}

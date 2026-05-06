@@ -90,10 +90,10 @@ public class VoxelMesherCenter  {
 		int cornerNN = fullFace(negZ & negX) == 0 ? getBlockCached(blockIndex - p12) : 1;
 
 		int lightMap = cache.getLightmapCenter(blockIndex);
-		int light0 = avg(avgF(lightMap, cornerPP), avg(posZ, posX)); // 0 vertex
-		int light1 = avg(avgF(lightMap, cornerPN), avg(posX, negZ)); // 1 vertex
-		int light2 = avg(avgF(lightMap, cornerNN), avg(negZ, negX)); // 2 vertex
-		int light3 = avg(avgF(lightMap, cornerNP), avg(negX, posZ)); // 3 vertex
+		int light0 = avg(avgU(cornerPP, lightMap), avg(posZ, posX)); // 0 vertex
+		int light1 = avg(avgU(cornerPN, lightMap), avg(posX, negZ)); // 1 vertex
+		int light2 = avg(avgU(cornerNN, lightMap), avg(negZ, negX)); // 2 vertex
+		int light3 = avg(avgU(cornerNP, lightMap), avg(negX, posZ)); // 3 vertex
 
 		int ao0 = ao(posZ, posX, cornerPP);
 		int ao1 = ao(negZ, posX, cornerPN);
@@ -120,15 +120,15 @@ public class VoxelMesherCenter  {
 		boolean flip = ao0 > ao3 || ao2 > ao1;
 
 		if (flip) {
+			ptr = addVertex(ptr, quadOffs >> (3 * 12), x, y, z, uv3, color3, light3);
 			ptr = addVertex(ptr, quadOffs >> (0 * 12), x, y, z, uv0, color0, light0);
 			ptr = addVertex(ptr, quadOffs >> (1 * 12), x, y, z, uv1, color1, light1);
 			ptr = addVertex(ptr, quadOffs >> (2 * 12), x, y, z, uv2, color2, light2);
-			ptr = addVertex(ptr, quadOffs >> (3 * 12), x, y, z, uv3, color3, light3);
 		} else {
-			ptr = addVertex(ptr, quadOffs >> (3 * 12), x, y, z, uv3, color3, light3);
 			ptr = addVertex(ptr, quadOffs >> (0 * 12), x, y, z, uv0, color0, light0);
 			ptr = addVertex(ptr, quadOffs >> (1 * 12), x, y, z, uv1, color1, light1);
 			ptr = addVertex(ptr, quadOffs >> (2 * 12), x, y, z, uv2, color2, light2);
+			ptr = addVertex(ptr, quadOffs >> (3 * 12), x, y, z, uv3, color3, light3);
 		}
 
 		writer.offset += TerrainFormat.STRIDE * 4;
@@ -146,15 +146,15 @@ public class VoxelMesherCenter  {
 			color3 = ColorBGRManager.multiplyColor(overlayColor, ao3);
 
 			if (flip) {
-				ptr = addVertex(ptr, quadOffs >> (0 * 12), x, y, z, uv0, color0, light0);
-				ptr = addVertex(ptr, quadOffs >> (1 * 12), x, y, z, uv1, color1, light1);
-				ptr = addVertex(ptr, quadOffs >> (2 * 12), x, y, z, uv2, color2, light2);
-				addVertex(ptr, quadOffs >> (3 * 12), x, y, z, uv3, color3, light3);
-			} else {
 				ptr = addVertex(ptr, quadOffs >> (3 * 12), x, y, z, uv3, color3, light3);
 				ptr = addVertex(ptr, quadOffs >> (0 * 12), x, y, z, uv0, color0, light0);
 				ptr = addVertex(ptr, quadOffs >> (1 * 12), x, y, z, uv1, color1, light1);
 				addVertex(ptr, quadOffs >> (2 * 12), x, y, z, uv2, color2, light2);
+			} else {
+				ptr = addVertex(ptr, quadOffs >> (0 * 12), x, y, z, uv0, color0, light0);
+				ptr = addVertex(ptr, quadOffs >> (1 * 12), x, y, z, uv1, color1, light1);
+				ptr = addVertex(ptr, quadOffs >> (2 * 12), x, y, z, uv2, color2, light2);
+				addVertex(ptr, quadOffs >> (3 * 12), x, y, z, uv3, color3, light3);
 			}
 			writer.offset += TerrainFormat.STRIDE * 4;
 			writer.vertices += 4;
@@ -173,6 +173,19 @@ public class VoxelMesherCenter  {
 		int blockLight = SectionCache.getNibble(SectionCache.CENTER_BLOCKLIGHT, blockIndex);
 
 		return MathExt.getLightmapCoord(skyLight, blockLight);
+	}
+
+	public static int getBlockCached(int blockIndex, int lightMap) {
+		int solidBlock = PrimitivesFlags.SOLID_LIGHT_MASK[SectionCache.CENTER_BLOCKS[blockIndex] & 0xFF];
+
+		if (solidBlock == 1) {
+			return lightMap;
+		}
+
+		int skyLight = SectionCache.getNibble(SectionCache.CENTER_SKYLIGHT, blockIndex);
+		int blockLight = SectionCache.getNibble(SectionCache.CENTER_BLOCKLIGHT, blockIndex);
+
+		return (MathExt.getLightmapCoord(skyLight, blockLight) + lightMap) >> 1;
 	}
 
 	public static int fullVoxel(int blockIndex) {

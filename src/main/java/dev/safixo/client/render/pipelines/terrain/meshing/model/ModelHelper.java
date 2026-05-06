@@ -1,6 +1,5 @@
 package dev.safixo.client.render.pipelines.terrain.meshing.model;
 
-import dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache;
 import dev.safixo.client.util.data.PrimitivesFlags;
 import net.minecraft.client.renderer.RenderBlocks;
 import net.minecraft.world.IBlockAccess;
@@ -67,23 +66,25 @@ public class ModelHelper {
 
 		corner |= side1 & side2;
 
-		return EMPTY_BLOCK_OCC_FACTOR - ((side1 + side2 + corner) >> 2);
+		return ((EMPTY_BLOCK_OCC_FACTOR << 2) - (side1 + side2 + corner)) >> 2;
+	}
+
+	public static int avgU(int a, int b) {
+		if (a == 1) {
+			return b;
+		}
+
+		return (a + b) >>> 1;
 	}
 
 	public static int avg(int a, int b) {
-		if (a <= 1) return b;
-		if (b <= 1) return a;
+		if (a == 1) {
+			return b;
+		}
+		if (b == 1) {
+			return a;
+		}
 
 		return (a + b) >>> 1;
-	}
-
-	public static int avgF(int a, int b) {
-		if (b <= 1) return a;
-
-		return (a + b) >>> 1;
-	}
-
-	private static boolean lossyEqual(double a, double b) {
-		return Math.abs(a - b) <= (1.0 / 16.0f);
 	}
 }

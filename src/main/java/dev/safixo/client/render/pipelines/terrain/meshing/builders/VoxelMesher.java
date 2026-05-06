@@ -5,7 +5,6 @@ import dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache;
 import dev.safixo.client.render.pipelines.terrain.meshing.model.ModelColorizer;
 import dev.safixo.client.util.MathExt;
 import net.minecraft.block.Block;
-import net.minecraft.block.BlockGrass;
 import net.minecraft.util.Icon;
 import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
 import dev.safixo.client.util.data.PrimitivesFlags;
@@ -126,10 +125,10 @@ public class VoxelMesher {
 		int color3 = ColorBGRManager.multiplyColor(blockColor, ao3);
 
 		int lightMap = cache.getLightmap(dirX, dirY, dirZ);
-		int light0 = avg(avgF(lightMap, cornerPP), avg(posZ, posX)); // 0 vertex
-		int light1 = avg(avgF(lightMap, cornerPN), avg(posX, negZ)); // 1 vertex
-		int light2 = avg(avgF(lightMap, cornerNN), avg(negZ, negX)); // 2 vertex
-		int light3 = avg(avgF(lightMap, cornerNP), avg(negX, posZ)); // 3 vertex
+		int light0 = avg(avgU(cornerPP, lightMap), avg(posZ, posX)); // 0 vertex
+		int light1 = avg(avgU(cornerPN, lightMap), avg(posX, negZ)); // 1 vertex
+		int light2 = avg(avgU(cornerNN, lightMap), avg(negZ, negX)); // 2 vertex
+		int light3 = avg(avgU(cornerNP, lightMap), avg(negX, posZ)); // 3 vertex
 
 		int uv0 = face.uv0;
 		int uv1 = face.uv1;
@@ -146,15 +145,15 @@ public class VoxelMesher {
 		boolean flip = ao0 > ao3 || ao2 > ao1;
 
 		if (flip) {
+			ptr = addVertex(ptr, quadOffs >> (3 * 12), x, y, z, uv3, color3, light3);
 			ptr = addVertex(ptr, quadOffs >> (0 * 12), x, y, z, uv0, color0, light0);
 			ptr = addVertex(ptr, quadOffs >> (1 * 12), x, y, z, uv1, color1, light1);
 			ptr = addVertex(ptr, quadOffs >> (2 * 12), x, y, z, uv2, color2, light2);
-			ptr = addVertex(ptr, quadOffs >> (3 * 12), x, y, z, uv3, color3, light3);
 		} else {
-			ptr = addVertex(ptr, quadOffs >> (3 * 12), x, y, z, uv3, color3, light3);
 			ptr = addVertex(ptr, quadOffs >> (0 * 12), x, y, z, uv0, color0, light0);
 			ptr = addVertex(ptr, quadOffs >> (1 * 12), x, y, z, uv1, color1, light1);
 			ptr = addVertex(ptr, quadOffs >> (2 * 12), x, y, z, uv2, color2, light2);
+			ptr = addVertex(ptr, quadOffs >> (3 * 12), x, y, z, uv3, color3, light3);
 		}
 
 		writer.offset += TerrainFormat.STRIDE * 4;
@@ -172,15 +171,15 @@ public class VoxelMesher {
 			color3 = ColorBGRManager.multiplyColor(overlayColor, ao3);
 
 			if (flip) {
-				ptr = addVertex(ptr, quadOffs >> (0 * 12), x, y, z, uv0, color0, light0);
-				ptr = addVertex(ptr, quadOffs >> (1 * 12), x, y, z, uv1, color1, light1);
-				ptr = addVertex(ptr, quadOffs >> (2 * 12), x, y, z, uv2, color2, light2);
-				addVertex(ptr, quadOffs >> (3 * 12), x, y, z, uv3, color3, light3);
-			} else {
 				ptr = addVertex(ptr, quadOffs >> (3 * 12), x, y, z, uv3, color3, light3);
 				ptr = addVertex(ptr, quadOffs >> (0 * 12), x, y, z, uv0, color0, light0);
 				ptr = addVertex(ptr, quadOffs >> (1 * 12), x, y, z, uv1, color1, light1);
 				addVertex(ptr, quadOffs >> (2 * 12), x, y, z, uv2, color2, light2);
+			} else {
+				ptr = addVertex(ptr, quadOffs >> (0 * 12), x, y, z, uv0, color0, light0);
+				ptr = addVertex(ptr, quadOffs >> (1 * 12), x, y, z, uv1, color1, light1);
+				ptr = addVertex(ptr, quadOffs >> (2 * 12), x, y, z, uv2, color2, light2);
+				addVertex(ptr, quadOffs >> (3 * 12), x, y, z, uv3, color3, light3);
 			}
 			writer.offset += TerrainFormat.STRIDE * 4;
 			writer.vertices += 4;
@@ -247,6 +246,26 @@ public class VoxelMesher {
 		int blockLight = SectionCache.getNibble(SectionCache.BLOCK_LIGHT[sectionIndex], blockIndex);
 
 		return MathExt.getLightmapCoord(skyLight, blockLight);
+	}
+
+	public static int getBlockCachedAvg(SectionCache cache, int x, int y, int z, int lightMap) {
+		int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
+
+		int blockX = x - cache.blockX;
+		int blockY = y - cache.blockY;
+		int blockZ = z - cache.blockZ;
+
+		int sectionIndex = SectionCache.sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
+		int solidBlock = PrimitivesFlags.SOLID_LIGHT_MASK[MathExt.byteToUnsigned(SectionCache.SECTION_BLOCKS[sectionIndex][blockIndex])];
+
+		if (solidBlock == 1) {
+			return lightMap | 1;
+		}
+
+		int skyLight = SectionCache.getNibble(SectionCache.SKY_LIGHT[sectionIndex], blockIndex);
+		int blockLight = SectionCache.getNibble(SectionCache.BLOCK_LIGHT[sectionIndex], blockIndex);
+
+		return (MathExt.getLightmapCoord(skyLight, blockLight) + lightMap) >>> 1;
 	}
 
 	private static Vector3i createVec3i(int x, int y, int z) {
