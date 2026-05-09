@@ -6,6 +6,7 @@ layout (location = 2) in uvec4 a_ColorAndLight;
 
 out vec3 v_Color;
 out vec2 v_TextureUv;
+out float v_Distance;
 
 uniform vec3 u_RegionPos;
 uniform mat4 u_ProjModelViewMat;
@@ -23,6 +24,11 @@ ivec2 lightmapTexelCoord(uint light) {
     return ivec2(light) >> ivec2(4, 0) & 0xF;
 }
 
+#define PRECISION_BITS 21u
+#define REGION_SIZE 128.0
+#define RADIUS 1.0
+#define SCALE ((REGION_SIZE + RADIUS * 2.0) / float(1u << PRECISION_BITS))
+
 void main() {
     vec3 blockPosition = extractBlockPos(a_Position);
     gl_Position = u_ProjModelViewMat * vec4(blockPosition, 1.0);
@@ -32,4 +38,5 @@ void main() {
 
     v_Color = color * texelFetch(u_LightTex, lightmapTexelCoord(light), 0).rgb;
     v_TextureUv = a_Uv * (1.0 / 65536.0);
+    v_Distance = length(blockPosition * SCALE);
 }

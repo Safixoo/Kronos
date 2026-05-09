@@ -57,6 +57,8 @@ public class SectionManager {
 
 	private long vramUsed, vramAllocated;
 	private int renderDistance;
+	private boolean graphUpdated;
+
 	public int drawnSolidRenderers;
 
 	private boolean terrainDirty;
@@ -167,6 +169,10 @@ public class SectionManager {
 		INSTANCE = null;
 	}
 
+	public boolean hasGraphUpdated() {
+		return this.graphUpdated;
+	}
+
 	public void update(WorldClient world, int renderDistance, double cameraX, double cameraY, double cameraZ, boolean worldChanged, float partialTick) {
 		CameraData camera = extractCameraData(cameraX, cameraY, cameraZ, renderDistance);
 
@@ -210,6 +216,9 @@ public class SectionManager {
 		if ((playerItem != DEBUG_ITEM || DEBUG_ITEM == null) && shouldUpdateGraph) {
 			this.bfsCuller.init(this.regionManager);
 			this.bfsCuller.updateRenderList(this, this.camera);
+			this.graphUpdated = true;
+		} else {
+			this.graphUpdated = false;
 		}
 
 		profiler.endStartSection("updatechunks");
@@ -326,7 +335,7 @@ public class SectionManager {
 		terrainShader.useProgram();
 		terrainShader.setupUniforms(noFog);
 
-		this.regionManager.drawAllRegions(terrainShader, this.camera, renderPass);
+		this.regionManager.drawAllRegions(this, terrainShader, this.camera, renderPass);
 		terrainShader.disableProgram();
 	}
 

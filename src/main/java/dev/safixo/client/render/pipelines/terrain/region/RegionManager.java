@@ -183,7 +183,7 @@ public class RegionManager {
 		}
 	}
 
-	public void drawAllRegions(TerrainProgram shader, CameraData camera, int pass) {
+	public void drawAllRegions(SectionManager manager, TerrainProgram shader, CameraData camera, int pass) {
 		RegionRender[] regionRenders = this.getRegionsSorted(camera);
 
 		if (regionRenders == null) {
@@ -207,10 +207,10 @@ public class RegionManager {
 		while (index != end) {
 			RegionRender region = regionRenders[index];
 
-			region.prepareAndDraw(shader, camera, pass);
+			region.prepareAndDraw(manager, shader, camera, pass);
 
 			if (pass == 0) {
-				SectionManager.getCurrentInstance().drawnSolidRenderers += region.sectionsToRender;
+				manager.drawnSolidRenderers += region.sectionsToRender;
 			}
 
 			index += inc;

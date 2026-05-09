@@ -1,5 +1,6 @@
 package dev.safixo.client.render.pipelines.terrain.region;
 
+import dev.safixo.client.render.pipelines.terrain.SectionManager;
 import dev.safixo.client.render.pipelines.terrain.shader.TerrainProgram;
 import dev.safixo.client.util.memory.NativeBuffer;
 import dev.safixo.client.util.memory.UnsafeUtil;
@@ -83,7 +84,7 @@ public class RegionRender {
 	// If nothing has changed since the last draw, including the visible bit-set,
 	// section count and render-indices try to re-use last draw command setup.
 	private final int[] lastDrawCount = new int[RENDER_PASSES];
-	private final short[] lastRenderIndices = new short[RENDER_PASSES * REGION_SECTION_SIZE];
+	private final short[][] lastRenderIndices = new short[RENDER_PASSES][REGION_SECTION_SIZE];
 
 	// This is important as the direction enum, is ordered in a way that fundamentally
 	// makes impossible batching draw without meshes being meshed in very specific
@@ -91,7 +92,8 @@ public class RegionRender {
 	private final int[] meshDirectionsOrdered = new int[REGION_SECTION_SIZE];
 
 	private final boolean[] shouldCachePass = new boolean[RENDER_PASSES];
-	private int lastVisibleSet = -1, lastVisibleCount;
+	private int[] lastVisibleCount = new int[RENDER_PASSES];
+	private int lastVisibleSet = -1;
 
 	// Number of sections queued for draw in the current frame.
 	public int sectionsToRender;
@@ -235,13 +237,13 @@ public class RegionRender {
 	// Processing draw data now and not in the BFS, allows decoupling the system and doing the extra
 	// work between draw which doesn't pressure the driver immediately, also as we work in a "small"
 	// and contiguous data-set we don't get penalized too much for pulling SectionRenders from memory.
-	public void prepareAndDraw(TerrainProgram shader, CameraData camera, int pass) {
+	public void prepareAndDraw(SectionManager manager, TerrainProgram shader, CameraData camera, int pass) {
 		if ((pass == 0 && this.solidFirst == UnsafeUtil.NULL) || (pass == 1 && this.translucentFirst == UnsafeUtil.NULL)) {
 			return;
 		}
 
 		// Try to re-use the last draw command setup.
-		if (this.shouldCachePass[pass] && this.shouldUseCachedDraw(camera, pass)) {
+		if (!manager.hasGraphUpdated() || (this.shouldCachePass[pass] && this.shouldUseCachedDraw(camera, pass))) {
 			int drawCount = this.lastDrawCount[pass];
 
 			if (drawCount != 0) {
@@ -335,20 +337,19 @@ public class RegionRender {
 
 		this.lastVisibleSet = regionVis;
 
-		if (regionVis != oldRegionVis || this.lastVisibleCount != this.sectionsToRender) {
-			this.lastVisibleCount = this.sectionsToRender;
+		if (regionVis != oldRegionVis || this.lastVisibleCount[pass] != this.sectionsToRender) {
+			this.lastVisibleCount[pass] = this.sectionsToRender;
 			return false;
 		}
 
-		final int offset = pass == 1 ? REGION_SECTION_SIZE : 0;
-		final short[] lastRenderIndices = this.lastRenderIndices;
+		final short[] lastRenderIndices = this.lastRenderIndices[pass];
 		final short[] renderIndices = this.renderIndices;
 		final int maxIndex = this.sectionsToRender;
 
 		int index = 0;
 
 		// Mismatch of section indices.
-		while (index < maxIndex && lastRenderIndices[index + offset] == renderIndices[index]) {
+		while (index < maxIndex && lastRenderIndices[index] == renderIndices[index]) {
 			index++;
 		}
 
@@ -356,7 +357,7 @@ public class RegionRender {
 
 		// A mismatch was found, copy the indices from the mismatch index.
 		while (index < maxIndex) {
-			lastRenderIndices[index + offset] = renderIndices[index++];
+			lastRenderIndices[index] = renderIndices[index++];
 		}
 
 		return canBeCached;

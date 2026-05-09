@@ -14,7 +14,7 @@ public class SectionRender {
 
 	// Some important section data as a bit-mask from SectionFlag encoding.
 	public int flags = SectionFlags.setDirty(0b0, true) |
-		SectionFlags.setCullFaces(0b0, 0b111_111);
+		SectionFlags.setCullFaces(0b0, 0b0);
 
 	// Section position relative to blocks.
 	public int blockX, blockY, blockZ;

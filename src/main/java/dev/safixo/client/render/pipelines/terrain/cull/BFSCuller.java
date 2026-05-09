@@ -45,7 +45,7 @@ public class BFSCuller {
 		SectionSet sectionSet = manager.getSectionSet();
 
 		int radius = sectionSet.getRadius();
-		int sectionIndex = SectionSet.getFlagIndex(radius, blockY >> 4, radius, sectionSet.getRadius());
+		int cameraIndex = SectionSet.getFlagIndex(radius, blockY >> 4, radius, sectionSet.getRadius());
 
 		short[] visibilitySet = sectionSet.visibilitySet;
 
@@ -53,7 +53,8 @@ public class BFSCuller {
 			int flags = origin.flags;
 
 			int diameter = radius * 2 + 1;
-			traverseNeighbors(visibilitySet, sectionIndex, diameter, SectionFlags.getAdjacentMask(flags));
+			int directions = SectionFlags.getAdjacentMask(flags) & ~SectionFlags.getCullFaces(flags);
+			traverseNeighbors(visibilitySet, cameraIndex, diameter, directions);
 
 			if (SectionFlags.isDirty(flags)) {
 				RebuildList.addToList(MathExt.asInt(0, blockY >> 4, 0));
@@ -63,7 +64,7 @@ public class BFSCuller {
 		}
 
 		int maxDistSquared = (int) MathExt.square(getFogDistance(camera));
-		iterateGraph(sectionSet, camera.intX, camera.intY, camera.intZ, maxDistSquared);
+		iterateGraph(sectionSet, cameraIndex, camera.intX, camera.intY, camera.intZ, maxDistSquared);
 
 		this.enqueueRegionData(camera);
 	}
@@ -113,9 +114,9 @@ public class BFSCuller {
 	 * by tomcc and the Sodium implementation, with many differences as it doesn't try to find connectivity 100% and uses some
 	 *  different ideas to avoid section queueing during the search.
 	 */
-	private static void iterateGraph(SectionSet sectionSet, int playerX, int playerY, int playerZ, int maxDistSquared) {
+	private static void iterateGraph(SectionSet sectionSet, int cameraIndex, int playerX, int playerY, int playerZ, int maxDistSquared) {
 		byte[] sectionFlags = sectionSet.sectionFlags;
-		short[] visibilitySet = sectionSet.visibilitySet;
+		short[] visSet = sectionSet.visibilitySet;
 
 		int radius = sectionSet.getRadius();
 		int diameter = radius * 2 + 1;
@@ -143,6 +144,7 @@ public class BFSCuller {
 			int diffZ = (diffChunkZ << 4) - (playerZ & 15);
 
 			int distance = getDistance(diffX, diffY, diffZ);
+			int outwardDir;
 
 			{ // Calculates visibility per section.
 				if (distance >= maxDistSquared || !FrustumCuller.withinFrustumBounds(diffX, diffY, diffZ)) {
@@ -150,21 +152,23 @@ public class BFSCuller {
 				}
 
 				if (diffChunkX != 0 && diffChunkY != 0 && diffChunkZ != 0 &&
-					processGridFactor(visibilitySet, sectionIndex, diameter, diffChunkX, diffChunkY, diffChunkZ) < TOLERANCE) {
+					processGridFactor(visSet, sectionIndex, diameter, diffChunkX, diffChunkY, diffChunkZ) < TOLERANCE) {
 					continue;
 				}
 
-				if ((distance >= 80 * 80 && CompressedFlags.hasPassesNonEmpty(flags) &&
-					rayNotVisible(visibilitySet, sectionIndex, diameter, -diffX - 8, -diffY - 8, -diffZ - 8))) {
+				outwardDir = getOutwardDirections(diffChunkX, diffChunkY, diffChunkZ);
+
+				if ((distance >= 64*64 && CompressedFlags.hasPassesNonEmpty(flags) &&
+					rayNotVisible(sectionFlags, visSet, cameraIndex, sectionIndex, diameter, -diffX-8, -diffY-8, -diffZ-8, outwardDir))) {
 					continue;
 				}
 			}
 
 			queueRenderTasks(flags, diffChunkX, sectionY, diffChunkZ);
-			int directions = getOutwardDirections(diffChunkX, diffChunkY, diffChunkZ) & CompressedFlags.getTraversableFaces(flags);
+			int directions = outwardDir & CompressedFlags.getTraversableFaces(flags);
 
 			if (directions != 0b0) {
-				traverseNeighbors(visibilitySet, sectionIndex, diameter, directions);
+				traverseNeighbors(visSet, sectionIndex, diameter, directions);
 			}
 		}
 	}
@@ -293,7 +297,7 @@ public class BFSCuller {
 	 * Traces a ray from the section to the camera and tries to find obstruction in the way using the section
 	 * current frame.
 	 */
-	private static boolean rayNotVisible(short[] visSet, int sectionIndex, int renderDiameter, int dX, int dY, int dZ) {
+	private static boolean rayNotVisible(byte[] flags, short[] visSet, int cameraIndex, int sectionIndex, int renderDiameter, int dX, int dY, int dZ, int outwardDir) {
 		int tMaxX = MAX_SCALE / (Math.abs(dX) | 1);
 		int tMaxY = MAX_SCALE / (Math.abs(dY) | 1);
 		int tMaxZ = MAX_SCALE / (Math.abs(dZ) | 1);
@@ -306,7 +310,11 @@ public class BFSCuller {
 		int signY = MathExt.mulSign(renderDiameter, dY);
 		int signZ = MathExt.mulSign(renderDiameter << 4, dZ);
 
-		for (int i = 0; i < 4; i++) {
+		int validC = 0;
+		int validT = 0;
+		int inwardDir = outwardDir ^ 0x3F;
+
+		for (int i = 0; i < 9; i++) {
 			if (tMaxX < tMaxY) {
 				if (tMaxX < tMaxZ) {
 					sectionIndex += signX;
@@ -325,11 +333,23 @@ public class BFSCuller {
 				}
 			}
 
-			if (visSet[sectionIndex] > TOLERANCE) {
+			if (cameraIndex == sectionIndex) {
 				return false;
+			}
+
+			int flag = flags[sectionIndex];
+
+			if ((CompressedFlags.getTraversableFaces(flag) & inwardDir) == 0 && ++validC >= 3) {
+				return true;
+			}
+
+			int visFact = visSet[sectionIndex];
+
+			if (visFact < TOLERANCE && ++validT >= 4) {
+				return true;
 			}
 		}
 
-		return true;
+		return false;
 	}
 }

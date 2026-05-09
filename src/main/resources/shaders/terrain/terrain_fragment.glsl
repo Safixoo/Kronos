@@ -1,5 +1,6 @@
 #version 330
 
+in float v_Distance;
 in vec3 v_Color;
 in vec2 v_TextureUv;
 
@@ -13,17 +14,10 @@ uniform float u_FogNegInvRadius;
 uniform float u_FogDensity;
 #endif
 
-uniform mat4 u_FogMat;
-
 out vec4 fragColor;
 
-float getDistance() {
-    vec4 pos = u_FogMat * vec4(gl_FragCoord.xyz, 1.0);
-    return length(pos.xyz / pos.w);
-}
-
 void main() {
-    float dist = getDistance();
+    float dist = v_Distance;
 
     #ifdef FOG_LINEAR
     // Optimized GL_LINEAR formula.
