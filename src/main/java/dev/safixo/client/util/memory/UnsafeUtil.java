@@ -62,6 +62,14 @@ public class UnsafeUtil {
 		UNSAFE.putInt(ptr, value);
 	}
 
+	public static void memPutDouble(long ptr, double value) {
+		UNSAFE.putDouble(ptr, value);
+	}
+
+	public static double memGetDouble(long ptr) {
+		return UNSAFE.getDouble(ptr);
+	}
+
 	public static void memPutShort(long ptr, short value) {
 		UNSAFE.putShort(ptr, value);
 	}

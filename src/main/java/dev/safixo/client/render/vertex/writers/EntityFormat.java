@@ -13,8 +13,7 @@ public class EntityFormat extends GlVertexFormat {
 	}
 
 	@Override
-	public void writeVertex(long ptr, int offset) {
-		VertexWriter writer = VertexWriter.getCurrentInstance();
+	public void writeVertex(VertexWriter writer, long ptr, int offset) {
 		writeVertex(ptr, writer.x, writer.y, writer.z, writer.u, writer.v, writer.normal);
 	}
 

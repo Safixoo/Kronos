@@ -158,7 +158,7 @@ public class BFSCuller {
 
 				outwardDir = getOutwardDirections(diffChunkX, diffChunkY, diffChunkZ);
 
-				if ((distance >= 64*64 && CompressedFlags.hasPassesNonEmpty(flags) &&
+				if ((distance >= 70*70 && CompressedFlags.hasPassesNonEmpty(flags) &&
 					rayNotVisible(sectionFlags, visSet, cameraIndex, sectionIndex, diameter, -diffX-8, -diffY-8, -diffZ-8, outwardDir))) {
 					continue;
 				}
@@ -339,7 +339,7 @@ public class BFSCuller {
 
 			int flag = flags[sectionIndex];
 
-			if ((CompressedFlags.getTraversableFaces(flag) & inwardDir) == 0 && ++validC >= 3) {
+			if ((CompressedFlags.getTraversableFaces(flag) & inwardDir) == 0 && ++validC >= 4) {
 				return true;
 			}
 

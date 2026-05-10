@@ -23,14 +23,12 @@ public class TerrainFormat extends GlVertexFormat {
 	}
 
 	@Override
-	public void writeVertex(long ptr, int offset) {
-		VertexWriter man = VertexWriter.getCurrentInstance();
+	public void writeVertex(VertexWriter writer, long ptr, int offset) {
+		float posX = writer.x + writer.trasX;
+		float posY = writer.y + writer.trasY;
+		float posZ = writer.z + writer.trasZ;
 
-		float posX = man.x + man.trasX;
-		float posY = man.y + man.trasY;
-		float posZ = man.z + man.trasZ;
-
-		writeTerrainVertex(ptr, posX, posY, posZ, man.u, man.v, man.color, man.lightMap);
+		writeTerrainVertex(ptr, posX, posY, posZ, writer.u, writer.v, writer.color & 0xFFFFFF, writer.lightMap);
 	}
 
 	private static int extractPos(float pos) {

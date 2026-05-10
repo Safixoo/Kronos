@@ -6,6 +6,7 @@ import dev.safixo.client.render.pipelines.terrain.shader.LinearFogProgram;
 import dev.safixo.client.render.pipelines.terrain.shader.TerrainProgram;
 import dev.safixo.client.util.ClientChunkListener;
 import dev.safixo.core.hooks.GlStateTracker;
+import dev.safixo.core.hooks.VertexRedirector;
 import it.unimi.dsi.fastutil.longs.*;
 import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
 import net.minecraft.client.Minecraft;
@@ -267,6 +268,7 @@ public class SectionManager {
 
 		PrimitivesFlags.processLeavesSolid();
 		PrimitivesFlags.REDIRECT_DRAWING = true;
+		VertexRedirector.ORGANIZE_NORMALS = true;
 
 		int i = 0, j = 0;
 
@@ -282,6 +284,7 @@ public class SectionManager {
 			}
 		}
 
+		VertexRedirector.ORGANIZE_NORMALS = false;
 		PrimitivesFlags.REDIRECT_DRAWING = false;
 	}
 	private void generateWholeVolume(double cameraX, double cameraZ) {

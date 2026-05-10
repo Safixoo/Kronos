@@ -3,6 +3,7 @@ package dev.safixo.client.render.gfx.vertex;
 import com.google.common.collect.ImmutableList;
 import dev.safixo.client.render.gfx.vertex.attribute.GlVertexAttribute;
 import dev.safixo.client.render.vertex.DefaultVertexFormats;
+import dev.safixo.client.render.vertex.VertexWriter;
 
 public abstract class GlVertexFormat {
 	private final ImmutableList<GlVertexAttribute> vertexProperties;
@@ -25,7 +26,7 @@ public abstract class GlVertexFormat {
 		this.vertexProperties = vertexProperties;
 	}
 
-	public abstract void writeVertex(long ptr, int index);
+	public abstract void writeVertex(VertexWriter writer, long ptr, int index);
 
 	public void setupBufferState() {
 		int offset = 0;

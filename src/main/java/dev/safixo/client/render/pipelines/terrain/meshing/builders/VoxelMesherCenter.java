@@ -117,7 +117,7 @@ public class VoxelMesherCenter  {
 		long ptr = writer.getTotalOffset();
 		long quadOffs = face.quadVert;
 
-		boolean flip = ao0 > ao3 || ao2 > ao1;
+		boolean flip = ao0 + ao2 > ao3 + ao1 || light0 + light2 <= light3 + light1;
 
 		if (flip) {
 			ptr = addVertex(ptr, quadOffs >> (3 * 12), x, y, z, uv3, color3, light3);

@@ -12,7 +12,7 @@ import dev.safixo.client.util.data.CameraData;
 import dev.safixo.client.util.MathExt;
 
 public class RegionManager {
-	public static boolean SUPPORT_INDIRECT = true;
+	public static boolean SUPPORT_INDIRECT;
 
 	public final Long2ReferenceOpenHashMap<RegionRender> regionMap = new Long2ReferenceOpenHashMap<>();
 

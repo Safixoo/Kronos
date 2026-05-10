@@ -13,7 +13,7 @@ public class CloudFormat extends GlVertexFormat {
 	}
 
 	@Override
-	public void writeVertex(long ptr, int offset) {
+	public void writeVertex(VertexWriter writer, long ptr, int offset) {
 	}
 
 	public static void writeCloudVertex(long ptr, int x, int y, int z, int color) {

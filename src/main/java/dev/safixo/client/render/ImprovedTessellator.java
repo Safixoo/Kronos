@@ -1,13 +1,11 @@
 package dev.safixo.client.render;
 
 import dev.safixo.client.render.gfx.buffer.GlVertexBuffer;
-import dev.safixo.client.render.gfx.vertex.GlVertexArrayObject;
 import dev.safixo.client.util.data.PrimitivesFlags;
 import dev.safixo.client.util.memory.NativeBuffer;
 import dev.safixo.client.util.memory.UnsafeUtil;
 import dev.safixo.core.hooks.GlStateTracker;
-import dev.safixo.core.hooks.TessellatorHook;
-import net.minecraft.client.Minecraft;
+import dev.safixo.core.hooks.VertexRedirector;
 import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.Tessellator;
 import org.lwjgl.opengl.*;
@@ -212,7 +210,7 @@ public class ImprovedTessellator extends Tessellator {
 		this.flags |= VERTEX_UV;
 
 		if (PrimitivesFlags.REDIRECT_DRAWING) {
-			TessellatorHook.setTextureUV(u, v);
+			VertexRedirector.setTextureUV(u, v);
 			return;
 		}
 
@@ -225,12 +223,6 @@ public class ImprovedTessellator extends Tessellator {
 	@Override
 	public void setBrightness(int light) {
 		this.flags |= VERTEX_LIGHT;
-
-		if (PrimitivesFlags.REDIRECT_DRAWING) {
-			TessellatorHook.setBrightness(light);
-			return;
-		}
-
 		this.light = light;
 	}
 
@@ -255,17 +247,12 @@ public class ImprovedTessellator extends Tessellator {
 			return;
 		}
 
-		if (PrimitivesFlags.REDIRECT_DRAWING) {
-			TessellatorHook.setColorRGBA(r, g, b, a);
-			return;
-		}
-
-		this.flags |= VERTEX_COLOR;
-
 		r &= 0xFF;
 		g &= 0xFF;
 		b &= 0xFF;
 		a &= 0xFF;
+
+		this.flags |= VERTEX_COLOR;
 
 		if (ByteOrder.nativeOrder() == ByteOrder.LITTLE_ENDIAN) {
 			this.color = a << 24 | b << 16 | g << 8 | r;
@@ -277,7 +264,7 @@ public class ImprovedTessellator extends Tessellator {
 	@Override
 	public void addVertexWithUV(double x, double y, double z, double u, double v) {
 		if (PrimitivesFlags.REDIRECT_DRAWING) {
-			TessellatorHook.addVertexWithUV(x + this.xOff, y + this.yOff, z + this.zOff, u, v);
+			VertexRedirector.addVertexWithUV(x + this.xOff, y + this.yOff, z + this.zOff, u, v);
 			return;
 		}
 
@@ -328,7 +315,7 @@ public class ImprovedTessellator extends Tessellator {
 	@Override
 	public void addVertex(double x, double y, double z) {
 		if (PrimitivesFlags.REDIRECT_DRAWING) {
-			TessellatorHook.addVertex(x + this.xOff, y + this.yOff, z + this.zOff);
+			VertexRedirector.addVertex(x + this.xOff, y + this.yOff, z + this.zOff);
 			return;
 		}
 
@@ -405,10 +392,6 @@ public class ImprovedTessellator extends Tessellator {
 		int nZ = (byte) (normalZ * 0x7F);
 
 		this.normal = (nX & 0xFF) << 0 | (nY & 0xFF) << 8 | (nZ & 0xFF) << 16;
-
-		if (PrimitivesFlags.REDIRECT_DRAWING) {
-			TessellatorHook.setNormal(this.normal);
-		}
 	}
 
 	@Override
