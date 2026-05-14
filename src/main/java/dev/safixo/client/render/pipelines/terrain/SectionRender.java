@@ -10,7 +10,7 @@ import net.minecraft.tileentity.TileEntity;
 // carriage of section data, besides that is only used in meshing as it is avoided in all hot-spots
 // such as culling or region draw setup.
 public class SectionRender {
-	private SectionSet sectionSet;
+	private final SectionSet sectionSet;
 
 	// Some important section data as a bit-mask from SectionFlag encoding.
 	public int flags = SectionFlags.setDirty(0b0, true) |

@@ -7,7 +7,6 @@ import it.unimi.dsi.fastutil.objects.*;
 import org.lwjgl.opengl.*;
 import dev.safixo.client.render.pipelines.terrain.SectionManager;
 import dev.safixo.client.render.pipelines.terrain.shader.TerrainProgram;
-import dev.safixo.client.render.pipelines.terrain.cull.BFSQueue;
 import dev.safixo.client.util.data.CameraData;
 import dev.safixo.client.util.MathExt;
 
@@ -20,9 +19,8 @@ public class RegionManager {
 	private double lastUpdateZ;
 
 	public RegionManager() {
-		// TODO: Test the performance of indirect draws in Intel drivers.
-		// String vendor = GL11.glGetString(GL11.GL_VENDOR);
-		SUPPORT_INDIRECT = GLContext.getCapabilities().GL_ARB_multi_draw_indirect; // && !vendor.contains("Intel");
+		String vendor = GL11.glGetString(GL11.GL_VENDOR);
+		SUPPORT_INDIRECT = GLContext.getCapabilities().GL_ARB_multi_draw_indirect && !vendor.contains("Intel");
 	}
 
 	public RegionRender getRegion(int sectionX, int sectionY, int sectionZ) {

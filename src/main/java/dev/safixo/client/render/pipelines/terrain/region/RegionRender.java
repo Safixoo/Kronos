@@ -1,5 +1,6 @@
 package dev.safixo.client.render.pipelines.terrain.region;
 
+import dev.safixo.client.render.gfx.util.RenderBuffer;
 import dev.safixo.client.render.pipelines.terrain.SectionManager;
 import dev.safixo.client.render.pipelines.terrain.shader.TerrainProgram;
 import dev.safixo.client.util.memory.NativeBuffer;
@@ -92,16 +93,18 @@ public class RegionRender {
 	private final int[] meshDirectionsOrdered = new int[REGION_SECTION_SIZE];
 
 	private final boolean[] shouldCachePass = new boolean[RENDER_PASSES];
-	private int[] lastVisibleCount = new int[RENDER_PASSES];
+	private final int[] lastVisibleCount = new int[RENDER_PASSES];
 	private int lastVisibleSet = -1;
 
-	// Number of sections queued for draw in the current frame.
+	// Number of sections queued for rendering in the current frame.
 	public int sectionsToRender;
 
 	public static final RegionRender NULL = new RegionRender(null, 0, Integer.MIN_VALUE, 0);
 
 	private long solidIndirectPtr;
 	private long translucentIndirectPtr;
+
+	private static final int INDIRECT_STRUCT_SIZE = 16;
 
 	public RegionRender(RegionManager regionManager, int sectionX, int sectionY, int sectionZ) {
 		this.regionX = sectionX >> (RegionRender.BLOCK_SHIFT_X - 4);
@@ -111,9 +114,8 @@ public class RegionRender {
 		this.regionManager = regionManager;
 
 		if (RegionManager.SUPPORT_INDIRECT) {
-			int structSize = 16;
-			this.solidIndirectPtr = NativeBuffer.nmemAlloc(SOLID_DRAWS * REGION_SECTION_SIZE * structSize);
-			this.translucentIndirectPtr = NativeBuffer.nmemAlloc(TRANSLUCENT_DRAWS * REGION_SECTION_SIZE * structSize);
+			this.solidIndirectPtr = NativeBuffer.nmemAlloc(SOLID_DRAWS * REGION_SECTION_SIZE * INDIRECT_STRUCT_SIZE);
+			this.translucentIndirectPtr = NativeBuffer.nmemAlloc(TRANSLUCENT_DRAWS * REGION_SECTION_SIZE * INDIRECT_STRUCT_SIZE);
 		}
 	}
 
@@ -125,11 +127,6 @@ public class RegionRender {
 	private void prepareTranslucentPtr() {
 		this.translucentFirst = NativeBuffer.nmemAlloc(REGION_SECTION_SIZE * INT_BYTES);
 		this.translucentCount = NativeBuffer.nmemAlloc(REGION_SECTION_SIZE * INT_BYTES);
-	}
-
-	public boolean canSafelyClear() {
-		return (this.solidBuffer == null || this.solidBuffer.isEmpty()) ||
-			(this.translucentBuffer == null || this.translucentBuffer.isEmpty());
 	}
 
 	public void clear() {
@@ -295,12 +292,9 @@ public class RegionRender {
 	}
 
 	private void multiDrawData(CameraData camera, TerrainProgram shader, int pass, int drawCount) {
-		RegionBuffer vertexBuffer = pass == 0 ? this.solidBuffer.vertexBuffer : this.translucentBuffer.vertexBuffer;
+		RenderBuffer vertexBuffer = pass == 0 ? this.solidBuffer.vertexBuffer : this.translucentBuffer.vertexBuffer;
 
 		vertexBuffer.bindState(true);
-
-		long first = pass != 0 ? this.translucentFirst : this.solidFirst;
-		long count = pass != 0 ? this.translucentCount : this.solidCount;
 
 		int blockRegionX = this.regionX << RegionRender.BLOCK_SHIFT_X;
 		int blockRegionY = this.regionY << RegionRender.BLOCK_SHIFT_Y;
@@ -309,28 +303,43 @@ public class RegionRender {
 		// Setup camera and region offset.
 		shader.setupRegionOffset(camera, blockRegionX, blockRegionY, blockRegionZ);
 
-		if (!RegionManager.SUPPORT_INDIRECT) {
-			// As of now count and first use the pointer but with some offset, so simply offset
-			// count itself to make the same effect.
-			IntBuffer firstBuff = NativeBuffer.wrap(first).asIntBuffer();
-			IntBuffer countBuff = NativeBuffer.wrap(count).asIntBuffer();
-
-			((Buffer) firstBuff).limit(drawCount);
-			((Buffer) countBuff).limit(drawCount);
-
-			GL14.glMultiDrawArrays(GL11.GL_QUADS, firstBuff, countBuff);
+		if (RegionManager.SUPPORT_INDIRECT) {
+			this.multiDrawIndirect(drawCount, pass);
 		} else {
-			ByteBuffer indirectBuff = NativeBuffer.wrap(pass == 0 ? this.solidIndirectPtr : this.translucentIndirectPtr);
-
-			if (indirectBuff == null) {
-				return;
-			}
-
-			((Buffer) indirectBuff).limit(drawCount * 16);
-			GL43.glMultiDrawArraysIndirect(GL11.GL_QUADS, indirectBuff, drawCount, 0);
+			this.multiDrawDirect(drawCount, pass);
 		}
 	}
 
+	private void multiDrawDirect(int drawCount, int pass) {
+		long first = pass != 0 ? this.translucentFirst : this.solidFirst;
+		long count = pass != 0 ? this.translucentCount : this.solidCount;
+
+		// As of now count and first use the pointer but with some offset, so simply offset
+		// count itself to make the same effect.
+		IntBuffer firstBuff = NativeBuffer.wrap(first).asIntBuffer();
+		IntBuffer countBuff = NativeBuffer.wrap(count).asIntBuffer();
+
+		((Buffer) firstBuff).limit(drawCount);
+		((Buffer) countBuff).limit(drawCount);
+
+		GL14.glMultiDrawArrays(GL11.GL_QUADS, firstBuff, countBuff);
+	}
+
+	private void multiDrawIndirect(int drawCount, int pass) {
+		ByteBuffer indirectBuff = NativeBuffer.wrap(pass == 0 ? this.solidIndirectPtr : this.translucentIndirectPtr);
+
+		if (indirectBuff == null) {
+			return;
+		}
+
+		((Buffer) indirectBuff).limit(drawCount * INDIRECT_STRUCT_SIZE);
+
+		GL43.glMultiDrawArraysIndirect(GL11.GL_QUADS, indirectBuff, drawCount, 0);
+	}
+
+	// TODO: In some cases even this code isn't even correct (ex: inside a region sometimes the result is invalid but
+	//  because the camera didn't move in the exact way to invalidate indices, the result is re-used and culling
+	//  artifacts are seen).
 	private boolean shouldUseCachedDraw(CameraData camera, int pass) {
 		int regionVis = getRegionVisibleFaces(camera.intX, camera.intY, camera.intZ, this.centerBlockX(), this.centerBlockY(), this.centerBlockZ());
 		int oldRegionVis = this.lastVisibleSet;
@@ -378,15 +387,15 @@ public class RegionRender {
 			return drawCount;
 		}
 
-		int first = -1;
-		int count = -1;
+		int batchedFirst = -1;
+		int batchedCount = -1;
 		boolean meshRemaining = false;
 
-		int meshOrderMask = this.meshDirectionsOrdered[regionIndex];
+		int orderedDirectionMask = this.meshDirectionsOrdered[regionIndex];
 
 		for (int dir = 0; dir < MeshDirection.COUNT; dir++) {
-			int meshCurrentDir = meshOrderMask & 0xF;
-			meshOrderMask >>= 4;
+			int meshCurrentDir = orderedDirectionMask & 0xF;
+			orderedDirectionMask >>= 4;
 
 			if ((visibleFaces & (1 << meshCurrentDir)) == 0) {
 				continue;
@@ -394,45 +403,51 @@ public class RegionRender {
 
 			long drawData = this.regionDrawData[regionIndex * TOTAL_DRAWS + meshCurrentDir];
 
-			int meshFirst = RegionAllocation.unpackFirst(drawData);
-			int meshCount = RegionAllocation.unpackCount(drawData);
+			int first = RegionAllocation.unpackFirst(drawData);
+			int count = RegionAllocation.unpackCount(drawData);
 
 			// Always save the last draw data and if the draw data is contiguous in memory
 			// continue batching the draw, is slower than the normal method but with the draw
 			// caching technique combined with the batching here, is a nice improvement.
-			if ((first + count) != meshFirst) {
+			if ((batchedFirst + batchedCount) != first) {
 				if (meshRemaining) {
-					if (RegionManager.SUPPORT_INDIRECT) {
-						addIndirectCommand(this.solidIndirectPtr, drawCount, first, count);
-					} else {
-						addDirectCommand(this.solidFirst, this.solidCount, drawCount, first, count);
-					}
-					drawCount++;
+					this.addCommandSolid(drawCount++, batchedFirst, batchedCount);
 				}
 
-				first = meshFirst;
-				count = meshCount;
 				meshRemaining = true;
+				batchedFirst = first;
+				batchedCount = count;
 			} else /* ((first + count) == meshFirst) */ {
-				count += meshCount;
+				batchedCount += count;
 			}
 
 		}
 
 		if (meshRemaining) {
-			if (RegionManager.SUPPORT_INDIRECT) {
-				addIndirectCommand(this.solidIndirectPtr, drawCount, first, count);
-			} else {
-				addDirectCommand(this.solidFirst, this.solidCount, drawCount, first, count);
-			}
-			drawCount++;
+			this.addCommandSolid(drawCount++, batchedFirst, batchedCount);
 		}
 
 		return drawCount;
 	}
 
+	private void addCommandSolid(int drawCount, int first, int count) {
+		if (RegionManager.SUPPORT_INDIRECT) {
+			addIndirectCommand(this.solidIndirectPtr, drawCount, first, count);
+		} else {
+			addDirectCommand(this.solidFirst, this.solidCount, drawCount, first, count);
+		}
+	}
+
+	private void addCommandTranslucent(int drawCount, int first, int count) {
+		if (RegionManager.SUPPORT_INDIRECT) {
+			addIndirectCommand(this.translucentIndirectPtr, drawCount, first, count);
+		} else {
+			addDirectCommand(this.translucentFirst, this.translucentCount, drawCount, first, count);
+		}
+	}
+
 	@SuppressWarnings("IntegerMultiplicationImplicitCastToLong")
-	public static void addDirectCommand(long firstPtr, long countPtr, int drawCount, int first, int count) {
+	private static void addDirectCommand(long firstPtr, long countPtr, int drawCount, int first, int count) {
 		UnsafeUtil.memPutInt(firstPtr + (drawCount << 2), first);
 		UnsafeUtil.memPutInt(countPtr + (drawCount << 2), count);
 	}
@@ -444,7 +459,7 @@ public class RegionRender {
 	//		uint  baseInstance;
 	//	} DrawArraysIndirectCommand;
 	@SuppressWarnings("IntegerMultiplicationImplicitCastToLong")
-	public static void addIndirectCommand(long indirectPtr, int drawCount, int first, int count) {
+	private static void addIndirectCommand(long indirectPtr, int drawCount, int first, int count) {
 		long ptr = indirectPtr + (drawCount << 4);
 
 		UnsafeUtil.memPutLong(ptr + 0, count | (1L << 32L));
@@ -460,12 +475,7 @@ public class RegionRender {
 		int first = RegionAllocation.unpackFirst(drawData);
 		int count = RegionAllocation.unpackCount(drawData);
 
-		if (RegionManager.SUPPORT_INDIRECT) {
-			addIndirectCommand(this.translucentIndirectPtr, drawCount, first, count);
-		} else {
-			addDirectCommand(this.translucentFirst, this.translucentCount, drawCount, first, count);
-		}
-
+		this.addCommandTranslucent(drawCount, first, count);
 		return ++drawCount;
 	}
 
@@ -526,15 +536,15 @@ public class RegionRender {
 		int restDirectionSet = 0;
 
 		for (int dir = 0; dir < MeshDirection.COUNT; dir++) {
-			// Mesh directions are as big as 0b111
+			// Mesh directions are always less than 0xF.
 			if ((meshBitDirections & (1 << dir)) != 0) {
-				preferredDirSet |= (dir & 0b111) << (preferredCount++ << 2);
+				preferredDirSet |= (dir & 0xF) << (preferredCount++ * 4);
 			} else {
-				restDirectionSet |= (dir & 0b111) << (restCount++ << 2);
+				restDirectionSet |= (dir & 0xF) << (restCount++ * 4);
 			}
 		}
 
-		return preferredDirSet | (restDirectionSet << (preferredCount << 2));
+		return preferredDirSet | (restDirectionSet << (preferredCount * 4));
 	}
 
 	public static int sectionX(int regionIndex) {

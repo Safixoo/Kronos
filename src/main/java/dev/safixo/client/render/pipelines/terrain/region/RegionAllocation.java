@@ -2,6 +2,7 @@ package dev.safixo.client.render.pipelines.terrain.region;
 
 import dev.safixo.client.render.gfx.buffer.GlVertexBuffer;
 import dev.safixo.client.render.gfx.util.GlBufferUtil;
+import dev.safixo.client.render.gfx.util.RenderBuffer;
 import org.lwjgl.opengl.*;
 import dev.safixo.client.render.pipelines.terrain.SectionFlags;
 import dev.safixo.client.render.pipelines.terrain.SectionManager;
@@ -16,7 +17,7 @@ public class RegionAllocation {
 	private static final int TRANSLUCENT_MIN_ALLOC = 1024 * 512;
 	private static final int SOLID_MIN_ALLOC = 4 * 1024 * 1024;
 
-	public RegionBuffer vertexBuffer;
+	public RenderBuffer vertexBuffer;
 
 	public long offset;
 	public long capacity;
@@ -40,7 +41,7 @@ public class RegionAllocation {
 		}
 
 		SectionManager.getCurrentInstance().addMemory(size);
-		this.vertexBuffer = new RegionBuffer(size, GL15.GL_STATIC_DRAW);
+		this.vertexBuffer = new RenderBuffer(size, GL15.GL_STATIC_DRAW);
 		this.capacity = size;
 	}
 
@@ -82,10 +83,8 @@ public class RegionAllocation {
 
 			} else {
 				// Allocate a temporal buffer to hold region memory.
-				RegionBuffer tempBuffer = new RegionBuffer((int) this.offset, GL15.GL_DYNAMIC_COPY);
-
 				GlVertexBuffer regionBuffer = this.vertexBuffer.getVertexBuffer();
-				GlVertexBuffer spareBuffer = tempBuffer.getVertexBuffer();
+				GlVertexBuffer spareBuffer = new GlVertexBuffer((int) this.offset, GL15.GL_DYNAMIC_COPY);
 
 				GlBufferUtil.copyBufferToBuffer(regionBuffer, spareBuffer, 0, 0, (int) this.offset);
 
@@ -93,7 +92,7 @@ public class RegionAllocation {
 
 				GlBufferUtil.copyBufferToBuffer(spareBuffer, regionBuffer, 0, 0, (int) this.offset);
 
-				tempBuffer.delete();
+				spareBuffer.delete();
 			}
 
 			this.capacity = newSize;

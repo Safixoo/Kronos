@@ -2,9 +2,9 @@ package dev.safixo.client.render.pipelines.terrain.region.allocation;
 
 import dev.safixo.client.render.gfx.buffer.GlVertexBuffer;
 import dev.safixo.client.render.gfx.util.GlBufferUtil;
+import dev.safixo.client.render.gfx.util.RenderBuffer;
 import dev.safixo.client.render.pipelines.terrain.SectionFlags;
 import dev.safixo.client.render.pipelines.terrain.SectionRender;
-import dev.safixo.client.render.pipelines.terrain.region.RegionBuffer;
 import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
 import dev.safixo.client.render.vertex.writers.TerrainFormat;
 import org.lwjgl.opengl.GL15;
@@ -21,7 +21,7 @@ public class NewRegionAllocator {
 	private long capacity;
 	private long offset;
 
-	private final RegionBuffer vertexBuffer;
+	private final RenderBuffer vertexBuffer;
 
 	private static final int STRIDE = TerrainFormat.STRIDE;
 	private static final int MIN_ALLOCATION = 4 << 20;
@@ -29,7 +29,7 @@ public class NewRegionAllocator {
 	public NewRegionAllocator(int size) {
 		size = Math.max(MIN_ALLOCATION, size);
 
-		this.vertexBuffer = new RegionBuffer(size, GL15.GL_STATIC_DRAW);
+		this.vertexBuffer = new RenderBuffer(size, GL15.GL_STATIC_DRAW);
 		this.capacity = size;
 
 		if (COPY_BUFFER == null) {
@@ -226,16 +226,14 @@ public class NewRegionAllocator {
 				}
 			} else {
 				// Allocate a temporal buffer to hold region memory.
-				RegionBuffer tempBuffer = new RegionBuffer((int) this.offset, GL15.GL_DYNAMIC_COPY);
-
+				GlVertexBuffer spareBuffer = new GlVertexBuffer((int) this.offset, GL15.GL_DYNAMIC_COPY);
 				GlVertexBuffer regionBuffer = this.vertexBuffer.getVertexBuffer();
-				GlVertexBuffer spareBuffer = tempBuffer.getVertexBuffer();
 
 				GlBufferUtil.copyBufferToBuffer(regionBuffer, spareBuffer, 0, 0, (int) this.offset);
 				this.vertexBuffer.allocateSpace((int) newSize, GL15.GL_STATIC_DRAW);
 				GlBufferUtil.copyBufferToBuffer(spareBuffer, regionBuffer, 0, 0, (int) this.offset);
 
-				tempBuffer.delete();
+				spareBuffer.delete();
 			}
 			this.capacity = newSize;
 		} else { // Use a intermediary copying buffer to avoid resizes.

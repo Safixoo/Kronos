@@ -9,18 +9,25 @@ import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
 
 import java.util.Arrays;
 
+// Most of the useful section data saved in a couple of arrays, because of reasons (*performance*).
 public class SectionSet {
 	private static final int FLAG_NULL = CompressedFlags.setTraversableFaces(0b0, 0b0);
 
-	private final ReferenceOpenHashSet<SectionRender> queuedFlags = new ReferenceOpenHashSet<>();
+	private final ReferenceOpenHashSet<SectionRender> queuedChanges = new ReferenceOpenHashSet<>();
 	private SectionRender lastSection;
 
+	// Saves a CompressedFlags bit-mask of each section in the radius.
 	public byte[] sectionFlags;
+
+	// Temporary array to be able to make changes in sectionFlags easier.
 	public byte[] tempFlags;
+
+	// Saves the visibility value from each section in the radius, which is quantized
+	// as "grid factor" (the term used in BFSCuller).
 	public short[] visibilitySet;
 
 	private int lastCameraChunkX = Integer.MIN_VALUE, lastCameraChunkZ = Integer.MIN_VALUE;
-	private float lastDistance;
+	private float lastDistance = Integer.MIN_VALUE;
 
 	private CameraData camera;
 	private int radius;
@@ -96,11 +103,9 @@ public class SectionSet {
 			this.setFlag(diffChunkX + radius, section.blockY >> 4, diffChunkZ + radius, compressedFlags);
 		}
 
-		this.queuedFlags.clear();
+		this.lastSection = null;
+		this.queuedChanges.clear();
 	}
-
-	@SuppressWarnings("MismatchedReadAndWriteOfArray")
-	private static final short[] EMPTY_ARRAY = new short[8192];
 
 	private void resetVisibilityState() {
 		int size = MathExt.square(this.radius * 2 + 1) * 16;
@@ -144,7 +149,7 @@ public class SectionSet {
 			return;
 		}
 
-		this.queuedFlags.add(section);
+		this.queuedChanges.add(section);
 		this.lastSection = section;
 	}
 
@@ -219,7 +224,7 @@ public class SectionSet {
 		int cameraChunkZ = this.camera.intZ >> 4;
 		int radius = this.radius;
 
-		for (SectionRender section : this.queuedFlags) {
+		for (SectionRender section : this.queuedChanges) {
 			int flags = CompressedFlags.sectionToCompressed(section.flags);
 
 			int sectionX = section.blockX >> 4;
@@ -236,7 +241,7 @@ public class SectionSet {
 			this.setFlag(diffChunkX + radius, sectionY, diffChunkZ + radius, flags);
 		}
 
-		this.queuedFlags.clear();
+		this.queuedChanges.clear();
 		this.lastSection = null;
 	}
 
