@@ -1,11 +1,11 @@
 package dev.safixo.core.hooks;
 
 import dev.safixo.client.render.ImprovedTessellator;
+import dev.safixo.client.render.gfx.state.GlMatrixTracker;
 import dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache;
 import dev.safixo.client.util.ClientChunkListener;
 import dev.safixo.client.util.Direction;
 import dev.safixo.client.util.MathExt;
-import dev.safixo.client.util.Matrix4Stack;
 import dev.safixo.client.util.data.PrimitivesFlags;
 import dev.safixo.client.util.memory.UnsafeUtil;
 import dev.safixo.core.HookUtils;
@@ -17,7 +17,6 @@ import net.minecraft.client.renderer.EntityRenderer;
 import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.util.ResourceLocation;
-import net.minecraft.world.EnumSkyBlock;
 import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
@@ -62,7 +61,7 @@ public class MinecraftHook {
 			ver.resize();
 		}
 
-		Matrix4f matrix = GlStateTracker.MODEL_VIEW_STACK.top();
+		Matrix4f matrix = GlMatrixTracker.MODEL_VIEW_STACK.top();
 
 		if (matrix.m22() > 0) {
 			// Front quad.

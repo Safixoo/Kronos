@@ -45,7 +45,7 @@ public class VertexRedirector {
 
 	public static void addVertex(double x, double y, double z) {
 		long ptr = PTR_QUAD + VERTEX_SIZE * VERT_INDEX;
-		ImprovedTessellator tes = ImprovedTessellator.TESSELLATOR;
+		ImprovedTessellator tes = ImprovedTessellator.INSTANCE;
 
 		UnsafeUtil.memPutFloat(ptr + X, (float) (x + tes.xOff));
 		UnsafeUtil.memPutFloat(ptr + Y, (float) (y + tes.yOff));

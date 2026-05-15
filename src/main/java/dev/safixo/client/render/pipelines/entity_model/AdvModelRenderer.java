@@ -1,6 +1,7 @@
 package dev.safixo.client.render.pipelines.entity_model;
 
 import dev.safixo.client.render.gfx.buffer.GlVertexBuffer;
+import dev.safixo.client.render.gfx.state.GlMatrixTracker;
 import dev.safixo.client.render.gfx.util.GlBufferUtil;
 import dev.safixo.client.render.gfx.vertex.GlVertexArrayObject;
 import dev.safixo.client.render.vertex.DefaultVertexFormats;
@@ -10,15 +11,12 @@ import dev.safixo.client.util.Direction;
 import dev.safixo.client.util.Matrix4Stack;
 import dev.safixo.client.util.memory.NativeBuffer;
 import dev.safixo.client.util.memory.UnsafeUtil;
-import dev.safixo.core.hooks.GLFunctions;
-import dev.safixo.core.hooks.GlStateTracker;
+import dev.safixo.client.render.gfx.state.GlStateTracker;
 import it.unimi.dsi.fastutil.objects.ReferenceArrayList;
 import net.minecraft.client.model.ModelBox;
 import net.minecraft.client.model.ModelRenderer;
 import net.minecraft.client.renderer.Tessellator;
-import net.minecraftforge.client.model.obj.Vertex;
 import org.joml.Matrix4f;
-import org.lwjgl.MemoryUtil;
 import org.lwjgl.opengl.*;
 
 import java.nio.Buffer;
@@ -188,7 +186,7 @@ public class AdvModelRenderer {
 			return;
 		}
 
-		Matrix4f matrix = GlStateTracker.MODEL_VIEW_STACK.top();
+		Matrix4f matrix = GlMatrixTracker.MODEL_VIEW_STACK.top();
 		int cubes = vertices / 24;
 
 		COUNT.put(cubes * 4);
@@ -294,14 +292,14 @@ public class AdvModelRenderer {
 
 		analyzeModel(writer);
 
-		VERTEX_BUFFER.bufferSubData(writer.getVertexDataNio(), OFFSET, writer.getOffset());
+		VERTEX_BUFFER.bufferSubData(writer.getWriterNio(), OFFSET, writer.getOffset());
 		int drawData = writer.getVertices() | (OFFSET / 24) << 16;
 
 		OFFSET += writer.getOffset();
 
 		writer.stopDrawing();
 		writer.setVertexFormat(null);
-		writer.clear();
+		writer.delete();
 		REDIRECT_DRAWING = false;
 
 		setCompiled(model, true);
@@ -320,7 +318,7 @@ public class AdvModelRenderer {
 		int totalOffset = entityData.getOffset();
 
 		for (int quad = 0; quad < (entityData.vertices / 4); quad++) {
-			long readPtr = entityData.getVertexData() + (quad * 4L * entityStride);
+			long readPtr = entityData.getWriterPtr() + (quad * 4L * entityStride);
 			int normal = UnsafeUtil.memGetInt(readPtr + normalOffset);
 
 			byte normalX = (byte) ((normal >>> 0) & 0xFF);
@@ -347,7 +345,7 @@ public class AdvModelRenderer {
 		for (int dir = 0; dir < Direction.COUNT; dir++) {
 			VertexWriter writerDir = VertexWriter.SOLID[dir];
 
-			UnsafeUtil.UNSAFE.copyMemory(writerDir.getVertexData(), entityData.getVertexData() + offset, writerDir.getOffset());
+			UnsafeUtil.UNSAFE.copyMemory(writerDir.getWriterPtr(), entityData.getWriterPtr() + offset, writerDir.getOffset());
 			offset += writerDir.getOffset();
 
 			writerDir.stopDrawing();

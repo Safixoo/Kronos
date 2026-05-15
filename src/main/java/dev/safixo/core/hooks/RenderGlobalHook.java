@@ -37,7 +37,7 @@ public  class RenderGlobalHook {
 
 	private static final Field RENDERERS_BEING_LOADED = HookUtils.getField(RenderGlobal.class, "renderersBeingRendered", "field_72746_N");
 
-	static float PARTIAL_TICK;
+	public static float PARTIAL_TICK;
 
 	public static void loadRenderers(RenderGlobal renderGlobal) {
 		// Check capabilities (TODO: This check is probably implemented too late)
@@ -51,8 +51,6 @@ public  class RenderGlobalHook {
 		if (MANAGER != null) {
 			SectionManager.destroyInstance();
 			clearBuffers();
-		} else {
-			Tessellator.instance = ImprovedTessellator.TESSELLATOR;
 		}
 
 		MANAGER = SectionManager.getCurrentInstance();

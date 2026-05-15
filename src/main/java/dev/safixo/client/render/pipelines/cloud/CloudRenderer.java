@@ -1,6 +1,7 @@
 package dev.safixo.client.render.pipelines.cloud;
 
 import dev.safixo.client.render.gfx.buffer.GlVertexBuffer;
+import dev.safixo.client.render.gfx.state.GlFogTracker;
 import dev.safixo.client.render.gfx.util.RenderBuffer;
 import dev.safixo.client.render.pipelines.terrain.cull.FrustumCuller;
 import dev.safixo.client.util.ColorBGRManager;
@@ -8,9 +9,8 @@ import dev.safixo.client.util.Direction;
 import dev.safixo.client.util.MathExt;
 import dev.safixo.client.render.vertex.VertexWriter;
 import dev.safixo.client.render.vertex.DefaultVertexFormats;
-import dev.safixo.client.render.vertex.writers.CloudFormat;
 import dev.safixo.core.HookUtils;
-import dev.safixo.core.hooks.GlStateTracker;
+import dev.safixo.client.render.gfx.state.GlStateTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.WorldClient;
 import net.minecraft.client.renderer.RenderGlobal;
@@ -23,7 +23,6 @@ import net.minecraft.world.World;
 import org.lwjgl.opengl.*;
 
 import javax.imageio.ImageIO;
-import javax.swing.plaf.basic.BasicInternalFrameTitlePane;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
@@ -140,7 +139,7 @@ public class CloudRenderer {
 		WorldClient world = mc.theWorld;
 
 		int renderDistance = MathExt.getCanonicalRenderDistance(mc.gameSettings);
-		int cellDistance = Math.max((int) (GlStateTracker.FOG_END / CLOUD_WIDTH), (renderDistance * 16) / CLOUD_WIDTH) - 1;
+		int cellDistance = Math.max((int) (GlFogTracker.FOG_END / CLOUD_WIDTH), (renderDistance * 16) / CLOUD_WIDTH) - 1;
 		cellDistance = Math.min(cellDistance + 3, MAX_CELL_DISTANCE);
 
 		// Prepare for rendering the clouds.
@@ -184,7 +183,7 @@ public class CloudRenderer {
 		buildGeometry(writer, cellDistance, worldFracX, worldFracZ, worldFloorX, worldFloorZ, viewY);
 
 		// Upload the geometry.
-		buffer.getVertexBuffer().bufferData(writer.getVertexDataNio(), writer.getOffset());
+		buffer.getVertexBuffer().bufferData(writer.getWriterNio(), writer.getOffset());
 
 		// Draw the clouds.
 		drawClouds(writer.getVertices(), worldFracX, viewY, worldFracZ);
@@ -229,7 +228,7 @@ public class CloudRenderer {
 		worldFloorZ -= MAX_CELL_DISTANCE;
 
 		int insideCellsInd = -viewY >= EPSILON && -viewY <= CLOUD_HEIGHT + EPSILON ? MAX_DISTANCE_INDEX[1] : -1;
-		long ptr = writer.getVertexData();
+		long ptr = writer.getWriterPtr();
 
 		for (int i = 0; i <= maxIteration; i++) {
 			int cellData = CELL_XY_DATA[i];
@@ -306,7 +305,7 @@ public class CloudRenderer {
 			}
 		}
 
-		writer.offset = (int) (ptr - writer.getVertexData());
+		writer.offset = (int) (ptr - writer.getWriterPtr());
 		writer.vertices = writer.offset / CLOUD_STRIDE;
 	}
 

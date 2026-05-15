@@ -1,9 +1,10 @@
 package dev.safixo.client.render.pipelines.terrain.shader;
 
 import dev.safixo.client.render.gfx.shader.GlProgram;
+import dev.safixo.client.render.gfx.state.GlFogTracker;
 import dev.safixo.client.util.data.PrimitivesFlags;
 import dev.safixo.client.util.memory.NativeBuffer;
-import dev.safixo.core.hooks.GlStateTracker;
+import dev.safixo.client.render.gfx.state.GlStateTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiNewChat;
 import org.joml.Matrix4f;
@@ -51,7 +52,7 @@ public class TerrainProgram extends GlProgram {
 		Matrix4f projMvp = FrustumCuller.projectionMatrix.mul(FrustumCuller.modelViewMatrix, new Matrix4f());
 
 		GL20.glUniformMatrix4(this.u_ProjModelViewMat, false, projMvp.scale((float) (1.0 / TerrainFormat.SCALE)).get(MATRIX));
-		GL20.glUniform3f(this.u_FogColor, GlStateTracker.FOG_COLOR_R, GlStateTracker.FOG_COLOR_G, GlStateTracker.FOG_COLOR_B);
+		GL20.glUniform3f(this.u_FogColor, GlFogTracker.FOG_COLOR_R, GlFogTracker.FOG_COLOR_G, GlFogTracker.FOG_COLOR_B);
 	}
 
 	public void setupRegionOffset(CameraData camera, int regionX, int regionY, int regionZ) {

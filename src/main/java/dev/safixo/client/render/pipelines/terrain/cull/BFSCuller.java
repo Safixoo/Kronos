@@ -1,7 +1,8 @@
 package dev.safixo.client.render.pipelines.terrain.cull;
 
+import dev.safixo.client.render.gfx.state.GlFogTracker;
 import dev.safixo.client.render.pipelines.terrain.*;
-import dev.safixo.core.hooks.GlStateTracker;
+import dev.safixo.client.render.gfx.state.GlStateTracker;
 import dev.safixo.client.util.data.CameraData;
 import dev.safixo.client.render.pipelines.terrain.region.RegionManager;
 import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
@@ -72,7 +73,7 @@ public class BFSCuller {
 	}
 
 	public static float getFogDistance(CameraData camera) {
-		return Math.max(3 << 4, Math.min(GlStateTracker.FOG_END, camera.renderDistance << 4));
+		return Math.max(3 << 4, Math.min(GlFogTracker.FOG_END, camera.renderDistance << 4));
 	}
 
 	/**

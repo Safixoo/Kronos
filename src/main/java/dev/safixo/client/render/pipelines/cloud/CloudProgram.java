@@ -1,8 +1,6 @@
 package dev.safixo.client.render.pipelines.cloud;
 
 import dev.safixo.client.render.gfx.shader.GlProgram;
-import dev.safixo.client.util.ColorBGRManager;
-import dev.safixo.core.hooks.GlStateTracker;
 import org.lwjgl.opengl.GL20;
 
 public class CloudProgram extends GlProgram {

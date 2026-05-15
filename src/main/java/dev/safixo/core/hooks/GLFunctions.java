@@ -1,5 +1,7 @@
 package dev.safixo.core.hooks;
 
+import dev.safixo.client.render.gfx.state.GlMatrixTracker;
+import dev.safixo.client.render.gfx.state.GlStateTracker;
 import dev.safixo.client.render.gfx.util.GpuFlags;
 import org.lwjgl.opengl.EXTDirectStateAccess;
 import org.lwjgl.opengl.GL11;
@@ -10,7 +12,7 @@ import java.nio.FloatBuffer;
 public class GLFunctions {
 	public static void glLoadMatrix(FloatBuffer matrix) {
 		if (GpuFlags.EXT_DSA) {
-			EXTDirectStateAccess.glMatrixLoadEXT(GlStateTracker.MAT_MODE, matrix);
+			EXTDirectStateAccess.glMatrixLoadEXT(GlMatrixTracker.MAT_MODE, matrix);
 		} else {
 			GL11.glMultMatrix(matrix);
 		}
@@ -18,7 +20,7 @@ public class GLFunctions {
 
 	public static void glMultMatrix(FloatBuffer matrix) {
 		if (GpuFlags.EXT_DSA) {
-			EXTDirectStateAccess.glMatrixMultEXT(GlStateTracker.MAT_MODE, matrix);
+			EXTDirectStateAccess.glMatrixMultEXT(GlMatrixTracker.MAT_MODE, matrix);
 		} else {
 			GL11.glMultMatrix(matrix);
 		}
@@ -26,7 +28,7 @@ public class GLFunctions {
 
 	public static void glPushMatrix() {
 		if (GpuFlags.EXT_DSA) {
-			EXTDirectStateAccess.glMatrixPushEXT(GlStateTracker.MAT_MODE);
+			EXTDirectStateAccess.glMatrixPushEXT(GlMatrixTracker.MAT_MODE);
 		} else {
 			GL11.glPushMatrix();
 		}
@@ -34,7 +36,7 @@ public class GLFunctions {
 
 	public static void glPopMatrix() {
 		if (GpuFlags.EXT_DSA) {
-			EXTDirectStateAccess.glMatrixPopEXT(GlStateTracker.MAT_MODE);
+			EXTDirectStateAccess.glMatrixPopEXT(GlMatrixTracker.MAT_MODE);
 		} else {
 			GL11.glPopMatrix();
 		}
@@ -46,7 +48,7 @@ public class GLFunctions {
 
 	public static void glTranslatef(float x, float y, float z) {
 		if (GpuFlags.EXT_DSA) {
-			EXTDirectStateAccess.glMatrixTranslatefEXT(GlStateTracker.MAT_MODE, x, y, z);
+			EXTDirectStateAccess.glMatrixTranslatefEXT(GlMatrixTracker.MAT_MODE, x, y, z);
 		} else {
 			GL11.glTranslatef(x, y, z);
 		}
@@ -54,7 +56,7 @@ public class GLFunctions {
 
 	public static void glRotatef(float angle, float x, float y, float z) {
 		if (GpuFlags.EXT_DSA) {
-			EXTDirectStateAccess.glMatrixRotatefEXT(GlStateTracker.MAT_MODE, angle, x, y, z);
+			EXTDirectStateAccess.glMatrixRotatefEXT(GlMatrixTracker.MAT_MODE, angle, x, y, z);
 		} else {
 			GL11.glRotatef(angle, x, y, z);
 		}

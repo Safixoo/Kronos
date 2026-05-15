@@ -1,7 +1,8 @@
 package dev.safixo.client.render.pipelines.terrain.shader;
 
 import dev.safixo.client.render.gfx.shader.ShaderDefine;
-import dev.safixo.core.hooks.GlStateTracker;
+import dev.safixo.client.render.gfx.state.GlFogTracker;
+import dev.safixo.client.render.gfx.state.GlStateTracker;
 import org.lwjgl.opengl.GL20;
 
 import java.util.ArrayList;
@@ -26,6 +27,6 @@ public class ExpFogProgram extends TerrainProgram {
 	@Override
 	public void setupUniforms(boolean noFog) {
 		super.setupUniforms(noFog);
-		GL20.glUniform1f(this.u_FogDensity, GlStateTracker.FOG_DENSITY);
+		GL20.glUniform1f(this.u_FogDensity, GlFogTracker.FOG_DENSITY);
 	}
 }

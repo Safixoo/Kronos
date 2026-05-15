@@ -1,7 +1,8 @@
 package dev.safixo.client.render.pipelines.terrain.shader;
 
 import dev.safixo.client.render.gfx.shader.ShaderDefine;
-import dev.safixo.core.hooks.GlStateTracker;
+import dev.safixo.client.render.gfx.state.GlFogTracker;
+import dev.safixo.client.render.gfx.state.GlStateTracker;
 import org.lwjgl.opengl.GL20;
 
 import java.util.ArrayList;
@@ -31,8 +32,8 @@ public class LinearFogProgram extends TerrainProgram {
 
 		// (u_FogEnd - v_Distance) / (u_FogEnd - u_FogStart)
 		// (u_FogNegInvRadius * v_Distance) + u_FogEndNegInvRadius;
-		float start = GlStateTracker.FOG_START;
-		float end = GlStateTracker.FOG_END;
+		float start = GlFogTracker.FOG_START;
+		float end = GlFogTracker.FOG_END;
 
 		float radius = end - start;
 		float fogNegInvRadius = 1.0F / radius;

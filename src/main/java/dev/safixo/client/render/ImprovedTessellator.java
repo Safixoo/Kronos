@@ -4,8 +4,9 @@ import dev.safixo.client.render.gfx.buffer.GlVertexBuffer;
 import dev.safixo.client.util.data.PrimitivesFlags;
 import dev.safixo.client.util.memory.NativeBuffer;
 import dev.safixo.client.util.memory.UnsafeUtil;
-import dev.safixo.core.hooks.GlStateTracker;
+import dev.safixo.client.render.gfx.state.GlStateTracker;
 import dev.safixo.core.hooks.VertexRedirector;
+import it.unimi.dsi.fastutil.bytes.ByteArrayList;
 import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.Tessellator;
 import org.lwjgl.opengl.*;
@@ -22,7 +23,11 @@ import java.util.Arrays;
 // - Compacts vertex format based in the used attributes (vanilla uses 32-byte at all times).
 // - Overall more optimized and clean code.
 public class ImprovedTessellator extends Tessellator {
-	public static final ImprovedTessellator TESSELLATOR = new ImprovedTessellator();
+	public static final ImprovedTessellator INSTANCE = new ImprovedTessellator();
+
+	static {
+		Tessellator.instance = INSTANCE;
+	}
 
 	private static final int UNDEFINED_FORMAT = 12; // start position after position attribute.
 	private static final int UNDEFINED_VERTEX_ARRAY = -1;
@@ -34,7 +39,7 @@ public class ImprovedTessellator extends Tessellator {
 
 	private static final int MIN_ALLOC = 1024 * 128;
 
-	private final GlVertexBuffer vertexBuffer = new GlVertexBuffer(MIN_ALLOC, GL15.GL_STREAM_DRAW);
+	private final GlVertexBuffer vertexBuffer = new GlVertexBuffer(MIN_ALLOC, GL15.GL_DYNAMIC_DRAW);
 
 	private boolean disabledColor, canDraw;
 	public int drawMode, flags, capacity = MIN_ALLOC;
@@ -87,30 +92,30 @@ public class ImprovedTessellator extends Tessellator {
 		GL30.glBindVertexArray(vertexArray);
 		this.vertexBuffer.bind();
 
-		GlStateTracker.glEnableClientStateDirect(GL11.GL_VERTEX_ARRAY);
+		GL11.glEnableClientState(GL11.GL_VERTEX_ARRAY);
 		GL11.glVertexPointer(3, GL11.GL_FLOAT, stride, 0);
 
 		int offset = UNDEFINED_FORMAT;
 
 		if ((flags & VERTEX_UV) != 0) {
-			GlStateTracker.glEnableClientStateDirect(GL11.GL_TEXTURE_COORD_ARRAY);
+			GL11.glEnableClientState(GL11.GL_TEXTURE_COORD_ARRAY);
 			GL11.glTexCoordPointer(2, GL11.GL_FLOAT, stride, offset);
 			offset += 8;
 		}
 		if ((flags & VERTEX_COLOR) != 0) {
-			GlStateTracker.glEnableClientStateDirect(GL11.GL_COLOR_ARRAY);
+			GL11.glEnableClientState(GL11.GL_COLOR_ARRAY);
 			GL11.glColorPointer(4, GL11.GL_UNSIGNED_BYTE, stride, offset);
 			offset += 4;
 		}
 		if ((flags & VERTEX_NORMAL) != 0) {
-			GlStateTracker.glEnableClientStateDirect(GL11.GL_NORMAL_ARRAY);
+			GL11.glEnableClientState(GL11.GL_NORMAL_ARRAY);
 			GL11.glNormalPointer(GL11.GL_BYTE, stride, offset);
 			offset += 4;
 		}
 		if ((flags & VERTEX_LIGHT) != 0) {
 			GL13.glClientActiveTexture(OpenGlHelper.lightmapTexUnit);
 
-			GlStateTracker.glEnableClientStateDirect(GL11.GL_TEXTURE_COORD_ARRAY);
+			GL11.glEnableClientState(GL11.GL_TEXTURE_COORD_ARRAY);
 			GL11.glTexCoordPointer(2, GL11.GL_SHORT, stride, offset);
 			offset += 4;
 		}
@@ -119,21 +124,28 @@ public class ImprovedTessellator extends Tessellator {
 		GL30.glBindVertexArray(0);
 
 		if ((flags & VERTEX_LIGHT) != 0) {
-			GlStateTracker.glDisableClientStateDirect(GL11.GL_TEXTURE_COORD_ARRAY);
+			GL11.glDisableClientState(GL11.GL_TEXTURE_COORD_ARRAY);
 			GL13.glClientActiveTexture(OpenGlHelper.defaultTexUnit);
 		}
 		if ((flags & VERTEX_NORMAL) != 0) {
-			GlStateTracker.glDisableClientStateDirect(GL11.GL_NORMAL_ARRAY);
+			GL11.glDisableClientState(GL11.GL_NORMAL_ARRAY);
 		}
 		if ((flags & VERTEX_COLOR) != 0) {
-			GlStateTracker.glDisableClientStateDirect(GL11.GL_COLOR_ARRAY);
+			GL11.glDisableClientState(GL11.GL_COLOR_ARRAY);
 		}
 		if ((flags & VERTEX_UV) != 0) {
-			GlStateTracker.glDisableClientStateDirect(GL11.GL_TEXTURE_COORD_ARRAY);
+			GL11.glDisableClientState(GL11.GL_TEXTURE_COORD_ARRAY);
 		}
 
 		VERTEX_ARRAYS[flags] = vertexArray | offset << 24;
 		return vertexArray | offset << 24;
+	}
+
+	private ByteArrayList rasterStateList = new ByteArrayList();
+	private int draws;
+
+	private void flushAllDraws() {
+
 	}
 
 	@Override
