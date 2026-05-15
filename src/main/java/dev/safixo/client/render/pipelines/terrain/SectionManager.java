@@ -1,11 +1,13 @@
 package dev.safixo.client.render.pipelines.terrain;
 
+import dev.safixo.client.render.gfx.state.GlFogTracker;
 import dev.safixo.client.render.pipelines.terrain.meshing.SectionMesher;
 import dev.safixo.client.render.pipelines.terrain.shader.ExpFogProgram;
 import dev.safixo.client.render.pipelines.terrain.shader.LinearFogProgram;
 import dev.safixo.client.render.pipelines.terrain.shader.TerrainProgram;
 import dev.safixo.client.util.ClientChunkListener;
-import dev.safixo.core.hooks.GlStateTracker;
+import dev.safixo.client.render.gfx.state.GlStateTracker;
+import dev.safixo.core.hooks.RenderGlobalHook;
 import dev.safixo.core.hooks.VertexRedirector;
 import it.unimi.dsi.fastutil.longs.*;
 import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
@@ -39,8 +41,8 @@ public class SectionManager {
 		Minecraft.memoryReserve = null;
 	}
 
-	public static final int MAX_FULL_UPDATES = 2;
-	public static final int MAX_UPDATES_TRIES = 32;
+	public static final int MAX_FULL_UPDATES = 7;
+	public static final int MAX_UPDATES_TRIES = 48;
 	private static final Item DEBUG_ITEM = null;
 
 	private final Long2ReferenceOpenHashMap<SectionRender> sectionMap = new Long2ReferenceOpenHashMap<>(4096);
@@ -258,6 +260,27 @@ public class SectionManager {
 		return new CameraData(fractX, fractY, fractZ, playerX, playerY, playerZ, renderDistance);
 	}
 
+	private long lastFrameNano;
+	private long lastFrameBuildTime;
+	private long lerpFrameBudget;
+
+	private static final long MAX_TIME = (long) (1E+9D / 240);
+
+	private long calculateFrameBudgetNs(long current) {
+		long currentFrameTimeNs = (current - this.lastFrameNano) - this.lastFrameBuildTime;
+		long budget = Math.min(currentFrameTimeNs / 8, MAX_TIME);
+
+		// If the budget is over the one in the current frame, start giving more budget slowly,
+		// but if the budget is lower simply give lower budget.
+		if (budget > this.lerpFrameBudget && this.lerpFrameBudget != 0L) {
+			// adds 10ms of budget per sec.
+			budget = (long) Math.min(budget, this.lerpFrameBudget + (RenderGlobalHook.PARTIAL_TICK * 1E+7));
+		}
+
+		this.lerpFrameBudget = budget;
+		return budget;
+	}
+
 	private void queueRebuilds(Set<TileEntity> tileSet) {
 		int rebuildSize = RebuildList.size();
 		int maxSize = Math.min(SectionManager.MAX_UPDATES_TRIES, rebuildSize);
@@ -266,27 +289,63 @@ public class SectionManager {
 			this.terrainDirty = false;
 		}
 
+		long current = System.nanoTime();
+		long budget = calculateFrameBudgetNs(current);
+
 		PrimitivesFlags.processLeavesSolid();
 		PrimitivesFlags.REDIRECT_DRAWING = true;
 		VertexRedirector.ORGANIZE_NORMALS = true;
 
-		int i = 0, j = 0;
+		int updateIndex = 0, nonEmptyUpdates = 0;
 
-		while (i < maxSize && j < SectionManager.MAX_FULL_UPDATES) {
-			SectionRender section = this.sectionMap.get(RebuildList.getSectionPos(this.camera, i++));
+		while (updateIndex < maxSize && nonEmptyUpdates < SectionManager.MAX_FULL_UPDATES) {
+			SectionRender section = this.sectionMap.get(RebuildList.getSectionPos(this.camera, updateIndex++));
 
 			if (section != null && section.isDirty()) {
-				boolean nonEmpty = SectionMesher.rebuild(section, this.camera, this, this.worldObj, tileSet);
+				boolean nonEmpty = SectionMesher.buildMesh(section, this.camera, this, this.worldObj, tileSet);
 
 				if (nonEmpty) {
-					j++;
+					nonEmptyUpdates++;
+				}
+			}
+
+			if (section != null && this.isBudgetOver(current, budget)) {
+				int distance = distanceToSection(section, this.camera);
+				int minUpdates = distance <= 20*20 ? 2 : 1;
+
+				if (nonEmptyUpdates >= minUpdates) {
+					break;
 				}
 			}
 		}
 
 		VertexRedirector.ORGANIZE_NORMALS = false;
 		PrimitivesFlags.REDIRECT_DRAWING = false;
+
+		long diff = System.nanoTime() - current;
+		float partialTick = RenderGlobalHook.PARTIAL_TICK;
+
+		this.lastFrameBuildTime = diff > this.lastFrameBuildTime
+			? diff
+			: (long) Math.max(diff, this.lastFrameBuildTime - 5 * 1E+6D * partialTick);
+		this.lastFrameNano = current;
 	}
+
+	private boolean isBudgetOver(long current, long budget) {
+		long timeBuilding = System.nanoTime() - current;
+		// if we are over budget, or we have passed 0.2ms more time building than last
+		// frame, stop it.
+		return timeBuilding >= budget || timeBuilding - (1E+6 / 5) >= this.lastFrameBuildTime;
+	}
+
+	private static int distanceToSection(SectionRender render, CameraData camera) {
+		int dX = render.blockX - camera.intX + 8;
+		int dY = render.blockY - camera.intY + 8;
+		int dZ = render.blockZ - camera.intZ + 8;
+
+		return MathExt.square(dX) + MathExt.square(dY) + MathExt.square(dZ);
+	}
+
 	private void generateWholeVolume(double cameraX, double cameraZ) {
 		int cameraChunkX = MathExt.posToSectionIntegral(cameraX);
 		int cameraChunkZ = MathExt.posToSectionIntegral(cameraZ);
@@ -316,8 +375,8 @@ public class SectionManager {
 	public void drawRenderPass(int renderPass) {
 		// Disables fog when option is active.
 		boolean noFog = false;
-		boolean expFog = GlStateTracker.FOG_MODE == GL11.GL_EXP;
-		boolean linearFog = GlStateTracker.FOG_MODE == GL11.GL_LINEAR;
+		boolean expFog = GlFogTracker.FOG_MODE == GL11.GL_EXP;
+		boolean linearFog = GlFogTracker.FOG_MODE == GL11.GL_LINEAR;
 
 		TerrainProgram terrainShader;
 
