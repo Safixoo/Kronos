@@ -17,8 +17,6 @@ public class DebugScreenHook {
 
 			renderDebugOption(fontRenderer, "Kronos Renderer: v0.0", x, offY, 0x1F00F1 | Math.max(120, effect) << 8);
 			offY += 10;
-			renderDebugOption(fontRenderer, "Sections: " + manager.allocatedSections(), x, offY, color);
-			offY += 10;
 			renderDebugOption(fontRenderer, "Regions: " + manager.getRegionCount(), x, offY, color);
 			offY += 10;
 			renderDebugOption(fontRenderer, "VRAM U/A: " + manager.getMemoryUsed() + "/" + manager.getMemoryTotal() + "MiB", x, offY, color);

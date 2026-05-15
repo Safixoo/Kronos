@@ -8,6 +8,8 @@ import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
 import dev.safixo.client.util.Direction;
 import dev.safixo.client.util.MathExt;
 
+import static dev.safixo.client.render.pipelines.terrain.CompressedFlags.*;
+
 public class BFSCuller {
 	private static final long[] INV_DIVS = new long[256];
 
@@ -64,7 +66,7 @@ public class BFSCuller {
 		}
 
 		int maxDistSquared = (int) MathExt.square(getFogDistance(camera));
-		iterateGraph(sectionSet, cameraIndex, camera.intX, camera.intY, camera.intZ, maxDistSquared);
+		iterateGraph(sectionSet, camera.intX, camera.intY, camera.intZ, maxDistSquared);
 
 		this.enqueueRegionData(camera);
 	}
@@ -112,9 +114,9 @@ public class BFSCuller {
 	/**
 	 * Does a BFS traversal based off <a href="https://tomcc.github.io/2014/08/31/visibility-1.html">Advanced Cave Culling</a>
 	 * by tomcc and the Sodium implementation, with many differences as it doesn't try to find connectivity 100% and uses some
-	 *  different ideas to avoid section queueing during the search.
+	 * different ideas to avoid section queueing during the search.
 	 */
-	private static void iterateGraph(SectionSet sectionSet, int cameraIndex, int playerX, int playerY, int playerZ, int maxDistSquared) {
+	private static void iterateGraph(SectionSet sectionSet, int playerX, int playerY, int playerZ, int maxDistSquared) {
 		byte[] sectionFlags = sectionSet.sectionFlags;
 		short[] visSet = sectionSet.visibilitySet;
 
@@ -135,67 +137,81 @@ public class BFSCuller {
 			int offsetZ = sectionY >> 4;
 			sectionY &= 15;
 
-			int diffChunkX = offsetX - radius;
-			int diffChunkY = sectionY - (playerY >> 4);
-			int diffChunkZ = offsetZ - radius;
+			int diffSectX = offsetX - radius;
+			int diffSectY = sectionY - (playerY >> 4);
+			int diffSectZ = offsetZ - radius;
 
-			int diffX = (diffChunkX << 4) - (playerX & 15);
-			int diffY = (diffChunkY << 4) - (playerY & 15);
-			int diffZ = (diffChunkZ << 4) - (playerZ & 15);
+			int diffX = (diffSectX << 4) - (playerX & 15);
+			int diffY = (diffSectY << 4) - (playerY & 15);
+			int diffZ = (diffSectZ << 4) - (playerZ & 15);
 
-			int distance = getDistance(diffX, diffY, diffZ);
-			int outwardDir;
-
-			{ // Calculates visibility per section.
-				if (distance >= maxDistSquared || !FrustumCuller.withinFrustumBounds(diffX, diffY, diffZ)) {
-					continue;
-				}
-
-				if (diffChunkX != 0 && diffChunkY != 0 && diffChunkZ != 0 &&
-					processGridFactor(visSet, sectionIndex, diameter, diffChunkX, diffChunkY, diffChunkZ) < TOLERANCE) {
-					continue;
-				}
-
-				outwardDir = getOutwardDirections(diffChunkX, diffChunkY, diffChunkZ);
-
-				if ((distance >= 70*70 && CompressedFlags.hasPassesNonEmpty(flags) &&
-					rayNotVisible(sectionFlags, visSet, cameraIndex, sectionIndex, diameter, -diffX-8, -diffY-8, -diffZ-8, outwardDir))) {
-					continue;
-				}
+			if (isSectionInvisible(
+				visSet, flags, diffX, diffY, diffZ,
+				diffSectX, diffSectY, diffSectZ,
+				maxDistSquared, sectionIndex, diameter)) {
+				continue;
 			}
 
-			queueRenderTasks(flags, diffChunkX, sectionY, diffChunkZ);
-			int directions = outwardDir & CompressedFlags.getTraversableFaces(flags);
+			queueRenderTasks(flags, diffSectX, sectionY, diffSectZ);
+			int outwardDirections = getOutwardDirections(diffSectX, diffSectY, diffSectZ);
+			int directions = getTraversableFaces(flags) & outwardDirections;
+			int angleMask = getAngleVisibilityMask(diffX, diffY, diffZ);
 
-			if (directions != 0b0) {
+			// I don't save the incoming direction info so I can directly use the angle mask to
+			// restrict the direction bit-set, but in some cases like when traversable faces are
+			// narrowed the angle-mask can be useful.
+			if ((directions & angleMask) != 0b0) {
 				traverseNeighbors(visSet, sectionIndex, diameter, directions);
 			}
 		}
 	}
 
 	/**
+	 * Calculates section visibility by various methods, using distance, frustum, ray-casts and
+	 * grid visibility data.
+	 */
+	private static boolean isSectionInvisible(short[] visSet, int flags,
+											  int diffX, int diffY, int diffZ,
+											  int diffSectX, int diffSectY, int diffSectZ,
+											  int maxDistSquared, int sectionIndex, int diameter) {
+		int distance = getDistance(diffX, diffY, diffZ);
+
+		if (distance >= maxDistSquared || !FrustumCuller.withinFrustumBounds(diffX, diffY, diffZ)) {
+			return true;
+		}
+
+		if (diffSectX != 0 && diffSectY != 0 && diffSectZ != 0 &&
+			genGridFactor(visSet, sectionIndex, diameter, diffSectX, diffSectY, diffSectZ) < TOLERANCE) {
+			return true;
+		}
+
+		return distance >= 70 * 70 && hasPassesNonEmpty(flags) &&
+			rayNotVisible(visSet, sectionIndex, diameter, -diffX-8, -diffY-8, -diffZ-8);
+	}
+
+	/**
 	 * Based in the flag data and position relative to the camera, saves positions to be later
 	 * retrieved and processed for region rendering and meshing.
 	 */
-	private static void queueRenderTasks(int flags, int distChunkX, int sectionY, int distChunkZ) {
-		if (CompressedFlags.isDirty(flags)) {
-			RebuildList.addToList(MathExt.asInt(distChunkX, sectionY, distChunkZ));
+	private static void queueRenderTasks(int flags, int diffSectX, int diffSectY, int diffSectZ) {
+		if (isDirty(flags)) {
+			RebuildList.addToList(MathExt.asInt(diffSectX, diffSectY, diffSectZ));
 		}
 
-		if (CompressedFlags.hasPassesNonEmpty(flags)) {
-			BFSQueue.RENDER_INDICES[BFSQueue.renderIndex++] = MathExt.asInt(distChunkX, sectionY, distChunkZ);
+		if (hasPassesNonEmpty(flags)) {
+			BFSQueue.RENDER_INDICES[BFSQueue.renderIndex++] = MathExt.asInt(diffSectX, diffSectY, diffSectZ);
 		}
 	}
 
 	/**
 	 * Generates a mask to discard invariants inward directions early in the search.
 	 */
-	private static int getOutwardDirections(int diffChunkX, int diffChunkY, int diffChunkZ) {
+	private static int getOutwardDirections(int diffSectX, int diffSectY, int diffSectZ) {
 		int planes = 0;
 
-		planes |= (diffChunkX >> 31) & Direction.EAST_BIT  | (-diffChunkX >> 31) & Direction.WEST_BIT;
-		planes |= (diffChunkY >> 31) & Direction.UP_BIT    | (-diffChunkY >> 31) & Direction.DOWN_BIT;
-		planes |= (diffChunkZ >> 31) & Direction.SOUTH_BIT | (-diffChunkZ >> 31) & Direction.NORTH_BIT;
+		planes |= (diffSectX >> 31) & Direction.EAST_BIT  | (-diffSectX >> 31) & Direction.WEST_BIT;
+		planes |= (diffSectY >> 31) & Direction.UP_BIT    | (-diffSectY >> 31) & Direction.DOWN_BIT;
+		planes |= (diffSectZ >> 31) & Direction.SOUTH_BIT | (-diffSectZ >> 31) & Direction.NORTH_BIT;
 
 		return planes ^ 0b111_111;
 	}
@@ -256,13 +272,33 @@ public class BFSCuller {
 		BFSQueue.bfsIndex = index;
 	}
 
+	// Sodium 0.6 (Polyform Shield) code.
+	private static int getAngleVisibilityMask(int diffX, int diffY, int diffZ) {
+		int dx = Math.abs(diffX + 8);
+		int dy = Math.abs(diffY + 8);
+		int dz = Math.abs(diffZ + 8);
+
+		int angleOcclusionMask = 0;
+		if (dx > dy + 16 || dz > dy + 16) {
+			angleOcclusionMask |= 0b000011;
+		}
+		if (dx > dz + 16 || dy > dz + 16) {
+			angleOcclusionMask |= 0b001100;
+		}
+		if (dy > dx + 16 || dz > dx + 16) {
+			angleOcclusionMask |= 0b110000;
+		}
+
+		return ~angleOcclusionMask;
+	}
+
 	/**
 	 * Uses the key idea from the article of <a href ="https://towardsdatascience.com/a-quick-and-clear-look-at-grid-based-visibility-bf63769fbc78">Grid Based Visibility</a>
 	 * to determine the factor of grid visibility in 3D for the current visited section of the graph. It might not be perfectly
 	 * optimized, but it helps a ton when there's a lot of occluders.
 	 * @return Grid Visibility Factor
 	 */
-	private static short processGridFactor(short[] visSet, int sectionIndex, int renderDiameter, int diffX, int diffY, int diffZ) {
+	private static short genGridFactor(short[] visSet, int sectionIndex, int renderDiameter, int diffX, int diffY, int diffZ) {
 		int gradInd = 0;
 
 		int signX = MathExt.sign(diffX);
@@ -297,24 +333,22 @@ public class BFSCuller {
 	 * Traces a ray from the section to the camera and tries to find obstruction in the way using the section
 	 * current frame.
 	 */
-	private static boolean rayNotVisible(byte[] flags, short[] visSet, int cameraIndex, int sectionIndex, int renderDiameter, int dX, int dY, int dZ, int outwardDir) {
-		int tMaxX = MAX_SCALE / (Math.abs(dX) | 1);
-		int tMaxY = MAX_SCALE / (Math.abs(dY) | 1);
-		int tMaxZ = MAX_SCALE / (Math.abs(dZ) | 1);
+	private static boolean rayNotVisible(short[] visSet, int sectionIndex, int renderDiameter, int diffX, int diffY, int diffZ) {
+		int tMaxX = MAX_SCALE / (Math.abs(diffX) | 1);
+		int tMaxY = MAX_SCALE / (Math.abs(diffY) | 1);
+		int tMaxZ = MAX_SCALE / (Math.abs(diffZ) | 1);
 
 		int tDeltaX = tMaxX << 1;
 		int tDeltaY = tMaxY << 1;
 		int tDeltaZ = tMaxZ << 1;
 
-		int signX = MathExt.sign(dX);
-		int signY = MathExt.mulSign(renderDiameter, dY);
-		int signZ = MathExt.mulSign(renderDiameter << 4, dZ);
+		int signX = MathExt.sign(diffX);
+		int signY = MathExt.mulSign(renderDiameter, diffY);
+		int signZ = MathExt.mulSign(renderDiameter << 4, diffZ);
 
-		int validC = 0;
-		int validT = 0;
-		int inwardDir = outwardDir ^ 0x3F;
+		int valid = 0;
 
-		for (int i = 0; i < 9; i++) {
+		for (int i = 0; i < 7; i++) {
 			if (tMaxX < tMaxY) {
 				if (tMaxX < tMaxZ) {
 					sectionIndex += signX;
@@ -333,19 +367,9 @@ public class BFSCuller {
 				}
 			}
 
-			if (cameraIndex == sectionIndex) {
-				return false;
-			}
-
-			int flag = flags[sectionIndex];
-
-			if ((CompressedFlags.getTraversableFaces(flag) & inwardDir) == 0 && ++validC >= 4) {
-				return true;
-			}
-
 			int visFact = visSet[sectionIndex];
 
-			if (visFact < TOLERANCE && ++validT >= 4) {
+			if (visFact < TOLERANCE && ++valid >= 4) {
 				return true;
 			}
 		}
