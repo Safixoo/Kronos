@@ -7,12 +7,15 @@ import dev.safixo.client.render.pipelines.terrain.meshing.builders.VoxelMesher;
 import dev.safixo.client.render.pipelines.terrain.meshing.builders.VoxelMesherCenter;
 import dev.safixo.client.render.pipelines.terrain.meshing.data.CullSetGenerator;
 import dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache;
+import dev.safixo.client.render.pipelines.terrain.region.RegionAllocation;
 import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
 import dev.safixo.client.render.vertex.DefaultVertexFormats;
 import dev.safixo.client.render.vertex.VertexWriter;
+import dev.safixo.client.render.vertex.writers.TerrainFormat;
 import dev.safixo.client.util.MeshDirection;
 import dev.safixo.client.util.data.CameraData;
 import dev.safixo.client.util.data.PrimitivesFlags;
+import dev.safixo.client.util.memory.UnsafeUtil;
 import it.unimi.dsi.fastutil.objects.ReferenceArrayList;
 import net.minecraft.block.Block;
 import net.minecraft.client.Minecraft;
@@ -31,7 +34,7 @@ import static dev.safixo.client.util.Direction.*;
 public class SectionMesher {
 	private static final int AIR_ID = 0;
 
-	public static boolean rebuild(SectionRender section, CameraData camera, SectionManager sectionManager, World world, Set<TileEntity> tileSet) {
+	public static boolean buildMesh(SectionRender section, CameraData camera, SectionManager sectionManager, World world, Set<TileEntity> tileSet) {
 		Chunk.isLit = false;
 
 		SectionCache sectionCache = new SectionCache(world, section.blockX, section.blockY, section.blockZ);
@@ -249,14 +252,10 @@ public class SectionMesher {
 			}
 
 			section.region.addMeshOrderMask(section.regionIndex, meshDrawOrder);
+			long[] drawData = joinAllSolidBuffers(meshDrawOrder);
 
-			for (int dir = 0; dir < MeshDirection.COUNT; dir++) {
-				int realMeshDir = meshDrawOrder & 0xF;
-				meshDrawOrder >>= 4;
-
-				if (VertexWriter.SOLID[realMeshDir].getVertices() != 0) {
-					section.region.addSolidMesh(section, VertexWriter.SOLID[realMeshDir], realMeshDir);
-				}
+			if (JOINER.getOffset() != 0) {
+				section.region.addSolidMesh(section, JOINER, drawData);
 			}
 		}
 
@@ -290,6 +289,41 @@ public class SectionMesher {
 		}
 
 		return mask;
+	}
+
+	private static VertexWriter JOINER;
+
+	private static long[] joinAllSolidBuffers(int meshDrawOrder) {
+		long[] drawData = new long[MeshDirection.COUNT];
+
+		if (JOINER == null || JOINER.getWriterPtr() == UnsafeUtil.NULL) {
+			JOINER = new VertexWriter(4096);
+		}
+
+		VertexWriter joiner = JOINER;
+		joiner.startDrawing();
+
+		for (int dir = 0; dir < MeshDirection.COUNT; dir++) {
+			int realMeshDir = meshDrawOrder & 0xF;
+			meshDrawOrder >>= 4;
+
+			VertexWriter writer = VertexWriter.SOLID[realMeshDir];
+
+			if (writer == null) {
+				continue;
+			}
+
+			int writerOffset = writer.getOffset();
+
+			drawData[realMeshDir] = RegionAllocation.packDrawData(writerOffset / TerrainFormat.STRIDE, joiner.getOffset() / TerrainFormat.STRIDE);
+			joiner.ensureCapacity(writerOffset);
+
+			UnsafeUtil.memCopy(writer.getWriterPtr(), joiner.getWriterPtr() + joiner.getOffset(), writerOffset);
+			joiner.offset += writerOffset;
+		}
+
+		joiner.vertices = joiner.offset / TerrainFormat.STRIDE;
+		return drawData;
 	}
 
 	private static void prepareWriterForTerrain(SectionRender section, VertexWriter writerManager) {

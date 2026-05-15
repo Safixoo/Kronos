@@ -170,7 +170,7 @@ public class RegionRender {
 		}
 	}
 
-	public void addSolidMesh(SectionRender render, VertexWriter manager, int side) {
+	public void addSolidMesh(SectionRender render, VertexWriter manager, long[] packedDrawData) {
 		this.shouldCachePass[SOLID_PASS] = false;
 
 		if (this.solidBuffer == null) {
@@ -181,14 +181,21 @@ public class RegionRender {
 			this.prepareSolidPtr();
 		}
 
-		int index = (render.regionIndex * TOTAL_DRAWS) + side;
+		long drawData = this.solidBuffer.allocate(render, manager.getWriterPtr(), manager.getVertices());
+		int sectionFirst = RegionAllocation.unpackFirst(drawData);
 
-		if (this.regionDrawData[index] == 0) {
-			this.regionDrawData[index] = this.solidBuffer.allocate(render, manager.getVertexData(), manager.getVertices(), side);
-			return;
+		for (int dir = 0; dir < MeshDirection.COUNT; dir++) {
+			int index = (render.regionIndex * TOTAL_DRAWS) + dir;
+			long relDrawData = packedDrawData[dir];
+
+			if (relDrawData != 0L) {
+				int first = RegionAllocation.unpackFirst(relDrawData);
+				int count = RegionAllocation.unpackCount(relDrawData);
+				this.regionDrawData[index] = RegionAllocation.packDrawData(count, first + sectionFirst);
+			} else {
+				this.regionDrawData[index] = 0L;
+			}
 		}
-
-		this.regionDrawData[index] = this.solidBuffer.renewAllocation(render, manager.getVertexData(), manager.getVertices(), side);
 	}
 
 	public void addTranslucentMesh(SectionRender render, VertexWriter manager) {
@@ -203,13 +210,7 @@ public class RegionRender {
 		}
 
 		int index = (render.regionIndex * TOTAL_DRAWS) + SOLID_DRAWS;
-
-		if (this.regionDrawData[index] == 0) {
-			this.regionDrawData[index] = this.translucentBuffer.allocate(render, manager.getVertexData(), manager.getVertices(), 1);
-			return;
-		}
-
-		this.regionDrawData[index] = this.translucentBuffer.renewAllocation(render, manager.getVertexData(), manager.getVertices(), 1);
+		this.regionDrawData[index] = this.translucentBuffer.allocate(render, manager.getWriterPtr(), manager.getVertices());
 	}
 
 	public void deleteRenderAllocation(SectionRender render) {
@@ -219,13 +220,13 @@ public class RegionRender {
 		int solidDrawData = (render.regionIndex * TOTAL_DRAWS);
 
 		if (drawData[translucentDrawData] != 0L) {
-			this.translucentBuffer.remove(render, 0);
+			this.translucentBuffer.remove(render);
 			drawData[translucentDrawData] = 0L;
 		}
 
-		for (int dir = 0; dir < MeshDirection.COUNT; dir++) {
-			if (drawData[solidDrawData + dir] != 0L) {
-				this.solidBuffer.remove(render, dir);
+		if (this.solidBuffer != null) {
+			this.solidBuffer.remove(render);
+			for (int dir = 0; dir < MeshDirection.COUNT; dir++) {
 				drawData[solidDrawData + dir] = 0L;
 			}
 		}

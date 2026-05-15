@@ -2,12 +2,15 @@ package dev.safixo.core;
 
 import dev.safixo.client.util.data.PrimitivesFlags;
 import dev.safixo.core.hooks.LongHashMapHook;
+import net.minecraft.launchwrapper.Launch;
+import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.ClassWriter;
 import net.minecraft.launchwrapper.IClassTransformer;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.tree.*;
 
+import java.util.HashMap;
 import java.util.HashSet;
 
 import static org.objectweb.asm.Opcodes.*;
@@ -36,14 +39,26 @@ public class KronosTransformer implements IClassTransformer {
 	static final String CLIPPING_HELPER = "net.minecraft.client.renderer.culling.ClippingHelper";
 	static final String FONT_RENDERER = "net.minecraft.client.gui.FontRenderer";
 	static final String MINECRAFT = "net.minecraft.client.Minecraft";
-	static final String ACTIVE_RENDER_INFO = "net.minecraft.client.renderer.ActiveRenderInfo";
-	static final String BIOME_GEN_BASE = "net.minecraft.world.biome.BiomeGenBase";
 	static final String LONG_HASH_MAP = "net.minecraft.util.LongHashMap";
 	static final String WORLD_CLIENT = "net.minecraft.client.multiplayer.WorldClient";
 	static final String MODEL_RENDERER = "net.minecraft.client.model.ModelRenderer";
 	static final String WORLD = "net.minecraft.world.World";
 
-	static HashSet<String> FUNCTION_NAMES;
+	static HashMap<String, String> FUNCTION_NAMES;
+
+	public static boolean IN_DEV;
+	static boolean CHECKED_FOR_DEV;
+
+	static void checkDevEnvironment() {
+		if (CHECKED_FOR_DEV) {
+			return;
+		}
+
+		CHECKED_FOR_DEV = true;
+		Object deObf = Launch.blackboard.get("fml.deobfuscatedEnvironment");
+
+		IN_DEV = deObf != null && (Boolean) deObf;
+	}
 
 	@Override
 	public byte[] transform(String name, String transformedName, byte[] basicClass) {
@@ -53,10 +68,13 @@ public class KronosTransformer implements IClassTransformer {
 			transformedName = "";
 		}
 
+		checkDevEnvironment();
+
 		// Overwrites classes methods completely with a function call with the same
 		// args and with the instance of the original class.
 		switch (transformedName) {
 			case ENTITY_RENDERER:
+				avoidDoublePassBullshit(reference);
 				replaceClassMethod(MINECRAFT_HOOK, "disableLightmap", "a", "(D)V", reference, true);
 				replaceClassMethod(MINECRAFT_HOOK, "enableLightmap", "b", "(D)V", reference, true);
 			case BLOCK:
@@ -123,98 +141,89 @@ public class KronosTransformer implements IClassTransformer {
 				// In many drivers in make stalls the GPU too soon in the tick loop.
 				replaceClassMethod(MINECRAFT_HOOK, "checkGLError", "c", "(Ljava/lang/String;)V", reference, true);
 				break;
-			case BIOME_GEN_BASE:
-				// TODO: Save a event instance per-thread to avoid creating events for every-biome fetched
-				//  in meshing which is stupid slow thanks to Forge.
-			case ACTIVE_RENDER_INFO:
-				// TODO: this is not even verified to help even, to avoid this mess the best option is to backport
-				//  Angelica's ASM GlStateTracker or hooking to the matrices setup which is ugly.
 		}
 
 		fillStateMachineFunctions();
 
-		if (!transformedName.equals("dev.safixo.core.hooks.GlStateTracker") && !transformedName.equals("dev.safixo.core.hooks.GLFunctions")) {
+		if (!transformedName.contains("dev.safixo.client.render.gfx.state") && !transformedName.equals("dev.safixo.core.hooks.GLFunctions")) {
 			redirectGlCalls(reference);
-		}
-
-		if (transformedName.equals("net.minecraft.client.renderer.EntityRenderer")) {
-			avoidDoublePassBullshit(reference);
 		}
 
 		return reference[0];
 	}
 
+	static void addFunction(String className, String function) {
+		FUNCTION_NAMES.put(function, className);
+	}
+
 	static void fillStateMachineFunctions() {
 		if (FUNCTION_NAMES == null) {
-			FUNCTION_NAMES = new HashSet<>();
+			FUNCTION_NAMES = new HashMap<>(64);
 		}
 
-		FUNCTION_NAMES.add("glEnable");
-		FUNCTION_NAMES.add("glDisable");
-		FUNCTION_NAMES.add("glMatrixMode");
-		FUNCTION_NAMES.add("glGetFloat");
-		FUNCTION_NAMES.add("glLoadIdentity");
-		FUNCTION_NAMES.add("glLoadMatrix");
-		FUNCTION_NAMES.add("glPopMatrix");
-		FUNCTION_NAMES.add("glPushMatrix");
-		FUNCTION_NAMES.add("glMultMatrix");
-		FUNCTION_NAMES.add("glScalef");
-		FUNCTION_NAMES.add("glScaled");
-		FUNCTION_NAMES.add("glRotatef");
+		addFunction("GlBooleanTracker", "glEnable");
+		addFunction("GlBooleanTracker", "glDisable");
+		addFunction("GlBooleanTracker", "glDepthMask");
 
-		FUNCTION_NAMES.add("glCopyTexSubImage2D");
-		FUNCTION_NAMES.add("glMultiTexCoord2f");
-		FUNCTION_NAMES.add("glActiveTexture");
+		addFunction("GlMatrixTracker", "glMatrixMode");
+		addFunction("GlMatrixTracker", "glLoadIdentity");
+		addFunction("GlMatrixTracker", "glLoadMatrix");
+		addFunction("GlMatrixTracker", "glPopMatrix");
+		addFunction("GlMatrixTracker", "glPushMatrix");
+		addFunction("GlMatrixTracker", "glMultMatrix");
+		addFunction("GlMatrixTracker", "glScalef");
+		addFunction("GlMatrixTracker", "glTranslatef");
+		addFunction("GlMatrixTracker", "glRotatef");
+		addFunction("GlMatrixTracker", "glFrustum");
+		addFunction("GlMatrixTracker", "glScaled");
+		addFunction("GlMatrixTracker", "glRotated");
+		addFunction("GlMatrixTracker", "glOrtho");
+		addFunction("GlMatrixTracker", "gluPerspective");
 
-		FUNCTION_NAMES.add("glRotated");
-		FUNCTION_NAMES.add("glTranslatef");
-		FUNCTION_NAMES.add("glBindFramebuffer");
-		FUNCTION_NAMES.add("glFlush");
-		FUNCTION_NAMES.add("glBindTexture");
-		FUNCTION_NAMES.add("glColorMaterial");
-		FUNCTION_NAMES.add("glViewport");
-		FUNCTION_NAMES.add("glColor4f");
-		FUNCTION_NAMES.add("glColor3f");
-		FUNCTION_NAMES.add("glDepthFunc");
-		FUNCTION_NAMES.add("glClear");
-		FUNCTION_NAMES.add("glBlendFunc");
-		FUNCTION_NAMES.add("glDepthMask");
-		FUNCTION_NAMES.add("glShadeModel");
+		addFunction("GlTextureTracker", "glMultiTexCoord2f");
+		addFunction("GlTextureTracker", "glActiveTexture");
+		addFunction("GlTextureTracker", "glBindTexture");
+		addFunction("GlTextureTracker", "glViewport");
+		addFunction("GlTextureTracker", "glCopyTexSubImage2D");
+		addFunction("GlTextureTracker", "glBindFramebuffer");
 
-		FUNCTION_NAMES.add("glClearColor");
+		addFunction("GlLightColorTracker", "glColorMaterial");
+		addFunction("GlLightColorTracker", "glColor4f");
+		addFunction("GlLightColorTracker", "glColor3f");
+		addFunction("GlLightColorTracker", "glClearColor");
+		addFunction("GlLightColorTracker", "glColorMask");
+		addFunction("GlLightColorTracker", "glBlendFunc");
+		addFunction("GlLightColorTracker", "glShadeModel");
+		addFunction("GlLightColorTracker", "glClear");
 
-		FUNCTION_NAMES.add("glGetInteger");
-		FUNCTION_NAMES.add("glBindBuffer");
-		FUNCTION_NAMES.add("glBegin");
+		addFunction("GlDrawTracker", "glNewList");
+		addFunction("GlDrawTracker", "glEndList");
+		addFunction("GlDrawTracker", "glCallList");
+		addFunction("GlDrawTracker", "glBegin");
+		addFunction("GlDrawTracker", "glEnd");
+		addFunction("GlDrawTracker", "glDrawArrays");
 
-		FUNCTION_NAMES.add("glEnableClientState");
-		FUNCTION_NAMES.add("glDisableClientState");
+		addFunction("GlStateTracker", "glGetInteger");
+		addFunction("GlStateTracker", "glGetFloat");
+		addFunction("GlStateTracker", "glBindVertexArray");
+		addFunction("GlStateTracker", "glBindBuffer");
+		addFunction("GlStateTracker", "glFlush");
+		addFunction("GlStateTracker", "glDepthFunc");
+		addFunction("GlStateTracker", "update");
 
-		FUNCTION_NAMES.add("glBindVertexArray");
-
-		FUNCTION_NAMES.add("glNewList");
-		FUNCTION_NAMES.add("glEndList");
-		FUNCTION_NAMES.add("glCallList");
-		FUNCTION_NAMES.add("glColorMask");
-
-		FUNCTION_NAMES.add("glFog");
-		FUNCTION_NAMES.add("glFogf");
-		FUNCTION_NAMES.add("glFogi");
-
-		FUNCTION_NAMES.add("glFrustum");
-		FUNCTION_NAMES.add("glOrtho");
-
-		FUNCTION_NAMES.add("gluPerspective");
-
-		FUNCTION_NAMES.add("update");
+		addFunction("GlFogTracker", "glFog");
+		addFunction("GlFogTracker", "glFogf");
+		addFunction("GlFogTracker", "glFogi");
 	}
 
 	static void avoidDoublePassBullshit(byte[][] basicClass) {
 		ClassReader reader = new ClassReader(basicClass[0]);
+		ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+
 		ClassNode classNode = new ClassNode();
 		reader.accept(classNode, 0);
 
-		String renderWorld = PrimitivesFlags.DEV_ENVIRONMENT ? "renderWorld" : "a";
+		String renderWorld = IN_DEV ? "renderWorld" : "a";
 
 		for (int i = 0; i < classNode.methods.size(); i++) {
 			MethodNode node = (MethodNode) classNode.methods.get(i);
@@ -241,7 +250,6 @@ public class KronosTransformer implements IClassTransformer {
 			}
 		}
 
-		ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
 		classNode.accept(writer);
 		basicClass[0] = writer.toByteArray();
 	}
@@ -262,8 +270,10 @@ public class KronosTransformer implements IClassTransformer {
 					MethodInsnNode m = (MethodInsnNode) insn;
 
 					if (m.owner.contains("lwjgl")) {
-						if (FUNCTION_NAMES.contains(m.name)) {
-							m.owner = "dev/safixo/core/hooks/GlStateTracker";
+						String className = FUNCTION_NAMES.get(m.name);
+
+						if (className != null) {
+							m.owner = "dev/safixo/client/render/gfx/state/" + className;
 							shouldReplace = true;
 						}
 					}
@@ -281,6 +291,7 @@ public class KronosTransformer implements IClassTransformer {
 
 	static void replaceClassMethod(String hookPath, String methodName, String runtimeName, String descriptor, byte[][] basicClass, boolean voidRet) {
 		ClassReader reader = new ClassReader(basicClass[0]);
+		ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
 
 		ClassNode classNode = new ClassNode();
 		reader.accept(classNode, 0);
@@ -353,9 +364,7 @@ public class KronosTransformer implements IClassTransformer {
 			method.instructions.add(inject);
 		}
 
-		ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
 		classNode.accept(writer);
-
 		basicClass[0] = writer.toByteArray();
 	}
 
@@ -368,13 +377,13 @@ public class KronosTransformer implements IClassTransformer {
 		for (int i = 0; i < classNode.methods.size(); i++) {
 			MethodNode method = (MethodNode) classNode.methods.get(i);
 
-			if (!method.name.equals("setBlockBounds")) {
+			if (!method.name.equals(IN_DEV ? "setBlockBounds" : "func_71905_a")) {
 				continue;
 			}
 
 			InsnList ins = method.instructions;
 
-			String argument = true ? "(Lnet/minecraft/block/Block;FFFFFF)V" : "(Laqz;FFFFFF)V";
+			String argument = IN_DEV ? "(Lnet/minecraft/block/Block;FFFFFF)V" : "(Laqz;FFFFFF)V";
 			method.instructions.insertBefore(ins.getFirst(), new MethodInsnNode(INVOKESTATIC, SIDE_CULLER, "calculateSolidSides", argument));
 			method.instructions.insertBefore(ins.getFirst(), new VarInsnNode(FLOAD, 6));
 			method.instructions.insertBefore(ins.getFirst(), new VarInsnNode(FLOAD, 5));
@@ -390,7 +399,6 @@ public class KronosTransformer implements IClassTransformer {
 
 		basicClass[0] = writer.toByteArray();
 	}
-
 
 	static int processType(StringBuilder newDesc, Type type, InsnList inject, int offset) {
 		newDesc.append(type.getDescriptor());

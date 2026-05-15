@@ -116,7 +116,7 @@ public class VertexWriter {
 		this.disableColor = false;
 	}
 
-	public void clear() {
+	public void delete() {
 		NativeBuffer.nmemFree(this.vertexPtr);
 
 		this.vertexPtr = UnsafeUtil.NULL;
@@ -127,7 +127,7 @@ public class VertexWriter {
 
 	public static void clearBuffers() {
 		for (VertexWriter manager : VERTEX_WRITERS) {
-			manager.clear();
+			manager.delete();
 		}
 
 		VERTEX_WRITERS.clear();
@@ -156,11 +156,11 @@ public class VertexWriter {
 		return this.offset;
 	}
 
-	public long getVertexData() {
+	public long getWriterPtr() {
 		return this.vertexPtr;
 	}
 
-	public ByteBuffer getVertexDataNio() {
+	public ByteBuffer getWriterNio() {
 		return this.vertexPtrNio;
 	}
 

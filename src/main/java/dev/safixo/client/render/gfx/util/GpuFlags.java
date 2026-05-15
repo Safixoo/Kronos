@@ -13,7 +13,7 @@ public class GpuFlags {
 	public static void processFlags() {
 		ContextCapabilities capabilities = GLContext.getCapabilities();
 
-		// The extension has worked in my Nvidia' GPU, but in an AMD APU seems to fail bad.
+		// The extension did work in my Nvidia GPU, but in an AMD APU it seemed to fail bad.
 		EXT_DSA = capabilities.GL_EXT_direct_state_access && GL11.glGetString(GL11.GL_VENDOR).contains("Nvidia");
 
 		if (capabilities.OpenGL43) {
