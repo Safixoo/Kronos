@@ -43,9 +43,9 @@ public class RegionManager {
 		int regionCameraX = camera.intX >> RegionRender.BLOCK_SHIFT_X;
 		int regionCameraZ = camera.intZ >> RegionRender.BLOCK_SHIFT_Z;
 
-		int renderDiameter = Math.min(3 << 3, camera.renderDistance * 2 + 1);
+		int renderDiameter = camera.renderDistance * 2 + 1 + 16;
 
-		int factorXZ = renderDiameter >> 2;
+		int factorXZ = renderDiameter >> 3;
 		int factorY = 256 >> RegionRender.BLOCK_SHIFT_Y;
 
 		RegionRender[] indexedRegions = new RegionRender[MathExt.square(factorXZ * 2 + 1) * factorY];
@@ -62,7 +62,7 @@ public class RegionManager {
 	}
 
 	public static RegionRender getRegionFromIndexed(RegionRender[] indexedRegions, int renderDiameter, int regionX, int regionY, int regionZ) {
-		int factorXZ = renderDiameter >> 2;
+		int factorXZ = renderDiameter >> 3;
 		int factorY = 256 >> RegionRender.BLOCK_SHIFT_Y;
 
 		regionX += factorXZ;
@@ -157,12 +157,11 @@ public class RegionManager {
 
 	public void sanitizeRegions(CameraData camera, int renderDistance) {
 		ReferenceCollection<RegionRender> regions = this.regionMap.values();
-		int renderDistanceBlocks = (renderDistance + 1) * 16;
 
 		LongArrayList removedList = new LongArrayList();
 
 		for (RegionRender region : regions) {
-			if (region.sectionsToRender == 0 && (MathExt.euclideanDistance(region, camera) > MathExt.square(renderDistanceBlocks) || region.activeSections == 0)) {
+			if (region.sectionsToRender == 0 && region.activeSections == 0) {
 				long regionPos = MathExt.asLong(region.regionX, region.regionY, region.regionZ);
 
 				removedList.add(regionPos);

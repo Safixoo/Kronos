@@ -23,6 +23,11 @@ out vec4 fragColor;
 
 void main() {
     vec4 textureColor = texture(u_ModelTex, v_Uv);
+
+    if (textureColor.a < 0.1) {
+        discard;
+    }
+
     vec3 normal = normalize(cross(dFdx(v_Pos), dFdy(v_Pos)));
     normal.xy = -normal.xy;
 

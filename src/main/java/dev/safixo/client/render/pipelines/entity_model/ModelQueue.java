@@ -1,7 +1,6 @@
 package dev.safixo.client.render.pipelines.entity_model;
 
 import dev.safixo.client.render.gfx.buffer.GlShaderStorageBuffer;
-import dev.safixo.client.render.gfx.state.GlLightColorTracker;
 import dev.safixo.client.render.gfx.state.GlMatrixTracker;
 import dev.safixo.client.render.gfx.state.GlTextureTracker;
 import dev.safixo.client.render.gfx.vertex.GlVertexArrayObject;
@@ -10,9 +9,12 @@ import dev.safixo.client.util.Matrix4Stack;
 import dev.safixo.client.util.memory.NativeBuffer;
 import dev.safixo.core.HookUtils;
 import dev.safixo.core.hooks.MinecraftHook;
-import dev.safixo.core.hooks.RenderGlobalHook;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Reference2IntLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Reference2IntOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.EntityRenderer;
 import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.util.ResourceLocation;
 import org.joml.Matrix4f;
@@ -21,6 +23,7 @@ import org.lwjgl.opengl.*;
 import java.nio.ByteBuffer;
 
 import static dev.safixo.client.util.memory.UnsafeUtil.*;
+import static dev.safixo.core.hooks.MinecraftHook.LIGHTMAP_RESOURCE;
 
 // TODO:
 //  - Extract all entity textures (excluding players) to its own texture atlas.
@@ -35,13 +38,14 @@ import static dev.safixo.client.util.memory.UnsafeUtil.*;
 // with glBufferData. Also in many systems most of the overhead from entity-rendering comes from the state
 // changes done and DataWatcher calls before and after ModelRenderer#render, so this doesn't solve everything.
 public class ModelQueue {
-	public static final ModelQueue MODEL_QUEUE = new ModelQueue(32);
+	public static final ModelQueue INSTANCE = new ModelQueue(32);
 	public GlShaderStorageBuffer matrixDataBuffer;
 
 	public Matrix4f viewMatrix = new Matrix4f();
 
 	private long matricesPtr;
 	private long drawData;
+	private ResourceLocation[] textureResources;
 	private int[] textures;
 	private byte[] light;
 
@@ -49,14 +53,16 @@ public class ModelQueue {
 	private int position;
 
 	private ModelProgram modelProgram;
-	public Object2IntOpenHashMap<ResourceLocation> resourceToTex = new Object2IntOpenHashMap<>();
+	public Reference2IntOpenHashMap<ResourceLocation> textureMap = new Reference2IntOpenHashMap<>();
 
 	private ModelQueue(int size) {
 		this.matricesPtr = NativeBuffer.nmemAlloc(64L * size);
 		this.drawData = NativeBuffer.nmemAlloc(4L * size);
 		this.textures = new int[size];
+		this.textureResources = new ResourceLocation[size];
 		this.light = new byte[size];
 
+		this.textureMap.defaultReturnValue(-1);
 		this.size = size;
 	}
 
@@ -64,6 +70,7 @@ public class ModelQueue {
 		int pos = this.position;
 		int newSize = this.size << 1;
 
+		ResourceLocation[] newTextureResource = new ResourceLocation[newSize];
 		long newMatrices = NativeBuffer.nmemAlloc(64L * newSize);
 		long newDrawData = NativeBuffer.nmemAlloc(4L * newSize);
 		int[] newTextures = new int[newSize];
@@ -74,11 +81,13 @@ public class ModelQueue {
 			memPutInt(newDrawData + i * 4L, memGetInt(this.drawData + i * 4L));
 			newTextures[i] = this.textures[i];
 			newLight[i] = this.light[i];
+			newTextureResource[i] = this.textureResources[i];
 		}
 
 		NativeBuffer.nmemFree(this.matricesPtr);
 		NativeBuffer.nmemFree(this.drawData);
 
+		this.textureResources = newTextureResource;
 		this.matricesPtr = newMatrices;
 		this.textures = newTextures;
 		this.light = newLight;
@@ -86,17 +95,23 @@ public class ModelQueue {
 		this.size = newSize;
 	}
 
-	public void addToQueue(int texture, int drawData) {
+	public void addToQueue(int drawData) {
 		if (this.position >= this.size) {
 			this.resize();
 		}
 
 		int pos = this.position++;
-
+		int texture = this.textureMap.getInt(MinecraftHook.ENTITY_TEX);
 		int light = TerrainFormat.compressLightmap((int) GlTextureTracker.MU & 0xFFFF | (int) GlTextureTracker.MV << 16);
 
 		Matrix4Stack.copyMat(GlMatrixTracker.CURRENT_STACK.top(), this.matricesPtr + pos * 64L);
 		memPutInt(this.drawData + pos * 4L, drawData);
+
+		if (texture == -1) {
+			texture = GlTextureTracker.TEXTURE_PER_UNIT[0];
+			this.textureMap.put(MinecraftHook.ENTITY_TEX, texture);
+		}
+
 		this.textures[pos] = texture;
 		this.light[pos] = (byte) light;
 	}
@@ -119,20 +134,26 @@ public class ModelQueue {
 
 		ByteBuffer matrixBuffer = NativeBuffer.wrap(this.matricesPtr);
 		this.matrixDataBuffer.bufferData(matrixBuffer, this.position * 64);
-
-		ARBMultitexture.glActiveTextureARB(ARBMultitexture.GL_TEXTURE1_ARB);
-		GL13.glActiveTexture(GL13.GL_TEXTURE1);
-		Minecraft mc = Minecraft.getMinecraft();
-		mc.renderEngine.bindTexture((ResourceLocation) HookUtils.getFieldValue(MinecraftHook.LIGHTMAP_RESOURCE, mc.entityRenderer));
-		ARBMultitexture.glActiveTextureARB(ARBMultitexture.GL_TEXTURE0_ARB);
-		GL13.glActiveTexture(GL13.GL_TEXTURE0);
-
 		this.modelProgram.useProgram();
 		this.modelProgram.uploadUniforms();
 
 		int maxPos = this.position;
 
+		Minecraft mc = Minecraft.getMinecraft();
+		EntityRenderer render = mc.entityRenderer;
+
+		OpenGlHelper.setActiveTexture(OpenGlHelper.lightmapTexUnit);
+		GL11.glEnable(GL11.GL_TEXTURE_2D);
+
+		mc.getTextureManager().bindTexture((ResourceLocation) HookUtils.getFieldValue(LIGHTMAP_RESOURCE, render));
+
+		OpenGlHelper.setActiveTexture(OpenGlHelper.defaultTexUnit);
+		GL11.glEnable(GL11.GL_TEXTURE_2D);
+
+		GL11.glColor4f(1, 1, 1, 1);
 		GL11.glDisable(GL11.GL_CULL_FACE);
+		GL11.glDisable(GL11.GL_BLEND);
+		GL11.glEnable(GL11.GL_ALPHA_TEST);
 
 		if (this.lastVertexArray != AdvancedModelRenderer.VERTEX_ARRAY_GL20) {
 			this.lastVertexArray = AdvancedModelRenderer.VERTEX_ARRAY_GL20;
@@ -164,6 +185,7 @@ public class ModelQueue {
 		GL30.glBindVertexArray(0);
 		GL20.glUseProgram(0);
 		GL11.glColor4f(1, 1, 1, 1);
+		GL11.glEnable(GL11.GL_BLEND);
 
 		this.position = 0;
 	}

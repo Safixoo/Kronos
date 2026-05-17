@@ -37,7 +37,7 @@ public class ModelProgram extends GlProgram {
 
 	public void uploadUniforms() {
 		GL20.glUniformMatrix4(this.u_ProjectionMat, false, GlMatrixTracker.PROJECTION_STACK.top().get(MATRIX));
-		GL20.glUniformMatrix4(this.u_InvViewMat, false, ModelQueue.MODEL_QUEUE.viewMatrix.get(MATRIX));
+		GL20.glUniformMatrix4(this.u_InvViewMat, false, ModelQueue.INSTANCE.viewMatrix.get(MATRIX));
 
 		float start = GlFogTracker.FOG_START;
 		float end = GlFogTracker.FOG_END;

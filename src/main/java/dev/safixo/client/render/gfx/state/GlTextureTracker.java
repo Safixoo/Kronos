@@ -16,7 +16,7 @@ public class GlTextureTracker {
 	public static final boolean[] ENABLED_TEXTURES = new boolean[GL13.GL_TEXTURE31 - GL13.GL_TEXTURE0 + 1];
 
 	private static int LAST_VIEWPORT_WH = -1;
-	private static int LAST_TARGET = -1;
+	public static int LAST_TARGET = -1;
 	public static float MU, MV;
 
 	public static void glBindFramebuffer(int target, int frameBuffer) {
@@ -47,12 +47,10 @@ public class GlTextureTracker {
 	}
 
 	public static void glMultiTexCoord2f(int target, float u, float v) {
-		if ((LAST_TARGET != target || MU != u || MV != v) && !MinecraftHook.FAST_ENTITY_PATH) {
+		if ((LAST_TARGET != target || MU != u || MV != v)) {
 			LAST_TARGET = target;
 			MU = u;
 			MV = v;
-
-			GL13.glMultiTexCoord2f(target, u, v);
 		}
 	}
 
@@ -61,38 +59,54 @@ public class GlTextureTracker {
 	}
 
 	public static void glTurnTexturing(boolean state) {
-		if (GlStateTracker.SKIP_CACHE || ACTIVE_UNIT == -1 || ENABLED_TEXTURES[ACTIVE_UNIT] != state) {
+		if (GlStateTracker.SKIP_CACHE) {
 			GlStateTracker.flushDrawState();
 			assertActiveTexture();
 
-			if (ACTIVE_UNIT != -1) {
-				ENABLED_TEXTURES[ACTIVE_UNIT] = state;
+			if (state) {
+				GL11.glEnable(GL11.GL_TEXTURE_2D);
+			} else {
+				GL11.glDisable(GL11.GL_TEXTURE_2D);
 			}
+		}
+
+		if (ACTIVE_UNIT >= 0) {
+			ENABLED_TEXTURES[ACTIVE_UNIT] = state;
 		}
 	}
 
 	// Only change the active texture when there is an operation that
 	// uses the active texture.
 	public static void glActiveTexture(int texture) {
+		if (GlStateTracker.SKIP_CACHE) {
+			assertActiveTexture();
+		}
 		ACTIVE_UNIT = texture - GL13.GL_TEXTURE0;
 	}
 
 	public static void assertActiveTexture() {
-		if (ACTIVE_UNIT != BINDED_UNIT) {
-			BINDED_UNIT = ACTIVE_UNIT;
+		assertActiveTexture(ACTIVE_UNIT);
+	}
+
+	public static void assertActiveTexture(int target) {
+		if (target != BINDED_UNIT) {
+			GlDrawTracker.checkMismatchTexturing(target);
+
+			BINDED_UNIT = target;
 			GL13.glActiveTexture(BINDED_UNIT + GL13.GL_TEXTURE0);
 		}
 	}
 
 	public static void glBindTexture(int target, int texture) {
-		if (GlStateTracker.SKIP_CACHE || ACTIVE_UNIT == -1) {
+		if (GlStateTracker.SKIP_CACHE || ACTIVE_UNIT < 0) {
 			assertActiveTexture();
+
 			GlStateTracker.flushDrawState();
 			GL11.glBindTexture(target, texture);
 		} else if (texture != TEXTURE_PER_UNIT[ACTIVE_UNIT]) {
-			TEXTURE_PER_UNIT[ACTIVE_UNIT] = texture;
-
 			assertActiveTexture();
+
+			TEXTURE_PER_UNIT[ACTIVE_UNIT] = texture;
 			GlStateTracker.flushDrawState();
 			GL11.glBindTexture(target, texture);
 		}

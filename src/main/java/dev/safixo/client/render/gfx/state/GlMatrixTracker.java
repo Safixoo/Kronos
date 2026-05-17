@@ -90,6 +90,7 @@ public class GlMatrixTracker {
 			} else if (mode == GL11.GL_MODELVIEW) {
 				CURRENT_STACK = MODEL_VIEW_STACK;
 			} else if (mode == GL11.GL_TEXTURE) {
+				GlTextureTracker.assertActiveTexture();
 				CURRENT_STACK = TEXTURE_STACK;
 			} else {
 				CURRENT_STACK = NULL_STACK;

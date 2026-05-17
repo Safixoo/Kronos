@@ -36,12 +36,14 @@ public class GlBooleanTracker {
 	}
 
 	protected static void setState(int cap, boolean state) {
-		if (!GlStateTracker.SKIP_CACHE) {
-			CAP_BITS[cap] = state ? DEFINED_ENABLED : DEFINED_DISABLED;
-		}
+		CAP_BITS[cap] = state ? DEFINED_ENABLED : DEFINED_DISABLED;
 	}
 
 	private static boolean isRasterState(int cap, boolean state) {
+		if (GlStateTracker.SKIP_CACHE) {
+			return false;
+		}
+
 		if (cap == GL11.GL_CULL_FACE) {
 			GlDrawTracker.glTurnCulling(state);
 			return true;
@@ -51,7 +53,10 @@ public class GlBooleanTracker {
 		} else if (cap == GL11.GL_LIGHTING) {
 			GlDrawTracker.glTurnLighting(state);
 			return true;
-		} else if (cap == GL12.GL_RESCALE_NORMAL || cap == GL11.GL_TEXTURE_2D) {
+		} else if (cap == GL11.GL_TEXTURE_2D) {
+			GlTextureTracker.glTurnTexturing(state);
+			return true;
+		} else if (cap == GL12.GL_RESCALE_NORMAL) {
 			return true;
 		}
 

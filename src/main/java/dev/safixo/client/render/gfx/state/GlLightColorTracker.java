@@ -9,8 +9,8 @@ public class GlLightColorTracker {
 	public static int LAST_CLEAR_COLOR = 0;
 	public static int LAST_COLOR = -1;
 
-	public static int S_FACTOR;
-	public static int D_FACTOR;
+	public static int S_FACTOR = GL11.GL_ONE;
+	public static int D_FACTOR = GL11.GL_ZERO;
 
 	public static void glShadeModel(int mode) {
 		GlStateTracker.flushDrawState();
@@ -30,6 +30,7 @@ public class GlLightColorTracker {
 		GlStateTracker.flushDrawState();
 		S_FACTOR = sFactor;
 		D_FACTOR = dFactor;
+		GL11.glBlendFunc(sFactor, dFactor);
 	}
 
 	public static void glColor3f(float red, float green, float blue) {

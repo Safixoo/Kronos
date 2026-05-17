@@ -7,7 +7,6 @@ import dev.safixo.client.render.gfx.util.GlBufferUtil;
 import dev.safixo.client.render.gfx.vertex.GlVertexArrayObject;
 import dev.safixo.client.render.vertex.DefaultVertexFormats;
 import dev.safixo.client.render.vertex.VertexWriter;
-import dev.safixo.client.render.vertex.writers.EntityFormat;
 import dev.safixo.client.util.Direction;
 import dev.safixo.client.util.Matrix4Stack;
 import dev.safixo.client.util.memory.NativeBuffer;
@@ -42,7 +41,6 @@ public class AdvancedModelRenderer {
 
 	// Current offset for writing in the vertex buffer.
 	private static int OFFSET = 0;
-
 	private static final ReferenceArrayList<ModelRenderer> MODELS = new ReferenceArrayList<>();
 
 	static {
@@ -92,7 +90,7 @@ public class AdvancedModelRenderer {
 				matStack.top().translate(offX, offY, offZ);
 			}
 
-			ModelQueue.MODEL_QUEUE.addToQueue(MinecraftHook.ENTITY_TEX, displayList);
+			ModelQueue.INSTANCE.addToQueue(displayList);
 
 			if (model.childModels != null) {
 				for (int i = 0; i < model.childModels.size(); i++) {
@@ -123,7 +121,7 @@ public class AdvancedModelRenderer {
 			matStack.push();
 			matStack.top().mul(modelView);
 
-			ModelQueue.MODEL_QUEUE.addToQueue(MinecraftHook.ENTITY_TEX, displayList);
+			ModelQueue.INSTANCE.addToQueue(displayList);
 
 			if (model.childModels != null) {
 				for (int i = 0; i < model.childModels.size(); i++) {
@@ -189,7 +187,7 @@ public class AdvancedModelRenderer {
 			}
 
 			GL30.glBindVertexArray(VERTEX_ARRAY_FPP.getHandle());
-			draw(GL11.GL_QUADS, offset, vertices);
+			GL11.glDrawArrays(GL11.GL_QUADS, offset, vertices);
 
 			if (model.childModels != null) {
 				for (int i = 0; i < model.childModels.size(); i++) {
@@ -222,7 +220,7 @@ public class AdvancedModelRenderer {
 			GlMatrixTracker.CURRENT_STACK.top().mul(modelView, GlMatrixTracker.CURRENT_STACK.top());
 
 			GL30.glBindVertexArray(VERTEX_ARRAY_FPP.getHandle());
-			draw(GL11.GL_QUADS, offset, vertices);
+			GL11.glDrawArrays(GL11.GL_QUADS, offset, vertices);
 
 			if (model.childModels != null) {
 				for (int i = 0; i < model.childModels.size(); i++) {
@@ -232,54 +230,6 @@ public class AdvancedModelRenderer {
 
 			GL11.glPopMatrix();
 		}
-	}
-
-	private static final IntBuffer COUNT = NativeBuffer.memAlloc(4 * Direction.COUNT).asIntBuffer();
-	private static final IntBuffer FIRST = NativeBuffer.memAlloc(4 * Direction.COUNT).asIntBuffer();
-
-	// Replace technique with copies of the vertex data place in different spots with each permutation of visible
-	// faces to avoid draw-calls per quad as of now, maybe instead of storing data directly in display-list, store
-	// an index to the final draw-data.
-	// Also, it should also be needed to take over TextureManager to have access to the textures and check the opacity to
-	// know if it is possible to cull back-faces without changing visuals.
-	private static final boolean BACK_FACE_CULLING = false;
-
-	private static void draw(int mode, int offset, int vertices) {
-		if (!BACK_FACE_CULLING) {
-			GL11.glDrawArrays(mode, offset, vertices);
-			return;
-		}
-
-		Matrix4f matrix = GlMatrixTracker.MODEL_VIEW_STACK.top();
-		int cubes = vertices / 24;
-
-		COUNT.put(cubes * 4);
-		COUNT.put(cubes * 4);
-		COUNT.put(cubes * 4);
-
-		// add epsilon (???)
-		if (matrix.m12() < 0) { // +Y
-			FIRST.put(offset + cubes * 0);
-		} else { // -Y
-			FIRST.put(offset + cubes * 4);
-		}
-
-		if (matrix.m22() < 0) { // +Z
-			FIRST.put(offset + cubes * 8);
-		} else { // -Z
-			FIRST.put(offset + cubes * 12);
-		}
-
-		if (matrix.m02() < 0) { // +X
-			FIRST.put(offset + cubes * 16);
-		} else { // -X
-			FIRST.put(offset + cubes * 20);
-		}
-
-		((Buffer) FIRST).flip();
-		((Buffer) COUNT).flip();
-
-		GL14.glMultiDrawArrays(mode, FIRST, COUNT);
 	}
 
 	public static void postRender(ModelRenderer model, float scale) {
@@ -310,14 +260,10 @@ public class AdvancedModelRenderer {
 		}
 	}
 
-
-	public static boolean BUFFER_CHANGED = true;
-
 	private static void compileDisplayList(ModelRenderer model, float scale) {
-		VertexWriter writer = new VertexWriter(512);
+		VertexWriter writer = new VertexWriter(4096);
 
 		REDIRECT_DRAWING = true;
-		BUFFER_CHANGED = true;
 		MODELS.add(model);
 
 		writer.startDrawing();
@@ -331,14 +277,7 @@ public class AdvancedModelRenderer {
 		}
 
 		if (VERTEX_BUFFER == null) {
-			VERTEX_BUFFER = new GlVertexBuffer(writer.offset * 2, GL15.GL_STATIC_DRAW);
-		}
-
-		if (writer.offset + OFFSET >= VERTEX_BUFFER.getCapacity()) {
-			GlVertexBuffer newBuffer = new GlVertexBuffer(VERTEX_BUFFER.getCapacity() * 2, GL15.GL_STATIC_DRAW);
-			GlBufferUtil.copyBufferToBuffer(VERTEX_BUFFER, newBuffer, 0, 0, OFFSET);
-			VERTEX_BUFFER.delete();
-			VERTEX_BUFFER = newBuffer;
+			VERTEX_BUFFER = new GlVertexBuffer(512 * 1024, GL15.GL_STATIC_DRAW);
 		}
 
 		if (VERTEX_ARRAY_GL20 == null) {
@@ -348,18 +287,18 @@ public class AdvancedModelRenderer {
 
 		VERTEX_ARRAY_FPP.bind(null);
 		VERTEX_BUFFER.bind();
-		GL11.glVertexPointer(3, GL11.GL_FLOAT, 24, 0);
-		GL11.glEnableClientState(GL11.GL_VERTEX_ARRAY);
+		{
+			GL11.glVertexPointer(3, GL11.GL_FLOAT, 24, 0);
+			GL11.glEnableClientState(GL11.GL_VERTEX_ARRAY);
 
-		GL11.glTexCoordPointer(2, GL11.GL_FLOAT, 24, 12);
-		GL11.glEnableClientState(GL11.GL_TEXTURE_COORD_ARRAY);
+			GL11.glTexCoordPointer(2, GL11.GL_FLOAT, 24, 12);
+			GL11.glEnableClientState(GL11.GL_TEXTURE_COORD_ARRAY);
 
-		GL11.glNormalPointer(GL11.GL_BYTE, 24, 20);
-		GL11.glEnableClientState(GL11.GL_NORMAL_ARRAY);
+			GL11.glNormalPointer(GL11.GL_BYTE, 24, 20);
+			GL11.glEnableClientState(GL11.GL_NORMAL_ARRAY);
+		}
 		VERTEX_ARRAY_FPP.unbind();
 		VERTEX_BUFFER.unbind();
-
-		analyzeModel(writer);
 
 		VERTEX_BUFFER.bufferSubData(writer.getWriterNio(), OFFSET, writer.getOffset());
 		int drawData = writer.getVertices() | (OFFSET / 24) << 16;
@@ -373,72 +312,6 @@ public class AdvancedModelRenderer {
 
 		setCompiled(model, true);
 		setDisplayList(model, drawData);
-	}
-
-	private static void analyzeModel(VertexWriter entityData) {
-		int entityStride = DefaultVertexFormats.ENTITY_FORMAT.getStride();
-		int normalOffset = 12 + 8;
-
-		for (int dir = 0; dir < Direction.COUNT; dir++) {
-			VertexWriter writerDir = VertexWriter.SOLID[dir];
-			writerDir.startDrawing();
-		}
-
-		int totalOffset = entityData.getOffset();
-
-		for (int quad = 0; quad < (entityData.vertices / 4); quad++) {
-			long readPtr = entityData.getWriterPtr() + (quad * 4L * entityStride);
-			int normal = UnsafeUtil.memGetInt(readPtr + normalOffset);
-
-			byte normalX = (byte) ((normal >>> 0) & 0xFF);
-			byte normalY = (byte) ((normal >>> 8) & 0xFF);
-			byte normalZ = (byte) ((normal >>> 16) & 0xFF);
-
-			if (normalX > 0) {
-				copyQuad(readPtr, VertexWriter.SOLID[Direction.EAST]);
-			} else if (normalX < 0) {
-				copyQuad(readPtr, VertexWriter.SOLID[Direction.WEST]);
-			} else if (normalY > 0) {
-				copyQuad(readPtr, VertexWriter.SOLID[Direction.UP]);
-			} else if (normalY < 0) {
-				copyQuad(readPtr, VertexWriter.SOLID[Direction.DOWN]);
-			} else if (normalZ > 0) {
-				copyQuad(readPtr, VertexWriter.SOLID[Direction.SOUTH]);
-			} else if (normalZ < 0) {
-				copyQuad(readPtr, VertexWriter.SOLID[Direction.NORTH]);
-			}
-		}
-
-		int offset = 0;
-
-		for (int dir = 0; dir < Direction.COUNT; dir++) {
-			VertexWriter writerDir = VertexWriter.SOLID[dir];
-
-			UnsafeUtil.UNSAFE.copyMemory(writerDir.getWriterPtr(), entityData.getWriterPtr() + offset, writerDir.getOffset());
-			offset += writerDir.getOffset();
-
-			writerDir.stopDrawing();
-		}
-	}
-
-	private static void copyQuad(long quadPtr, VertexWriter dest) {
-		dest.ensureCapacity(DefaultVertexFormats.ENTITY_FORMAT.getStride() * 4);
-
-		for (long i = 0; i < 4; i++) {
-			long readPtr = quadPtr + i * DefaultVertexFormats.ENTITY_FORMAT.getStride();
-
-			float x = UnsafeUtil.memGetFloat(readPtr + 0);
-			float y = UnsafeUtil.memGetFloat(readPtr + 4);
-			float z = UnsafeUtil.memGetFloat(readPtr + 8);
-
-			float u = UnsafeUtil.memGetFloat(readPtr + 12);
-			float v = UnsafeUtil.memGetFloat(readPtr + 16);
-
-			int normal = UnsafeUtil.memGetInt(readPtr + 20);
-
-			EntityFormat.writeVertex(dest.getTotalOffset(), x, y, z, u, v, normal);
-			dest.addVertexCounter(DefaultVertexFormats.ENTITY_FORMAT.getStride());
-		}
 	}
 
 	public static void cleanupEntityModelPool() {

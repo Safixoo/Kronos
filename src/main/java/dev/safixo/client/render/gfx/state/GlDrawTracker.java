@@ -25,54 +25,61 @@ public class GlDrawTracker {
 	public static int S_FACTOR;
 	public static int D_FACTOR;
 
+	public static int LAST_TARGET = -1;
+	public static float MU, MV;
+
 	static {
 		Arrays.fill(TEXTURING, true);
 	}
 
 	public static void glTurnCulling(boolean state) {
-		CULLING = state;
+		GlBooleanTracker.setState(GL11.GL_CULL_FACE, state);
 	}
 
 	public static void glTurnBlending(boolean state) {
-		BLENDING = state;
+		GlBooleanTracker.setState(GL11.GL_BLEND, state);
 	}
 
 	public static void glTurnLighting(boolean state) {
-		LIGHTING = state;
+		GlBooleanTracker.setState(GL11.GL_LIGHTING, state);
 	}
 
 	public static void flushRasterState() {
+		if (GlStateTracker.SKIP_CACHE) {
+			return;
+		}
+
 		if (GlBooleanTracker.isEnabled(GL11.GL_LIGHTING) != LIGHTING) {
+			LIGHTING = GlBooleanTracker.isEnabled(GL11.GL_LIGHTING);
 			setState(GL11.GL_LIGHTING, LIGHTING);
 		}
 		if (GlBooleanTracker.isEnabled(GL11.GL_BLEND) != BLENDING) {
-			if (BLENDING) {
-				if (GlLightColorTracker.S_FACTOR != S_FACTOR || GlLightColorTracker.D_FACTOR != D_FACTOR) {
-					S_FACTOR = GlLightColorTracker.S_FACTOR;
-					D_FACTOR = GlLightColorTracker.D_FACTOR;
-					GL11.glBlendFunc(S_FACTOR, D_FACTOR);
-				}
-			} else {
-				S_FACTOR = 0;
-				D_FACTOR = 0;
-			}
-
+			BLENDING = GlBooleanTracker.isEnabled(GL11.GL_BLEND);
 			setState(GL11.GL_BLEND, BLENDING);
 		}
 		if (GlBooleanTracker.isEnabled(GL11.GL_CULL_FACE) != CULLING) {
+			CULLING = GlBooleanTracker.isEnabled(GL11.GL_CULL_FACE);
 			setState(GL11.GL_CULL_FACE, CULLING);
 		}
 
-		int activeUnit = GlTextureTracker.ACTIVE_UNIT;
-		boolean textureState = activeUnit == -1 || GlTextureTracker.ENABLED_TEXTURES[activeUnit];
+		checkMismatchTexturing(GlTextureTracker.ACTIVE_UNIT);
 
-		if (activeUnit == -1 || textureState != TEXTURING[activeUnit]) {
+		if (MU != GlTextureTracker.MU || MV != GlTextureTracker.MV || LAST_TARGET != GlTextureTracker.LAST_TARGET) {
+			MU = GlTextureTracker.MU;
+			MV = GlTextureTracker.MV;
+			LAST_TARGET = GlTextureTracker.LAST_TARGET;
+			GL13.glMultiTexCoord2f(LAST_TARGET, MU, MV);
+		}
+	}
+
+	public static void checkMismatchTexturing(int unit) {
+		if (unit < 0 || GlTextureTracker.ENABLED_TEXTURES[unit] != TEXTURING[unit]) {
 			GlTextureTracker.assertActiveTexture();
 
-			if (activeUnit != -1) {
-				TEXTURING[activeUnit] = textureState;
+			if (unit >= 0) {
+				TEXTURING[unit] = GlTextureTracker.ENABLED_TEXTURES[unit];
 			}
-			setState(GL11.GL_TEXTURE_2D, textureState);
+			setState(GL11.GL_TEXTURE_2D, unit < 0 || TEXTURING[unit]);
 		}
 	}
 
@@ -82,7 +89,6 @@ public class GlDrawTracker {
 		} else {
 			GL11.glDisable(cap);
 		}
-		GlBooleanTracker.setState(cap, turn);
 	}
 
 	public static void glBegin(int mode) {

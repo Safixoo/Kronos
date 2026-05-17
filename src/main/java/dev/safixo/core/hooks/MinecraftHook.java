@@ -19,7 +19,6 @@ import net.minecraft.client.renderer.EntityRenderer;
 import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.entity.Render;
-import net.minecraft.entity.Entity;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
@@ -28,6 +27,7 @@ import net.minecraft.world.chunk.IChunkProvider;
 import net.minecraft.world.chunk.storage.ExtendedBlockStorage;
 import org.joml.Matrix4f;
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL13;
 
 import java.lang.reflect.Field;
 
@@ -39,8 +39,8 @@ public class MinecraftHook {
 
 
 	public static String PROFILING_TARGET;
-	public static boolean FAST_ENTITY_PATH = false;
-	public static int ENTITY_TEX;
+	public static boolean FAST_ENTITY_PATH;
+	public static ResourceLocation ENTITY_TEX;
 
 	public static Thread MAIN_THREAD;
 
@@ -53,15 +53,9 @@ public class MinecraftHook {
 	}
 
 	public static void bindTexture(Render render, ResourceLocation resource) {
-		if (MinecraftHook.FAST_ENTITY_PATH) {
-			int texture = ModelQueue.MODEL_QUEUE.resourceToTex.getInt(resource);
+		MinecraftHook.ENTITY_TEX = resource;
 
-			if (texture == 0) {
-				Minecraft.getMinecraft().renderEngine.bindTexture(resource);
-				ModelQueue.MODEL_QUEUE.resourceToTex.put(resource, GlTextureTracker.TEXTURE_PER_UNIT[0]);
-			}
-
-			ENTITY_TEX = ModelQueue.MODEL_QUEUE.resourceToTex.getInt(resource);
+		if (MinecraftHook.FAST_ENTITY_PATH && ModelQueue.INSTANCE.textureMap.containsKey(resource)) {
 			return;
 		}
 
@@ -79,11 +73,11 @@ public class MinecraftHook {
 		PROFILING_TARGET = prof;
 
 		if (fastPath && !FAST_ENTITY_PATH) {
-			ModelQueue.MODEL_QUEUE.drawAllQueue();
+			ModelQueue.INSTANCE.drawAllQueue();
 		}
 
 		if (!fastPath && FAST_ENTITY_PATH) {
-			ModelQueue.MODEL_QUEUE.viewMatrix = new Matrix4f(GlMatrixTracker.MODEL_VIEW_STACK.top()).invert();
+			ModelQueue.INSTANCE.viewMatrix = new Matrix4f(GlMatrixTracker.MODEL_VIEW_STACK.top()).invert();
 		}
 	}
 
