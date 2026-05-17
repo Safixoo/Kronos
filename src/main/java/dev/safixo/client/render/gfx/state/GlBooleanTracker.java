@@ -1,6 +1,7 @@
 package dev.safixo.client.render.gfx.state;
 
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL12;
 
 import java.util.Arrays;
 
@@ -23,6 +24,10 @@ public class GlBooleanTracker {
 	}
 
 	public static boolean isEnabled(int cap) {
+		if (cap == GL11.GL_TEXTURE_2D) {
+			return GlTextureTracker.ENABLED_TEXTURES[GlTextureTracker.ACTIVE_UNIT];
+		}
+
 		return CAP_BITS[cap] == DEFINED_ENABLED;
 	}
 
@@ -30,13 +35,34 @@ public class GlBooleanTracker {
 		return CAP_BITS[cap] == DEFINED_DISABLED;
 	}
 
-	private static void setState(int cap, boolean state) {
+	protected static void setState(int cap, boolean state) {
 		if (!GlStateTracker.SKIP_CACHE) {
 			CAP_BITS[cap] = state ? DEFINED_ENABLED : DEFINED_DISABLED;
 		}
 	}
 
+	private static boolean isRasterState(int cap, boolean state) {
+		if (cap == GL11.GL_CULL_FACE) {
+			GlDrawTracker.glTurnCulling(state);
+			return true;
+		} else if (cap == GL11.GL_BLEND) {
+			GlDrawTracker.glTurnBlending(state);
+			return true;
+		} else if (cap == GL11.GL_LIGHTING) {
+			GlDrawTracker.glTurnLighting(state);
+			return true;
+		} else if (cap == GL12.GL_RESCALE_NORMAL || cap == GL11.GL_TEXTURE_2D) {
+			return true;
+		}
+
+		return false;
+	}
+
 	public static void glEnable(int cap) {
+		if (isRasterState(cap, true)) {
+			return;
+		}
+
 		if (cap == GL11.GL_TEXTURE_2D) {
 			GlTextureTracker.glTurnTexturing(true);
 			return;
@@ -51,6 +77,10 @@ public class GlBooleanTracker {
 	}
 
 	public static void glDisable(int cap) {
+		if (isRasterState(cap, false)) {
+			return;
+		}
+
 		if (cap == GL11.GL_TEXTURE_2D) {
 			GlTextureTracker.glTurnTexturing(false);
 			return;

@@ -61,18 +61,18 @@ public class SectionSet {
 
 		for (int x = 0; x <= radius; x++) {
 			for (int z = 0; z <= radius; z++) {
-				if (MathExt.square(x) + MathExt.square(z) >= squaredDistance) {
-					for (int y = 0; y < 16; y++) {
-						int flagIndexPP = getFlagIndex(x + radius, y, z + radius, radius);
-						int flagIndexNP = getFlagIndex(-x + radius, y, z + radius, radius);
-						int flagIndexNN = getFlagIndex(-x + radius, y, -z + radius, radius);
-						int flagIndexPN = getFlagIndex(x + radius, y, -z + radius, radius);
+				short overDistance = (short) (MathExt.square(x) + MathExt.square(z) >= squaredDistance ? 1 : 0);
 
-						visibilitySet[flagIndexPP] = 1;
-						visibilitySet[flagIndexNP] = 1;
-						visibilitySet[flagIndexNN] = 1;
-						visibilitySet[flagIndexPN] = 1;
-					}
+				for (int y = 0; y < 16; y++) {
+					int flagIndexPP = getFlagIndex(x + radius, y, z + radius, radius);
+					int flagIndexNP = getFlagIndex(-x + radius, y, z + radius, radius);
+					int flagIndexNN = getFlagIndex(-x + radius, y, -z + radius, radius);
+					int flagIndexPN = getFlagIndex(x + radius, y, -z + radius, radius);
+
+					visibilitySet[flagIndexPP] = overDistance;
+					visibilitySet[flagIndexNP] = overDistance;
+					visibilitySet[flagIndexNN] = overDistance;
+					visibilitySet[flagIndexPN] = overDistance;
 				}
 			}
 		}

@@ -4,6 +4,7 @@ import dev.safixo.client.render.pipelines.terrain.meshing.builders.VoxelMesher;
 import dev.safixo.client.render.pipelines.terrain.meshing.model.ModelColorizer;
 import dev.safixo.client.render.vertex.writers.TerrainFormat;
 import dev.safixo.client.util.MathExt;
+import dev.safixo.core.hooks.AsyncBlockHook;
 import net.minecraft.block.*;
 import net.minecraft.block.material.Material;
 import net.minecraft.client.Minecraft;
@@ -60,7 +61,7 @@ public class PrimitivesFlags {
 			NORMAL_BLOCK[i] = ((block != null && block.blockMaterial.isOpaque() && block.renderAsNormalBlock() && !block.canProvidePower()));
 			MATERIAL[i] = (block == null || i == 0) ? Material.air : block.blockMaterial;
 			SOLID_CULL_MASK[i] = (byte) (((block != null && block.isOpaqueCube()) || block instanceof BlockLeaves) ? 1 : 0);
-			SOLID_LIGHT_MASK[i] = (byte) (((block != null && block.isOpaqueCube()) || block instanceof BlockLeaves || Block.lightOpacity[i] >= 14) ? 1 : 0);
+			SOLID_LIGHT_MASK[i] = (byte) (((block != null && block.isOpaqueCube() && Block.lightValue[i] <= 5) || block instanceof BlockLeaves || Block.lightOpacity[i] >= 14) ? 1 : 0);
 			TILE_ENTITY[i] = block != null && block.hasTileEntity(0);
 			RENDER_PASS[i] = block == null ? -777 : (short) block.getRenderBlockPass();
 		}
@@ -138,6 +139,8 @@ public class PrimitivesFlags {
 			} else {
 				COLOR_MODULATOR[i] = ModelColorizer.DYNAMIC_COLOR;
 			}
+
+//			AsyncBlockHook.setupAsyncBounds(block);
 		}
 	}
 

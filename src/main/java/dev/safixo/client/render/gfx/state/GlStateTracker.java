@@ -15,6 +15,7 @@ public class GlStateTracker {
 	public static int LAST_DEPTH_FUNC = -1;
 	public static int LAST_VAO = -1;
 	public static int LAST_VBO = -1;
+	public static int LAST_SSBO = -1;
 
 	public static void update(boolean processMessages) {
 		flushDrawState();
@@ -38,8 +39,14 @@ public class GlStateTracker {
 			if (id == LAST_VBO) {
 				return;
 			}
-
 			LAST_VBO = id;
+		}
+
+		if (target == GL43.GL_SHADER_STORAGE_BUFFER && !SKIP_CACHE) {
+			if (id == LAST_SSBO) {
+				return;
+			}
+			LAST_SSBO = id;
 		}
 
 		GL15.glBindBuffer(target, id);
@@ -63,15 +70,13 @@ public class GlStateTracker {
 			VENDOR = GL11.glGetString(GL11.GL_VENDOR);
 		}
 
-		if (VENDOR != null && VENDOR.contains("Nvidia")) {
-			if (name == GL11.GL_MODELVIEW_MATRIX) {
-				GlMatrixTracker.MODEL_VIEW_STACK.top().get(params);
-				return;
-			}
-			else if (name == GL11.GL_PROJECTION_MATRIX) {
-				GlMatrixTracker.PROJECTION_STACK.top().get(params);
-				return;
-			}
+		if (name == GL11.GL_MODELVIEW_MATRIX) {
+			GlMatrixTracker.MODEL_VIEW_STACK.top().get(params);
+			return;
+		}
+		else if (name == GL11.GL_PROJECTION_MATRIX) {
+			GlMatrixTracker.PROJECTION_STACK.top().get(params);
+			return;
 		}
 
 		GL11.glGetFloat(name, params);

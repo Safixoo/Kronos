@@ -42,7 +42,7 @@ public class GlVertexArrayObject {
 	}
 
 	public void bind(GlVertexBuffer vbo) {
-		if (this.vertexFormat == null && this.id == 0x80000000) {
+		if ((vbo == null || this.vertexFormat == null) && this.id == 0x80000000) {
 			this.id = GL30.glGenVertexArrays();
 		}
 

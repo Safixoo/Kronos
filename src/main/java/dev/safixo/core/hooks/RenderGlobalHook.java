@@ -1,19 +1,16 @@
 package dev.safixo.core.hooks;
 
-import dev.safixo.client.render.ImprovedTessellator;
 import dev.safixo.client.render.gfx.util.GpuFlags;
 import dev.safixo.client.render.pipelines.cloud.CloudRenderer;
-import dev.safixo.client.render.pipelines.entity_model.AdvModelRenderer;
+import dev.safixo.client.render.pipelines.entity_model.AdvancedModelRenderer;
 import dev.safixo.client.render.pipelines.terrain.SectionManager;
 import dev.safixo.client.render.vertex.VertexWriter;
-import dev.safixo.client.util.FastLongHashMap;
 import dev.safixo.client.util.MathExt;
 import dev.safixo.client.util.data.PrimitivesFlags;
 import dev.safixo.core.HookUtils;
 import net.minecraft.block.Block;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderGlobal;
-import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.culling.ICamera;
 import net.minecraft.client.settings.GameSettings;
 import net.minecraft.entity.EntityLivingBase;
@@ -75,7 +72,7 @@ public  class RenderGlobalHook {
 
 	private static void clearBuffers() {
 		VertexWriter.clearBuffers();
-		AdvModelRenderer.cleanupEntityModelPool();
+		AdvancedModelRenderer.cleanupEntityModelPool();
 	}
 
 	// Executed only in the first pass of renderWorld.
@@ -83,6 +80,8 @@ public  class RenderGlobalHook {
 		double cameraX = MathExt.lerp(player.lastTickPosX, player.posX, PARTIAL_TICK);
 		double cameraY = MathExt.lerp(player.lastTickPosY, player.posY, PARTIAL_TICK);
 		double cameraZ = MathExt.lerp(player.lastTickPosZ, player.posZ, PARTIAL_TICK);
+
+		MinecraftHook.MAIN_THREAD = Thread.currentThread();
 
 		Minecraft minecraft = Minecraft.getMinecraft();
 		int realRenderDistance = MathExt.getCanonicalRenderDistance(minecraft.gameSettings);

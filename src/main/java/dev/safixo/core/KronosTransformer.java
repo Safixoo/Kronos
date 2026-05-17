@@ -1,6 +1,5 @@
 package dev.safixo.core;
 
-import dev.safixo.client.util.data.PrimitivesFlags;
 import dev.safixo.core.hooks.LongHashMapHook;
 import net.minecraft.launchwrapper.Launch;
 import org.objectweb.asm.Opcodes;
@@ -23,12 +22,17 @@ public class KronosTransformer implements IClassTransformer {
 	static final String FONT_RENDERER_HOOK = "dev/safixo/core/hooks/FontRendererHook";
 	static final String FRUSTUM_HOOK = "dev/safixo/core/hooks/FrustumHook";
 	static final String MINECRAFT_HOOK = "dev/safixo/core/hooks/MinecraftHook";
-	static final String ADV_MODEL_RENDERER = "dev/safixo/client/render/pipelines/entity_model/AdvModelRenderer";
+	static final String ADV_MODEL_RENDERER = "dev/safixo/client/render/pipelines/entity_model/AdvancedModelRenderer";
 
 	static final String REBUILD_LISTENER = "dev/safixo/client/render/pipelines/terrain/meshing/RebuildListener";
 	static final String SIDE_CULLER = "dev/safixo/client/render/pipelines/terrain/meshing/SideCuller";
 	static final String VANILLA_MESHER = "dev/safixo/client/render/pipelines/terrain/meshing/builders/VanillaBlockMesher";
 
+	static final String RENDER = "net.minecraft.client.renderer.entity.Render";
+	static final String STRING_TRANSLATE = "net.minecraft.util.StringTranslate";
+	static final String DATA_WATCHER = "net.minecraft.entity.DataWatcher";
+	static final String TEXTURE_MANAGER = "net.minecraft.client.renderer.texture.TextureManager";
+	static final String PROFILER = "net.minecraft.profiler.Profiler";
 	static final String RENDER_BLOCKS = "net.minecraft.client.renderer.RenderBlocks";
 	static final String BLOCK_SNOW = "net.minecraft.block.BlockSnow";
 	static final String BLOCK = "net.minecraft.block.Block";
@@ -45,6 +49,7 @@ public class KronosTransformer implements IClassTransformer {
 	static final String WORLD = "net.minecraft.world.World";
 
 	static HashMap<String, String> FUNCTION_NAMES;
+	static HashSet<String> BLOCK_TYPES;
 
 	public static boolean IN_DEV;
 	static boolean CHECKED_FOR_DEV;
@@ -69,10 +74,21 @@ public class KronosTransformer implements IClassTransformer {
 		}
 
 		checkDevEnvironment();
+//		startBlockCollection(basicClass);
+//		redirectAsyncBlocksCalls(reference);
 
 		// Overwrites classes methods completely with a function call with the same
 		// args and with the instance of the original class.
 		switch (transformedName) {
+			case RENDER:
+				replaceClassMethod(MINECRAFT_HOOK, "bindTexture", "a", "(D)V", reference, true);
+				break;
+			case STRING_TRANSLATE: case DATA_WATCHER: case TEXTURE_MANAGER:
+				changeHashMap(reference);
+				break;
+			case PROFILER:
+				setFieldInProfiling(reference, "", "");
+				break;
 			case ENTITY_RENDERER:
 				avoidDoublePassBullshit(reference);
 				replaceClassMethod(MINECRAFT_HOOK, "disableLightmap", "a", "(D)V", reference, true);
@@ -80,6 +96,7 @@ public class KronosTransformer implements IClassTransformer {
 			case BLOCK:
 				replaceClassMethod(SIDE_CULLER, "shouldSideBeRendered", "a", "(Lacf;IIII)Z", reference, false);
 				catchBlockBounds(reference);
+//				setupAsyncFields(reference);
 				break;
 			case BLOCK_SNOW:
 				replaceClassMethod(MINECRAFT_HOOK, "shouldSideBeRendered", "a", "(Lacf;IIII)Z", reference, false);
@@ -152,6 +169,188 @@ public class KronosTransformer implements IClassTransformer {
 		return reference[0];
 	}
 
+	static final String ASYNC_BLOCK_HOOK = "dev.safixo.core.hooks";
+
+	static void changeHashMap(byte[][] basicClass) {
+		ClassReader reader = new ClassReader(basicClass[0]);
+		ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+
+		ClassNode classNode = new ClassNode();
+		reader.accept(classNode, 0);
+
+		for (int i = 0; i < classNode.methods.size(); i++) {
+			MethodNode method = (MethodNode) classNode.methods.get(i);
+
+			if (!method.name.equals("<init>")) {
+				continue;
+			}
+
+			InsnList inns = method.instructions;
+			AbstractInsnNode insn = inns.getFirst();
+
+			while (insn != null) {
+				if (insn.getOpcode() == INVOKESPECIAL) {
+					MethodInsnNode m = (MethodInsnNode) insn;
+					if (m.owner.equals("java/util/HashMap")) {
+						m.owner = "dev/safixo/client/util/HashMapWrapped";
+					}
+				} else if (insn.getOpcode() == NEW) {
+					TypeInsnNode t = (TypeInsnNode) insn;
+					if (t.desc.equals("java/util/HashMap")) {
+						t.desc = "dev/safixo/client/util/HashMapWrapped";
+					}
+				} else if (insn.getOpcode() == INVOKESTATIC) {
+					MethodInsnNode m = (MethodInsnNode) insn;
+					if (m.owner.equals("com/google/common/collect/Maps")) {
+						m.owner = "dev/safixo/client/util/HashMapWrapped";
+					}
+				}
+
+				insn = insn.getNext();
+			}
+		}
+
+		classNode.accept(writer);
+		basicClass[0] = writer.toByteArray();
+	}
+
+	static void setFieldInProfiling(byte[][] basicClass, String runtimeName, String descriptor) {
+		ClassReader reader = new ClassReader(basicClass[0]);
+
+		ClassNode classNode = new ClassNode();
+		reader.accept(classNode, 0);
+
+		for (int i = 0; i < classNode.methods.size(); i++) {
+			MethodNode method = (MethodNode) classNode.methods.get(i);
+
+			if ((!method.name.equals("startSection") && ((!method.name.equals(runtimeName)) || !method.desc.contains(descriptor)))) {
+				continue;
+			}
+
+			method.instructions.insertBefore(method.instructions.getFirst(), new MethodInsnNode(INVOKESTATIC, MINECRAFT_HOOK, "setProfilerTarget", "(Ljava/lang/String;)V"));
+			method.instructions.insertBefore(method.instructions.getFirst(), new VarInsnNode(ALOAD, 1));
+		}
+
+		ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+		classNode.accept(writer);
+
+		basicClass[0] = writer.toByteArray();
+	}
+
+	public static void redirectAsyncBlocksCalls(byte[][] basicClass) {
+		ClassReader reader = new ClassReader(basicClass[0]);
+		ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+
+		ClassNode classNode = new ClassNode();
+		reader.accept(classNode, 0);
+
+		for (int i = 0; i < classNode.methods.size(); i++) {
+			MethodNode node = (MethodNode) classNode.methods.get(i);
+
+			InsnList inns = node.instructions;
+			AbstractInsnNode insn = inns.getFirst();
+
+			boolean skip = false;
+
+			while (insn != null && !skip) {
+				int opcode = insn.getOpcode();
+
+				if (opcode == GETFIELD || opcode == PUTFIELD) {
+					FieldInsnNode m = (FieldInsnNode) insn;
+
+					if (m.name.startsWith("m") && BLOCK_TYPES.contains(m.owner) && isField(m.name)) {
+						String name;
+						String desc = IN_DEV
+							? "(Lnet/minecraft/src/Block;D)V"
+							: "(Laqz;D)V";
+
+						if (opcode == GETFIELD) {
+							name = "get" + getField(m.name);
+						} else {
+							name = "set" + getField(m.name);
+						}
+
+						System.out.println("Rewriting!!");
+						node.instructions.set(m, new MethodInsnNode(INVOKESTATIC, ASYNC_BLOCK_HOOK, name, desc));
+					}
+
+				}
+				insn = insn.getNext();
+			}
+		}
+
+		classNode.accept(writer);
+		basicClass[0] = writer.toByteArray();
+	}
+
+	public static boolean isField(String name) {
+		switch (name) {
+			case "minX":
+			case "minY":
+			case "minZ":
+			case "maxX":
+			case "maxY":
+			case "maxZ": return true;
+
+			default:
+				return false;
+		}
+	}
+
+	public static String getField(String name) {
+		switch (name) {
+			case "minX": return "MinX";
+			case "minY": return "MinY";
+			case "minZ": return "MinZ";
+			case "maxX": return "MaxX";
+			case "maxY": return "MaxY";
+			case "maxZ": return "MaxZ";
+			default:
+				return null;
+		}
+	}
+
+	public static void setupAsyncFields(byte[][] basicClass) {
+		ClassReader reader = new ClassReader(basicClass[0]);
+		ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+
+		ClassNode classNode = new ClassNode();
+		reader.accept(classNode, 0);
+
+		addField(classNode, "minXMT");
+		addField(classNode, "minYMT");
+		addField(classNode, "minZMT");
+
+		addField(classNode, "maxXMT");
+		addField(classNode, "maxYMT");
+		addField(classNode, "maxZMT");
+
+		classNode.accept(writer);
+		basicClass[0] = writer.toByteArray();
+	}
+	private static final Double NULL_DOUBLE = (double) 0;
+
+	private static void addField(ClassNode classNode, String name) {
+		classNode.visitField(Opcodes.ACC_PUBLIC, name, "D", null, NULL_DOUBLE);
+	}
+
+	static void startBlockCollection(byte[] basicClass) {
+		if (BLOCK_TYPES == null) {
+			BLOCK_TYPES = new HashSet<>();
+			BLOCK_TYPES.add(IN_DEV ? "net/minecraft/src/Block" : "aqz");
+		}
+
+		ClassReader reader = new ClassReader(basicClass);
+
+		ClassNode classNode = new ClassNode();
+		reader.accept(classNode, 0);
+
+		if (BLOCK_TYPES.contains(classNode.superName)) {
+			System.out.println(classNode.name);
+			BLOCK_TYPES.add(classNode.name);
+		}
+	}
+
 	static void addFunction(String className, String function) {
 		FUNCTION_NAMES.put(function, className);
 	}
@@ -202,6 +401,8 @@ public class KronosTransformer implements IClassTransformer {
 		addFunction("GlDrawTracker", "glBegin");
 		addFunction("GlDrawTracker", "glEnd");
 		addFunction("GlDrawTracker", "glDrawArrays");
+		addFunction("GlDrawTracker", "glMultiDrawArrays");
+		addFunction("GlDrawTracker", "glMultiDrawArraysIndirect");
 
 		addFunction("GlStateTracker", "glGetInteger");
 		addFunction("GlStateTracker", "glGetFloat");

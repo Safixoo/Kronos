@@ -9,6 +9,9 @@ public class GlLightColorTracker {
 	public static int LAST_CLEAR_COLOR = 0;
 	public static int LAST_COLOR = -1;
 
+	public static int S_FACTOR;
+	public static int D_FACTOR;
+
 	public static void glShadeModel(int mode) {
 		GlStateTracker.flushDrawState();
 		GL11.glShadeModel(mode);
@@ -19,16 +22,21 @@ public class GlLightColorTracker {
 		GL11.glClear(mask);
 	}
 
-	public static void glBlendFunc(int a, int b) {
+	public static void glBlendFunc(int sFactor, int dFactor) {
+		if (sFactor == S_FACTOR && dFactor == D_FACTOR) {
+			return;
+		}
+
 		GlStateTracker.flushDrawState();
-		GL11.glBlendFunc(a, b);
+		S_FACTOR = sFactor;
+		D_FACTOR = dFactor;
 	}
 
 	public static void glColor3f(float red, float green, float blue) {
 		int color = ColorBGRManager.packColor(red, green, blue) | LAST_COLOR & 0xFF_000000;
 
 		if (color != LAST_COLOR || GlStateTracker.SKIP_CACHE) {
-			LAST_COLOR = color;
+			LAST_COLOR = color | LAST_COLOR & 0xFF_000000;
 			GlStateTracker.flushDrawState();
 			GL11.glColor3f(red, green, blue);
 		}

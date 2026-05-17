@@ -84,7 +84,7 @@ public class TerrainFormat extends GlVertexFormat {
 	}
 
 	// skylight << 20 | blocklight << 4
-	private static int compressLightmap(int lightmap) {
+	public static int compressLightmap(int lightmap) {
 		int skyLight4 = (lightmap >>> 20) & 0xF;
 		int blockLight4 = (lightmap & 0xF0);
 

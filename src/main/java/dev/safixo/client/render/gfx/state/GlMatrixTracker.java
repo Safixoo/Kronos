@@ -1,9 +1,8 @@
 package dev.safixo.client.render.gfx.state;
 
-import dev.safixo.client.render.gfx.util.GpuFlags;
 import dev.safixo.client.util.Matrix4Stack;
+import dev.safixo.client.util.memory.NativeBuffer;
 import org.joml.Matrix4f;
-import org.lwjgl.opengl.EXTDirectStateAccess;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.util.glu.Project;
 
@@ -20,30 +19,44 @@ public class GlMatrixTracker {
 	public static int MAT_MODE = GL11.GL_PROJECTION_MATRIX;
 	private static final Matrix4f MATRIX = new Matrix4f();
 
+	public static final boolean EMULATE_STACK = true;
+	private static boolean STACK_CHANGED = true;
+
 	public static void gluPerspective(float fovy, float aspect, float zNear, float zFar) {
 		CURRENT_STACK.top().mul(MATRIX.setPerspective((float) Math.toRadians(fovy), aspect, zNear, zFar));
-		Project.gluPerspective(fovy, aspect, zNear, zFar);
+		STACK_CHANGED = true;
+
+		if (!EMULATE_STACK) {
+			Project.gluPerspective(fovy, aspect, zNear, zFar);
+		}
 	}
 
 	public static void glOrtho(double left, double right, double bottom, double top, double zNear, double zFar) {
 		GlStateTracker.flushDrawState();
 		CURRENT_STACK.top().ortho((float) left, (float) right, (float) bottom, (float) top, (float) zNear, (float) zFar);
-		GL11.glOrtho(left, right, bottom, top, zNear, zFar);
+		STACK_CHANGED = true;
+
+		if (!EMULATE_STACK) {
+			GL11.glOrtho(left, right, bottom, top, zNear, zFar);
+		}
 	}
 
 	public static void glFrustum(double left, double right, double bottom, double top, double zNear, double zFar) {
 		GlStateTracker.flushDrawState();
 		CURRENT_STACK.top().frustum((float) left, (float) right, (float) bottom, (float) top, (float) zNear, (float) zFar);
-		GL11.glFrustum(left, right, bottom, top, zNear, zFar);
+		STACK_CHANGED = true;
+
+		if (!EMULATE_STACK) {
+			GL11.glFrustum(left, right, bottom, top, zNear, zFar);
+		}
 	}
 
 	public static void glPushMatrix() {
 		GlStateTracker.flushDrawState();
 		CURRENT_STACK.push();
+		STACK_CHANGED = true;
 
-		if (GpuFlags.EXT_DSA) {
-			EXTDirectStateAccess.glMatrixPushEXT(MAT_MODE);
-		} else {
+		if (!EMULATE_STACK) {
 			GL11.glPushMatrix();
 		}
 	}
@@ -51,31 +64,38 @@ public class GlMatrixTracker {
 	public static void glPopMatrix() {
 		GlStateTracker.flushDrawState();
 		CURRENT_STACK.pop();
+		STACK_CHANGED = true;
 
-		if (GpuFlags.EXT_DSA) {
-			EXTDirectStateAccess.glMatrixPopEXT(MAT_MODE);
-		} else {
+		if (!EMULATE_STACK) {
 			GL11.glPopMatrix();
+		}
+	}
+
+	private static final FloatBuffer BUFFER = NativeBuffer.memAllocFloat(16);
+
+	public static void loadCurrentMatrix() {
+		if (EMULATE_STACK && STACK_CHANGED) {
+			STACK_CHANGED = false;
+			GL11.glLoadMatrix(GlMatrixTracker.CURRENT_STACK.top().get(BUFFER));
 		}
 	}
 
 	public static void glMatrixMode(int mode) {
 		if (MAT_MODE != mode || GlStateTracker.SKIP_CACHE) {
+			loadCurrentMatrix();
 			GlStateTracker.flushDrawState();
 
 			if (mode == GL11.GL_PROJECTION) {
 				CURRENT_STACK = PROJECTION_STACK;
-			}
-			else if (mode == GL11.GL_MODELVIEW) {
+			} else if (mode == GL11.GL_MODELVIEW) {
 				CURRENT_STACK = MODEL_VIEW_STACK;
-			}
-			else if (mode == GL11.GL_TEXTURE) {
+			} else if (mode == GL11.GL_TEXTURE) {
 				CURRENT_STACK = TEXTURE_STACK;
-			}
-			else {
+			} else {
 				CURRENT_STACK = NULL_STACK;
 			}
 
+			STACK_CHANGED = true;
 			MAT_MODE = mode;
 			GL11.glMatrixMode(mode);
 		}
@@ -84,10 +104,9 @@ public class GlMatrixTracker {
 	public static void glLoadIdentity() {
 		GlStateTracker.flushDrawState();
 		CURRENT_STACK.top().identity();
+		STACK_CHANGED = true;
 
-		if (GpuFlags.EXT_DSA) {
-			EXTDirectStateAccess.glMatrixLoadIdentityEXT(MAT_MODE);
-		} else {
+		if (!EMULATE_STACK) {
 			GL11.glLoadIdentity();
 		}
 	}
@@ -95,21 +114,19 @@ public class GlMatrixTracker {
 	public static void glLoadMatrix(FloatBuffer matrix) {
 		GlStateTracker.flushDrawState();
 		CURRENT_STACK.top().set(matrix);
+		STACK_CHANGED = true;
 
-		if (GpuFlags.EXT_DSA) {
-			EXTDirectStateAccess.glMatrixLoadEXT(MAT_MODE, matrix);
-		} else {
-			GL11.glMultMatrix(matrix);
+		if (!EMULATE_STACK) {
+			GL11.glLoadMatrix(matrix);
 		}
 	}
 
 	public static void glMultMatrix(FloatBuffer matrix) {
 		GlStateTracker.flushDrawState();
 		CURRENT_STACK.top().mul(MATRIX.set(matrix));
+		STACK_CHANGED = true;
 
-		if (GpuFlags.EXT_DSA) {
-			EXTDirectStateAccess.glMatrixMultEXT(MAT_MODE, matrix);
-		} else {
+		if (!EMULATE_STACK) {
 			GL11.glMultMatrix(matrix);
 		}
 	}
@@ -125,10 +142,9 @@ public class GlMatrixTracker {
 	public static void glScalef(float x, float y, float z) {
 		GlStateTracker.flushDrawState();
 		CURRENT_STACK.top().scale(x, y, z);
+		STACK_CHANGED = true;
 
-		if (GpuFlags.EXT_DSA) {
-			EXTDirectStateAccess.glMatrixScalefEXT(MAT_MODE, x, y, z);
-		} else {
+		if (!EMULATE_STACK) {
 			GL11.glScalef(x, y, z);
 		}
 	}
@@ -146,22 +162,19 @@ public class GlMatrixTracker {
 
 		// the angle passed in glRotatef is in degrees but JOML accepts in radians.
 		CURRENT_STACK.top().rotate(angle * 3.14159265358979f / 180.0f, x, y, z);
+		STACK_CHANGED = true;
 
-		if (GpuFlags.EXT_DSA) {
-			EXTDirectStateAccess.glMatrixRotatefEXT(MAT_MODE, angle, x, y, z);
-		} else {
+		if (!EMULATE_STACK) {
 			GL11.glRotatef(angle, x, y, z);
 		}
 	}
 
 	public static void glTranslatef(float x, float y, float z) {
 		GlStateTracker.flushDrawState();
-
 		CURRENT_STACK.top().translate(x, y, z);
+		STACK_CHANGED = true;
 
-		if (GpuFlags.EXT_DSA) {
-			EXTDirectStateAccess.glMatrixTranslatefEXT(MAT_MODE, x, y, z);
-		} else {
+		if (!EMULATE_STACK) {
 			GL11.glTranslatef(x, y, z);
 		}
 	}

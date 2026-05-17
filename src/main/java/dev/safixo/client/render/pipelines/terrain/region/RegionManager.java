@@ -1,6 +1,5 @@
 package dev.safixo.client.render.pipelines.terrain.region;
 
-import dev.safixo.client.render.pipelines.terrain.region.allocation.NewRegionAllocator;
 import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.objects.*;
@@ -80,11 +79,6 @@ public class RegionManager {
 		if (RegionAllocation.SPARE_BUFFER != null) {
 			RegionAllocation.SPARE_BUFFER.delete();
 			RegionAllocation.SPARE_BUFFER = null;
-		}
-
-		if (NewRegionAllocator.COPY_BUFFER != null) {
-			NewRegionAllocator.COPY_BUFFER.delete();
-			NewRegionAllocator.COPY_BUFFER = null;
 		}
 
 		this.regionMap.clear();

@@ -4,35 +4,33 @@ import dev.safixo.client.render.gfx.util.GpuFlags;
 import dev.safixo.client.util.memory.NativeBuffer;
 import dev.safixo.client.util.memory.UnsafeUtil;
 import org.lwjgl.opengl.EXTDirectStateAccess;
-import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL15;
+import org.lwjgl.opengl.GL30;
+import org.lwjgl.opengl.GL43;
 
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
 
-public class GlVertexBuffer implements GlBuffer {
+public class GlShaderStorageBuffer implements GlBuffer {
 	private int id;
 	private int hint = GL15.GL_STATIC_DRAW;
 	private int capacity;
+	private int bindingIndex;
 
-	public GlVertexBuffer(int hint) {
+	public GlShaderStorageBuffer(int hint, int bindingIndex) {
 		this.id = GL15.glGenBuffers();
 		this.setHint(hint);
+		this.setBindingIndex(bindingIndex);
 	}
 
-	public GlVertexBuffer(int size, int hint) {
-		this(hint);
+	public GlShaderStorageBuffer(int size, int bindingIndex, int hint) {
+		this(hint, bindingIndex);
 		this.allocate(UnsafeUtil.NULL, size);
 	}
 
 	@Override
 	public int getHandle() {
 		return this.id;
-	}
-
-	@Override
-	public int getCapacity() {
-		return this.capacity;
 	}
 
 	public void allocate(long vertexData, int size) {
@@ -42,18 +40,13 @@ public class GlVertexBuffer implements GlBuffer {
 			ByteBuffer vertexDataBuffer = NativeBuffer.wrap(vertexData);
 			((Buffer) vertexDataBuffer).limit(size);
 
-			GL15.glBufferData(GL15.GL_ARRAY_BUFFER, vertexDataBuffer, this.hint);
+			GL15.glBufferData(GL43.GL_SHADER_STORAGE_BUFFER, vertexDataBuffer, this.hint);
 		} else {
-			GL15.glBufferData(GL15.GL_ARRAY_BUFFER, size, this.hint);
+			GL15.glBufferData(GL43.GL_SHADER_STORAGE_BUFFER, size, this.hint);
 		}
 
 		this.capacity = size;
 		this.unbind();
-	}
-
-	public void bufferSubData(long vertexData, int offset, int size) {
-		ByteBuffer vertexDataBuffer = NativeBuffer.wrap(vertexData);
-		this.bufferSubData(vertexDataBuffer, offset, size);
 	}
 
 	public void bufferData(ByteBuffer buffer, int size) {
@@ -63,7 +56,7 @@ public class GlVertexBuffer implements GlBuffer {
 			EXTDirectStateAccess.glNamedBufferDataEXT(this.id, buffer, this.hint);
 		} else {
 			this.bind();
-			GL15.glBufferData(GL15.GL_ARRAY_BUFFER, buffer, this.hint);
+			GL15.glBufferData(GL43.GL_SHADER_STORAGE_BUFFER, buffer, this.hint);
 		}
 	}
 
@@ -74,21 +67,21 @@ public class GlVertexBuffer implements GlBuffer {
 			EXTDirectStateAccess.glNamedBufferSubDataEXT(this.id, offset, buffer);
 		} else {
 			this.bind();
-			GL15.glBufferSubData(GL15.GL_ARRAY_BUFFER, offset, buffer);
-			this.unbind();
+			GL15.glBufferSubData(GL43.GL_SHADER_STORAGE_BUFFER, offset, buffer);
 		}
-	}
-
-	public void draw(int vertices, int first) {
-		GL11.glDrawArrays(GL11.GL_QUADS, first, vertices);
-	}
-
-	public void draw(int drawMode, int vertices, int first) {
-		GL11.glDrawArrays(drawMode, first, vertices);
 	}
 
 	public void setHint(int hint) {
 		this.hint = hint;
+	}
+
+	public void setBindingIndex(int index) {
+		this.bindingIndex = index;
+	}
+
+	@Override
+	public int getCapacity() {
+		return this.capacity;
 	}
 
 	public void clear() {
@@ -104,11 +97,15 @@ public class GlVertexBuffer implements GlBuffer {
 		this.id = -1;
 	}
 
+	public void bindBase() {
+		GL30.glBindBufferBase(GL43.GL_SHADER_STORAGE_BUFFER, this.bindingIndex, this.id);
+	}
+
 	public void bind() {
-		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, this.id);
+		GL15.glBindBuffer(GL43.GL_SHADER_STORAGE_BUFFER, this.id);
 	}
 
 	public void unbind() {
-		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
+		GL15.glBindBuffer(GL43.GL_SHADER_STORAGE_BUFFER, 0);
 	}
 }

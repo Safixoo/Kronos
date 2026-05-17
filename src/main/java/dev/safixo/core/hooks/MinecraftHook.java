@@ -2,6 +2,8 @@ package dev.safixo.core.hooks;
 
 import dev.safixo.client.render.ImprovedTessellator;
 import dev.safixo.client.render.gfx.state.GlMatrixTracker;
+import dev.safixo.client.render.gfx.state.GlTextureTracker;
+import dev.safixo.client.render.pipelines.entity_model.ModelQueue;
 import dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache;
 import dev.safixo.client.util.ClientChunkListener;
 import dev.safixo.client.util.Direction;
@@ -16,6 +18,8 @@ import net.minecraft.client.multiplayer.WorldClient;
 import net.minecraft.client.renderer.EntityRenderer;
 import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.Tessellator;
+import net.minecraft.client.renderer.entity.Render;
+import net.minecraft.entity.Entity;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
@@ -33,12 +37,54 @@ public class MinecraftHook {
 	public static final Field LIGHTMAP_RESOURCE = HookUtils.getField(EntityRenderer.class,
 		"locationLightMap", "field_110922_T");
 
+
+	public static String PROFILING_TARGET;
+	public static boolean FAST_ENTITY_PATH = false;
+	public static int ENTITY_TEX;
+
+	public static Thread MAIN_THREAD;
+
 	public static void checkGLError(Minecraft minecraft, String str) {
 		if (!PrimitivesFlags.DETECTED) {
 			PrimitivesFlags.processDevInfo();
 		}
 
 		// NO-OP
+	}
+
+	public static void bindTexture(Render render, ResourceLocation resource) {
+		if (MinecraftHook.FAST_ENTITY_PATH) {
+			int texture = ModelQueue.MODEL_QUEUE.resourceToTex.getInt(resource);
+
+			if (texture == 0) {
+				Minecraft.getMinecraft().renderEngine.bindTexture(resource);
+				ModelQueue.MODEL_QUEUE.resourceToTex.put(resource, GlTextureTracker.TEXTURE_PER_UNIT[0]);
+			}
+
+			ENTITY_TEX = ModelQueue.MODEL_QUEUE.resourceToTex.getInt(resource);
+			return;
+		}
+
+		Minecraft.getMinecraft().renderEngine.bindTexture(resource);
+	}
+
+	public static void setProfilerTarget(String prof) {
+		if (Thread.currentThread() != MAIN_THREAD) {
+			return;
+		}
+
+		boolean fastPath = FAST_ENTITY_PATH;
+
+		FAST_ENTITY_PATH = prof.equals("entities") && PROFILING_TARGET.equals("global");
+		PROFILING_TARGET = prof;
+
+		if (fastPath && !FAST_ENTITY_PATH) {
+			ModelQueue.MODEL_QUEUE.drawAllQueue();
+		}
+
+		if (!fastPath && FAST_ENTITY_PATH) {
+			ModelQueue.MODEL_QUEUE.viewMatrix = new Matrix4f(GlMatrixTracker.MODEL_VIEW_STACK.top()).invert();
+		}
 	}
 
 	private static final int TOP_NORMAL = MathExt.packedNormal(0.0F, 1.0F, 0.0F);
