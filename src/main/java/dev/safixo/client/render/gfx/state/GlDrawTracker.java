@@ -28,10 +28,6 @@ public class GlDrawTracker {
 	public static int LAST_TARGET = -1;
 	public static float MU, MV;
 
-	static {
-		Arrays.fill(TEXTURING, true);
-	}
-
 	public static void glTurnCulling(boolean state) {
 		GlBooleanTracker.setState(GL11.GL_CULL_FACE, state);
 	}
@@ -49,15 +45,15 @@ public class GlDrawTracker {
 			return;
 		}
 
-		if (GlBooleanTracker.isEnabled(GL11.GL_LIGHTING) != LIGHTING) {
+		if (GlBooleanTracker.isEnabled(GL11.GL_LIGHTING) != LIGHTING && GlBooleanTracker.isStateKnown(GL11.GL_LIGHTING)) {
 			LIGHTING = GlBooleanTracker.isEnabled(GL11.GL_LIGHTING);
 			setState(GL11.GL_LIGHTING, LIGHTING);
 		}
-		if (GlBooleanTracker.isEnabled(GL11.GL_BLEND) != BLENDING) {
+		if (GlBooleanTracker.isEnabled(GL11.GL_BLEND) != BLENDING && GlBooleanTracker.isStateKnown(GL11.GL_BLEND)) {
 			BLENDING = GlBooleanTracker.isEnabled(GL11.GL_BLEND);
 			setState(GL11.GL_BLEND, BLENDING);
 		}
-		if (GlBooleanTracker.isEnabled(GL11.GL_CULL_FACE) != CULLING) {
+		if (GlBooleanTracker.isEnabled(GL11.GL_CULL_FACE) != CULLING && GlBooleanTracker.isStateKnown(GL11.GL_CULL_FACE)) {
 			CULLING = GlBooleanTracker.isEnabled(GL11.GL_CULL_FACE);
 			setState(GL11.GL_CULL_FACE, CULLING);
 		}
@@ -73,13 +69,11 @@ public class GlDrawTracker {
 	}
 
 	public static void checkMismatchTexturing(int unit) {
-		if (unit < 0 || GlTextureTracker.ENABLED_TEXTURES[unit] != TEXTURING[unit]) {
+		if (GlTextureTracker.ENABLED_TEXTURES[unit] != TEXTURING[unit]) {
+			TEXTURING[unit] = GlTextureTracker.ENABLED_TEXTURES[unit];
 			GlTextureTracker.assertActiveTexture();
 
-			if (unit >= 0) {
-				TEXTURING[unit] = GlTextureTracker.ENABLED_TEXTURES[unit];
-			}
-			setState(GL11.GL_TEXTURE_2D, unit < 0 || TEXTURING[unit]);
+			setState(GL11.GL_TEXTURE_2D, TEXTURING[unit]);
 		}
 	}
 

@@ -9,8 +9,8 @@ import java.util.Arrays;
 
 @SuppressWarnings("unused")
 public class GlTextureTracker {
-	public static int ACTIVE_UNIT = -1;
-	public static int BINDED_UNIT = -1;
+	public static int ACTIVE_UNIT = 0;
+	public static int BINDED_UNIT = 0;
 
 	public static final int[] TEXTURE_PER_UNIT = new int[GL13.GL_TEXTURE31 - GL13.GL_TEXTURE0 + 1];
 	public static final boolean[] ENABLED_TEXTURES = new boolean[GL13.GL_TEXTURE31 - GL13.GL_TEXTURE0 + 1];
@@ -54,10 +54,6 @@ public class GlTextureTracker {
 		}
 	}
 
-	static {
-		Arrays.fill(ENABLED_TEXTURES, true);
-	}
-
 	public static void glTurnTexturing(boolean state) {
 		if (GlStateTracker.SKIP_CACHE) {
 			GlStateTracker.flushDrawState();
@@ -70,9 +66,7 @@ public class GlTextureTracker {
 			}
 		}
 
-		if (ACTIVE_UNIT >= 0) {
-			ENABLED_TEXTURES[ACTIVE_UNIT] = state;
-		}
+		ENABLED_TEXTURES[ACTIVE_UNIT] = state;
 	}
 
 	// Only change the active texture when there is an operation that
@@ -90,7 +84,7 @@ public class GlTextureTracker {
 
 	public static void assertActiveTexture(int target) {
 		if (target != BINDED_UNIT) {
-			GlDrawTracker.checkMismatchTexturing(target);
+			GlDrawTracker.checkMismatchTexturing(BINDED_UNIT);
 
 			BINDED_UNIT = target;
 			GL13.glActiveTexture(BINDED_UNIT + GL13.GL_TEXTURE0);
@@ -98,15 +92,17 @@ public class GlTextureTracker {
 	}
 
 	public static void glBindTexture(int target, int texture) {
-		if (GlStateTracker.SKIP_CACHE || ACTIVE_UNIT < 0) {
+		if (GlStateTracker.SKIP_CACHE) {
 			assertActiveTexture();
 
+			GlDrawTracker.checkMismatchTexturing(GlTextureTracker.ACTIVE_UNIT);
 			GlStateTracker.flushDrawState();
 			GL11.glBindTexture(target, texture);
 		} else if (texture != TEXTURE_PER_UNIT[ACTIVE_UNIT]) {
 			assertActiveTexture();
 
 			TEXTURE_PER_UNIT[ACTIVE_UNIT] = texture;
+			GlDrawTracker.checkMismatchTexturing(GlTextureTracker.ACTIVE_UNIT);
 			GlStateTracker.flushDrawState();
 			GL11.glBindTexture(target, texture);
 		}

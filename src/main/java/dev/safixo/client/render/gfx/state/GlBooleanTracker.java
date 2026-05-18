@@ -19,8 +19,8 @@ public class GlBooleanTracker {
 		Arrays.fill(CAP_BITS, UNDEFINED);
 	}
 
-	public static boolean isStateUnknown(int cap) {
-		return CAP_BITS[cap] == UNDEFINED;
+	public static boolean isStateKnown(int cap) {
+		return CAP_BITS[cap] != UNDEFINED;
 	}
 
 	public static boolean isEnabled(int cap) {
@@ -68,11 +68,6 @@ public class GlBooleanTracker {
 			return;
 		}
 
-		if (cap == GL11.GL_TEXTURE_2D) {
-			GlTextureTracker.glTurnTexturing(true);
-			return;
-		}
-
 		if (!isEnabled(cap) || GlStateTracker.SKIP_CACHE) {
 			setState(cap, true);
 
@@ -83,11 +78,6 @@ public class GlBooleanTracker {
 
 	public static void glDisable(int cap) {
 		if (isRasterState(cap, false)) {
-			return;
-		}
-
-		if (cap == GL11.GL_TEXTURE_2D) {
-			GlTextureTracker.glTurnTexturing(false);
 			return;
 		}
 
