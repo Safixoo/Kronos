@@ -84,7 +84,7 @@ public class KronosTransformer implements IClassTransformer {
 				replaceClassMethod(MINECRAFT_HOOK, "bindTexture", "a", "(D)V", reference, true);
 				break;
 			case STRING_TRANSLATE: case DATA_WATCHER: case TEXTURE_MANAGER:
-				changeHashMap(reference);
+//				changeHashMap(reference);
 				break;
 			case PROFILER:
 				setFieldInProfiling(reference, "", "");
@@ -394,6 +394,10 @@ public class KronosTransformer implements IClassTransformer {
 		addFunction("GlLightColorTracker", "glBlendFunc");
 		addFunction("GlLightColorTracker", "glShadeModel");
 		addFunction("GlLightColorTracker", "glClear");
+		addFunction("GlLightColorTracker", "glLight");
+		addFunction("GlLightColorTracker", "glLightf");
+		addFunction("GlLightColorTracker", "glLighti");
+		addFunction("GlLightColorTracker", "glLightModel");
 
 		addFunction("GlDrawTracker", "glNewList");
 		addFunction("GlDrawTracker", "glEndList");

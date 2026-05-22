@@ -1,11 +1,8 @@
 package dev.safixo.client.render.gfx.state;
 
-import dev.safixo.core.hooks.MinecraftHook;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
 import org.lwjgl.opengl.GL30;
-
-import java.util.Arrays;
 
 @SuppressWarnings("unused")
 public class GlTextureTracker {
@@ -54,55 +51,33 @@ public class GlTextureTracker {
 		}
 	}
 
-	public static void glTurnTexturing(boolean state) {
-		if (GlStateTracker.SKIP_CACHE) {
-			GlStateTracker.flushDrawState();
-			assertActiveTexture();
-
-			if (state) {
-				GL11.glEnable(GL11.GL_TEXTURE_2D);
-			} else {
-				GL11.glDisable(GL11.GL_TEXTURE_2D);
-			}
-		}
-
-		ENABLED_TEXTURES[ACTIVE_UNIT] = state;
-	}
-
 	// Only change the active texture when there is an operation that
 	// uses the active texture.
-	public static void glActiveTexture(int texture) {
+	public static void glActiveTexture(int target) {
 		if (GlStateTracker.SKIP_CACHE) {
 			assertActiveTexture();
 		}
-		ACTIVE_UNIT = texture - GL13.GL_TEXTURE0;
+		ACTIVE_UNIT = target - GL13.GL_TEXTURE0;
 	}
+
 
 	public static void assertActiveTexture() {
-		assertActiveTexture(ACTIVE_UNIT);
-	}
+		if (ACTIVE_UNIT != BINDED_UNIT) {
+			GlDrawTracker.checkMismatchEnabledTexture(BINDED_UNIT);
 
-	public static void assertActiveTexture(int target) {
-		if (target != BINDED_UNIT) {
-			GlDrawTracker.checkMismatchTexturing(BINDED_UNIT);
-
-			BINDED_UNIT = target;
+			BINDED_UNIT = ACTIVE_UNIT;
 			GL13.glActiveTexture(BINDED_UNIT + GL13.GL_TEXTURE0);
 		}
 	}
 
 	public static void glBindTexture(int target, int texture) {
-		if (GlStateTracker.SKIP_CACHE) {
-			assertActiveTexture();
-
-			GlDrawTracker.checkMismatchTexturing(GlTextureTracker.ACTIVE_UNIT);
-			GlStateTracker.flushDrawState();
-			GL11.glBindTexture(target, texture);
-		} else if (texture != TEXTURE_PER_UNIT[ACTIVE_UNIT]) {
-			assertActiveTexture();
-
+		if (GlStateTracker.SKIP_CACHE || texture != TEXTURE_PER_UNIT[ACTIVE_UNIT]) {
 			TEXTURE_PER_UNIT[ACTIVE_UNIT] = texture;
-			GlDrawTracker.checkMismatchTexturing(GlTextureTracker.ACTIVE_UNIT);
+
+			GlDrawTracker.checkMismatchEnabledTexture(GlTextureTracker.BINDED_UNIT);
+			assertActiveTexture();
+			GlDrawTracker.checkMismatchEnabledTexture(GlTextureTracker.ACTIVE_UNIT);
+
 			GlStateTracker.flushDrawState();
 			GL11.glBindTexture(target, texture);
 		}

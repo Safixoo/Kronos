@@ -1,7 +1,14 @@
 package dev.safixo.client.render.gfx.state;
 
 import dev.safixo.client.util.ColorBGRManager;
+import org.lwjgl.BufferChecks;
+import org.lwjgl.MemoryUtil;
+import org.lwjgl.opengl.ContextCapabilities;
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GLContext;
+
+import java.nio.FloatBuffer;
+import java.nio.IntBuffer;
 
 @SuppressWarnings("unused")
 public class GlLightColorTracker {
@@ -72,8 +79,40 @@ public class GlLightColorTracker {
 		}
 	}
 
-	public static void glColorMask(boolean red, boolean green, boolean blue, boolean alpha) {
+ 	public static void glColorMask(boolean red, boolean green, boolean blue, boolean alpha) {
 		GlStateTracker.flushDrawState();
 		GL11.glColorMask(red, green, blue, alpha);
+	}
+
+	public static void glLight(int light, int pname, IntBuffer params) {
+		GL11.glLight(light, pname, params);
+	}
+
+	public static void glLight(int light, int pname, FloatBuffer params) {
+		GL11.glLight(light, pname, params);
+	}
+
+	public static void glLighti(int light, int pname, int params) {
+		GL11.glLighti(light, pname, params);
+	}
+
+	public static void glLightf(int light, int pname, float params) {
+		GL11.glLightf(light, pname, params);
+	}
+
+	public static void glLightModel(int pname, IntBuffer params) {
+		GL11.glLightModel(pname, params);
+	}
+
+	public static void glLightModel(int pname, FloatBuffer params) {
+		GL11.glLightModel(pname, params);
+	}
+
+	public static void glLightModeli(int pname, int params) {
+		GL11.glLightModeli(pname, params);
+	}
+
+	public static void glLightModelf(int pname, float params) {
+		GL11.glLightModelf(pname, params);
 	}
 }

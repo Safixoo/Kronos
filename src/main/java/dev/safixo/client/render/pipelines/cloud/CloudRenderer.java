@@ -1,8 +1,10 @@
 package dev.safixo.client.render.pipelines.cloud;
 
+import dev.safixo.client.render.ImprovedTessellator;
 import dev.safixo.client.render.gfx.buffer.GlVertexBuffer;
 import dev.safixo.client.render.gfx.state.GlFogTracker;
 import dev.safixo.client.render.gfx.util.RenderBuffer;
+import dev.safixo.client.render.gfx.vertex.GlVertexArrayObject;
 import dev.safixo.client.render.pipelines.terrain.cull.FrustumCuller;
 import dev.safixo.client.util.ColorBGRManager;
 import dev.safixo.client.util.Direction;
@@ -47,9 +49,7 @@ public class CloudRenderer {
 
 	private static final int[] CLOUD_TEX_COLOR = new int[256 * 256];
 
-	private static final float CULL_Y = CLOUD_HEIGHT + 1;
-
-	private static RenderBuffer VERTEX_BUFFER;
+	private static GlVertexArrayObject VERTEX_ARRAY;
 	private static CloudProgram CLOUD_SHADER;
 
 	private static Field CLOUD_TICK_COUNTER;
@@ -106,8 +106,8 @@ public class CloudRenderer {
 		writer.startDrawing();
 		writer.setVertexFormat(DefaultVertexFormats.CLOUD_FORMAT);
 
-		if (VERTEX_BUFFER == null) {
-			VERTEX_BUFFER = new RenderBuffer(DefaultVertexFormats.CLOUD_FORMAT, 0, GL15.GL_STATIC_DRAW);
+		if (VERTEX_ARRAY == null) {
+			VERTEX_ARRAY = new GlVertexArrayObject(DefaultVertexFormats.CLOUD_FORMAT);
 		}
 
 		if (CLOUD_SHADER == null) {
@@ -127,11 +127,7 @@ public class CloudRenderer {
 	}
 
 	private static int getCloudTickCounter(RenderGlobal renderGlobal) {
-		try {
-			return (Integer) CLOUD_TICK_COUNTER.get(renderGlobal);
-		} catch (Exception e) {
-			throw new RuntimeException(e);
-		}
+		return (Integer) HookUtils.getFieldValue(CLOUD_TICK_COUNTER, renderGlobal);
 	}
 
 	public static void renderCloudsFancy(float partialTick) {
@@ -175,7 +171,6 @@ public class CloudRenderer {
 		float worldFracZ = (float) (worldZ - worldFloorZ);
 
 		VertexWriter writer = VertexWriter.getCurrentInstance();
-		RenderBuffer buffer = VERTEX_BUFFER;
 
 		FrustumCuller.prepareCloudFrustum(worldFracX, viewY, worldFracZ);
 
@@ -183,7 +178,7 @@ public class CloudRenderer {
 		buildGeometry(writer, cellDistance, worldFracX, worldFracZ, worldFloorX, worldFloorZ, viewY);
 
 		// Upload the geometry.
-		buffer.getVertexBuffer().bufferData(writer.getWriterNio(), writer.getOffset());
+		ImprovedTessellator.INSTANCE.getVertexBuffer().bufferData(writer.getWriterNio(), writer.getOffset());
 
 		// Draw the clouds.
 		drawClouds(writer.getVertices(), worldFracX, viewY, worldFracZ);
@@ -198,12 +193,10 @@ public class CloudRenderer {
 		GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
 
 		CLOUD_SHADER.setOffset(-worldFracX - MAX_CELL_DISTANCE, viewY, -worldFracZ - MAX_CELL_DISTANCE);
-		VERTEX_BUFFER.bindState(true);
+		VERTEX_ARRAY.bind(ImprovedTessellator.INSTANCE.getVertexBuffer());
 
-		GlVertexBuffer vertexBuffer = VERTEX_BUFFER.getVertexBuffer();
+		GlVertexBuffer vertexBuffer = ImprovedTessellator.INSTANCE.getVertexBuffer();
 		vertexBuffer.draw(vertices, 0);
-
-		VERTEX_BUFFER.bindState(false);
 
 		GL11.glDisable(GL11.GL_BLEND);
 		GL11.glEnable(GL11.GL_ALPHA_TEST);

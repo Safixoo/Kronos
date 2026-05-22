@@ -44,19 +44,17 @@ public class GlBooleanTracker {
 			return false;
 		}
 
-		if (cap == GL11.GL_CULL_FACE) {
-			GlDrawTracker.glTurnCulling(state);
-			return true;
-		} else if (cap == GL11.GL_BLEND) {
-			GlDrawTracker.glTurnBlending(state);
-			return true;
-		} else if (cap == GL11.GL_LIGHTING) {
-			GlDrawTracker.glTurnLighting(state);
+		if (cap == GL11.GL_CULL_FACE || cap == GL11.GL_BLEND || cap == GL11.GL_LIGHTING) {
+			if (GlBooleanTracker.isEnabled(cap) != state) {
+				GlStateTracker.flushDrawState();
+			}
+			GlBooleanTracker.setState(cap, state);
 			return true;
 		} else if (cap == GL11.GL_TEXTURE_2D) {
-			GlTextureTracker.glTurnTexturing(state);
-			return true;
-		} else if (cap == GL12.GL_RESCALE_NORMAL) {
+			if (GlBooleanTracker.isEnabled(cap) != state) {
+				GlStateTracker.flushDrawState();
+			}
+			GlTextureTracker.ENABLED_TEXTURES[GlTextureTracker.ACTIVE_UNIT] = state;
 			return true;
 		}
 
@@ -69,6 +67,10 @@ public class GlBooleanTracker {
 		}
 
 		if (!isEnabled(cap) || GlStateTracker.SKIP_CACHE) {
+			if (cap == GL12.GL_RESCALE_NORMAL && GlMatrixTracker.MAT_MODE == GL11.GL_MODELVIEW) {
+				GlMatrixTracker.loadCurrentMatrix();
+			}
+
 			setState(cap, true);
 
 			GlStateTracker.flushDrawState();

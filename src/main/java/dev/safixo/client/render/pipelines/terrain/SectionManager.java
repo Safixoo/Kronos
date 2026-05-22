@@ -226,8 +226,8 @@ public class SectionManager {
 
 		profiler.endStartSection("updatechunks");
 
-		this.queueRebuilds(this.tileEntitiesSet);
 		this.regionManager.update(this.camera, renderDistance, worldChanged);
+		this.queueRebuilds(this.tileEntitiesSet);
 
 		profiler.endStartSection("ticking");
 

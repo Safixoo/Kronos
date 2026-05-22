@@ -84,7 +84,7 @@ public class BFSCuller {
 		RegionManager regionManager = SectionManager.getRegionManager();
 		RegionRender[] regions = regionManager.getIndexedRegions(camera);
 
-		int renderDiameter = camera.renderDistance * 2 + 1 + 16;
+		int renderDiameter = camera.renderDistance * 2 + 1 + (2 << 3);
 		int regionCameraX = camera.intX >> RegionRender.BLOCK_SHIFT_X;
 		int regionCameraZ = camera.intZ >> RegionRender.BLOCK_SHIFT_Z;
 

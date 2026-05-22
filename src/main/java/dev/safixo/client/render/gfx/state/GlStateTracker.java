@@ -101,7 +101,6 @@ public class GlStateTracker {
 	}
 
 	public static void glFlush() {
-		GL11.glFlush();
 	}
 
 	public static void flushDrawState() {

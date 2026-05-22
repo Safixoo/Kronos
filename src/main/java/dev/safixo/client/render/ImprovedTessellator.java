@@ -70,6 +70,11 @@ public class ImprovedTessellator extends Tessellator {
 		}
 	}
 
+	// The vertex buffer is reused in cloud rendering, to avoid re-binding vertex-buffers
+	public GlVertexBuffer getVertexBuffer() {
+		return this.vertexBuffer;
+	}
+
 	public ImprovedTessellator() {
 		Arrays.fill(VERTEX_ARRAYS, UNDEFINED_VERTEX_ARRAY);
 	}
@@ -141,13 +146,6 @@ public class ImprovedTessellator extends Tessellator {
 		return vertexArray | offset << 24;
 	}
 
-	private ByteArrayList rasterStateList = new ByteArrayList();
-	private int draws;
-
-	private void flushAllDraws() {
-
-	}
-
 	@Override
 	public int draw() {
 		this.lastFlag = this.flags;
@@ -191,8 +189,6 @@ public class ImprovedTessellator extends Tessellator {
 	public void resize() {
 		int newCapacity = this.capacity * 2;
 		long newVertexPtr = NativeBuffer.nmemAlloc(newCapacity);
-
-		this.vertexBuffer.allocate(UnsafeUtil.NULL, newCapacity);
 
 		UnsafeUtil.memCopy(this.vertexPtr, newVertexPtr, this.offset);
 		NativeBuffer.nmemFree(this.vertexPtr);

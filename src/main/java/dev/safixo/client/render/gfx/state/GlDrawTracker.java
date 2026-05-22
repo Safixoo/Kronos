@@ -1,6 +1,8 @@
 package dev.safixo.client.render.gfx.state;
 
 import dev.safixo.client.util.memory.NativeBuffer;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiMainMenu;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
 import org.lwjgl.opengl.GL14;
@@ -9,10 +11,9 @@ import org.lwjgl.opengl.GL43;
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
-import java.util.Arrays;
 
-// Memoize the state of frequent raster states to gl calls and draw-flushing so often,
-// given that the game tends to change these states in a way that breaks batching pretty often.
+// Memoize the state of frequent raster states to reduce frequent gl calls and draw batch flushing,
+// given that the game tends to change these states in a way that breaks the batching system pretty often.
 
 // The states: DepthMask, Blending, GlCullFace, GlTexture2D, GlLighting
 @SuppressWarnings("unused")
@@ -28,18 +29,6 @@ public class GlDrawTracker {
 	public static int LAST_TARGET = -1;
 	public static float MU, MV;
 
-	public static void glTurnCulling(boolean state) {
-		GlBooleanTracker.setState(GL11.GL_CULL_FACE, state);
-	}
-
-	public static void glTurnBlending(boolean state) {
-		GlBooleanTracker.setState(GL11.GL_BLEND, state);
-	}
-
-	public static void glTurnLighting(boolean state) {
-		GlBooleanTracker.setState(GL11.GL_LIGHTING, state);
-	}
-
 	public static void flushRasterState() {
 		if (GlStateTracker.SKIP_CACHE) {
 			return;
@@ -47,18 +36,19 @@ public class GlDrawTracker {
 
 		if (GlBooleanTracker.isEnabled(GL11.GL_LIGHTING) != LIGHTING && GlBooleanTracker.isStateKnown(GL11.GL_LIGHTING)) {
 			LIGHTING = GlBooleanTracker.isEnabled(GL11.GL_LIGHTING);
-			setState(GL11.GL_LIGHTING, LIGHTING);
+			setGlState(GL11.GL_LIGHTING, LIGHTING);
 		}
 		if (GlBooleanTracker.isEnabled(GL11.GL_BLEND) != BLENDING && GlBooleanTracker.isStateKnown(GL11.GL_BLEND)) {
 			BLENDING = GlBooleanTracker.isEnabled(GL11.GL_BLEND);
-			setState(GL11.GL_BLEND, BLENDING);
+			setGlState(GL11.GL_BLEND, BLENDING);
 		}
 		if (GlBooleanTracker.isEnabled(GL11.GL_CULL_FACE) != CULLING && GlBooleanTracker.isStateKnown(GL11.GL_CULL_FACE)) {
 			CULLING = GlBooleanTracker.isEnabled(GL11.GL_CULL_FACE);
-			setState(GL11.GL_CULL_FACE, CULLING);
+			setGlState(GL11.GL_CULL_FACE, CULLING);
 		}
 
-		checkMismatchTexturing(GlTextureTracker.ACTIVE_UNIT);
+		GlTextureTracker.assertActiveTexture();
+		checkMismatchEnabledTexture(GlTextureTracker.ACTIVE_UNIT);
 
 		if (MU != GlTextureTracker.MU || MV != GlTextureTracker.MV || LAST_TARGET != GlTextureTracker.LAST_TARGET) {
 			MU = GlTextureTracker.MU;
@@ -68,16 +58,14 @@ public class GlDrawTracker {
 		}
 	}
 
-	public static void checkMismatchTexturing(int unit) {
+	public static void checkMismatchEnabledTexture(int unit) {
 		if (GlTextureTracker.ENABLED_TEXTURES[unit] != TEXTURING[unit]) {
 			TEXTURING[unit] = GlTextureTracker.ENABLED_TEXTURES[unit];
-			GlTextureTracker.assertActiveTexture();
-
-			setState(GL11.GL_TEXTURE_2D, TEXTURING[unit]);
+			setGlState(GL11.GL_TEXTURE_2D, TEXTURING[unit]);
 		}
 	}
 
-	public static void setState(int cap, boolean turn) {
+	public static void setGlState(int cap, boolean turn) {
 		if (turn) {
 			GL11.glEnable(cap);
 		} else {

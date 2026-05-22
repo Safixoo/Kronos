@@ -43,7 +43,7 @@ public class RegionManager {
 		int regionCameraX = camera.intX >> RegionRender.BLOCK_SHIFT_X;
 		int regionCameraZ = camera.intZ >> RegionRender.BLOCK_SHIFT_Z;
 
-		int renderDiameter = camera.renderDistance * 2 + 1 + 16;
+		int renderDiameter = camera.renderDistance * 2 + 1 + (2 << 3);
 
 		int factorXZ = renderDiameter >> 3;
 		int factorY = 256 >> RegionRender.BLOCK_SHIFT_Y;
@@ -54,6 +54,11 @@ public class RegionManager {
 			int regionX = region.regionX - regionCameraX + factorXZ;
 			int regionY = region.regionY;
 			int regionZ = region.regionZ - regionCameraZ + factorXZ;
+
+			// Region out-of-bounds.
+			if (regionX < 0 || regionX > factorXZ * 2 || regionZ < 0 || regionZ > factorXZ * 2) {
+				continue;
+			}
 
 			indexedRegions[regionX + (regionY + regionZ * factorY) * factorXZ] = region;
 		}
