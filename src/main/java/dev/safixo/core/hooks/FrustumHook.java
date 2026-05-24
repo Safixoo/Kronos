@@ -1,5 +1,7 @@
 package dev.safixo.core.hooks;
 
+import dev.safixo.client.render.gfx.state.GlMatrixTracker;
+import dev.safixo.client.render.gfx.state.GlStateTracker;
 import dev.safixo.client.render.pipelines.terrain.cull.FrustumCuller;
 import dev.safixo.core.HookUtils;
 import net.minecraft.client.renderer.ActiveRenderInfo;
@@ -13,18 +15,12 @@ import java.nio.FloatBuffer;
 @SuppressWarnings("unused")
 public class FrustumHook {
 	public static void init(ClippingHelperImpl clipper) {
-		FrustumCuller.modelViewBuff = (FloatBuffer) HookUtils.getFieldStatic(ActiveRenderInfo.class, "modelview", "field_74594_j");
-		FrustumCuller.projectionBuff = (FloatBuffer) HookUtils.getFieldStatic(ActiveRenderInfo.class, "projection", "field_74595_k");
+		FrustumCuller.projectionMatrix.set(GlMatrixTracker.PROJECTION_STACK.top());
+		FrustumCuller.modelViewMatrix.set(GlMatrixTracker.MODEL_VIEW_STACK.top());
 
-		((Buffer) FrustumCuller.modelViewBuff).rewind().limit(16);
-		((Buffer) FrustumCuller.projectionBuff).rewind().limit(16);
+		Matrix4f mvp = FrustumCuller.projectionMatrix.mul(FrustumCuller.modelViewMatrix, new Matrix4f());
 
-		FrustumCuller.projectionMatrix.set(FrustumCuller.projectionBuff);
-		FrustumCuller.modelViewMatrix.set(FrustumCuller.modelViewBuff);
-
-		Matrix4f combined = FrustumCuller.projectionMatrix.mul(FrustumCuller.modelViewMatrix, new Matrix4f());
-
-		FrustumCuller.processMatrices(combined);
+		FrustumCuller.processMatrices(mvp);
 	}
 
 	public static boolean isBoxInFrustum(ClippingHelper clipper, double minX, double minY, double minZ, double maxX, double maxY, double maxZ) {
