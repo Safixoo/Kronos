@@ -4,9 +4,7 @@ import dev.safixo.client.render.gfx.buffer.GlVertexBuffer;
 import dev.safixo.client.util.data.PrimitivesFlags;
 import dev.safixo.client.util.memory.NativeBuffer;
 import dev.safixo.client.util.memory.UnsafeUtil;
-import dev.safixo.client.render.gfx.state.GlStateTracker;
 import dev.safixo.core.hooks.VertexRedirector;
-import it.unimi.dsi.fastutil.bytes.ByteArrayList;
 import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.Tessellator;
 import org.lwjgl.opengl.*;
@@ -32,10 +30,10 @@ public class ImprovedTessellator extends Tessellator {
 	private static final int UNDEFINED_FORMAT = 12; // start position after position attribute.
 	private static final int UNDEFINED_VERTEX_ARRAY = -1;
 
-	public static final int VERTEX_UV     = 0b0100;
+	public static final int VERTEX_UV     = 0b1000;
 	public static final int VERTEX_COLOR  = 0b0010;
 	public static final int VERTEX_NORMAL = 0b0001;
-	public static final int VERTEX_LIGHT  = 0b1000;
+	public static final int VERTEX_LIGHT  = 0b0100;
 
 	private static final int MIN_ALLOC = 1024 * 128;
 
@@ -54,7 +52,7 @@ public class ImprovedTessellator extends Tessellator {
 	public long vertexPtr = NativeBuffer.nmemAlloc(MIN_ALLOC);
 	private ByteBuffer vertexPtrNio = NativeBuffer.wrap(this.vertexPtr);
 
-	private final int[] VERTEX_ARRAYS = new int[0b1111 + 1];
+	private final int[] vertexArrays = new int[0b1111 + 1];
 	private static final byte[] STRIDES = new byte[0b1111 + 1];
 
 	static {
@@ -76,7 +74,7 @@ public class ImprovedTessellator extends Tessellator {
 	}
 
 	public ImprovedTessellator() {
-		Arrays.fill(VERTEX_ARRAYS, UNDEFINED_VERTEX_ARRAY);
+		Arrays.fill(vertexArrays, UNDEFINED_VERTEX_ARRAY);
 	}
 
 	// Caches the stride and buffer state abusing the idea that each format attribute
@@ -85,7 +83,7 @@ public class ImprovedTessellator extends Tessellator {
 	// permutation possible is 16 (1 bit per attribute, 4 possibles in total => 0b1111 + 1 =>
 	// 15 + 1 (0b0000 counts)).
 	private int getVertexArray(int flags) {
-		int vertexArray = VERTEX_ARRAYS[flags];
+		int vertexArray = this.vertexArrays[flags];
 
 		if (vertexArray != UNDEFINED_VERTEX_ARRAY) {
 			return vertexArray;
@@ -95,8 +93,18 @@ public class ImprovedTessellator extends Tessellator {
 		int stride = STRIDES[flags];
 
 		GL30.glBindVertexArray(vertexArray);
-		this.vertexBuffer.bind();
 
+		this.vertexBuffer.bind();
+		setupVertexState(flags, stride);
+		this.vertexBuffer.unbind();
+
+		GL30.glBindVertexArray(0);
+		cleanupVertexState(flags);
+
+		return this.vertexArrays[flags] = vertexArray;
+	}
+
+	private static void setupVertexState(int flags, int stride) {
 		GL11.glEnableClientState(GL11.GL_VERTEX_ARRAY);
 		GL11.glVertexPointer(3, GL11.GL_FLOAT, stride, 0);
 
@@ -122,11 +130,11 @@ public class ImprovedTessellator extends Tessellator {
 
 			GL11.glEnableClientState(GL11.GL_TEXTURE_COORD_ARRAY);
 			GL11.glTexCoordPointer(2, GL11.GL_SHORT, stride, offset);
-			offset += 4;
 		}
+	}
 
-		this.vertexBuffer.unbind();
-		GL30.glBindVertexArray(0);
+	private static void cleanupVertexState(int flags) {
+		GL11.glDisableClientState(GL11.GL_VERTEX_ARRAY);
 
 		if ((flags & VERTEX_LIGHT) != 0) {
 			GL11.glDisableClientState(GL11.GL_TEXTURE_COORD_ARRAY);
@@ -141,9 +149,6 @@ public class ImprovedTessellator extends Tessellator {
 		if ((flags & VERTEX_UV) != 0) {
 			GL11.glDisableClientState(GL11.GL_TEXTURE_COORD_ARRAY);
 		}
-
-		VERTEX_ARRAYS[flags] = vertexArray | offset << 24;
-		return vertexArray | offset << 24;
 	}
 
 	@Override
@@ -177,9 +182,7 @@ public class ImprovedTessellator extends Tessellator {
 		this.lastFlag = -1;
 		this.canDraw = false;
 
-		int packedData = this.getVertexArray(flags);
-		int vertexArray = packedData & 0xFFFFF;
-
+		int vertexArray = this.getVertexArray(flags);
 		GL30.glBindVertexArray(vertexArray);
 
 		this.vertexBuffer.bufferData(this.vertexPtrNio, offset);

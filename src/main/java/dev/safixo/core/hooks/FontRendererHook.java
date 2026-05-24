@@ -1,6 +1,7 @@
 package dev.safixo.core.hooks;
 
 import dev.safixo.client.render.ImprovedTessellator;
+import dev.safixo.client.util.ColorBGRManager;
 import dev.safixo.client.util.memory.UnsafeUtil;
 import dev.safixo.core.HookUtils;
 import it.unimi.dsi.fastutil.objects.ObjectArrayFIFOQueue;
@@ -27,9 +28,7 @@ public class FontRendererHook {
 	private final ResourceLocation FONT_TEXTURE = new ResourceLocation("textures/font/ascii.png");
 	private static int FONT_TEXTURE_ID = -1;
 
-	private float r, g, b, a;
 	private int textColor, currentColor;
-
 	private boolean randomStyle, boldStyle, italicStyle, underlineStyle, strikethroughStyle, unicodeText;
 
 	private float[] charWidth;
@@ -83,33 +82,11 @@ public class FontRendererHook {
 			ALLOWED_CHARACTERS_INDEX[i] = ChatAllowedCharacters.allowedCharacters.indexOf(i);
 		}
 
-//		int handle = this.vertexArrayObject.getHandle();
-//
-//		if (handle == 0x80000000) {
-//			this.vertexArrayObject.generateHandle();
-//		}
-
 		if (FONT_TEXTURE_ID == -1) {
 			Map<?, ?> textureMap = (Map<?, ?>) HookUtils.getFieldObj(this.textureManager, "mapTextureObjects", "field_110585_a");
 			TextureObject texObj = (TextureObject) textureMap.get(FONT_TEXTURE);
 			FONT_TEXTURE_ID = texObj.getGlTextureId();
 		}
-
-//		this.vertexBuffer.allocate(UnsafeUtil.NULL, 16 * 4 * 1024);
-//
-//		{
-//			this.vertexArrayObject.bind(this.vertexBuffer);
-//			this.vertexBuffer.bind();
-//
-//			GL11.glEnableClientState(GL11.GL_VERTEX_ARRAY);
-//			GL11.glVertexPointer(2, GL11.GL_FLOAT, 16, 0);
-//
-//			GL11.glEnableClientState(GL11.GL_TEXTURE_COORD_ARRAY);
-//			GL11.glTexCoordPointer(2, GL11.GL_FLOAT, 16, 8);
-//
-//			this.vertexBuffer.unbind();
-//			this.vertexArrayObject.unbind();
-//		}
 	}
 
 	public static FontRendererHook getUsableInstance(FontRenderer renderer) {
@@ -142,9 +119,6 @@ public class FontRendererHook {
 	}
 
 	public int renderStringFast(String text, int posX, int posZ, int color, boolean margin) {
-//		this.vertexArrayObject.bind(this.vertexBuffer);
-//		VertexWriterManager.DEFAULT_INSTANCE.startDrawing();
-
 		if ((color & 0xFF000000) == 0) {
 			color |= 0xFF000000;
 		}
@@ -153,18 +127,14 @@ public class FontRendererHook {
 			color = (color & 0xFCFCFC) >> 2 | color & 0xFF000000;
 		}
 
-		this.a = (color >>> 24) * (1.0f / 255.0f);
-		this.r = (color >>> 16 & 0xFF) * (1.0f / 255.0f);
-		this.b = (color >>> 8 & 0xFF) * (1.0f / 255.0f);
-		this.g = (color >>> 0 & 0xFF) * (1.0f / 255.0f);
-		GL11.glColor4f(this.r, this.b, this.g, this.a);
 		this.currentColor = this.textColor = color;
 
 		ImprovedTessellator tes = (ImprovedTessellator) Tessellator.instance;
-		tes.startDrawing(GL11.GL_QUADS);
 
 		// Render main string.
+		tes.startDrawing(GL11.GL_QUADS);
 		float returnVal = this.renderStringAtPos(tes, posX, posZ, text, margin);
+		tes.draw();
 
 		// Draw extra styles.
 		if (!this.underlines.isEmpty() || !this.spikeThrough.isEmpty()){
@@ -177,13 +147,6 @@ public class FontRendererHook {
 			tes.draw();
 			GL11.glEnable(GL11.GL_TEXTURE_2D);
 		}
-
-		if (this.lastTexture != null || tes.isDrawing) {
-			tes.draw();
-		}
-
-		// Flush cached last texture bind.
-		this.lastTexture = null;
 
 		return (int) returnVal;
 	}
@@ -215,9 +178,7 @@ public class FontRendererHook {
 				type += 16;
 			}
 
-			int color = this.colorCode[type];
-			GL11.glColor3f((float)(color >> 16) / 255.0F, (float)(color >> 8 & 255) / 255.0F, (float)(color & 255) / 255.0F);
-			this.currentColor = color;
+			this.currentColor = this.colorCode[type];
 		} else if (type == 16) {
 			this.randomStyle = true;
 		} else if (type == 17) {
@@ -234,7 +195,6 @@ public class FontRendererHook {
 			this.strikethroughStyle = false;
 			this.underlineStyle = false;
 			this.italicStyle = false;
-			GL11.glColor3f(this.r, this.g, this.b);
 			this.currentColor = this.textColor;
 		}
 	}
@@ -252,7 +212,7 @@ public class FontRendererHook {
 				continue;
 			}
 
-			if (tes.offset + 80 > tes.capacity) {
+			if (tes.offset + 128 > tes.capacity) {
 				tes.resize();
 			}
 
@@ -321,7 +281,7 @@ public class FontRendererHook {
 		}
 	}
 
-	private static void addVertexWithUV(ImprovedTessellator tes, float x, float y, float u, float v) {
+	private static void addVertexWithUV(ImprovedTessellator tes, float x, float y, float u, float v, int color) {
 		long ptr = tes.vertexPtr + tes.offset;
 
 		UnsafeUtil.memPutFloat(ptr + 0, x);
@@ -331,9 +291,12 @@ public class FontRendererHook {
 		UnsafeUtil.memPutFloat(ptr + 12, u);
 		UnsafeUtil.memPutFloat(ptr + 16, v);
 
+		UnsafeUtil.memPutInt(ptr + 20, color);
+
 		tes.vertices++;
 		tes.flags |= ImprovedTessellator.VERTEX_UV;
-		tes.offset += 20;
+		tes.flags |= ImprovedTessellator.VERTEX_COLOR;
+		tes.offset += 24;
 	}
 
 	private void drawSpikeThrough() {
@@ -371,42 +334,26 @@ public class FontRendererHook {
 	}
 
 	private float renderDefaultChar(ImprovedTessellator tes, float posX, float posY, int textChar, boolean shouldMargin) {
-		float u = ((textChar & 15) * FONT_WIDTH);
+		float u = ((textChar & 0xF) * FONT_WIDTH);
 		float v = ((textChar >> 4) * FONT_WIDTH);
 		float margin = shouldMargin ? 1.0F : 0.0F;
 
-		bindTextureAndRender(tes, FONT_TEXTURE);
+		this.textureManager.bindTexture(FONT_TEXTURE);
 
 		float width = this.charWidth[textChar] - 0.01F - 1.0f;
 		float invTex = 1.0f / 128.0f;
 
-		addVertexWithUV(tes, posX + margin, posY, u * invTex, v * invTex);
-		addVertexWithUV(tes, posX - margin, posY + 7.99F, u * invTex, (v + 7.99F) * invTex);
-		addVertexWithUV(tes, posX + width - margin, posY + 7.99F, (u + width) * invTex, (v + 7.99F) * invTex);
-		addVertexWithUV(tes, posX + width + margin, posY, (u + width) * invTex, v * invTex);
+		int color = ColorBGRManager.rgbToBgr(this.currentColor) | 0xFF_000000;
+		addVertexWithUV(tes, posX + margin, posY, u * invTex, v * invTex, color);
+		addVertexWithUV(tes, posX - margin, posY + 7.99F, u * invTex, (v + 7.99F) * invTex, color);
+		addVertexWithUV(tes, posX + width - margin, posY + 7.99F, (u + width) * invTex, (v + 7.99F) * invTex, color);
+		addVertexWithUV(tes, posX + width + margin, posY, (u + width) * invTex, v * invTex, color);
 
 		return this.charWidth[textChar];
 	}
 
 	private void loadGlyphTexture(ImprovedTessellator tes, int par1) {
-		bindTextureAndRender(tes, getUnicodePageLocation(par1));
-	}
-
-	private void bindTextureAndRender(ImprovedTessellator tes, ResourceLocation texture) {
-		if (texture != this.lastTexture) {
-			if (this.lastTexture != null) {
-				tes.draw();
-				tes.startDrawing(GL11.GL_QUADS);
-			}
-
-			this.lastTexture = texture;
-
-			if (texture != FONT_TEXTURE) {
-				this.textureManager.bindTexture(texture);
-			} else {
-				GL11.glBindTexture(GL11.GL_TEXTURE_2D, FONT_TEXTURE_ID);
-			}
-		}
+		this.textureManager.bindTexture(getUnicodePageLocation(par1));
 	}
 
 	private float renderUnicodeChar(ImprovedTessellator tes, float posX, float posY, char unicode, boolean margin) {
@@ -428,10 +375,10 @@ public class FontRendererHook {
 
 		float invTex = 1.0f / 256.0f;
 
-		addVertexWithUV(tes, posX + marginSize, posY, u * invTex, v * invTex);
-		addVertexWithUV(tes, posX - marginSize, posY + 7.99F, u * invTex, (v + 15.98F) * invTex);
-		addVertexWithUV(tes, posX + diff / 2.0F - marginSize, posY + 7.99F, (u + diff) * invTex, (v + 15.98F) * invTex);
-		addVertexWithUV(tes, posX + diff / 2.0F + marginSize, posY, (u + diff) * invTex, v * invTex);
+		addVertexWithUV(tes, posX + marginSize, posY, u * invTex, v * invTex, this.textColor);
+		addVertexWithUV(tes, posX - marginSize, posY + 7.99F, u * invTex, (v + 15.98F) * invTex, this.textColor);
+		addVertexWithUV(tes, posX + diff / 2.0F - marginSize, posY + 7.99F, (u + diff) * invTex, (v + 15.98F) * invTex, this.textColor);
+		addVertexWithUV(tes, posX + diff / 2.0F + marginSize, posY, (u + diff) * invTex, v * invTex, this.textColor);
 
 		return (glyphLow - glyphHigh) * 0.5F + 1.0F;
 	}

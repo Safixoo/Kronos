@@ -44,7 +44,7 @@ public class GlLightColorTracker {
 		int color = ColorBGRManager.packColor(red, green, blue) | LAST_COLOR & 0xFF_000000;
 
 		if (color != LAST_COLOR || GlStateTracker.SKIP_CACHE) {
-			LAST_COLOR = color | LAST_COLOR & 0xFF_000000;
+			LAST_COLOR = color;
 			GlStateTracker.flushDrawState();
 			GL11.glColor3f(red, green, blue);
 		}
