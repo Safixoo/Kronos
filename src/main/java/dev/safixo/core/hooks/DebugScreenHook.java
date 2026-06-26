@@ -1,13 +1,13 @@
 package dev.safixo.core.hooks;
 
-import dev.safixo.client.render.pipelines.terrain.SectionManager;
+import dev.safixo.client.render.pipelines.terrain.WorldManager;
 import net.minecraft.client.gui.FontRenderer;
 
 @SuppressWarnings("unused")
 public class DebugScreenHook {
 	public static int drawStringWithShadow(FontRenderer fontRenderer, String text, int x, int y, int color) {
 		if (text.contains("Alloc")) {
-			SectionManager manager = SectionManager.getCurrentInstance();
+			WorldManager manager = WorldManager.getCurrentInstance();
 
 			int charWidth = fontRenderer.getStringWidth(text);
 			int offY = y + 80;

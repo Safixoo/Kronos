@@ -26,6 +26,10 @@ public class MathExt {
 		return realRenderDistance;
 	}
 
+	public static boolean equals(float a, float b) {
+		return Math.abs(a - b) < (1.0f / 8192.0f);
+	}
+
 	public static int nextPOT(int a) {
 		a--;
 
@@ -117,7 +121,7 @@ public class MathExt {
 
 	public static int floor(float num) {
 		int integral = (int) num;
-		return num < 0 ? integral - 1 : integral;
+		return num < integral ? integral - 1 : integral;
 	}
 
 	public static int byteToUnsigned(byte id) {
@@ -126,7 +130,7 @@ public class MathExt {
 
 	public static int floor(double num) {
 		int integral = (int) num;
-		return num < 0 ? integral - 1 : integral;
+		return num < integral ? integral - 1 : integral;
 	}
 
 	public static float clamp(float value, float min, float max) {

@@ -1,7 +1,7 @@
 package dev.safixo.client.render.pipelines.terrain.meshing;
 
 import dev.safixo.client.render.pipelines.terrain.SectionFlags;
-import dev.safixo.client.render.pipelines.terrain.SectionManager;
+import dev.safixo.client.render.pipelines.terrain.WorldManager;
 import dev.safixo.client.render.pipelines.terrain.SectionRender;
 import dev.safixo.client.render.pipelines.terrain.meshing.builders.VoxelMesher;
 import dev.safixo.client.render.pipelines.terrain.meshing.builders.VoxelMesherCenter;
@@ -34,7 +34,7 @@ import static dev.safixo.client.util.Direction.*;
 public class SectionMesher {
 	private static final int AIR_ID = 0;
 
-	public static boolean buildMesh(SectionRender section, CameraData camera, SectionManager sectionManager, World world, Set<TileEntity> tileSet) {
+	public static boolean buildMesh(SectionRender section, CameraData camera, WorldManager worldManager, World world, Set<TileEntity> tileSet) {
 		Chunk.isLit = false;
 
 		SectionCache sectionCache = new SectionCache(world, section.blockX, section.blockY, section.blockZ);
@@ -124,7 +124,7 @@ public class SectionMesher {
 		int visibleFaces = RegionRender.getSectionVisibleFaces(camera.intX, camera.intY, camera.intZ, section.blockX, section.blockY, section.blockZ);
 		int meshDrawOrder = RegionRender.generateMeshDrawOrderMask(solidDrawMask & visibleFaces);
 
-		uploadMeshesToRegion(sectionManager, section, translucentWriter, sumVertices, meshDrawOrder);
+		uploadMeshesToRegion(worldManager, section, translucentWriter, sumVertices, meshDrawOrder);
 
 		byte drawMask = (byte) (solidDrawMask << 1 & 0b1_111_111_0 | translucentDrawMask);
 		section.region.drawDataMask[section.regionIndex] = drawMask;
@@ -244,11 +244,10 @@ public class SectionMesher {
 		}
 	}
 
-	private static void uploadMeshesToRegion(SectionManager manager, SectionRender section, VertexWriter translucentWriter, int sumVertices, int meshDrawOrder) {
+	private static void uploadMeshesToRegion(WorldManager manager, SectionRender section, VertexWriter translucentWriter, int sumVertices, int meshDrawOrder) {
 		if (sumVertices > 0) {
 			if (section.region == RegionRender.NULL) {
 				section.region = manager.getRegion(section.blockX >> 4, section.blockY >> 4, section.blockZ >> 4);
-				section.region.activeSections++;
 			}
 
 			section.region.addMeshOrderMask(section.regionIndex, meshDrawOrder);
@@ -262,7 +261,6 @@ public class SectionMesher {
 		if (translucentWriter.getVertices() != 0) {
 			if (section.region == RegionRender.NULL) {
 				section.region = manager.getRegion(section.blockX >> 4, section.blockY >> 4, section.blockZ >> 4);
-				section.region.activeSections++;
 			}
 
 			section.region.addTranslucentMesh(section, translucentWriter);

@@ -17,13 +17,14 @@ public class GlMatrixTracker {
 
 	public static Matrix4Stack CURRENT_STACK = PROJECTION_STACK;
 	public static int MAT_MODE = GL11.GL_PROJECTION_MATRIX;
-	private static final Matrix4f MATRIX = new Matrix4f();
+
+	private static final Matrix4f TEMP_MATRIX = new Matrix4f();
 
 	public static final boolean EMULATE_STACK = true;
 	private static boolean STACK_CHANGED = true;
 
 	public static void gluPerspective(float fovy, float aspect, float zNear, float zFar) {
-		CURRENT_STACK.top().mul(MATRIX.setPerspective((float) Math.toRadians(fovy), aspect, zNear, zFar));
+		CURRENT_STACK.top().mul(TEMP_MATRIX.setPerspective((float) Math.toRadians(fovy), aspect, zNear, zFar));
 		STACK_CHANGED = true;
 
 		if (!EMULATE_STACK) {
@@ -74,10 +75,23 @@ public class GlMatrixTracker {
 	private static final FloatBuffer BUFFER = NativeBuffer.memAllocFloat(16);
 
 	public static void loadCurrentMatrix() {
-		if (EMULATE_STACK && STACK_CHANGED) {
+		if (EMULATE_STACK || STACK_CHANGED) {
 			STACK_CHANGED = false;
+
+			if (CURRENT_STACK == TEXTURE_STACK) {
+				GlTextureTracker.assertActiveTexture();
+
+				if (GlTextureTracker.ACTIVE_UNIT == 0) {
+					return;
+				}
+			}
+
 			GL11.glLoadMatrix(GlMatrixTracker.CURRENT_STACK.top().get(BUFFER));
 		}
+	}
+
+	private static boolean isMatrixIdentity(Matrix4f matrix) {
+		return (matrix.properties() & Matrix4f.PROPERTY_IDENTITY) != 0;
 	}
 
 	public static void glMatrixMode(int mode) {
@@ -90,7 +104,6 @@ public class GlMatrixTracker {
 			} else if (mode == GL11.GL_MODELVIEW) {
 				CURRENT_STACK = MODEL_VIEW_STACK;
 			} else if (mode == GL11.GL_TEXTURE) {
-				GlTextureTracker.assertActiveTexture();
 				CURRENT_STACK = TEXTURE_STACK;
 			} else {
 				CURRENT_STACK = NULL_STACK;
@@ -124,7 +137,7 @@ public class GlMatrixTracker {
 
 	public static void glMultMatrix(FloatBuffer matrix) {
 		GlStateTracker.flushDrawState();
-		CURRENT_STACK.top().mul(MATRIX.set(matrix));
+		CURRENT_STACK.top().mul(TEMP_MATRIX.set(matrix));
 		STACK_CHANGED = true;
 
 		if (!EMULATE_STACK) {

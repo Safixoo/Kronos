@@ -1,5 +1,6 @@
 package dev.safixo.client.render.gfx.state;
 
+import dev.safixo.client.util.MathExt;
 import org.lwjgl.opengl.GL11;
 
 import java.nio.FloatBuffer;
@@ -37,6 +38,14 @@ public class GlFogTracker {
 
 	public static void glFog(int mode, FloatBuffer value) {
 		if (mode == GL11.GL_FOG_COLOR) {
+			float r = value.get(0);
+			float g = value.get(1);
+			float b = value.get(2);
+
+			if (MathExt.equals(r, FOG_COLOR_R) && MathExt.equals(g, FOG_COLOR_G) && MathExt.equals(b, FOG_COLOR_B)) {
+				return;
+			}
+
 			FOG_COLOR_R = value.get(0);
 			FOG_COLOR_G = value.get(1);
 			FOG_COLOR_B = value.get(2);

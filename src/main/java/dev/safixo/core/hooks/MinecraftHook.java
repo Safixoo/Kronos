@@ -79,6 +79,13 @@ public class MinecraftHook {
 		if (!fastPath && FAST_ENTITY_PATH) {
 			ModelQueue.INSTANCE.viewMatrix = new Matrix4f(GlMatrixTracker.MODEL_VIEW_STACK.top()).invert();
 		}
+
+		int light = MathExt.getLightmapCoord(15, 15);
+
+		int j = light % 65536;
+		int k = light / 65536;
+
+		GL13.glMultiTexCoord2f(GL13.GL_TEXTURE1, j, k);
 	}
 
 	private static final int TOP_NORMAL = MathExt.packedNormal(0.0F, 1.0F, 0.0F);
@@ -239,17 +246,24 @@ public class MinecraftHook {
 	}
 
 	public static boolean shouldSideBeRendered(BlockSnow blockSnow, IBlockAccess worldAccess, int x, int y, int z, int dir) {
-		if (dir == Direction.UP) {
+		if (dir == Direction.UP && blockSnow.getBlockBoundsMaxY() < 1.0f) {
 			return true;
 		}
 
 		int blockId = worldAccess.getBlockId(x, y, z);
 
-		if (PrimitivesFlags.SOLID[blockId] || dir > Direction.UP && blockId == Block.snow.blockID) {
+		if (PrimitivesFlags.SOLID[blockId] || (dir > Direction.UP && blockId == Block.snow.blockID && shouldCullSnowSide(blockSnow, worldAccess, x, y, z))) {
 			return false;
 		}
 
 		return true;
+	}
+
+	private static boolean shouldCullSnowSide(BlockSnow block, IBlockAccess worldAccess, int x, int y, int z) {
+		int metaDepth = worldAccess.getBlockMetadata(x, y, z) & 0b111;
+		float depth = (2 * (1 + metaDepth)) * (1.0f / 16.0f);
+
+		return block.getBlockBoundsMaxY() <= depth;
 	}
 
 	private static boolean SETUP_LIGHTING = false;

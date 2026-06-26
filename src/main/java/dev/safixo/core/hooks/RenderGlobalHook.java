@@ -3,7 +3,7 @@ package dev.safixo.core.hooks;
 import dev.safixo.client.render.gfx.util.GpuFlags;
 import dev.safixo.client.render.pipelines.cloud.CloudRenderer;
 import dev.safixo.client.render.pipelines.entity_model.AdvancedModelRenderer;
-import dev.safixo.client.render.pipelines.terrain.SectionManager;
+import dev.safixo.client.render.pipelines.terrain.WorldManager;
 import dev.safixo.client.render.vertex.VertexWriter;
 import dev.safixo.client.util.MathExt;
 import dev.safixo.client.util.data.PrimitivesFlags;
@@ -26,7 +26,7 @@ import java.util.List;
 // TODO: Replace the current system now by a simpler one, now that the two pass has been patched.
 @SuppressWarnings("unused")
 public  class RenderGlobalHook {
-	public static SectionManager MANAGER;
+	public static WorldManager MANAGER;
 
 	public static boolean SHOULD_RELOAD;
 	public static boolean OPTIFINE_CHECKED = false;
@@ -46,11 +46,11 @@ public  class RenderGlobalHook {
 		}
 
 		if (MANAGER != null) {
-			SectionManager.destroyInstance();
+			WorldManager.destroyInstance();
 			clearBuffers();
 		}
 
-		MANAGER = SectionManager.getCurrentInstance();
+		MANAGER = WorldManager.getCurrentInstance();
 		GameSettings gameSettings = Minecraft.getMinecraft().gameSettings;
 
 		Block.leaves.setGraphicsLevel(gameSettings.fancyGraphics);

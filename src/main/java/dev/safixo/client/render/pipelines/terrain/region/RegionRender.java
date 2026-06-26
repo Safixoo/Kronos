@@ -1,7 +1,7 @@
 package dev.safixo.client.render.pipelines.terrain.region;
 
 import dev.safixo.client.render.gfx.util.RenderBuffer;
-import dev.safixo.client.render.pipelines.terrain.SectionManager;
+import dev.safixo.client.render.pipelines.terrain.WorldManager;
 import dev.safixo.client.render.pipelines.terrain.shader.TerrainProgram;
 import dev.safixo.client.util.memory.NativeBuffer;
 import dev.safixo.client.util.memory.UnsafeUtil;
@@ -36,8 +36,6 @@ public class RegionRender {
 
 	// Region coordinates in region space.
 	public int regionX, regionY, regionZ;
-
-	public int activeSections = 0;
 
 	public static final int BLOCK_SHIFT_X = 7;
 	public static final int BLOCK_SHIFT_Y = 7;
@@ -235,7 +233,7 @@ public class RegionRender {
 	// Processing draw data now and not in the BFS, allows decoupling the system and doing the extra
 	// work between draw which doesn't pressure the driver immediately, also as we work in a "small"
 	// and contiguous data-set we don't get penalized too much for pulling SectionRenders from memory.
-	public void prepareAndDraw(SectionManager manager, TerrainProgram shader, CameraData camera, int pass) {
+	public void prepareAndDraw(WorldManager manager, TerrainProgram shader, CameraData camera, int pass) {
 		if ((pass == 0 && this.solidFirst == UnsafeUtil.NULL) || (pass == 1 && this.translucentFirst == UnsafeUtil.NULL)) {
 			return;
 		}

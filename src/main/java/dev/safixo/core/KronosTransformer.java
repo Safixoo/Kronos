@@ -83,8 +83,8 @@ public class KronosTransformer implements IClassTransformer {
 			case RENDER:
 				replaceClassMethod(MINECRAFT_HOOK, "bindTexture", "a", "(D)V", reference, true);
 				break;
-			case STRING_TRANSLATE: case DATA_WATCHER: case TEXTURE_MANAGER:
-//				changeHashMap(reference);
+			case TEXTURE_MANAGER:
+				changeHashMap(reference);
 				break;
 			case PROFILER:
 				setFieldInProfiling(reference, "", "");
@@ -95,7 +95,7 @@ public class KronosTransformer implements IClassTransformer {
 				replaceClassMethod(MINECRAFT_HOOK, "enableLightmap", "b", "(D)V", reference, true);
 			case BLOCK:
 				replaceClassMethod(SIDE_CULLER, "shouldSideBeRendered", "a", "(Lacf;IIII)Z", reference, false);
-				catchBlockBounds(reference);
+//				catchBlockBounds(reference);
 //				setupAsyncFields(reference);
 				break;
 			case BLOCK_SNOW:
@@ -363,6 +363,14 @@ public class KronosTransformer implements IClassTransformer {
 		addFunction("GlBooleanTracker", "glEnable");
 		addFunction("GlBooleanTracker", "glDisable");
 		addFunction("GlBooleanTracker", "glDepthMask");
+
+		addFunction("GlClientStateTracker", "glClientActiveTexture");
+		addFunction("GlClientStateTracker", "glEnableClientState");
+		addFunction("GlClientStateTracker", "glDisableClientState");
+		addFunction("GlClientStateTracker", "glVertexPointer");
+		addFunction("GlClientStateTracker", "glTexCoordPointer");
+		addFunction("GlClientStateTracker", "glColorPointer");
+		addFunction("GlClientStateTracker", "glNormalPointer");
 
 		addFunction("GlMatrixTracker", "glMatrixMode");
 		addFunction("GlMatrixTracker", "glLoadIdentity");

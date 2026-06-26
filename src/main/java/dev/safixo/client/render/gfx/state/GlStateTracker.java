@@ -35,6 +35,10 @@ public class GlStateTracker {
 	}
 
 	public static void glBindBuffer(int target, int id) {
+		if (id != 0) {
+			GlClientStateTracker.invalidateAllCachedClientState();
+		}
+
 		if (target == GL15.GL_ARRAY_BUFFER && !SKIP_CACHE) {
 			if (id == LAST_VBO) {
 				return;
@@ -53,6 +57,10 @@ public class GlStateTracker {
 	}
 
 	public static void glBindVertexArray(int vao) {
+		if (vao != 0) {
+			GlClientStateTracker.invalidateAllCachedClientState();
+		}
+
 		if (LAST_VAO == vao) {
 			return;
 		}

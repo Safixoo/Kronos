@@ -56,6 +56,8 @@ public class GlDrawTracker {
 			LAST_TARGET = GlTextureTracker.LAST_TARGET;
 			GL13.glMultiTexCoord2f(LAST_TARGET, MU, MV);
 		}
+
+		GlClientStateTracker.invalidateAllCachedClientState();
 	}
 
 	public static void checkMismatchEnabledTexture(int unit) {
@@ -92,8 +94,10 @@ public class GlDrawTracker {
 
 	public static void glCallList(int list) {
 		GlStateTracker.flushDrawState();
+
 		GlMatrixTracker.loadCurrentMatrix();
 		flushRasterState();
+
 		GL11.glCallList(list);
 	}
 
@@ -105,8 +109,10 @@ public class GlDrawTracker {
 	private static final FloatBuffer BUFFER = NativeBuffer.memAllocFloat(16);
 
 	public static void glDrawArrays(int mode, int first, int count) {
+		GlStateTracker.flushDrawState();
+
 		GlMatrixTracker.loadCurrentMatrix();
-		flushRasterState();
+		GlDrawTracker.flushRasterState();
 
 		GL11.glDrawArrays(mode, first, count);
 	}

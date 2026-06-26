@@ -2,7 +2,6 @@ package dev.safixo.client.render.pipelines.terrain.cull;
 
 import dev.safixo.client.render.gfx.state.GlFogTracker;
 import dev.safixo.client.render.pipelines.terrain.*;
-import dev.safixo.client.render.gfx.state.GlStateTracker;
 import dev.safixo.client.util.data.CameraData;
 import dev.safixo.client.render.pipelines.terrain.region.RegionManager;
 import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
@@ -39,13 +38,13 @@ public class BFSCuller {
 	 * Gets the first sections of the search, prepares the graph-search max distance and queues the first couple
 	 * of sections to start the search afterward.
 	 */
-	public void updateRenderList(SectionManager manager, CameraData camera) {
+	public void updateRenderList(WorldManager manager, CameraData camera) {
 		int blockX = camera.intX;
 		int blockY = MathExt.clamp(camera.intY, 0, 255);
 		int blockZ = camera.intZ;
 
-		SectionRender origin = manager.getSectionMap().get(MathExt.asLong(blockX >> 4, blockY >> 4, blockZ >> 4));
 		SectionSet sectionSet = manager.getSectionSet();
+		SectionRender origin = sectionSet.getSection(blockX >> 4, blockY >> 4, blockZ >> 4);
 
 		int radius = sectionSet.getRadius();
 		int cameraIndex = SectionSet.getFlagIndex(radius, blockY >> 4, radius, sectionSet.getRadius());
@@ -81,7 +80,7 @@ public class BFSCuller {
 	 * their relative region indices in the region to later be used for drawing.
 	 */
 	private void enqueueRegionData(CameraData camera) {
-		RegionManager regionManager = SectionManager.getRegionManager();
+		RegionManager regionManager = WorldManager.getRegionManager();
 		RegionRender[] regions = regionManager.getIndexedRegions(camera);
 
 		int renderDiameter = camera.renderDistance * 2 + 1 + (2 << 3);
@@ -322,9 +321,9 @@ public class BFSCuller {
 	 * the nearest point in cases where an axis is not intersecting with the player.
 	 */
 	private static int getDistance(int distX, int distY, int distZ) {
-		distX += (distX >>> 27); // ... >>> 31) << 4
-		distY += (distY >>> 27); // ... >>> 31) << 4
-		distZ += (distZ >>> 27); // ... >>> 31) << 4
+		distX += ((distX + 8) >>> 27); // ... >>> 31) << 4
+		distY += ((distY + 8) >>> 27); // ... >>> 31) << 4
+		distZ += ((distZ + 8) >>> 27); // ... >>> 31) << 4
 		return MathExt.square(distX) + MathExt.square(distY) + MathExt.square(distZ);
 	}
 

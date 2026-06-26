@@ -5,6 +5,7 @@ import dev.safixo.client.util.data.PrimitivesFlags;
 import net.minecraft.block.Block;
 import net.minecraft.world.IBlockAccess;
 
+@SuppressWarnings("unused")
 public class SideCuller {
 	public static void calculateSolidSides(Block block, float minX, float minY, float minZ, float maxX, float maxY, float maxZ) {
 		PrimitivesFlags.FULL_FACES[block.blockID] = (byte) getMask(minX, minY, minZ, maxX, maxY, maxZ);

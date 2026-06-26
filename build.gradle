@@ -41,7 +41,7 @@ dependencies {
     // https://mvnrepository.com/artifact/org.joml/joml
     implementation("org.joml:joml:1.9.20")
 //    // https://mvnrepository.com/artifact/org.lwjgl.lwjgl/lwjgl
-//    implementation("org.lwjgl.lwjgl:lwjgl:2.9.1")
+    compileOnly("org.lwjgl.lwjgl:lwjgl:2.9.1")
 }
 
 jar {

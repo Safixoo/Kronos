@@ -1,6 +1,6 @@
 package dev.safixo.client.render.pipelines.terrain.cull;
 
-import dev.safixo.client.render.pipelines.terrain.SectionManager;
+import dev.safixo.client.render.pipelines.terrain.WorldManager;
 import dev.safixo.client.util.MathExt;
 import dev.safixo.client.util.data.CameraData;
 
@@ -10,11 +10,11 @@ import dev.safixo.client.util.data.CameraData;
  * the origin.
  */
 public class RebuildList {
-	private static final int[] UPDATE_QUEUE = new int[SectionManager.MAX_UPDATES_TRIES];
+	private static final int[] UPDATE_QUEUE = new int[WorldManager.MAX_UPDATES_TRIES];
 	private static int UPDATE_POSITION = 0;
 
 	public static void addToList(int section) {
-		if (UPDATE_POSITION >= SectionManager.MAX_UPDATES_TRIES) {
+		if (UPDATE_POSITION >= WorldManager.MAX_UPDATES_TRIES) {
 			return;
 		}
 

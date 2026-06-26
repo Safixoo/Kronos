@@ -1,7 +1,6 @@
 package dev.safixo.client.util;
 
-import dev.safixo.client.render.pipelines.terrain.SectionManager;
-import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
+import dev.safixo.client.render.pipelines.terrain.WorldManager;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ChunkProviderClient;
@@ -44,10 +43,6 @@ public class ClientChunkListener extends ChunkProviderClient {
 		Chunk chunk = meta.chunk;
 
 		if (!chunk.isEmpty()) {
-			for (int y = 0; y < 16; y++) {
-				SectionManager.getCurrentInstance().removeRender(chunk.xPosition, y, chunk.zPosition);
-			}
-
 			chunk.onChunkUnload();
 			this.testNeighborArea(meta, true);
 		}
@@ -75,19 +70,17 @@ public class ClientChunkListener extends ChunkProviderClient {
 		return meta == null ? this.blankChunk : meta.chunk;
 	}
 
-	public void processAllQueuedSections() {
+	public void processAllQueuedSections(WorldManager worldManager) {
 		if (this.chunksToSend.isEmpty()) {
 			return;
 		}
 
-		SectionManager sectionManager = SectionManager.getCurrentInstance();
-
 		for (long position : this.chunksToSend) {
-			int x = (int) (position & 0xFFFF_FFFFL);
-			int z = (int) (position >>> 32L);
+			int x = MathExt.decodeX(position);
+			int z = MathExt.decodeZ(position);
 
 			for (int y = 0; y < 16; y++) {
-				sectionManager.markDirty(x, y, z);
+				worldManager.markDirty(x, y, z);
 			}
 		}
 
@@ -129,7 +122,7 @@ public class ClientChunkListener extends ChunkProviderClient {
 				}
 
 				if (currentNode.adjacentMask == 0b111_111_111 && prevCurrentMask != 0b111_111_111) {
-					SectionManager manager = SectionManager.getCurrentInstance();
+					WorldManager manager = WorldManager.getCurrentInstance();
 					Minecraft mc = Minecraft.getMinecraft();
 					if (mc.skipRenderWorld) {
 						for (int y = 0; y < 16; y++) {
@@ -141,7 +134,7 @@ public class ClientChunkListener extends ChunkProviderClient {
 				}
 
 				if (neighborNode.adjacentMask == 0b111_111_111 && prevNeighborMask != 0b111_111_111) {
-					SectionManager manager = SectionManager.getCurrentInstance();
+					WorldManager manager = WorldManager.getCurrentInstance();
 					Minecraft mc = Minecraft.getMinecraft();
 					if (mc.skipRenderWorld) {
 						for (int y = 0; y < 16; y++) {

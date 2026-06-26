@@ -4,7 +4,7 @@ import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.objects.*;
 import org.lwjgl.opengl.*;
-import dev.safixo.client.render.pipelines.terrain.SectionManager;
+import dev.safixo.client.render.pipelines.terrain.WorldManager;
 import dev.safixo.client.render.pipelines.terrain.shader.TerrainProgram;
 import dev.safixo.client.util.data.CameraData;
 import dev.safixo.client.util.MathExt;
@@ -161,25 +161,37 @@ public class RegionManager {
 	}
 
 	public void sanitizeRegions(CameraData camera, int renderDistance) {
-		ReferenceCollection<RegionRender> regions = this.regionMap.values();
+		LongArrayList forRemoval = new LongArrayList();
+		int distanceSquared = MathExt.square((renderDistance + 3) << 4);
 
-		LongArrayList removedList = new LongArrayList();
-
-		for (RegionRender region : regions) {
-			if (region.sectionsToRender == 0 && region.activeSections == 0) {
+		for (RegionRender region : this.regionMap.values()) {
+			if (nearestDistanceToRegion(camera, region) > distanceSquared && region.sectionsToRender == 0) {
 				long regionPos = MathExt.asLong(region.regionX, region.regionY, region.regionZ);
 
-				removedList.add(regionPos);
+				forRemoval.add(regionPos);
 				region.clear();
 			}
 		}
 
-		for (long position : removedList) {
+		for (long position : forRemoval) {
 			this.regionMap.remove(position);
 		}
 	}
 
-	public void drawAllRegions(SectionManager manager, TerrainProgram shader, CameraData camera, int pass) {
+	private static int nearestDistanceToRegion(CameraData camera, RegionRender region) {
+		int minX = (region.regionX << RegionRender.BLOCK_SHIFT_X) - camera.intX;
+		int minZ = (region.regionZ << RegionRender.BLOCK_SHIFT_Z) - camera.intZ;
+
+		int maxX = minX + RegionRender.DIAMETER_X;
+		int maxZ = minZ + RegionRender.DIAMETER_Z;
+
+		int diffX = Math.min(maxX, Math.max(0, minX));
+		int diffZ = Math.min(maxZ, Math.max(0, minZ));
+
+		return MathExt.square(diffX) + MathExt.square(diffZ);
+	}
+
+	public void drawAllRegions(WorldManager manager, TerrainProgram shader, CameraData camera, int pass) {
 		RegionRender[] regionRenders = this.getRegionsSorted(camera);
 
 		if (regionRenders == null) {

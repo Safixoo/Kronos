@@ -3,9 +3,9 @@ package dev.safixo.client.render.pipelines.terrain.region;
 import dev.safixo.client.render.gfx.buffer.GlVertexBuffer;
 import dev.safixo.client.render.gfx.util.GlBufferUtil;
 import dev.safixo.client.render.gfx.util.RenderBuffer;
+import dev.safixo.client.render.pipelines.terrain.WorldManager;
 import org.lwjgl.opengl.*;
 import dev.safixo.client.render.pipelines.terrain.SectionFlags;
-import dev.safixo.client.render.pipelines.terrain.SectionManager;
 import dev.safixo.client.render.pipelines.terrain.SectionRender;
 import dev.safixo.client.render.vertex.writers.TerrainFormat;
 
@@ -40,7 +40,7 @@ public class RegionAllocation {
 			SPARE_BUFFER = new GlVertexBuffer(SPARE_BUFFER_ALLOC, GL15.GL_STREAM_COPY);
 		}
 
-		SectionManager.getCurrentInstance().addMemory(size);
+		WorldManager.getCurrentInstance().addMemory(size);
 		this.vertexBuffer = new RenderBuffer(size, GL15.GL_STATIC_DRAW);
 		this.capacity = size;
 	}
@@ -114,7 +114,7 @@ public class RegionAllocation {
 	// When freeing all the allocations of the region, is also wanted to avoid any interference
 	// with the sections and the invalid region/allocation.
 	public void clear() {
-		SectionManager.getCurrentInstance().removeMemory((int) this.capacity);
+		WorldManager.getCurrentInstance().removeMemory((int) this.capacity);
 
 		this.vertexBuffer.delete();
 		this.capacity = 0;
@@ -129,9 +129,8 @@ public class RegionAllocation {
 
 			alloc.render.setFlags(flags);
 			alloc.render.markDirty(true);
-			alloc.render.clearAllocations();
 
-			SectionManager.getCurrentInstance().removeUsedMemory(alloc.vertices * STRIDE);
+			WorldManager.getCurrentInstance().removeUsedMemory(alloc.vertices * STRIDE);
 
 			alloc = alloc.next;
 		}
@@ -152,7 +151,7 @@ public class RegionAllocation {
 		}
 
 		alloc.render = render;
-		SectionManager.getCurrentInstance().addUsedMemory(alloc.vertices * STRIDE);
+		WorldManager.getCurrentInstance().addUsedMemory(alloc.vertices * STRIDE);
 
 		this.sumbitToBuffer(alloc, vertexData, size);
 		return packDrawData(size, (int) alloc.first);
@@ -162,13 +161,13 @@ public class RegionAllocation {
 		long maxOffset = this.offset / STRIDE;
 		int sizeInBytes = size * STRIDE;
 
-		SectionManager.getCurrentInstance().removeMemory((int) this.capacity);
+		WorldManager.getCurrentInstance().removeMemory((int) this.capacity);
 
 		if (this.offset + sizeInBytes > this.capacity) {
 			this.resize(this.offset + sizeInBytes);
 		}
 
-		SectionManager.getCurrentInstance().addMemory((int) this.capacity);
+		WorldManager.getCurrentInstance().addMemory((int) this.capacity);
 
 		Allocation newAlloc = new Allocation(render, maxOffset, size);
 		Allocation first = this.firstEntry;
@@ -297,7 +296,7 @@ public class RegionAllocation {
 	private void addToFreeList(Allocation alloc) {
 		Allocation free = this.freeAllocations;
 
-		SectionManager.getCurrentInstance().removeUsedMemory(alloc.vertices * STRIDE);
+		WorldManager.getCurrentInstance().removeUsedMemory(alloc.vertices * STRIDE);
 
 		alloc.render = null;
 		alloc.sectionId = Allocation.UNDEFINED;

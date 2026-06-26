@@ -28,7 +28,6 @@ public class ImprovedTessellator extends Tessellator {
 	}
 
 	private static final int UNDEFINED_FORMAT = 12; // start position after position attribute.
-	private static final int UNDEFINED_VERTEX_ARRAY = -1;
 
 	public static final int VERTEX_UV     = 0b1000;
 	public static final int VERTEX_COLOR  = 0b0010;
@@ -52,7 +51,6 @@ public class ImprovedTessellator extends Tessellator {
 	public long vertexPtr = NativeBuffer.nmemAlloc(MIN_ALLOC);
 	private ByteBuffer vertexPtrNio = NativeBuffer.wrap(this.vertexPtr);
 
-	private final int[] vertexArrays = new int[0b1111 + 1];
 	private static final byte[] STRIDES = new byte[0b1111 + 1];
 
 	static {
@@ -73,67 +71,50 @@ public class ImprovedTessellator extends Tessellator {
 		return this.vertexBuffer;
 	}
 
-	public ImprovedTessellator() {
-		Arrays.fill(vertexArrays, UNDEFINED_VERTEX_ARRAY);
-	}
-
-	// Caches the stride and buffer state abusing the idea that each format attribute
-	// order and offset in the written format is unique to the flag which saves the
-	// permutation of current vertex attributes, which means that the count of every
-	// permutation possible is 16 (1 bit per attribute, 4 possibles in total => 0b1111 + 1 =>
-	// 15 + 1 (0b0000 counts)).
-	private int getVertexArray(int flags) {
-		int vertexArray = this.vertexArrays[flags];
-
-		if (vertexArray != UNDEFINED_VERTEX_ARRAY) {
-			return vertexArray;
-		}
-
-		vertexArray = GL30.glGenVertexArrays();
+	private void setupVertexState(int flags, int offset) {
 		int stride = STRIDES[flags];
+		ByteBuffer buffer = this.vertexPtrNio;
 
-		GL30.glBindVertexArray(vertexArray);
+		((Buffer) buffer).clear();
+		((Buffer) buffer).limit(offset);
 
-		this.vertexBuffer.bind();
-		setupVertexState(flags, stride);
-		this.vertexBuffer.unbind();
-
-		GL30.glBindVertexArray(0);
-		cleanupVertexState(flags);
-
-		return this.vertexArrays[flags] = vertexArray;
-	}
-
-	private static void setupVertexState(int flags, int stride) {
 		GL11.glEnableClientState(GL11.GL_VERTEX_ARRAY);
-		GL11.glVertexPointer(3, GL11.GL_FLOAT, stride, 0);
+		GL11.glVertexPointer(3, GL11.GL_FLOAT, stride, buffer);
 
-		int offset = UNDEFINED_FORMAT;
+		int attOffset = UNDEFINED_FORMAT;
 
 		if ((flags & VERTEX_UV) != 0) {
+			((Buffer) buffer).position(attOffset);
+
 			GL11.glEnableClientState(GL11.GL_TEXTURE_COORD_ARRAY);
-			GL11.glTexCoordPointer(2, GL11.GL_FLOAT, stride, offset);
-			offset += 8;
+			GL11.glTexCoordPointer(2, GL11.GL_FLOAT, stride, buffer);
+			attOffset += 8;
 		}
 		if ((flags & VERTEX_COLOR) != 0) {
+			((Buffer) buffer).position(attOffset);
+
 			GL11.glEnableClientState(GL11.GL_COLOR_ARRAY);
-			GL11.glColorPointer(4, GL11.GL_UNSIGNED_BYTE, stride, offset);
-			offset += 4;
+			GL11.glColorPointer(4, GL11.GL_UNSIGNED_BYTE, stride, buffer);
+			attOffset += 4;
 		}
 		if ((flags & VERTEX_NORMAL) != 0) {
+			((Buffer) buffer).position(attOffset);
+
 			GL11.glEnableClientState(GL11.GL_NORMAL_ARRAY);
-			GL11.glNormalPointer(GL11.GL_BYTE, stride, offset);
-			offset += 4;
+			GL11.glNormalPointer(GL11.GL_BYTE, stride, buffer);
+			attOffset += 4;
 		}
 		if ((flags & VERTEX_LIGHT) != 0) {
+			((Buffer) buffer).position(attOffset);
+
 			GL13.glClientActiveTexture(OpenGlHelper.lightmapTexUnit);
 
 			GL11.glEnableClientState(GL11.GL_TEXTURE_COORD_ARRAY);
-			GL11.glTexCoordPointer(2, GL11.GL_SHORT, stride, offset);
+			GL11.glTexCoordPointer(2, GL11.GL_SHORT, stride, buffer);
 		}
 	}
 
-	private static void cleanupVertexState(int flags) {
+	private void cleanupVertexState(int flags) {
 		GL11.glDisableClientState(GL11.GL_VERTEX_ARRAY);
 
 		if ((flags & VERTEX_LIGHT) != 0) {
@@ -182,11 +163,12 @@ public class ImprovedTessellator extends Tessellator {
 		this.lastFlag = -1;
 		this.canDraw = false;
 
-		int vertexArray = this.getVertexArray(flags);
-		GL30.glBindVertexArray(vertexArray);
+		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
+		GL30.glBindVertexArray(0);
 
-		this.vertexBuffer.bufferData(this.vertexPtrNio, offset);
-		this.vertexBuffer.draw(drawMode, vertices, 0);
+		this.setupVertexState(flags, offset);
+		GL11.glDrawArrays(drawMode, 0, vertices);
+		this.cleanupVertexState(flags);
 	}
 
 	public void resize() {

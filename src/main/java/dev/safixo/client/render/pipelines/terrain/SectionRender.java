@@ -10,11 +10,12 @@ import net.minecraft.tileentity.TileEntity;
 // carriage of section data, besides that is only used in meshing as it is avoided in all hot-spots
 // such as culling or region draw setup.
 public class SectionRender {
+	private static final int DEFAULT_FLAGS = SectionFlags.setDirty(0b0, true) | SectionFlags.setCullFaces(0b0, 0b0);
+
 	private final SectionSet sectionSet;
 
 	// Some important section data as a bit-mask from SectionFlag encoding.
-	public int flags = SectionFlags.setDirty(0b0, true) |
-		SectionFlags.setCullFaces(0b0, 0b0);
+	public int flags = DEFAULT_FLAGS;
 
 	// Section position relative to blocks.
 	public int blockX, blockY, blockZ;
@@ -72,11 +73,8 @@ public class SectionRender {
 		RegionRender region = this.region;
 		this.region = RegionRender.NULL;
 
-		if (region == RegionRender.NULL) {
-			return;
+		if (region != RegionRender.NULL) {
+			region.deleteRenderAllocation(this);
 		}
-
-		this.region.activeSections--;
-		region.deleteRenderAllocation(this);
 	}
 }

@@ -6,7 +6,6 @@ import dev.safixo.client.render.pipelines.terrain.shader.ExpFogProgram;
 import dev.safixo.client.render.pipelines.terrain.shader.LinearFogProgram;
 import dev.safixo.client.render.pipelines.terrain.shader.TerrainProgram;
 import dev.safixo.client.util.ClientChunkListener;
-import dev.safixo.client.render.gfx.state.GlStateTracker;
 import dev.safixo.core.hooks.RenderGlobalHook;
 import dev.safixo.core.hooks.VertexRedirector;
 import it.unimi.dsi.fastutil.longs.*;
@@ -35,17 +34,10 @@ import org.lwjgl.opengl.GL11;
 import java.util.List;
 import java.util.Set;
 
-public class SectionManager {
-	static {
-		// free 10mb
-		Minecraft.memoryReserve = null;
-	}
-
+public class WorldManager {
 	public static final int MAX_FULL_UPDATES = 7;
 	public static final int MAX_UPDATES_TRIES = 48;
 	private static final Item DEBUG_ITEM = null;
-
-	private final Long2ReferenceOpenHashMap<SectionRender> sectionMap = new Long2ReferenceOpenHashMap<>(4096);
 
 	private LinearFogProgram linearFogProgram;
 	private ExpFogProgram expFogProgram;
@@ -66,16 +58,16 @@ public class SectionManager {
 
 	private boolean terrainDirty;
 
-	private static SectionManager INSTANCE;
+	private static WorldManager INSTANCE;
 
-	public SectionManager(WorldClient world) {
+	public WorldManager(WorldClient world) {
 		INSTANCE = this;
 		this.worldObj = world;
 	}
 
-	public static SectionManager getCurrentInstance() {
+	public static WorldManager getCurrentInstance() {
 		if (INSTANCE == null) {
-			INSTANCE = new SectionManager(Minecraft.getMinecraft().theWorld);
+			INSTANCE = new WorldManager(Minecraft.getMinecraft().theWorld);
 		}
 
 		return INSTANCE;
@@ -95,21 +87,6 @@ public class SectionManager {
 
 	public int getRegionCount() {
 		return this.regionManager.regionMap.size();
-	}
-
-	public int allocatedSections() {
-		return this.sectionMap.size();
-	}
-
-	public void removeRender(int posX, int posY, int posZ) {
-		long position = MathExt.asLong(posX, posY, posZ);
-
-		SectionRender sectionRender = this.sectionMap.remove(position);
-
-		if (sectionRender != null) {
-			sectionRender.clearAllocations();
-			this.disconnectNeighbors(sectionRender);
-		}
 	}
 
 	public void addUsedMemory(int bytes) {
@@ -136,24 +113,13 @@ public class SectionManager {
 		return (this.vramAllocated / 1024L) / 1024L;
 	}
 
-	public void markDirty(int posX, int posY, int posZ) {
-		if (posY < 0 || posY >= 16) {
+	public void markDirty(int sectionX, int sectionY, int sectionZ) {
+		if (sectionY < 0 || sectionY >= 16) {
 			return;
 		}
 
-		long position = MathExt.asLong(posX, posY, posZ);
-
-		SectionRender sectionRender = this.sectionMap.get(position);
-
-		if (sectionRender == null) {
-			sectionRender = new SectionRender(this.sectionSet, posX * 16, posY * 16, posZ * 16);
-
-			this.sectionMap.put(position, sectionRender);
-			this.connectNeighbors(sectionRender);
-		}
-
+		this.sectionSet.markDirty(sectionX, sectionY, sectionZ);
 		this.terrainDirty = true;
-		sectionRender.markDirty(true);
 	}
 
 	public static void destroyInstance() {
@@ -190,15 +156,15 @@ public class SectionManager {
 			this.worldObj = world;
 
 			this.tileEntitiesSet.clear();
-			this.sectionMap.clear();
+			this.sectionSet.clearSectionSet();
 
-			this.generateWholeVolume(cameraX, cameraZ);
+			this.generateWholeVolume(camera);
 		}
 
 		IChunkProvider provider = world.getChunkProvider();
 
 		if (provider instanceof ClientChunkListener) {
-			((ClientChunkListener) provider).processAllQueuedSections();
+			((ClientChunkListener) provider).processAllQueuedSections(this);
 		}
 
 		EntityClientPlayerMP playerLocal = Minecraft.getMinecraft().thePlayer;
@@ -240,10 +206,6 @@ public class SectionManager {
 		profiler.endStartSection("updatechunks");
 	}
 
-	public Long2ReferenceMap<SectionRender> getSectionMap() {
-		return this.sectionMap;
-	}
-
 	public SectionSet getSectionSet() {
 		return this.sectionSet;
 	}
@@ -283,7 +245,7 @@ public class SectionManager {
 
 	private void queueRebuilds(Set<TileEntity> tileSet) {
 		int rebuildSize = RebuildList.size();
-		int maxSize = Math.min(SectionManager.MAX_UPDATES_TRIES, rebuildSize);
+		int maxSize = Math.min(WorldManager.MAX_UPDATES_TRIES, rebuildSize);
 
 		if (rebuildSize == 0) {
 			this.terrainDirty = false;
@@ -298,8 +260,14 @@ public class SectionManager {
 
 		int updateIndex = 0, nonEmptyUpdates = 0;
 
-		while (updateIndex < maxSize && nonEmptyUpdates < SectionManager.MAX_FULL_UPDATES) {
-			SectionRender section = this.sectionMap.get(RebuildList.getSectionPos(this.camera, updateIndex++));
+		while (updateIndex < maxSize && nonEmptyUpdates < WorldManager.MAX_FULL_UPDATES) {
+			long position = RebuildList.getSectionPos(this.camera, updateIndex++);
+
+			int sectionX = MathExt.decodeX(position);
+			int sectionY = MathExt.decodeY(position);
+			int sectionZ = MathExt.decodeZ(position);
+
+			SectionRender section = this.sectionSet.getSection(sectionX, sectionY, sectionZ);
 
 			if (section != null && section.isDirty()) {
 				boolean nonEmpty = SectionMesher.buildMesh(section, this.camera, this, this.worldObj, tileSet);
@@ -346,9 +314,9 @@ public class SectionManager {
 		return MathExt.square(dX) + MathExt.square(dY) + MathExt.square(dZ);
 	}
 
-	private void generateWholeVolume(double cameraX, double cameraZ) {
-		int cameraChunkX = MathExt.posToSectionIntegral(cameraX);
-		int cameraChunkZ = MathExt.posToSectionIntegral(cameraZ);
+	private void generateWholeVolume(CameraData camera) {
+		int cameraChunkX = camera.intX >> 4;
+		int cameraChunkZ = camera.intZ >> 4;
 
 		int renderDistance = this.renderDistance + 2;
 		ClientChunkListener provider = (ClientChunkListener) this.worldObj.getChunkProvider();
@@ -368,7 +336,6 @@ public class SectionManager {
 
 	private void clearRenderer() {
 		this.regionManager.clear();
-		this.sectionMap.clear();
 		this.tileEntitiesSet.clear();
 	}
 
@@ -403,36 +370,7 @@ public class SectionManager {
 
 	boolean lastEvent = false;
 
-	public void connectNeighbors(SectionRender render) {
-		for (int dir = 0; dir < Direction.COUNT; dir++) {
-			SectionRender adjacent = this.getAdjacent(render, dir);
-
-			if (adjacent != null) {
-				adjacent.setAdjacentNeighbor(render, Direction.opposite(dir));
-			}
-
-			render.setAdjacentNeighbor(adjacent, dir);
-		}
+	static { // free 10mb
+		Minecraft.memoryReserve = null;
 	}
-
-	public void disconnectNeighbors(SectionRender render) {
-		for (int dir = 0; dir < Direction.COUNT; dir++) {
-			SectionRender renderer = this.getAdjacent(render, dir);
-
-			if (renderer != null) {
-				renderer.setAdjacentNeighbor(null, Direction.opposite(dir));
-			}
-
-			render.setAdjacentNeighbor(null, dir);
-		}
-	}
-
-	private SectionRender getAdjacent(SectionRender section, int direction) {
-		int chunkX = (section.blockX >> 4) + Direction.x(direction);
-		int chunkY = (section.blockY >> 4) + Direction.y(direction);
-		int chunkZ = (section.blockZ >> 4) + Direction.z(direction);
-
-		return this.sectionMap.get(MathExt.asLong(chunkX, chunkY, chunkZ));
-	}
-
 }

@@ -1,6 +1,6 @@
 package dev.safixo.client.render.pipelines.terrain.meshing;
 
-import dev.safixo.client.render.pipelines.terrain.SectionManager;
+import dev.safixo.client.render.pipelines.terrain.WorldManager;
 import dev.safixo.client.util.ClientChunkListener;
 import dev.safixo.client.util.MathExt;
 import net.minecraft.client.Minecraft;
@@ -24,7 +24,7 @@ public class RebuildListener {
 		minY >>= 4; maxY >>= 4;
 		minZ >>= 4; maxZ >>= 4;
 
-		SectionManager manager = SectionManager.getCurrentInstance();
+		WorldManager manager = WorldManager.getCurrentInstance();
 		ClientChunkListener provider = getChunkListener();
 
 		for (int x = minX; x <= maxX; x++) {
