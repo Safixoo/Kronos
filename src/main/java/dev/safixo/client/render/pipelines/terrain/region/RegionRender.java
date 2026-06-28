@@ -5,7 +5,6 @@ import dev.safixo.client.render.pipelines.terrain.WorldManager;
 import dev.safixo.client.render.pipelines.terrain.shader.TerrainProgram;
 import dev.safixo.client.util.memory.NativeBuffer;
 import dev.safixo.client.util.memory.UnsafeUtil;
-import org.lwjgl.opengl.*;
 import dev.safixo.client.render.pipelines.terrain.SectionRender;
 import dev.safixo.client.util.MeshDirection;
 import dev.safixo.client.util.data.CameraData;
@@ -13,12 +12,14 @@ import dev.safixo.client.util.Direction;
 import dev.safixo.client.render.vertex.VertexWriter;
 import dev.safixo.client.render.vertex.writers.TerrainFormat;
 
-import java.nio.Buffer;
 import java.nio.ByteBuffer;
-import java.nio.IntBuffer;
 import java.util.Arrays;
 
+import static dev.safixo.client.render.pipelines.terrain.region.RegionConstants.*;
+
 public class RegionRender {
+	protected static final int INDIRECT_STRUCT_SIZE = 16;
+
 	private static final int INT_BYTES = 4;
 
 	// Count of different render-passes possibly dispatched.
@@ -27,31 +28,12 @@ public class RegionRender {
 	public static final int RENDER_PASSES = 2;
 	public static final int SOLID_PASS = 0, TRANSLUCENT_PASS = 1;
 
-	// Region total volume area in SectionRenders.
-	public static final int REGION_SECTION_SIZE = 512; // 8 * 8 * 8
-
 	public static final int TRANSLUCENT_DRAWS = 1;
 	public static final int SOLID_DRAWS = MeshDirection.COUNT;
 	public static final int TOTAL_DRAWS = SOLID_DRAWS + TRANSLUCENT_DRAWS;
 
 	// Region coordinates in region space.
 	public int regionX, regionY, regionZ;
-
-	public static final int BLOCK_SHIFT_X = 7;
-	public static final int BLOCK_SHIFT_Y = 7;
-	public static final int BLOCK_SHIFT_Z = 7;
-
-	public static final int BLOCK_BITS_X = (1 << BLOCK_SHIFT_X) - 1;
-	public static final int BLOCK_BITS_Y = (1 << BLOCK_SHIFT_Y) - 1;
-	public static final int BLOCK_BITS_Z = (1 << BLOCK_SHIFT_Z) - 1;
-
-	public static final int RADIUS_X = 1 << (BLOCK_SHIFT_X - 1);
-	public static final int RADIUS_Y = 1 << (BLOCK_SHIFT_Y - 1);
-	public static final int RADIUS_Z = 1 << (BLOCK_SHIFT_Z - 1);
-
-	public static final int DIAMETER_X = 1 << (BLOCK_SHIFT_X);
-	public static final int DIAMETER_Y = 1 << (BLOCK_SHIFT_Y);
-	public static final int DIAMETER_Z = 1 << (BLOCK_SHIFT_Z);
 
 	// The vertex-buffers and its arenas.
 	private RegionAllocation translucentBuffer;
@@ -74,40 +56,32 @@ public class RegionRender {
 
 	// Each bit reference the visibility of the solid planes (2..8 bit) and
 	// visibility of translucent pass (1 bit).
-	public final byte[] drawDataMask = new byte[REGION_SECTION_SIZE];
+	private final byte[] drawDataMask = new byte[REGION_SECTION_SIZE];
 
 	// Each time a section is queued for rendering, its region index is saved
 	// in the drawIndex position of renderIndices, the top is signaled by drawInd.
-	public final short[] renderIndices = new short[REGION_SECTION_SIZE];
+	protected final short[] renderIndices = new short[REGION_SECTION_SIZE];
 
-	// If nothing has changed since the last draw, including the visible bit-set,
-	// section count and render-indices try to re-use last draw command setup.
-	private final int[] lastDrawCount = new int[RENDER_PASSES];
-	private final short[][] lastRenderIndices = new short[RENDER_PASSES][REGION_SECTION_SIZE];
-
-	// This is important as the direction enum, is ordered in a way that fundamentally
-	// makes impossible batching draw without meshes being meshed in very specific
-	// conditions/ways, also makes batching generally much more effective.
+	// This is important as the Minecraft direction enum is by default sorted in a way that fundamentally
+	// makes impossible batching draws without meshes meeting very specific criteria.
 	private final int[] meshDirectionsOrdered = new int[REGION_SECTION_SIZE];
 
-	private final boolean[] shouldCachePass = new boolean[RENDER_PASSES];
-	private final int[] lastVisibleCount = new int[RENDER_PASSES];
-	private int lastVisibleSet = -1;
-
 	// Number of sections queued for rendering in the current frame.
-	public int sectionsToRender;
+	private int sectionsToRender;
 
-	public static final RegionRender NULL = new RegionRender(null, 0, Integer.MIN_VALUE, 0);
-
+	// Pointers for the indirect drawing commands.
 	private long solidIndirectPtr;
 	private long translucentIndirectPtr;
 
-	private static final int INDIRECT_STRUCT_SIZE = 16;
+	// Memoize drawing context to check if the result of the last draw construction is still valid to cache.
+	private final RegionDrawContext drawContext = new RegionDrawContext();
 
-	public RegionRender(RegionManager regionManager, int sectionX, int sectionY, int sectionZ) {
-		this.regionX = sectionX >> (RegionRender.BLOCK_SHIFT_X - 4);
-		this.regionY = sectionY >> (RegionRender.BLOCK_SHIFT_Y - 4);
-		this.regionZ = sectionZ >> (RegionRender.BLOCK_SHIFT_Z - 4);
+	private final RegionTileEntities tileEntities = new RegionTileEntities();
+
+	protected RegionRender(RegionManager regionManager, int sectionX, int sectionY, int sectionZ) {
+		this.regionX = sectionX >> (RegionConstants.BLOCK_SHIFT_X - 4);
+		this.regionY = sectionY >> (RegionConstants.BLOCK_SHIFT_Y - 4);
+		this.regionZ = sectionZ >> (RegionConstants.BLOCK_SHIFT_Z - 4);
 
 		this.regionManager = regionManager;
 
@@ -127,9 +101,45 @@ public class RegionRender {
 		this.translucentCount = NativeBuffer.nmemAlloc(REGION_SECTION_SIZE * INT_BYTES);
 	}
 
+	public long getFirstPtr(int pass) {
+		return pass != 0 ? this.translucentFirst : this.solidFirst;
+	}
+
+	public long getCountPtr(int pass) {
+		return pass != 0 ? this.translucentCount : this.solidCount;
+	}
+
+	public RenderBuffer getRenderBuffer(int pass) {
+		return pass != 0 ? this.translucentBuffer.vertexBuffer : this.solidBuffer.vertexBuffer;
+	}
+
+	public ByteBuffer getIndirectBuffer(int pass) {
+		return NativeBuffer.wrap(pass == 0 ? this.solidIndirectPtr : this.translucentIndirectPtr);
+	}
+
+	public void setDrawMask(int sectionIndex, int mask) {
+		this.drawDataMask[sectionIndex] = (byte) mask;
+	}
+
+	public void resetRenderIndex() {
+		this.sectionsToRender = 0;
+	}
+
+	public void addToRenderList(int regionIndex) {
+		this.renderIndices[this.sectionsToRender++] = (short) regionIndex;
+	}
+
+	public int getRenderIndex() {
+		return this.sectionsToRender;
+	}
+
+	public RegionTileEntities getTileEntityManager() {
+		return this.tileEntities;
+	}
+
 	public void clear() {
-		this.shouldCachePass[SOLID_PASS] = false;
-		this.shouldCachePass[TRANSLUCENT_PASS] = false;
+		this.drawContext.invalidatePass(SOLID_PASS);
+		this.drawContext.invalidatePass(TRANSLUCENT_PASS);
 
 		Arrays.fill(this.regionDrawData, 0L);
 
@@ -169,7 +179,7 @@ public class RegionRender {
 	}
 
 	public void addSolidMesh(SectionRender render, VertexWriter manager, long[] packedDrawData) {
-		this.shouldCachePass[SOLID_PASS] = false;
+		this.drawContext.invalidatePass(SOLID_PASS);
 
 		if (this.solidBuffer == null) {
 			this.solidBuffer = new RegionAllocation(manager.getVertices() * TerrainFormat.STRIDE, RegionRender.SOLID_PASS);
@@ -197,7 +207,7 @@ public class RegionRender {
 	}
 
 	public void addTranslucentMesh(SectionRender render, VertexWriter manager) {
-		this.shouldCachePass[TRANSLUCENT_PASS] = false;
+		this.drawContext.invalidatePass(TRANSLUCENT_PASS);
 
 		if (this.translucentBuffer == null) {
 			this.translucentBuffer = new RegionAllocation(manager.getVertices() * TerrainFormat.STRIDE, RegionRender.TRANSLUCENT_PASS);
@@ -239,13 +249,8 @@ public class RegionRender {
 		}
 
 		// Try to re-use the last draw command setup.
-		if (!manager.hasGraphUpdated() || (this.shouldCachePass[pass] && this.shouldUseCachedDraw(camera, pass))) {
-			int drawCount = this.lastDrawCount[pass];
-
-			if (drawCount != 0) {
-				this.multiDrawData(camera, shader, pass, drawCount);
-			}
-
+		if (!manager.hasGraphUpdated() || (this.drawContext.isPassCacheable(pass) && this.drawContext.mismatchAndCopy(this, camera, pass))) {
+			this.drawContext.multiDrawData(this, camera, shader, pass);
 			return;
 		}
 
@@ -280,95 +285,14 @@ public class RegionRender {
 			index += inc;
 		}
 
-		this.lastDrawCount[pass] = drawCount;
+		this.drawContext.setDrawCount(pass, drawCount);
 
 		if (drawCount == 0) {
 			return;
 		}
 
-		this.multiDrawData(camera, shader, pass, drawCount);
-		this.shouldCachePass[pass] = true;
-	}
-
-	private void multiDrawData(CameraData camera, TerrainProgram shader, int pass, int drawCount) {
-		RenderBuffer vertexBuffer = pass == 0 ? this.solidBuffer.vertexBuffer : this.translucentBuffer.vertexBuffer;
-
-		vertexBuffer.bindState(true);
-
-		int blockRegionX = this.regionX << RegionRender.BLOCK_SHIFT_X;
-		int blockRegionY = this.regionY << RegionRender.BLOCK_SHIFT_Y;
-		int blockRegionZ = this.regionZ << RegionRender.BLOCK_SHIFT_Z;
-
-		// Setup camera and region offset.
-		shader.setupRegionOffset(camera, blockRegionX, blockRegionY, blockRegionZ);
-
-		if (RegionManager.SUPPORT_INDIRECT) {
-			this.multiDrawIndirect(drawCount, pass);
-		} else {
-			this.multiDrawDirect(drawCount, pass);
-		}
-	}
-
-	private void multiDrawDirect(int drawCount, int pass) {
-		long first = pass != 0 ? this.translucentFirst : this.solidFirst;
-		long count = pass != 0 ? this.translucentCount : this.solidCount;
-
-		// As of now count and first use the pointer but with some offset, so simply offset
-		// count itself to make the same effect.
-		IntBuffer firstBuff = NativeBuffer.wrap(first).asIntBuffer();
-		IntBuffer countBuff = NativeBuffer.wrap(count).asIntBuffer();
-
-		((Buffer) firstBuff).limit(drawCount);
-		((Buffer) countBuff).limit(drawCount);
-
-		GL14.glMultiDrawArrays(GL11.GL_QUADS, firstBuff, countBuff);
-	}
-
-	private void multiDrawIndirect(int drawCount, int pass) {
-		ByteBuffer indirectBuff = NativeBuffer.wrap(pass == 0 ? this.solidIndirectPtr : this.translucentIndirectPtr);
-
-		if (indirectBuff == null) {
-			return;
-		}
-
-		((Buffer) indirectBuff).limit(drawCount * INDIRECT_STRUCT_SIZE);
-
-		GL43.glMultiDrawArraysIndirect(GL11.GL_QUADS, indirectBuff, drawCount, 0);
-	}
-
-	// TODO: In some cases even this code isn't even correct (ex: inside a region sometimes the result is invalid but
-	//  because the camera didn't move in the exact way to invalidate indices, the result is re-used and culling
-	//  artifacts are seen).
-	private boolean shouldUseCachedDraw(CameraData camera, int pass) {
-		int regionVis = getRegionVisibleFaces(camera.intX, camera.intY, camera.intZ, this.centerBlockX(), this.centerBlockY(), this.centerBlockZ());
-		int oldRegionVis = this.lastVisibleSet;
-
-		this.lastVisibleSet = regionVis;
-
-		if (regionVis != oldRegionVis || this.lastVisibleCount[pass] != this.sectionsToRender) {
-			this.lastVisibleCount[pass] = this.sectionsToRender;
-			return false;
-		}
-
-		final short[] lastRenderIndices = this.lastRenderIndices[pass];
-		final short[] renderIndices = this.renderIndices;
-		final int maxIndex = this.sectionsToRender;
-
-		int index = 0;
-
-		// Mismatch of section indices.
-		while (index < maxIndex && lastRenderIndices[index] == renderIndices[index]) {
-			index++;
-		}
-
-		boolean canBeCached = index == maxIndex;
-
-		// A mismatch was found, copy the indices from the mismatch index.
-		while (index < maxIndex) {
-			lastRenderIndices[index] = renderIndices[index++];
-		}
-
-		return canBeCached;
+		this.drawContext.multiDrawData(this, camera, shader, pass);
+		this.drawContext.validatePass(pass);
 	}
 
 	private int prepareSolidBatch(CameraData camera, int regionIndex, int solidMask, int drawCount) {
@@ -492,29 +416,15 @@ public class RegionRender {
 		return planes;
 	}
 
-	public static int getRegionVisibleFaces(int originX, int originY, int originZ, int centerRegionX, int centerRegionY, int centerRegionZ) {
-		int planes = 1 << MeshDirection.GENERIC;
-
-		planes |= greaterThan(originX, (centerRegionX - RADIUS_X - 19)) << Direction.EAST;
-		planes |= greaterThan(originY, (centerRegionY - RADIUS_Y - 19)) << Direction.UP;
-		planes |= greaterThan(originZ, (centerRegionZ - RADIUS_Z - 19)) << Direction.SOUTH;
-
-		planes |= lessThan(originX, (centerRegionX + RADIUS_X + 19)) << Direction.WEST;
-		planes |= lessThan(originY, (centerRegionY + RADIUS_Y + 19)) << Direction.DOWN;
-		planes |= lessThan(originZ, (centerRegionZ + RADIUS_Z + 19)) << Direction.NORTH;
-
-		return planes;
-	}
-
 	public void addMeshOrderMask(int regionIndex, int mask) {
 		this.meshDirectionsOrdered[regionIndex] = mask;
 	}
 
-	public static int lessThan(int a, int b) {
+	private static int lessThan(int a, int b) {
 		return (a - b) >>> 31;
 	}
 
-	public static int greaterThan(int a, int b) {
+	private static int greaterThan(int a, int b) {
 		return (b - a) >>> 31;
 	}
 
@@ -546,15 +456,15 @@ public class RegionRender {
 		return preferredDirSet | (restDirectionSet << (preferredCount * 4));
 	}
 
-	public static int sectionX(int regionIndex) {
+	private static int sectionX(int regionIndex) {
  		return (regionIndex & 0b000_000_111) >>> 0;
 	}
 
-	public static int sectionY(int regionIndex) {
+	private static int sectionY(int regionIndex) {
 		return (regionIndex & 0b000_111_000) >>> 3;
 	}
 
-	public static int sectionZ(int regionIndex) {
+	private static int sectionZ(int regionIndex) {
 		return (regionIndex & 0b111_000_000) >>> 6;
 	}
 

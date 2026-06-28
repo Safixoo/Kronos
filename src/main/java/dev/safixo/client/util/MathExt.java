@@ -1,6 +1,7 @@
 package dev.safixo.client.util;
 
 import dev.safixo.client.render.pipelines.terrain.SectionRender;
+import dev.safixo.client.render.pipelines.terrain.region.RegionConstants;
 import dev.safixo.client.util.data.CameraData;
 import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
 import dev.safixo.core.HookUtils;
@@ -64,12 +65,12 @@ public class MathExt {
 		float distX = (region.blockX() - cameraData.intX) - cameraData.fractX;
 		float distZ = (region.blockZ() - cameraData.intZ) - cameraData.fractZ;
 
-		if (region.blockX() < cameraData.intX - RegionRender.RADIUS_X) {
-			distX += RegionRender.DIAMETER_X;
+		if (region.blockX() < cameraData.intX - RegionConstants.RADIUS_X) {
+			distX += RegionConstants.DIAMETER_X;
 		}
 
-		if (region.blockZ() < cameraData.intZ - RegionRender.RADIUS_Z) {
-			distZ += RegionRender.DIAMETER_Z;
+		if (region.blockZ() < cameraData.intZ - RegionConstants.RADIUS_Z) {
+			distZ += RegionConstants.DIAMETER_Z;
 		}
 
 		return MathExt.square(distX) + MathExt.square(distZ);

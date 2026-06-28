@@ -3,9 +3,10 @@ package dev.safixo.client.render.pipelines.terrain.region;
 import dev.safixo.client.render.gfx.buffer.GlVertexBuffer;
 import dev.safixo.client.render.gfx.util.GlBufferUtil;
 import dev.safixo.client.render.gfx.util.RenderBuffer;
+import dev.safixo.client.render.pipelines.terrain.SectionSet;
 import dev.safixo.client.render.pipelines.terrain.WorldManager;
+import dev.safixo.client.util.MathExt;
 import org.lwjgl.opengl.*;
-import dev.safixo.client.render.pipelines.terrain.SectionFlags;
 import dev.safixo.client.render.pipelines.terrain.SectionRender;
 import dev.safixo.client.render.vertex.writers.TerrainFormat;
 
@@ -62,6 +63,9 @@ public class RegionAllocation {
 			newSize = SPARE_BUFFER_ALLOC;
 		}
 
+		WorldManager worldManager = WorldManager.getCurrentInstance();
+		SectionSet sectionSet = worldManager.getSectionSet();
+
 		// If it has been overpassed the copying buffer limit, do mental gymnastics.
 		if (newSize > SPARE_BUFFER_ALLOC) {
 			// If the region is more than 32MB avoid allocating a temporal buffer as is preferred
@@ -72,12 +76,14 @@ public class RegionAllocation {
 				Allocation alloc = this.firstEntry;
 
 				while (alloc != null) {
-					int flags = alloc.render.flags;
+					long position = alloc.position;
 
-					flags = SectionFlags.setPassesNonEmpty(flags, 0b00);
+					int sectionX = MathExt.decodeX(position);
+					int sectionY = MathExt.decodeY(position);
+					int sectionZ = MathExt.decodeZ(position);
 
-					alloc.render.setFlags(flags);
-					alloc.render.markDirty(true);
+					sectionSet.markDirty(sectionX, sectionY, sectionZ);
+
 					alloc = alloc.next;
 				}
 
@@ -114,7 +120,10 @@ public class RegionAllocation {
 	// When freeing all the allocations of the region, is also wanted to avoid any interference
 	// with the sections and the invalid region/allocation.
 	public void clear() {
-		WorldManager.getCurrentInstance().removeMemory((int) this.capacity);
+		WorldManager worldManager = WorldManager.getCurrentInstance();
+		SectionSet sectionSet = worldManager.getSectionSet();
+
+		worldManager.removeMemory((int) this.capacity);
 
 		this.vertexBuffer.delete();
 		this.capacity = 0;
@@ -123,14 +132,14 @@ public class RegionAllocation {
 		Allocation alloc = this.firstEntry;
 
 		while (alloc != null) {
-			int flags = alloc.render.flags;
+			long position = alloc.position;
 
-			flags = SectionFlags.setPassesNonEmpty(flags, 0b00);
+			int sectionX = MathExt.decodeX(position);
+			int sectionY = MathExt.decodeY(position);
+			int sectionZ = MathExt.decodeZ(position);
 
-			alloc.render.setFlags(flags);
-			alloc.render.markDirty(true);
-
-			WorldManager.getCurrentInstance().removeUsedMemory(alloc.vertices * STRIDE);
+			sectionSet.markDirty(sectionX, sectionY, sectionZ);
+			worldManager.removeUsedMemory(alloc.vertices * STRIDE);
 
 			alloc = alloc.next;
 		}
@@ -150,7 +159,7 @@ public class RegionAllocation {
 			alloc = this.addAllocation(render, size);
 		}
 
-		alloc.render = render;
+		alloc.position = render.globalPosition;
 		WorldManager.getCurrentInstance().addUsedMemory(alloc.vertices * STRIDE);
 
 		this.sumbitToBuffer(alloc, vertexData, size);
@@ -169,7 +178,7 @@ public class RegionAllocation {
 
 		WorldManager.getCurrentInstance().addMemory((int) this.capacity);
 
-		Allocation newAlloc = new Allocation(render, maxOffset, size);
+		Allocation newAlloc = new Allocation(render.globalPosition, maxOffset, size);
 		Allocation first = this.firstEntry;
 		this.offset += sizeInBytes;
 
@@ -241,7 +250,7 @@ public class RegionAllocation {
 	public Allocation findPrevAlloc(SectionRender render) {
 		Allocation alloc = this.firstEntry;
 
-		while (alloc != null && alloc.render != render) {
+		while (alloc != null && alloc.position != render.globalPosition) {
 			alloc = alloc.next;
 		}
 
@@ -271,11 +280,11 @@ public class RegionAllocation {
 
 		// The allocation shouldn't be null as we are removing an existent
 		// allocation.
-		if (alloc.render == render) {
+		if (alloc.position == render.globalPosition) {
 			this.firstEntry = this.firstEntry.next;
 			this.addToFreeList(alloc);
 		} else {
-			while (alloc.next != null && alloc.next.render != render) {
+			while (alloc.next != null && alloc.next.position != render.globalPosition) {
 				alloc = alloc.next;
 			}
 
@@ -298,8 +307,7 @@ public class RegionAllocation {
 
 		WorldManager.getCurrentInstance().removeUsedMemory(alloc.vertices * STRIDE);
 
-		alloc.render = null;
-		alloc.sectionId = Allocation.UNDEFINED;
+		alloc.position = Long.MIN_VALUE;
 		alloc.next = null;
 
 		// Save removed alloc in free pool.
@@ -322,12 +330,10 @@ public class RegionAllocation {
 		public static final int UNDEFINED = 0x8000000;
 
 		public Allocation next;
-		public SectionRender render;
+		public long position;
 
-		public long sectionId;
-
-		public Allocation(SectionRender render, long offset, int size) {
-			this.render = render;
+		public Allocation(long render, long offset, int size) {
+			this.position = render;
 			this.first = offset;
 			this.vertices = size;
 		}

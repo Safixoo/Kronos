@@ -3,11 +3,14 @@ package dev.safixo.client.render.pipelines.terrain.region;
 import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.objects.*;
+import net.minecraft.tileentity.TileEntity;
 import org.lwjgl.opengl.*;
 import dev.safixo.client.render.pipelines.terrain.WorldManager;
 import dev.safixo.client.render.pipelines.terrain.shader.TerrainProgram;
 import dev.safixo.client.util.data.CameraData;
 import dev.safixo.client.util.MathExt;
+
+import java.util.List;
 
 public class RegionManager {
 	public static boolean SUPPORT_INDIRECT;
@@ -23,9 +26,9 @@ public class RegionManager {
 	}
 
 	public RegionRender getRegion(int sectionX, int sectionY, int sectionZ) {
-		int regionX = sectionX >> (RegionRender.BLOCK_SHIFT_X - 4);
-		int regionY = sectionY >> (RegionRender.BLOCK_SHIFT_Y - 4);
-		int regionZ = sectionZ >> (RegionRender.BLOCK_SHIFT_Z - 4);
+		int regionX = sectionX >> (RegionConstants.BLOCK_SHIFT_X - 4);
+		int regionY = sectionY >> (RegionConstants.BLOCK_SHIFT_Y - 4);
+		int regionZ = sectionZ >> (RegionConstants.BLOCK_SHIFT_Z - 4);
 
 		long position = MathExt.asLong(regionX, regionY, regionZ);
 		RegionRender region = this.regionMap.get(position);
@@ -40,13 +43,13 @@ public class RegionManager {
 
 	// Creates a mapping between position and regions, useful for BFS only.
 	public RegionRender[] getIndexedRegions(CameraData camera) {
-		int regionCameraX = camera.intX >> RegionRender.BLOCK_SHIFT_X;
-		int regionCameraZ = camera.intZ >> RegionRender.BLOCK_SHIFT_Z;
+		int regionCameraX = camera.intX >> RegionConstants.BLOCK_SHIFT_X;
+		int regionCameraZ = camera.intZ >> RegionConstants.BLOCK_SHIFT_Z;
 
 		int renderDiameter = camera.renderDistance * 2 + 1 + (2 << 3);
 
 		int factorXZ = renderDiameter >> 3;
-		int factorY = 256 >> RegionRender.BLOCK_SHIFT_Y;
+		int factorY = 256 >> RegionConstants.BLOCK_SHIFT_Y;
 
 		RegionRender[] indexedRegions = new RegionRender[MathExt.square(factorXZ * 2 + 1) * factorY];
 
@@ -68,7 +71,7 @@ public class RegionManager {
 
 	public static RegionRender getRegionFromIndexed(RegionRender[] indexedRegions, int renderDiameter, int regionX, int regionY, int regionZ) {
 		int factorXZ = renderDiameter >> 3;
-		int factorY = 256 >> RegionRender.BLOCK_SHIFT_Y;
+		int factorY = 256 >> RegionConstants.BLOCK_SHIFT_Y;
 
 		regionX += factorXZ;
 		regionZ += factorXZ;
@@ -129,9 +132,9 @@ public class RegionManager {
 	}
 
 	private static int manhattanDistance(RegionRender region, CameraData camera) {
-		int pX = camera.intX >> RegionRender.BLOCK_SHIFT_X;
-		int pY = camera.intY >> RegionRender.BLOCK_SHIFT_Y;
-		int pZ = camera.intZ >> RegionRender.BLOCK_SHIFT_Z;
+		int pX = camera.intX >> RegionConstants.BLOCK_SHIFT_X;
+		int pY = camera.intY >> RegionConstants.BLOCK_SHIFT_Y;
+		int pZ = camera.intZ >> RegionConstants.BLOCK_SHIFT_Z;
 
 		int rX = region.regionX;
 		int rY = region.regionY;
@@ -160,12 +163,20 @@ public class RegionManager {
 		}
 	}
 
+	public void iterateAllTileEntities(List<TileEntity> globalList) {
+		globalList.clear();
+
+		for (RegionRender region : this.regionMap.values()) {
+			region.getTileEntityManager().iterateTileEntities(globalList);
+		}
+	}
+
 	public void sanitizeRegions(CameraData camera, int renderDistance) {
 		LongArrayList forRemoval = new LongArrayList();
 		int distanceSquared = MathExt.square((renderDistance + 3) << 4);
 
 		for (RegionRender region : this.regionMap.values()) {
-			if (nearestDistanceToRegion(camera, region) > distanceSquared && region.sectionsToRender == 0) {
+			if (nearestDistanceToRegion(camera, region) > distanceSquared && region.getRenderIndex() == 0) {
 				long regionPos = MathExt.asLong(region.regionX, region.regionY, region.regionZ);
 
 				forRemoval.add(regionPos);
@@ -179,11 +190,11 @@ public class RegionManager {
 	}
 
 	private static int nearestDistanceToRegion(CameraData camera, RegionRender region) {
-		int minX = (region.regionX << RegionRender.BLOCK_SHIFT_X) - camera.intX;
-		int minZ = (region.regionZ << RegionRender.BLOCK_SHIFT_Z) - camera.intZ;
+		int minX = (region.regionX << RegionConstants.BLOCK_SHIFT_X) - camera.intX;
+		int minZ = (region.regionZ << RegionConstants.BLOCK_SHIFT_Z) - camera.intZ;
 
-		int maxX = minX + RegionRender.DIAMETER_X;
-		int maxZ = minZ + RegionRender.DIAMETER_Z;
+		int maxX = minX + RegionConstants.DIAMETER_X;
+		int maxZ = minZ + RegionConstants.DIAMETER_Z;
 
 		int diffX = Math.min(maxX, Math.max(0, minX));
 		int diffZ = Math.min(maxZ, Math.max(0, minZ));
@@ -218,7 +229,7 @@ public class RegionManager {
 			region.prepareAndDraw(manager, shader, camera, pass);
 
 			if (pass == 0) {
-				manager.drawnSolidRenderers += region.sectionsToRender;
+				manager.drawnSolidRenderers += region.getRenderIndex();
 			}
 
 			index += inc;

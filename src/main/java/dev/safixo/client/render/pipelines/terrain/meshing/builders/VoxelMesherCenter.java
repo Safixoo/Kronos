@@ -2,6 +2,7 @@ package dev.safixo.client.render.pipelines.terrain.meshing.builders;
 
 import dev.safixo.client.render.pipelines.terrain.meshing.data.FacingData;
 import dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache;
+import dev.safixo.client.render.pipelines.terrain.region.RegionConstants;
 import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
 import dev.safixo.client.render.vertex.VertexWriter;
 import dev.safixo.client.render.vertex.writers.TerrainFormat;
@@ -110,9 +111,9 @@ public class VoxelMesherCenter  {
 		int uv2 = face.uv2;
 		int uv3 = face.uv3;
 
-		x &= RegionRender.BLOCK_BITS_X;
-		y &= RegionRender.BLOCK_BITS_Y;
-		z &= RegionRender.BLOCK_BITS_Z;
+		x &= RegionConstants.BLOCK_BITS_X;
+		y &= RegionConstants.BLOCK_BITS_Y;
+		z &= RegionConstants.BLOCK_BITS_Z;
 
 		long ptr = writer.getTotalOffset();
 		long quadOffs = face.quadVert;

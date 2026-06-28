@@ -2,6 +2,7 @@ package dev.safixo.client.render.pipelines.terrain.cull;
 
 import dev.safixo.client.render.gfx.state.GlFogTracker;
 import dev.safixo.client.render.pipelines.terrain.*;
+import dev.safixo.client.render.pipelines.terrain.region.RegionConstants;
 import dev.safixo.client.util.data.CameraData;
 import dev.safixo.client.render.pipelines.terrain.region.RegionManager;
 import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
@@ -27,7 +28,7 @@ public class BFSCuller {
 
 	public void init(RegionManager regionManager) {
 		for (RegionRender render : regionManager.regionMap.values()) {
-			render.sectionsToRender = 0;
+			render.resetRenderIndex();
 		}
 
 		RebuildList.clear();
@@ -47,7 +48,7 @@ public class BFSCuller {
 		SectionRender origin = sectionSet.getSection(blockX >> 4, blockY >> 4, blockZ >> 4);
 
 		int radius = sectionSet.getRadius();
-		int cameraIndex = SectionSet.getFlagIndex(radius, blockY >> 4, radius, sectionSet.getRadius());
+		int cameraIndex = sectionSet.getFlagIndex(radius, blockY >> 4, radius);
 
 		short[] visibilitySet = sectionSet.visibilitySet;
 
@@ -84,8 +85,8 @@ public class BFSCuller {
 		RegionRender[] regions = regionManager.getIndexedRegions(camera);
 
 		int renderDiameter = camera.renderDistance * 2 + 1 + (2 << 3);
-		int regionCameraX = camera.intX >> RegionRender.BLOCK_SHIFT_X;
-		int regionCameraZ = camera.intZ >> RegionRender.BLOCK_SHIFT_Z;
+		int regionCameraX = camera.intX >> RegionConstants.BLOCK_SHIFT_X;
+		int regionCameraZ = camera.intZ >> RegionConstants.BLOCK_SHIFT_Z;
 
 		int cameraChunkX = camera.intX >> 4;
 		int cameraChunkZ = camera.intZ >> 4;
@@ -97,9 +98,9 @@ public class BFSCuller {
 			int sectionY = MathExt.decodeY(position);
 			int sectionZ = MathExt.decodeZ(position) + cameraChunkZ;
 
-			int distRegionX = (sectionX >> (RegionRender.BLOCK_SHIFT_X - 4)) - regionCameraX;
-			int distRegionY = (sectionY >> (RegionRender.BLOCK_SHIFT_Y - 4));
-			int distRegionZ = (sectionZ >> (RegionRender.BLOCK_SHIFT_Z - 4)) - regionCameraZ;
+			int distRegionX = (sectionX >> (RegionConstants.BLOCK_SHIFT_X - 4)) - regionCameraX;
+			int distRegionY = (sectionY >> (RegionConstants.BLOCK_SHIFT_Y - 4));
+			int distRegionZ = (sectionZ >> (RegionConstants.BLOCK_SHIFT_Z - 4)) - regionCameraZ;
 
 			RegionRender region = RegionManager.getRegionFromIndexed(regions, renderDiameter, distRegionX, distRegionY, distRegionZ);
 
@@ -107,7 +108,8 @@ public class BFSCuller {
 				continue;
 			}
 
-			region.renderIndices[region.sectionsToRender++] = (short) RegionRender.regionIndex(sectionX, sectionY, sectionZ);
+			int regionIndex = RegionRender.regionIndex(sectionX, sectionY, sectionZ);
+			region.addToRenderList(regionIndex);
 		}
 	}
 
@@ -223,7 +225,7 @@ public class BFSCuller {
 	private static void queueRegionNode(SectionRender section, int flags) {
 		if (SectionFlags.hasPassesNonEmpty(flags)) {
 			RegionRender region = section.region;
-			region.renderIndices[region.sectionsToRender++] = (short) section.regionIndex;
+			region.addToRenderList(section.regionIndex);
 		}
 	}
 

@@ -2,24 +2,27 @@ package dev.safixo.client.render.pipelines.terrain;
 
 import dev.safixo.client.render.pipelines.terrain.cull.BFSCuller;
 import dev.safixo.client.render.pipelines.terrain.cull.BFSQueue;
+import dev.safixo.client.util.ClientChunkListener;
 import dev.safixo.client.util.Direction;
 import dev.safixo.client.util.MathExt;
 import dev.safixo.client.util.data.CameraData;
-import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
-import it.unimi.dsi.fastutil.longs.LongSet;
+import it.unimi.dsi.fastutil.bytes.ByteIterator;
+import it.unimi.dsi.fastutil.longs.*;
 
 import java.util.Arrays;
 
 // Most of the useful section data saved in a couple of arrays, because of reasons (*performance*).
 public class SectionSet {
 	private static final int FLAG_NULL = CompressedFlags.setTraversableFaces(0b0, 0b111_111) | CompressedFlags.setDirty(0b0, true);
-	private final LongOpenHashSet queuedChanges = new LongOpenHashSet();
 
+	// All the changes are queued until the camera and context is updated.
+	private final Long2ByteOpenHashMap flagChangesQueued = new Long2ByteOpenHashMap();
+
+	// Convenient container of all important data about the sections.
 	private SectionRender[] sections;
 
 	// Saves a CompressedFlags bit-mask of each section in the radius.
 	public byte[] sectionFlags;
-
 	// Temporary array to be able to make changes in sectionFlags easier.
 	public byte[] tempFlags;
 
@@ -40,7 +43,7 @@ public class SectionSet {
 		this.camera = camera;
 		this.radius = camera.renderDistance + (16 / camera.renderDistance) + 1;
 
-		this.updateSectionArray(lastCamera);
+		this.updateSectionArray(lastCamera, worldChanged);
 		this.resetVisibilityState();
 
 		int fogDistance = (int) (BFSCuller.getFogDistance(camera) * 16);
@@ -51,9 +54,29 @@ public class SectionSet {
 		}
 
 		if (worldChanged || lastCamera == null || camera.renderDistance != lastCamera.renderDistance) {
-			this.initializeFlagData(manager);
+			this.initializeFlagData();
 		} else {
 			this.updateAllFlags(manager);
+		}
+	}
+
+	private void markAllVolumeDirty() {
+		int cameraChunkX = this.camera.intX >> 4;
+		int cameraChunkZ = this.camera.intZ >> 4;
+
+		int radius = this.radius;
+		ClientChunkListener chunkMap = ClientChunkListener.getChunkListener();
+
+		for (int x = -radius; x <= radius; x++) {
+			for (int z = -radius; z <= radius; z++) {
+				if (!chunkMap.canLoadChunk(cameraChunkX + x, cameraChunkZ + z)) {
+					continue;
+				}
+
+				for (int y = 0; y < 16; y++) {
+					this.processDirtySection(cameraChunkX + x, y, cameraChunkZ + z);
+				}
+			}
 		}
 	}
 
@@ -68,10 +91,10 @@ public class SectionSet {
 				short overDistance = (short) (MathExt.square(x) + MathExt.square(z) >= squaredDistance ? 1 : 0);
 
 				for (int y = 0; y < 16; y++) {
-					int flagIndexPP = getFlagIndex(x + radius, y, z + radius, radius);
-					int flagIndexNP = getFlagIndex(-x + radius, y, z + radius, radius);
-					int flagIndexNN = getFlagIndex(-x + radius, y, -z + radius, radius);
-					int flagIndexPN = getFlagIndex(x + radius, y, -z + radius, radius);
+					int flagIndexPP = this.getFlagIndex(x + radius, y, z + radius);
+					int flagIndexNP = this.getFlagIndex(-x + radius, y, z + radius);
+					int flagIndexNN = this.getFlagIndex(-x + radius, y, -z + radius);
+					int flagIndexPN = this.getFlagIndex(x + radius, y, -z + radius);
 
 					visibilitySet[flagIndexPP] = overDistance;
 					visibilitySet[flagIndexNP] = overDistance;
@@ -82,7 +105,7 @@ public class SectionSet {
 		}
 	}
 
-	private void initializeFlagData(WorldManager manager) {
+	private void initializeFlagData() {
 		int size = MathExt.square(this.radius * 2 + 1) * 16;
 
 		if (this.sectionFlags == null || this.sectionFlags.length != size) {
@@ -108,11 +131,13 @@ public class SectionSet {
 			int compressedFlags = CompressedFlags.sectionToCompressed(section.flags);
 			this.setFlag(diffChunkX + radius, section.blockY >> 4, diffChunkZ + radius, compressedFlags);
 		}
-
-		this.queuedChanges.clear();
 	}
 
-	public void updateSectionArray(CameraData lastCamera) {
+	public void queueFlagForSet(long pos, int flag) {
+		this.flagChangesQueued.put(pos, (byte) CompressedFlags.sectionToCompressed(flag));
+	}
+
+	public void updateSectionArray(CameraData lastCamera, boolean worldChanged) {
 		int diameter = this.radius * 2 + 1;
 		int arrayLength = MathExt.square(diameter) * 16;
 
@@ -123,71 +148,92 @@ public class SectionSet {
 			changed = true;
 		}
 
-		if (!changed) {
-			CameraData camera = this.camera;
-			int radius = this.radius;
-
-			int lastCameraChunkX = lastCamera.intX >> 4;
-			int lastCameraChunkZ = lastCamera.intZ >> 4;
-
-			int currentCameraChunkX = camera.intX >> 4;
-			int currentCameraChunkZ = camera.intZ >> 4;
-
-			int diffCameraChunkX = currentCameraChunkX - lastCameraChunkX;
-			int diffCameraChunkZ = currentCameraChunkZ - lastCameraChunkZ;
-
-			for (int offsetX = -radius; offsetX <= radius; offsetX++) {
-				for (int offsetZ = -radius; offsetZ <= radius; offsetZ++) {
-					if (Math.abs(offsetX + diffCameraChunkX) > radius || Math.abs(offsetZ + diffCameraChunkZ) > radius) {
-						int chunkX = offsetX + currentCameraChunkX;
-						int chunkZ = offsetZ + currentCameraChunkZ;
-
-						for (int sectionY = 0; sectionY < 16; sectionY++) {
-							int sectionIndex = this.getSectionIndex(chunkX, sectionY, chunkZ);
-							SectionRender sectionRender = this.sections[sectionIndex];
-
-							if (sectionRender != null) {
-								sectionRender.clearAllocations();
-								this.disconnectNeighbors(sectionRender);
-							}
-
-							sectionRender = this.sections[sectionIndex] = new SectionRender(this, chunkX << 4, sectionY << 4, chunkZ << 4);
-							this.connectNeighbors(sectionRender);
-						}
-					}
-				}
-			}
+		if (changed || worldChanged) {
+			this.markAllVolumeDirty();
+		} else {
+			this.markQueuedDirty(ClientChunkListener.getChunkListener());
 		}
 
+		this.calculateTranslatedSections(ClientChunkListener.getChunkListener(), lastCamera);
+	}
+
+	private void markQueuedDirty(ClientChunkListener chunkMap) {
+		// Mark dirty all positions.
 		for (long position : this.dirtyPositions) {
 			int sectionX = MathExt.decodeX(position);
 			int sectionY = MathExt.decodeY(position);
 			int sectionZ = MathExt.decodeZ(position);
 
-			if (!this.isInBounds(sectionX, sectionZ)) {
+			if (!chunkMap.canLoadChunk(sectionX, sectionZ)) {
 				continue;
 			}
 
-			int sectionIndex = this.getSectionIndex(sectionX, sectionY, sectionZ);
-			SectionRender section = this.sections[sectionIndex];
-
-			if (section == null) {
-				section = this.sections[sectionIndex] = new SectionRender(this, sectionX << 4, sectionY << 4, sectionZ << 4);
-				this.connectNeighbors(section);
-			} else {
-				if (section.blockX >> 4 == sectionX && section.blockZ >> 4 == sectionZ) {
-					section.markDirty(true);
-				} else {
-					section.clearAllocations();
-					this.disconnectNeighbors(section);
-
-					this.sections[sectionIndex] = new SectionRender(this, sectionX << 4, sectionY << 4, sectionZ << 4);
-					this.connectNeighbors(section);
-				}
-			}
+			this.processDirtySection(sectionX, sectionY, sectionZ);
 		}
 
 		this.dirtyPositions.clear();
+	}
+
+	private void processDirtySection(int sectionX, int sectionY, int sectionZ) {
+		if (!this.isInBounds(sectionX, sectionZ)) {
+			return;
+		}
+
+		int sectionIndex = this.getSectionIndex(sectionX, sectionY, sectionZ);
+		SectionRender section = this.sections[sectionIndex];
+
+		if (section == null) {
+			section = this.sections[sectionIndex] = new SectionRender(this, sectionX << 4, sectionY << 4, sectionZ << 4);
+			this.connectNeighbors(section);
+		} else {
+			if (section.blockX >> 4 != sectionX || section.blockZ >> 4 != sectionZ) {
+				this.disconnectNeighbors(section);
+				section.invalidate();
+
+				section.revalidate(sectionX << 4, sectionY << 4, sectionZ << 4);
+				this.connectNeighbors(section);
+			}
+		}
+		section.markDirty(true);
+		section.sendFlagsToSet();
+	}
+
+	private void calculateTranslatedSections(ClientChunkListener chunkMap, CameraData lastCamera) {
+		CameraData camera = this.camera;
+		int radius = this.radius;
+
+		int lastCameraChunkX = lastCamera == null ? Integer.MIN_VALUE : lastCamera.intX >> 4;
+		int lastCameraChunkZ = lastCamera == null ? Integer.MIN_VALUE : lastCamera.intZ >> 4;
+
+		int currentCameraChunkX = camera.intX >> 4;
+		int currentCameraChunkZ = camera.intZ >> 4;
+
+		int diffCameraChunkX = currentCameraChunkX - lastCameraChunkX;
+		int diffCameraChunkZ = currentCameraChunkZ - lastCameraChunkZ;
+
+		for (int offsetX = -radius; offsetX <= radius; offsetX++) {
+			for (int offsetZ = -radius; offsetZ <= radius; offsetZ++) {
+				if (Math.abs(offsetX + diffCameraChunkX) > radius || Math.abs(offsetZ + diffCameraChunkZ) > radius) {
+					int chunkX = offsetX + currentCameraChunkX;
+					int chunkZ = offsetZ + currentCameraChunkZ;
+
+					for (int sectionY = 0; sectionY < 16; sectionY++) {
+						int sectionIndex = this.getSectionIndex(chunkX, sectionY, chunkZ);
+						SectionRender section = this.sections[sectionIndex];
+
+						if (section != null) {
+							section.clearAllocations();
+							this.disconnectNeighbors(section);
+						}
+
+						section = this.sections[sectionIndex] = new SectionRender(this, chunkX << 4, sectionY << 4, chunkZ << 4);
+						this.connectNeighbors(section);
+
+						section.sendFlagsToSet();
+					}
+				}
+			}
+		}
 	}
 
 	private SectionRender getAdjacent(SectionRender section, int direction) {
@@ -198,27 +244,27 @@ public class SectionSet {
 		return sectionY < 0 || sectionY >= 16 ? null : this.getSection(sectionX, sectionY, sectionZ);
 	}
 
-	public void connectNeighbors(SectionRender render) {
+	public void connectNeighbors(SectionRender section) {
 		for (int dir = 0; dir < Direction.COUNT; dir++) {
-			SectionRender adjacent = this.getAdjacent(render, dir);
+			SectionRender adjacent = this.getAdjacent(section, dir);
 
 			if (adjacent != null) {
-				adjacent.setAdjacentNeighbor(render, Direction.opposite(dir));
+				adjacent.setAdjacentNeighbor(section, Direction.opposite(dir));
 			}
 
-			render.setAdjacentNeighbor(adjacent, dir);
+			section.setAdjacentNeighbor(adjacent, dir);
 		}
 	}
 
-	public void disconnectNeighbors(SectionRender render) {
+	public void disconnectNeighbors(SectionRender section) {
 		for (int dir = 0; dir < Direction.COUNT; dir++) {
-			SectionRender adjacent = this.getAdjacent(render, dir);
+			SectionRender adjacent = this.getAdjacent(section, dir);
 
 			if (adjacent != null) {
 				adjacent.setAdjacentNeighbor(null, Direction.opposite(dir));
 			}
 
-			render.setAdjacentNeighbor(null, dir);
+			section.setAdjacentNeighbor(null, dir);
 		}
 	}
 
@@ -285,40 +331,35 @@ public class SectionSet {
 		final int[] graphIndices = BFSQueue.GRAPH_INDICES;
 
 		int maxIndex = BFSQueue.bfsIndex;
+		int i = 0;
 
-		for (int i = 0; i < maxIndex >> 3; i++) {
-			int j = i << 3;
+		while (i < (maxIndex & -4)) {
+			int i0 = graphIndices[i++];
+			int i1 = graphIndices[i++];
+			int i2 = graphIndices[i++];
+			int i3 = graphIndices[i++];
 
-			visSet[graphIndices[j + 0]] = 0;
-			visSet[graphIndices[j + 1]] = 0;
-			visSet[graphIndices[j + 2]] = 0;
-			visSet[graphIndices[j + 3]] = 0;
-
-			visSet[graphIndices[j + 4]] = 0;
-			visSet[graphIndices[j + 5]] = 0;
-			visSet[graphIndices[j + 6]] = 0;
-			visSet[graphIndices[j + 7]] = 0;
+			visSet[i0] = 0;
+			visSet[i1] = 0;
+			visSet[i2] = 0;
+			visSet[i3] = 0;
 		}
 
-		for (int i = maxIndex & -8; i < maxIndex; i++) {
-			visSet[graphIndices[i]] = 0;
+		for (int j = maxIndex & -4; j < maxIndex; j++) {
+			visSet[graphIndices[j]] = 0;
 		}
 	}
 
-	public static int getFlagIndex(int offsetX, int sectionY, int offsetZ, int radius) {
-		int rd = (radius * 2 + 1);
-		return offsetX + (sectionY * rd) + (offsetZ * rd * 16);
-	}
-
-	public void queueFlagChange(SectionRender section) {
-		this.queuedChanges.add(section.globalPosition);
+	public int getFlagIndex(int offsetX, int sectionY, int offsetZ) {
+		int diameter = (this.radius * 2 + 1);
+		return offsetX + (sectionY + (offsetZ << 4)) * diameter;
 	}
 
 	private void updateAllFlags(WorldManager manager) {
 		int size = MathExt.square(this.radius * 2 + 1) * 16;
 
 		if (this.sectionFlags == null || this.sectionFlags.length != size) {
-			this.initializeFlagData(manager);
+			this.initializeFlagData();
 			return;
 		}
 
@@ -348,21 +389,19 @@ public class SectionSet {
 			return;
 		}
 
-		// 1D : X
-		// 2D : Y
-		// 3D : Z
+		// [X][Y][Z]
 		for (int x = -radius; x <= radius; x++) {
 			for (int z = -radius; z <= radius; z++) {
 				int chunkX = x + cameraChunkX;
 				int chunkZ = z + cameraChunkZ;
 
-				if (!(Math.abs(chunkX - lastCameraChunkX) <= radius && Math.abs(chunkZ - lastCameraChunkZ) <= radius)) {
+				if (Math.abs(chunkX - lastCameraChunkX) > radius || Math.abs(chunkZ - lastCameraChunkZ) > radius) {
 					continue;
 				}
 
 				for (int sectionY = 0; sectionY < 16; sectionY++) {
-					int lastFlagIndex = getFlagIndex(x + diffCameraX + radius, sectionY, z + diffCameraZ + radius, radius);
-					int flagIndex = getFlagIndex(x + radius, sectionY, z + radius, radius);
+					int lastFlagIndex = this.getFlagIndex(x + diffCameraX + radius, sectionY, z + diffCameraZ + radius);
+					int flagIndex = this.getFlagIndex(x + radius, sectionY, z + radius);
 
 					this.tempFlags[flagIndex] = this.sectionFlags[lastFlagIndex];
 				}
@@ -385,18 +424,16 @@ public class SectionSet {
 		int cameraChunkZ = this.camera.intZ >> 4;
 		int radius = this.radius;
 
-		for (long position : this.queuedChanges) {
+		ByteIterator valueIterator = this.flagChangesQueued.values().iterator();
+		LongIterator keysIterator = this.flagChangesQueued.keySet().iterator();
+
+		while (valueIterator.hasNext()) {
+			int flag = valueIterator.nextByte();
+			long position = keysIterator.nextLong();
+
 			int sectionX = MathExt.decodeX(position);
 			int sectionY = MathExt.decodeY(position);
 			int sectionZ = MathExt.decodeZ(position);
-
-			SectionRender section = this.getSection(sectionX, sectionY, sectionZ);
-
-			if (section == null) {
-				continue;
-			}
-
-			int flags = CompressedFlags.sectionToCompressed(section.flags);
 
 			int diffChunkX = sectionX - cameraChunkX;
 			int diffChunkZ = sectionZ - cameraChunkZ;
@@ -405,10 +442,10 @@ public class SectionSet {
 				continue;
 			}
 
-			this.setFlag(diffChunkX + radius, sectionY, diffChunkZ + radius, flags);
+			this.setFlag(diffChunkX + radius, sectionY, diffChunkZ + radius, flag);
 		}
 
-		this.queuedChanges.clear();
+		this.flagChangesQueued.clear();
 	}
 
 	public int getRadius() {
@@ -420,7 +457,7 @@ public class SectionSet {
 			return;
 		}
 
-		int flagIndex = getFlagIndex(offsetX, sectionY, offsetZ, this.radius);
+		int flagIndex = this.getFlagIndex(offsetX, sectionY, offsetZ);
 		this.sectionFlags[flagIndex] = (byte) flag;
 	}
 }

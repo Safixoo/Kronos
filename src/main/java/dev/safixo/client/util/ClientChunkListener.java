@@ -4,9 +4,11 @@ import dev.safixo.client.render.pipelines.terrain.WorldManager;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ChunkProviderClient;
+import net.minecraft.client.multiplayer.WorldClient;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.EmptyChunk;
+import net.minecraft.world.chunk.IChunkProvider;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.world.ChunkEvent;
 
@@ -23,12 +25,19 @@ public class ClientChunkListener extends ChunkProviderClient {
 		this.blankChunk = new EmptyChunk(world, 0, 0);
 	}
 
+	public static ClientChunkListener getChunkListener() {
+		WorldClient worldClient = Minecraft.getMinecraft().theWorld;
+		IChunkProvider provider = worldClient.getChunkProvider();
+
+		return (ClientChunkListener) provider;
+	}
+
 	@Override
 	public String makeString() {
 		return "KronosChunkCache: " + this.chunkMap.getSize();
 	}
 
-	public boolean shouldLoadChunk(int x, int z) {
+	public boolean canLoadChunk(int x, int z) {
 		ChunkMetadata meta = (ChunkMetadata) this.chunkMap.get(MathExt.asLong(x, z));
 		return meta != null && meta.adjacentMask == 0b111_111_111;
 	}

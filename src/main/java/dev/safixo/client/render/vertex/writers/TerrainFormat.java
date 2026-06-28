@@ -1,6 +1,7 @@
 package dev.safixo.client.render.vertex.writers;
 
 import com.google.common.collect.ImmutableList;
+import dev.safixo.client.render.pipelines.terrain.region.RegionConstants;
 import dev.safixo.client.util.memory.UnsafeUtil;
 import dev.safixo.client.render.vertex.VertexWriter;
 import dev.safixo.client.render.gfx.vertex.GlVertexFormat;
@@ -16,7 +17,7 @@ public class TerrainFormat extends GlVertexFormat {
 	static final float UV_PRECISION = (1 << UV_BITS);
 
 	public static final float RADIUS = 0.5f;
-	public static final float SCALE = (1 << POSITION_BITS) / (DIAMETER_X + RADIUS * 2.0f);
+	public static final float SCALE = (1 << POSITION_BITS) / (RegionConstants.DIAMETER_X + RADIUS * 2.0f);
 
 	public TerrainFormat(ImmutableList<GlVertexAttribute> vertexProperties) {
 		super(vertexProperties);

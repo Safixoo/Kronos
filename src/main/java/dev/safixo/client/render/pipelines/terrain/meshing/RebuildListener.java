@@ -9,13 +9,6 @@ import net.minecraft.client.renderer.RenderGlobal;
 import net.minecraft.world.chunk.IChunkProvider;
 
 public class RebuildListener {
-	public static ClientChunkListener getChunkListener() {
-		WorldClient worldClient = Minecraft.getMinecraft().theWorld;
-		IChunkProvider provider = worldClient.getChunkProvider();
-
-		return (ClientChunkListener) provider;
-	}
-
 	public static void notifyBlockUpdateRange(int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
 		minY = MathExt.clamp(minY, 0, 255);
 		maxY = MathExt.clamp(maxY, 0, 255);
@@ -25,11 +18,11 @@ public class RebuildListener {
 		minZ >>= 4; maxZ >>= 4;
 
 		WorldManager manager = WorldManager.getCurrentInstance();
-		ClientChunkListener provider = getChunkListener();
+		ClientChunkListener provider = ClientChunkListener.getChunkListener();
 
 		for (int x = minX; x <= maxX; x++) {
 			for (int z = minZ; z <= maxZ; z++) {
-				if (!provider.shouldLoadChunk(x, z)) {
+				if (!provider.canLoadChunk(x, z)) {
 					continue;
 				}
 

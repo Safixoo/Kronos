@@ -1,5 +1,6 @@
 package dev.safixo.client.util.data;
 
+import dev.safixo.client.util.MathExt;
 import net.minecraft.client.Minecraft;
 
 public class CameraData {
@@ -14,14 +15,22 @@ public class CameraData {
 	public final int renderDistance;
 	private final float yaw, pitch, fov;
 
-	public CameraData(float fractX, float fractY, float fractZ, int cameraX, int cameraY, int cameraZ, int renderDistance) {
+	public CameraData(double cameraX, double cameraY, double cameraZ, int renderDistance) {
+		int intX = MathExt.floor(cameraX);
+		int intY = MathExt.floor(cameraY);
+		int intZ = MathExt.floor(cameraZ);
+
+		float fractX = (float) (cameraX - intX);
+		float fractY = (float) (cameraY - intY);
+		float fractZ = (float) (cameraZ - intZ);
+
 		this.fractX = fractX;
 		this.fractY = fractY;
 		this.fractZ = fractZ;
 
-		this.intX = cameraX;
-		this.intY = cameraY;
-		this.intZ = cameraZ;
+		this.intX = intX;
+		this.intY = intY;
+		this.intZ = intZ;
 
 		Minecraft minecraft = Minecraft.getMinecraft();
 

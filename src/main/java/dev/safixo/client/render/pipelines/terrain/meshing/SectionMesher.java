@@ -8,6 +8,7 @@ import dev.safixo.client.render.pipelines.terrain.meshing.builders.VoxelMesherCe
 import dev.safixo.client.render.pipelines.terrain.meshing.data.CullSetGenerator;
 import dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache;
 import dev.safixo.client.render.pipelines.terrain.region.RegionAllocation;
+import dev.safixo.client.render.pipelines.terrain.region.RegionConstants;
 import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
 import dev.safixo.client.render.vertex.DefaultVertexFormats;
 import dev.safixo.client.render.vertex.VertexWriter;
@@ -16,7 +17,6 @@ import dev.safixo.client.util.MeshDirection;
 import dev.safixo.client.util.data.CameraData;
 import dev.safixo.client.util.data.PrimitivesFlags;
 import dev.safixo.client.util.memory.UnsafeUtil;
-import it.unimi.dsi.fastutil.objects.ReferenceArrayList;
 import net.minecraft.block.Block;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderBlocks;
@@ -26,15 +26,13 @@ import net.minecraft.tileentity.TileEntity;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
 
-import java.util.Set;
-
 import static dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache.makeBlockIndex;
 import static dev.safixo.client.util.Direction.*;
 
 public class SectionMesher {
 	private static final int AIR_ID = 0;
 
-	public static boolean buildMesh(SectionRender section, CameraData camera, WorldManager worldManager, World world, Set<TileEntity> tileSet) {
+	public static boolean buildMesh(SectionRender section, CameraData camera, WorldManager worldManager, World world) {
 		Chunk.isLit = false;
 
 		SectionCache sectionCache = new SectionCache(world, section.blockX, section.blockY, section.blockZ);
@@ -45,13 +43,6 @@ public class SectionMesher {
 			prepareWriterForTerrain(section, VertexWriter.SOLID[dir]);
 		}
 		prepareWriterForTerrain(section, translucentWriter);
-
-		if (section.tileEntities != null && !section.tileEntities.isEmpty()) {
-			for (int i = 0; i < section.tileEntities.size(); i++) {
-				tileSet.remove(section.tileEntities.get(i));
-			}
-			section.tileEntities.clear();
-		}
 
 		int cameraChunkX = camera.intX >> 4, cameraChunkY = camera.intY >> 4, cameraChunkZ = camera.intZ >> 4;
 		int sectionX = section.blockX >> 4, sectionY = section.blockY >> 4, sectionZ = section.blockZ >> 4;
@@ -110,9 +101,6 @@ public class SectionMesher {
 					}
 				}
 			}
-			if (section.tileEntities != null && !section.tileEntities.isEmpty()) {
-				tileSet.addAll(section.tileEntities);
-			}
 		} else {
 			section.setFlags(SectionFlags.setCullFaces(section.flags, 0b0));
 		}
@@ -127,13 +115,16 @@ public class SectionMesher {
 		uploadMeshesToRegion(worldManager, section, translucentWriter, sumVertices, meshDrawOrder);
 
 		byte drawMask = (byte) (solidDrawMask << 1 & 0b1_111_111_0 | translucentDrawMask);
-		section.region.drawDataMask[section.regionIndex] = drawMask;
+		section.region.setDrawMask(section.regionIndex, drawMask);;
 
 		int nonEmptyTranslucent = (translucentDrawMask << 1) & 0b10;
 		int nonEmptySolid = solidDrawMask != 0 ? 0b01 : 0;
 
 		section.setFlags(SectionFlags.setDirty(section.flags, false));
 		section.setFlags(SectionFlags.setPassesNonEmpty(section.flags, nonEmptyTranslucent | nonEmptySolid));
+
+		uploadAllTileEntities(worldManager, section);
+		section.clearTileEntityList();
 
 		for (int dir = 0; dir < MeshDirection.COUNT; dir++) {
 			VertexWriter.SOLID[dir].stopDrawing();
@@ -175,10 +166,7 @@ public class SectionMesher {
 				TileEntity tileEntity = cache.getBlockTileEntity(blockX, blockY, blockZ);
 
 				if (TileEntityRenderer.instance.hasSpecialRenderer(tileEntity)) {
-					if (section.tileEntities == null) {
-						section.tileEntities = new ReferenceArrayList<>();
-					}
-					section.tileEntities.add(tileEntity);
+					section.addTileEntity(tileEntity);
 				}
 			}
 
@@ -227,10 +215,7 @@ public class SectionMesher {
 				TileEntity tileEntity = cache.getBlockTileEntity(blockX, blockY, blockZ);
 
 				if (TileEntityRenderer.instance.hasSpecialRenderer(tileEntity)) {
-					if (section.tileEntities == null) {
-						section.tileEntities = new ReferenceArrayList<>();
-					}
-					section.tileEntities.add(tileEntity);
+					section.addTileEntity(tileEntity);
 				}
 			}
 
@@ -246,7 +231,7 @@ public class SectionMesher {
 
 	private static void uploadMeshesToRegion(WorldManager manager, SectionRender section, VertexWriter translucentWriter, int sumVertices, int meshDrawOrder) {
 		if (sumVertices > 0) {
-			if (section.region == RegionRender.NULL) {
+			if (section.region == RegionConstants.NULL) {
 				section.region = manager.getRegion(section.blockX >> 4, section.blockY >> 4, section.blockZ >> 4);
 			}
 
@@ -259,7 +244,7 @@ public class SectionMesher {
 		}
 
 		if (translucentWriter.getVertices() != 0) {
-			if (section.region == RegionRender.NULL) {
+			if (section.region == RegionConstants.NULL) {
 				section.region = manager.getRegion(section.blockX >> 4, section.blockY >> 4, section.blockZ >> 4);
 			}
 
@@ -287,6 +272,22 @@ public class SectionMesher {
 		}
 
 		return mask;
+	}
+
+	private static void uploadAllTileEntities(WorldManager manager, SectionRender section) {
+		TileEntity[] tileEntities = section.getTileEntityArray();
+
+		if (tileEntities == null) {
+			if (section.region != RegionConstants.NULL) {
+				section.region.getTileEntityManager().removeTileEntities(section.regionIndex);
+			}
+			return;
+		}
+
+		if (section.region == RegionConstants.NULL) {
+			section.region = manager.getRegion(section.blockX >> 4, section.blockY >> 4, section.blockZ >> 4);
+		}
+		section.region.getTileEntityManager().addTileEntities(tileEntities, section.regionIndex);
 	}
 
 	private static VertexWriter JOINER;
@@ -328,9 +329,9 @@ public class SectionMesher {
 		writerManager.startDrawing();
 
 		// Region translation-offset.
-		writerManager.trasX = -(section.blockX & ~RegionRender.BLOCK_BITS_X);
-		writerManager.trasY = -(section.blockY & ~RegionRender.BLOCK_BITS_Y);
-		writerManager.trasZ = -(section.blockZ & ~RegionRender.BLOCK_BITS_Z);
+		writerManager.trasX = -(section.blockX & ~RegionConstants.BLOCK_BITS_X);
+		writerManager.trasY = -(section.blockY & ~RegionConstants.BLOCK_BITS_Y);
+		writerManager.trasZ = -(section.blockZ & ~RegionConstants.BLOCK_BITS_Z);
 
 		writerManager.setVertexFormat(DefaultVertexFormats.TERRAIN_FORMAT);
 	}

@@ -8,8 +8,6 @@ import dev.safixo.client.render.pipelines.terrain.shader.TerrainProgram;
 import dev.safixo.client.util.ClientChunkListener;
 import dev.safixo.core.hooks.RenderGlobalHook;
 import dev.safixo.core.hooks.VertexRedirector;
-import it.unimi.dsi.fastutil.longs.*;
-import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.EntityClientPlayerMP;
 import net.minecraft.client.multiplayer.WorldClient;
@@ -27,12 +25,10 @@ import dev.safixo.client.util.data.PrimitivesFlags;
 import dev.safixo.client.util.data.CameraData;
 import dev.safixo.client.render.pipelines.terrain.region.RegionManager;
 import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
-import dev.safixo.client.util.Direction;
 import dev.safixo.client.util.MathExt;
 import org.lwjgl.opengl.GL11;
 
 import java.util.List;
-import java.util.Set;
 
 public class WorldManager {
 	public static final int MAX_FULL_UPDATES = 7;
@@ -41,8 +37,6 @@ public class WorldManager {
 
 	private LinearFogProgram linearFogProgram;
 	private ExpFogProgram expFogProgram;
-
-	private final ReferenceOpenHashSet<TileEntity> tileEntitiesSet = new ReferenceOpenHashSet<>();
 
 	private final SectionSet sectionSet = new SectionSet();
 	private final BFSCuller bfsCuller = new BFSCuller();
@@ -122,20 +116,24 @@ public class WorldManager {
 		this.terrainDirty = true;
 	}
 
-	public static void destroyInstance() {
+	public static void freeInstance() {
 		if (INSTANCE == null) {
 			return;
 		}
+		INSTANCE.clearInstance();
+	}
 
-		if (INSTANCE.expFogProgram != null) {
-			INSTANCE.expFogProgram.delete();
+	private void clearInstance() {
+		if (this.expFogProgram != null) {
+			this.expFogProgram.delete();
+			this.expFogProgram = null;
 		}
-		if (INSTANCE.linearFogProgram != null) {
-			INSTANCE.linearFogProgram.delete();
+		if (this.linearFogProgram != null) {
+			this.linearFogProgram.delete();
+			this.linearFogProgram = null;
 		}
 
-		INSTANCE.clearRenderer();
-		INSTANCE = null;
+		this.clearRenderer();
 	}
 
 	public boolean hasGraphUpdated() {
@@ -143,7 +141,7 @@ public class WorldManager {
 	}
 
 	public void update(WorldClient world, int renderDistance, double cameraX, double cameraY, double cameraZ, boolean worldChanged, float partialTick) {
-		CameraData camera = extractCameraData(cameraX, cameraY, cameraZ, renderDistance);
+		CameraData camera = new CameraData(cameraX, cameraY, cameraZ, renderDistance);
 
 		boolean shouldUpdateGraph = !camera.equals(this.camera) || this.terrainDirty;
 		this.camera = camera;
@@ -155,10 +153,7 @@ public class WorldManager {
 			this.renderDistance = renderDistance;
 			this.worldObj = world;
 
-			this.tileEntitiesSet.clear();
 			this.sectionSet.clearSectionSet();
-
-			this.generateWholeVolume(camera);
 		}
 
 		IChunkProvider provider = world.getChunkProvider();
@@ -193,33 +188,19 @@ public class WorldManager {
 		profiler.endStartSection("updatechunks");
 
 		this.regionManager.update(this.camera, renderDistance, worldChanged);
-		this.queueRebuilds(this.tileEntitiesSet);
+		this.queueRebuilds();
 
 		profiler.endStartSection("ticking");
 
 		@SuppressWarnings("unchecked")
 		List<TileEntity> tileEntities = (List<TileEntity>) Minecraft.getMinecraft().renderGlobal.tileEntities;
-
-		tileEntities.clear();
-		tileEntities.addAll(this.tileEntitiesSet);
+		this.regionManager.iterateAllTileEntities(tileEntities);
 
 		profiler.endStartSection("updatechunks");
 	}
 
 	public SectionSet getSectionSet() {
 		return this.sectionSet;
-	}
-
-	private static CameraData extractCameraData(double cameraX, double cameraY, double cameraZ, int renderDistance) {
-		int playerX = MathExt.floor(cameraX);
-		int playerY = MathExt.floor(cameraY);
-		int playerZ = MathExt.floor(cameraZ);
-
-		float fractX = (float) (cameraX - playerX);
-		float fractY = (float) (cameraY - playerY);
-		float fractZ = (float) (cameraZ - playerZ);
-
-		return new CameraData(fractX, fractY, fractZ, playerX, playerY, playerZ, renderDistance);
 	}
 
 	private long lastFrameNano;
@@ -243,7 +224,7 @@ public class WorldManager {
 		return budget;
 	}
 
-	private void queueRebuilds(Set<TileEntity> tileSet) {
+	private void queueRebuilds() {
 		int rebuildSize = RebuildList.size();
 		int maxSize = Math.min(WorldManager.MAX_UPDATES_TRIES, rebuildSize);
 
@@ -269,15 +250,19 @@ public class WorldManager {
 
 			SectionRender section = this.sectionSet.getSection(sectionX, sectionY, sectionZ);
 
-			if (section != null && section.isDirty()) {
-				boolean nonEmpty = SectionMesher.buildMesh(section, this.camera, this, this.worldObj, tileSet);
+			if (section == null) {
+				continue;
+			}
+
+			if (section.isDirty()) {
+				boolean nonEmpty = SectionMesher.buildMesh(section, this.camera, this, this.worldObj);
 
 				if (nonEmpty) {
 					nonEmptyUpdates++;
 				}
 			}
 
-			if (section != null && this.isBudgetOver(current, budget)) {
+			if (this.isBudgetOver(current, budget)) {
 				int distance = distanceToSection(section, this.camera);
 				int minUpdates = distance <= 20*20 ? 2 : 1;
 
@@ -285,6 +270,8 @@ public class WorldManager {
 					break;
 				}
 			}
+
+			section.sendFlagsToSet();
 		}
 
 		VertexRedirector.ORGANIZE_NORMALS = false;
@@ -314,29 +301,8 @@ public class WorldManager {
 		return MathExt.square(dX) + MathExt.square(dY) + MathExt.square(dZ);
 	}
 
-	private void generateWholeVolume(CameraData camera) {
-		int cameraChunkX = camera.intX >> 4;
-		int cameraChunkZ = camera.intZ >> 4;
-
-		int renderDistance = this.renderDistance + 2;
-		ClientChunkListener provider = (ClientChunkListener) this.worldObj.getChunkProvider();
-
-		for (int x = -renderDistance; x <= renderDistance; x++) {
-			for (int z = -renderDistance; z <= renderDistance; z++) {
-				if (!provider.shouldLoadChunk(cameraChunkX + x, cameraChunkZ + z)) {
-					continue;
-				}
-
-				for (int y = 0; y < 16; y++) {
-					this.markDirty(cameraChunkX + x, y, cameraChunkZ + z);
-				}
-			}
-		}
-	}
-
 	private void clearRenderer() {
 		this.regionManager.clear();
-		this.tileEntitiesSet.clear();
 	}
 
 	public void drawRenderPass(int renderPass) {

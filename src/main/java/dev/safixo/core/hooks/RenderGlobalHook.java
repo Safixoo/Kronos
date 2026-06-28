@@ -46,7 +46,7 @@ public  class RenderGlobalHook {
 		}
 
 		if (MANAGER != null) {
-			WorldManager.destroyInstance();
+			WorldManager.freeInstance();
 			clearBuffers();
 		}
 
