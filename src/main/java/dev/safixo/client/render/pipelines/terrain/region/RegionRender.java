@@ -137,6 +137,10 @@ public class RegionRender {
 		return this.tileEntities;
 	}
 
+	public boolean hasTileEntities() {
+		return this.tileEntities.hasTileEntities();
+	}
+
 	public void clear() {
 		this.drawContext.invalidatePass(SOLID_PASS);
 		this.drawContext.invalidatePass(TRANSLUCENT_PASS);

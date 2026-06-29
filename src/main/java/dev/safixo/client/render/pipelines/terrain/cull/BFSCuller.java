@@ -281,13 +281,13 @@ public class BFSCuller {
 		int dz = Math.abs(diffZ + 8);
 
 		int angleOcclusionMask = 0;
-		if (dx > dy + 16 || dz > dy + 16) {
+		if (dx > dy + 32 || dz > dy + 32) {
 			angleOcclusionMask |= 0b000011;
 		}
-		if (dx > dz + 16 || dy > dz + 16) {
+		if (dx > dz + 32 || dy > dz + 32) {
 			angleOcclusionMask |= 0b001100;
 		}
-		if (dy > dx + 16 || dz > dx + 16) {
+		if (dy > dx + 32 || dz > dx + 32) {
 			angleOcclusionMask |= 0b110000;
 		}
 

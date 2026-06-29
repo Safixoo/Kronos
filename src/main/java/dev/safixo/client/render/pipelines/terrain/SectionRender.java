@@ -1,12 +1,8 @@
 package dev.safixo.client.render.pipelines.terrain;
 
-import cpw.mods.fml.common.network.NetworkMod;
 import dev.safixo.client.render.pipelines.terrain.region.RegionConstants;
 import dev.safixo.client.util.MathExt;
-import it.unimi.dsi.fastutil.objects.ReferenceArrayList;
-import it.unimi.dsi.fastutil.objects.ReferenceList;
 import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
-import net.minecraft.tileentity.TileEntity;
 
 
 public class SectionRender {
@@ -29,9 +25,7 @@ public class SectionRender {
 	// Section main data structures.
 	public RegionRender region = RegionConstants.NULL;
 
-	// Tile entities from the section.
-	private ReferenceList<TileEntity> tileEntities;
-
+	// To avoid instancing too much sections, the ones no used are marked as invalid, and re-used.
 	private boolean valid;
 
 	public SectionRender(SectionSet sectionSet, int blockX, int blockY, int blockZ) {
@@ -40,7 +34,16 @@ public class SectionRender {
 		this.setup(blockX, blockY, blockZ);
 	}
 
-	private void setup(int blockX, int blockY, int blockZ) {
+	public SectionRender(SectionSet sectionSet) {
+		this.sectionSet = sectionSet;
+		this.valid = false;
+	}
+
+	public static SectionRender invalidInstance(SectionSet sectionSet) {
+		return new SectionRender(sectionSet);
+	}
+
+	public void setup(int blockX, int blockY, int blockZ) {
 		this.blockX = blockX;
 		this.blockY = blockY;
 		this.blockZ = blockZ;
@@ -52,12 +55,8 @@ public class SectionRender {
 	public void invalidate() {
 		if (this.valid) {
 			this.clearAllocations();
-			this.clearTileEntityList();
 			this.flags = DEFAULT_FLAGS;
-		} else {
-			throw new RuntimeException("Tried to invalidate a already invalid SectionRender!");
 		}
-
 		this.valid = false;
 	}
 
@@ -65,6 +64,7 @@ public class SectionRender {
 		if (this.valid) {
 			throw new RuntimeException("Tried to re-validate a valid SectionRender!");
 		}
+		this.valid = true;
 		this.setup(blockX, blockY, blockZ);
 	}
 
@@ -76,8 +76,13 @@ public class SectionRender {
 		return SectionFlags.isDirty(this.flags);
 	}
 
+	public boolean isInvalid() {
+		return !this.valid;
+	}
+
 	public void setFlags(int flags) {
 		this.flags = flags;
+		this.sendFlagsToSet();
 	}
 
 	public void setAdjacentNeighbor(SectionRender render, int direction) {
@@ -103,21 +108,5 @@ public class SectionRender {
 
 	public void sendFlagsToSet() {
 		this.sectionSet.queueFlagForSet(this.globalPosition, this.flags);
-	}
-
-	public void addTileEntity(TileEntity tileEntity) {
-		if (this.tileEntities == null) {
-			this.tileEntities = new ReferenceArrayList<>();
-		}
-
-		this.tileEntities.add(tileEntity);
-	}
-
-	public TileEntity[] getTileEntityArray() {
-		return this.tileEntities == null ? null : this.tileEntities.toArray(new TileEntity[0]);
-	}
-
-	public void clearTileEntityList() {
-		this.tileEntities = null;
 	}
 }

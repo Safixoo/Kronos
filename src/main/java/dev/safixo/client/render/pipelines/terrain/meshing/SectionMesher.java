@@ -17,6 +17,7 @@ import dev.safixo.client.util.MeshDirection;
 import dev.safixo.client.util.data.CameraData;
 import dev.safixo.client.util.data.PrimitivesFlags;
 import dev.safixo.client.util.memory.UnsafeUtil;
+import it.unimi.dsi.fastutil.objects.ReferenceArrayList;
 import net.minecraft.block.Block;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderBlocks;
@@ -26,23 +27,28 @@ import net.minecraft.tileentity.TileEntity;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
 
+import java.util.List;
+
 import static dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache.makeBlockIndex;
 import static dev.safixo.client.util.Direction.*;
 
 public class SectionMesher {
+	private final List<TileEntity> tileEntities = new ReferenceArrayList<>();
+
 	private static final int AIR_ID = 0;
 
-	public static boolean buildMesh(SectionRender section, CameraData camera, WorldManager worldManager, World world) {
+	public boolean buildMesh(SectionRender section, CameraData camera, WorldManager worldManager, World world) {
 		Chunk.isLit = false;
+		this.tileEntities.clear();
 
 		SectionCache sectionCache = new SectionCache(world, section.blockX, section.blockY, section.blockZ);
-		RenderBlocks renderBlocks = new RenderBlocks(sectionCache);
 
 		VertexWriter translucentWriter = VertexWriter.TRANSLUCENT;
+		prepareWriterForTerrain(section, translucentWriter);
+
 		for (int dir = 0; dir < MeshDirection.COUNT; dir++) {
 			prepareWriterForTerrain(section, VertexWriter.SOLID[dir]);
 		}
-		prepareWriterForTerrain(section, translucentWriter);
 
 		int cameraChunkX = camera.intX >> 4, cameraChunkY = camera.intY >> 4, cameraChunkZ = camera.intZ >> 4;
 		int sectionX = section.blockX >> 4, sectionY = section.blockY >> 4, sectionZ = section.blockZ >> 4;
@@ -52,6 +58,8 @@ public class SectionMesher {
 		boolean insideSection = cameraChunkX == sectionX && cameraChunkY == sectionY && cameraChunkZ == sectionZ;
 
 		if (!airEmpty) {
+			RenderBlocks renderBlocks = new RenderBlocks(sectionCache);
+
 			WorldRenderer.chunksUpdated++;
 			section.setFlags(SectionFlags.setCullFaces(section.flags, CullSetGenerator.floodFillSection(section, camera)));
 
@@ -123,8 +131,8 @@ public class SectionMesher {
 		section.setFlags(SectionFlags.setDirty(section.flags, false));
 		section.setFlags(SectionFlags.setPassesNonEmpty(section.flags, nonEmptyTranslucent | nonEmptySolid));
 
-		uploadAllTileEntities(worldManager, section);
-		section.clearTileEntityList();
+		this.uploadAllTileEntities(worldManager, section);
+		this.clearTileEntityList();
 
 		for (int dir = 0; dir < MeshDirection.COUNT; dir++) {
 			VertexWriter.SOLID[dir].stopDrawing();
@@ -136,7 +144,7 @@ public class SectionMesher {
 		return !airEmpty;
 	}
 
-	private static void meshBlockCenter(SectionRender section, RenderBlocks renderBlocks, SectionCache cache, int x, int y, int z, boolean ambient) {
+	private void meshBlockCenter(SectionRender section, RenderBlocks renderBlocks, SectionCache cache, int x, int y, int z, boolean ambient) {
 		int blockIndex = makeBlockIndex(x, y, z);
 		int blockId = cache.getBlockIdCenter(blockIndex);
 
@@ -166,7 +174,7 @@ public class SectionMesher {
 				TileEntity tileEntity = cache.getBlockTileEntity(blockX, blockY, blockZ);
 
 				if (TileEntityRenderer.instance.hasSpecialRenderer(tileEntity)) {
-					section.addTileEntity(tileEntity);
+					this.addTileEntity(tileEntity);
 				}
 			}
 
@@ -180,7 +188,7 @@ public class SectionMesher {
 		}
 	}
 
-	private static void meshBlock(SectionRender section, RenderBlocks renderBlocks, SectionCache cache, int x, int y, int z, boolean ambient) {
+	private void meshBlock(SectionRender section, RenderBlocks renderBlocks, SectionCache cache, int x, int y, int z, boolean ambient) {
 		int blockIndex = makeBlockIndex(x, y, z);
 		int blockId = cache.getBlockIdCenter(blockIndex);
 
@@ -215,7 +223,7 @@ public class SectionMesher {
 				TileEntity tileEntity = cache.getBlockTileEntity(blockX, blockY, blockZ);
 
 				if (TileEntityRenderer.instance.hasSpecialRenderer(tileEntity)) {
-					section.addTileEntity(tileEntity);
+					this.addTileEntity(tileEntity);
 				}
 			}
 
@@ -274,8 +282,8 @@ public class SectionMesher {
 		return mask;
 	}
 
-	private static void uploadAllTileEntities(WorldManager manager, SectionRender section) {
-		TileEntity[] tileEntities = section.getTileEntityArray();
+	private void uploadAllTileEntities(WorldManager manager, SectionRender section) {
+		TileEntity[] tileEntities = this.getTileEntityArray();
 
 		if (tileEntities == null) {
 			if (section.region != RegionConstants.NULL) {
@@ -334,5 +342,17 @@ public class SectionMesher {
 		writerManager.trasZ = -(section.blockZ & ~RegionConstants.BLOCK_BITS_Z);
 
 		writerManager.setVertexFormat(DefaultVertexFormats.TERRAIN_FORMAT);
+	}
+
+	public void addTileEntity(TileEntity tileEntity) {
+		this.tileEntities.add(tileEntity);
+	}
+
+	public TileEntity[] getTileEntityArray() {
+		return this.tileEntities.isEmpty() ? null : this.tileEntities.toArray(new TileEntity[0]);
+	}
+
+	public void clearTileEntityList() {
+		this.tileEntities.clear();
 	}
 }

@@ -1,10 +1,19 @@
 package dev.safixo.client.render.pipelines.terrain;
 
 public class SectionFlags {
-	public static final int PASSES_NON_EMPTY    = 0b000000000000011; // 1-2b
-	public static final int ADJACENT_MASK       = 0b000000011111100; // 3-8b
-	public static final int CULL_FACES          = 0b011111100000000; // 9-15b
-	public static final int DIRTY               = 0b100000000000000; // 16b
+	public static final int PASSES_NON_EMPTY    = 0b0000000000000011; // 1-2b
+	public static final int ADJACENT_MASK       = 0b0000000011111100; // 3-8b
+	public static final int CULL_FACES          = 0b0011111100000000; // 9-14b
+	public static final int DIRTY               = 0b0100000000000000; // 15b
+	public static final int VALID             = 0b1000000000000000; // 15b
+
+	public static int setValid(int flags, boolean valid) {
+		return (flags & ~VALID) | (valid ? 1 : 0);
+	}
+
+	public static boolean isValid(int flags) {
+		return (flags & VALID) != 0;
+	}
 
 	public static int setPassesNonEmpty(int flags, int nonEmpty) {
 		return (flags & ~PASSES_NON_EMPTY) | nonEmpty << 0;

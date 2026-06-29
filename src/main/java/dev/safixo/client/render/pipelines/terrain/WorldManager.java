@@ -38,6 +38,7 @@ public class WorldManager {
 	private LinearFogProgram linearFogProgram;
 	private ExpFogProgram expFogProgram;
 
+	private final SectionMesher mesher = new SectionMesher();
 	private final SectionSet sectionSet = new SectionSet();
 	private final BFSCuller bfsCuller = new BFSCuller();
 	private final RegionManager regionManager = new RegionManager();
@@ -255,7 +256,7 @@ public class WorldManager {
 			}
 
 			if (section.isDirty()) {
-				boolean nonEmpty = SectionMesher.buildMesh(section, this.camera, this, this.worldObj);
+				boolean nonEmpty = this.mesher.buildMesh(section, this.camera, this, this.worldObj);
 
 				if (nonEmpty) {
 					nonEmptyUpdates++;
@@ -270,8 +271,6 @@ public class WorldManager {
 					break;
 				}
 			}
-
-			section.sendFlagsToSet();
 		}
 
 		VertexRedirector.ORGANIZE_NORMALS = false;

@@ -167,6 +167,10 @@ public class RegionManager {
 		globalList.clear();
 
 		for (RegionRender region : this.regionMap.values()) {
+			if (!region.hasTileEntities()) {
+				continue;
+			}
+
 			region.getTileEntityManager().iterateTileEntities(globalList);
 		}
 	}

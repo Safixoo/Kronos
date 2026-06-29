@@ -22,4 +22,8 @@ public class RegionTileEntities {
 			Collections.addAll(globalList, tileEntities);
 		}
 	}
+
+	public boolean hasTileEntities() {
+		return !this.tileEntitiesPerSection.isEmpty();
+	}
 }

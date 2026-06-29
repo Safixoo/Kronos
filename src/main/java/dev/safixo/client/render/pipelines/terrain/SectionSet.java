@@ -145,16 +145,21 @@ public class SectionSet {
 
 		if (this.sections == null || this.sections.length != arrayLength) {
 			this.sections = new SectionRender[arrayLength];
+
+			for (int i = 0; i < arrayLength; i++) {
+				this.sections[i] = SectionRender.invalidInstance(this);
+			}
+
 			changed = true;
 		}
+
+		this.calculateTranslatedSections(ClientChunkListener.getChunkListener(), lastCamera);
 
 		if (changed || worldChanged) {
 			this.markAllVolumeDirty();
 		} else {
 			this.markQueuedDirty(ClientChunkListener.getChunkListener());
 		}
-
-		this.calculateTranslatedSections(ClientChunkListener.getChunkListener(), lastCamera);
 	}
 
 	private void markQueuedDirty(ClientChunkListener chunkMap) {
@@ -182,20 +187,16 @@ public class SectionSet {
 		int sectionIndex = this.getSectionIndex(sectionX, sectionY, sectionZ);
 		SectionRender section = this.sections[sectionIndex];
 
-		if (section == null) {
-			section = this.sections[sectionIndex] = new SectionRender(this, sectionX << 4, sectionY << 4, sectionZ << 4);
-			this.connectNeighbors(section);
-		} else {
-			if (section.blockX >> 4 != sectionX || section.blockZ >> 4 != sectionZ) {
-				this.disconnectNeighbors(section);
-				section.invalidate();
-
-				section.revalidate(sectionX << 4, sectionY << 4, sectionZ << 4);
-				this.connectNeighbors(section);
-			}
+		if (section.blockX >> 4 != sectionX || section.blockZ >> 4 != sectionZ) {
+			section.invalidate();
 		}
+
+		if (section.isInvalid()) {
+			section.revalidate(sectionX << 4, sectionY << 4, sectionZ << 4);
+			this.connectNeighbors(section);
+		}
+
 		section.markDirty(true);
-		section.sendFlagsToSet();
 	}
 
 	private void calculateTranslatedSections(ClientChunkListener chunkMap, CameraData lastCamera) {
@@ -213,23 +214,23 @@ public class SectionSet {
 
 		for (int offsetX = -radius; offsetX <= radius; offsetX++) {
 			for (int offsetZ = -radius; offsetZ <= radius; offsetZ++) {
-				if (Math.abs(offsetX + diffCameraChunkX) > radius || Math.abs(offsetZ + diffCameraChunkZ) > radius) {
-					int chunkX = offsetX + currentCameraChunkX;
-					int chunkZ = offsetZ + currentCameraChunkZ;
+				if (Math.abs(offsetX + diffCameraChunkX) <= radius && Math.abs(offsetZ + diffCameraChunkZ) <= radius) {
+					continue;
+				}
 
-					for (int sectionY = 0; sectionY < 16; sectionY++) {
-						int sectionIndex = this.getSectionIndex(chunkX, sectionY, chunkZ);
-						SectionRender section = this.sections[sectionIndex];
+				int chunkX = offsetX + currentCameraChunkX;
+				int chunkZ = offsetZ + currentCameraChunkZ;
 
-						if (section != null) {
-							section.clearAllocations();
-							this.disconnectNeighbors(section);
-						}
+				for (int sectionY = 0; sectionY < 16; sectionY++) {
+					int sectionIndex = this.getSectionIndex(chunkX, sectionY, chunkZ);
+					SectionRender section = this.sections[sectionIndex];
 
-						section = this.sections[sectionIndex] = new SectionRender(this, chunkX << 4, sectionY << 4, chunkZ << 4);
-						this.connectNeighbors(section);
+					if (section.isInvalid()) {
+						section.setup(chunkX << 4, sectionY << 4, chunkZ << 4);
+					} else {
+						this.disconnectNeighbors(section);
 
-						section.sendFlagsToSet();
+						section.invalidate();
 					}
 				}
 			}
@@ -296,7 +297,7 @@ public class SectionSet {
 
 		SectionRender sectionRender = this.sections[this.getSectionIndex(sectionX, sectionY, sectionZ)];
 
-		if (sectionRender != null && sectionRender.blockX >> 4 == sectionX && sectionRender.blockZ >> 4 == sectionZ) {
+		if (sectionRender != null && !sectionRender.isInvalid() && sectionRender.blockX >> 4 == sectionX && sectionRender.blockZ >> 4 == sectionZ) {
 			return sectionRender;
 		}
 
@@ -312,10 +313,12 @@ public class SectionSet {
 			return;
 		}
 
-		for (int i = 0; i < this.sections.length; i++) {
-			if (this.sections[i] != null) {
-				this.sections[i].clearAllocations();
+		for (SectionRender section : this.sections) {
+			if (section.isInvalid()) {
+				continue;
 			}
+
+			section.invalidate();
 		}
 	}
 
