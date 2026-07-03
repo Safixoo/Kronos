@@ -9,7 +9,7 @@ import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
 import dev.safixo.client.util.Direction;
 import dev.safixo.client.util.MathExt;
 
-import static dev.safixo.client.render.pipelines.terrain.CompressedFlags.*;
+import static dev.safixo.client.render.pipelines.terrain.SectionFlags.*;
 
 public class BFSCuller {
 	private static final long[] INV_DIVS = new long[256];
@@ -26,13 +26,15 @@ public class BFSCuller {
 		}
 	}
 
-	public void init(RegionManager regionManager) {
+	public void clearUpdateIndices() {
+		RebuildList.clear();
+		BFSQueue.clear();
+	}
+
+	public void resetRegionCounters(RegionManager regionManager) {
 		for (RegionRender render : regionManager.regionMap.values()) {
 			render.resetRenderIndex();
 		}
-
-		RebuildList.clear();
-		BFSQueue.clear();
 	}
 
 	/**
@@ -45,7 +47,7 @@ public class BFSCuller {
 		int blockZ = camera.intZ;
 
 		SectionSet sectionSet = manager.getSectionSet();
-		SectionRender origin = sectionSet.getSection(blockX >> 4, blockY >> 4, blockZ >> 4);
+		SectionRender origin = sectionSet.getSectionInstance(manager, blockX >> 4, blockY >> 4, blockZ >> 4);
 
 		int radius = sectionSet.getRadius();
 		int cameraIndex = sectionSet.getFlagIndex(radius, blockY >> 4, radius);
@@ -56,7 +58,7 @@ public class BFSCuller {
 			int flags = origin.flags;
 
 			int diameter = radius * 2 + 1;
-			int directions = SectionFlags.getAdjacentMask(flags) & ~SectionFlags.getCullFaces(flags);
+			int directions = 0x3F;
 			traverseNeighbors(visibilitySet, cameraIndex, diameter, directions);
 
 			if (SectionFlags.isDirty(flags)) {
@@ -119,8 +121,8 @@ public class BFSCuller {
 	 * different ideas to avoid section queueing during the search.
 	 */
 	private static void iterateGraph(SectionSet sectionSet, int playerX, int playerY, int playerZ, int maxDistSquared) {
-		byte[] sectionFlags = sectionSet.sectionFlags;
-		short[] visSet = sectionSet.visibilitySet;
+		byte[] sectionFlags = sectionSet.getFastSectionsSet();
+		short[] visSet = sectionSet.getVisibilitySet();
 
 		int radius = sectionSet.getRadius();
 		int diameter = radius * 2 + 1;
@@ -156,7 +158,7 @@ public class BFSCuller {
 
 			queueRenderTasks(flags, diffSectX, sectionY, diffSectZ);
 			int outwardDirections = getOutwardDirections(diffSectX, diffSectY, diffSectZ);
-			int directions = getTraversableFaces(flags) & outwardDirections;
+			int directions = ~getSolidFaces(flags) & outwardDirections;
 			int angleMask = getAngleVisibilityMask(diffX, diffY, diffZ);
 
 			// I don't save the incoming direction info so I can directly use the angle mask to

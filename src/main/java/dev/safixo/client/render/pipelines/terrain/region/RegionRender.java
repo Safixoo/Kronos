@@ -3,6 +3,7 @@ package dev.safixo.client.render.pipelines.terrain.region;
 import dev.safixo.client.render.gfx.util.RenderBuffer;
 import dev.safixo.client.render.pipelines.terrain.WorldManager;
 import dev.safixo.client.render.pipelines.terrain.shader.TerrainProgram;
+import dev.safixo.client.util.MathExt;
 import dev.safixo.client.util.memory.NativeBuffer;
 import dev.safixo.client.util.memory.UnsafeUtil;
 import dev.safixo.client.render.pipelines.terrain.SectionRender;
@@ -193,7 +194,7 @@ public class RegionRender {
 			this.prepareSolidPtr();
 		}
 
-		long drawData = this.solidBuffer.allocate(render, manager.getWriterPtr(), manager.getVertices());
+		long drawData = this.solidBuffer.allocate(render.globalPosition, manager.getWriterPtr(), manager.getVertices());
 		int sectionFirst = RegionAllocation.unpackFirst(drawData);
 
 		for (int dir = 0; dir < MeshDirection.COUNT; dir++) {
@@ -222,22 +223,28 @@ public class RegionRender {
 		}
 
 		int index = (render.regionIndex * TOTAL_DRAWS) + SOLID_DRAWS;
-		this.regionDrawData[index] = this.translucentBuffer.allocate(render, manager.getWriterPtr(), manager.getVertices());
+		this.regionDrawData[index] = this.translucentBuffer.allocate(render.globalPosition, manager.getWriterPtr(), manager.getVertices());
 	}
 
-	public void deleteRenderAllocation(SectionRender render) {
+	public void deleteRenderAllocation(long position) {
 		long[] drawData = this.regionDrawData;
 
-		int translucentDrawData = (render.regionIndex * TOTAL_DRAWS) + SOLID_DRAWS;
-		int solidDrawData = (render.regionIndex * TOTAL_DRAWS);
+		int sectionX = MathExt.decodeX(position);
+		int sectionY = MathExt.decodeY(position);
+		int sectionZ = MathExt.decodeZ(position);
+
+		int regionIndex = RegionRender.regionIndex(sectionX, sectionY, sectionZ);
+
+		int translucentDrawData = (regionIndex * TOTAL_DRAWS) + SOLID_DRAWS;
+		int solidDrawData = (regionIndex * TOTAL_DRAWS);
 
 		if (drawData[translucentDrawData] != 0L) {
-			this.translucentBuffer.remove(render);
+			this.translucentBuffer.remove(position);
 			drawData[translucentDrawData] = 0L;
 		}
 
 		if (this.solidBuffer != null) {
-			this.solidBuffer.remove(render);
+			this.solidBuffer.remove(position);
 			for (int dir = 0; dir < MeshDirection.COUNT; dir++) {
 				drawData[solidDrawData + dir] = 0L;
 			}

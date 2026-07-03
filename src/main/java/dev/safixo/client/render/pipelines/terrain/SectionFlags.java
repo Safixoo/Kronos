@@ -1,46 +1,34 @@
 package dev.safixo.client.render.pipelines.terrain;
 
 public class SectionFlags {
-	public static final int PASSES_NON_EMPTY    = 0b0000000000000011; // 1-2b
-	public static final int ADJACENT_MASK       = 0b0000000011111100; // 3-8b
-	public static final int CULL_FACES          = 0b0011111100000000; // 9-14b
-	public static final int DIRTY               = 0b0100000000000000; // 15b
-	public static final int VALID             = 0b1000000000000000; // 15b
+	public static final int DIRTY_FLAG = SectionFlags.setDirty(0b0, true);
+	public static final int FULL_SOLID_FLAG = SectionFlags.setSolidFaces(0b0, 0x3F);
 
-	public static int setValid(int flags, boolean valid) {
-		return (flags & ~VALID) | (valid ? 1 : 0);
-	}
+	public static final int SECTION_INVALID = (FULL_SOLID_FLAG);
+	public static final int SECTION_DEFAULT_DIRTY = (FULL_SOLID_FLAG | DIRTY_FLAG);
 
-	public static boolean isValid(int flags) {
-		return (flags & VALID) != 0;
-	}
+	private static final int SOLID_FACES_OFFSET = 0;
+	private static final int DIRTY_OFFSET       = 6;
+	private static final int PASSES_OFFSET      = 7;
+
+	private static final int PASSES      = 0b1 << PASSES_OFFSET;
+	private static final int SOLID_FACES = 0b111111 << SOLID_FACES_OFFSET;
+	private static final int DIRTY       = 0b1 << DIRTY_OFFSET;
 
 	public static int setPassesNonEmpty(int flags, int nonEmpty) {
-		return (flags & ~PASSES_NON_EMPTY) | nonEmpty << 0;
+		return (flags & ~PASSES) | (nonEmpty << PASSES_OFFSET) & PASSES;
 	}
 
 	public static boolean hasPassesNonEmpty(int flags) {
-		return (flags & PASSES_NON_EMPTY) != 0;
+		return (flags & PASSES) != 0;
 	}
 
-	public static int getPassesNonEmpty(int flags) {
-		return (flags & PASSES_NON_EMPTY);
+	public static int getSolidFaces(int flags) {
+		return (flags & SOLID_FACES) >>> SOLID_FACES_OFFSET;
 	}
 
-	public static int getAdjacentMask(int flags) {
-		return (flags & ADJACENT_MASK) >>> 2;
-	}
-
-	public static int setAdjacentMask(int flags, int adjacent) {
-		return (flags & ~ADJACENT_MASK) | (adjacent << 2);
-	}
-
-	public static int getCullFaces(int flags) {
-		return (flags & CULL_FACES) >>> 8;
-	}
-
-	public static int setCullFaces(int flags, int cullFaces) {
-		return (flags & ~CULL_FACES) | (cullFaces << 8);
+	public static int setSolidFaces(int flags, int cullFaces) {
+		return (flags & ~SOLID_FACES) | (cullFaces & SOLID_FACES) << SOLID_FACES_OFFSET;
 	}
 
 	public static boolean isDirty(int flags) {
@@ -48,6 +36,6 @@ public class SectionFlags {
 	}
 
 	public static int setDirty(int flags, boolean dirty) {
-		return (flags & ~DIRTY) | ((dirty ? 1 : 0) << 14);
+		return (flags & ~DIRTY) | (dirty ? DIRTY : 0);
 	}
 }

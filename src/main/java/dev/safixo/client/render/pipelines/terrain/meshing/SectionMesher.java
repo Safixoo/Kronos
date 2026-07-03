@@ -61,7 +61,7 @@ public class SectionMesher {
 			RenderBlocks renderBlocks = new RenderBlocks(sectionCache);
 
 			WorldRenderer.chunksUpdated++;
-			section.setFlags(SectionFlags.setCullFaces(section.flags, CullSetGenerator.floodFillSection(section, camera)));
+			section.setFlags(SectionFlags.setSolidFaces(section.flags, CullSetGenerator.floodFillSection(section, camera)));
 
 			// +-X face
 			for (int y = 0; y < 16; y++) {
@@ -99,7 +99,7 @@ public class SectionMesher {
 				}
 			}
 
-			if (insideSection || (SectionFlags.getCullFaces(section.flags) & 0b111_111) != 0b111_111) {
+			if (insideSection || SectionFlags.getSolidFaces(section.flags) != 0b111_111) {
 				// 14x14x14 center blocks.
 				for (int y = 1; y < 15; y++) {
 					for (int z = 1; z < 15; z++) {
@@ -110,8 +110,10 @@ public class SectionMesher {
 				}
 			}
 		} else {
-			section.setFlags(SectionFlags.setCullFaces(section.flags, 0b0));
+			section.setFlags(SectionFlags.setSolidFaces(section.flags, 0b0));
 		}
+
+		section.setFlags(SectionFlags.setSolidFaces(section.flags, SectionFlags.getSolidFaces(section.flags) & getAdjacentMask(sectionY)));
 
 		int sumVertices = sumAllSolidVertices();
 		int solidDrawMask = nonEmptyFacesMask();
@@ -129,7 +131,7 @@ public class SectionMesher {
 		int nonEmptySolid = solidDrawMask != 0 ? 0b01 : 0;
 
 		section.setFlags(SectionFlags.setDirty(section.flags, false));
-		section.setFlags(SectionFlags.setPassesNonEmpty(section.flags, nonEmptyTranslucent | nonEmptySolid));
+		section.setFlags(SectionFlags.setPassesNonEmpty(section.flags, (nonEmptyTranslucent | nonEmptySolid) != 0 ? 1 : 0));
 
 		this.uploadAllTileEntities(worldManager, section);
 		this.clearTileEntityList();
@@ -140,6 +142,8 @@ public class SectionMesher {
 
 		VertexWriter.DEFAULT_INSTANCE.stopDrawing();
 		translucentWriter.stopDrawing();
+
+		section.sendFlagsToSet();
 
 		return !airEmpty;
 	}
@@ -342,6 +346,18 @@ public class SectionMesher {
 		writerManager.trasZ = -(section.blockZ & ~RegionConstants.BLOCK_BITS_Z);
 
 		writerManager.setVertexFormat(DefaultVertexFormats.TERRAIN_FORMAT);
+	}
+
+	private static int getAdjacentMask(int sectionY) {
+		int adjacentMask = 0x3F;
+
+		if (sectionY == 0) {
+			adjacentMask &= ~DOWN_BIT;
+		} else if (sectionY == 15) {
+			adjacentMask &= ~UP_BIT;
+		}
+
+		return adjacentMask;
 	}
 
 	public void addTileEntity(TileEntity tileEntity) {

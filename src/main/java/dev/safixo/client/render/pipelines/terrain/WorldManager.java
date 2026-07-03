@@ -31,6 +31,8 @@ import org.lwjgl.opengl.GL11;
 import java.util.List;
 
 public class WorldManager {
+	private static final boolean DELETE_SHADERS = false;
+
 	public static final int MAX_FULL_UPDATES = 7;
 	public static final int MAX_UPDATES_TRIES = 48;
 	private static final Item DEBUG_ITEM = null;
@@ -125,16 +127,18 @@ public class WorldManager {
 	}
 
 	private void clearInstance() {
-		if (this.expFogProgram != null) {
-			this.expFogProgram.delete();
-			this.expFogProgram = null;
-		}
-		if (this.linearFogProgram != null) {
-			this.linearFogProgram.delete();
-			this.linearFogProgram = null;
+		if (DELETE_SHADERS) {
+			if (this.expFogProgram != null) {
+				this.expFogProgram.delete();
+				this.expFogProgram = null;
+			}
+			if (this.linearFogProgram != null) {
+				this.linearFogProgram.delete();
+				this.linearFogProgram = null;
+			}
 		}
 
-		this.clearRenderer();
+		this.regionManager.clear();
 	}
 
 	public boolean hasGraphUpdated() {
@@ -153,15 +157,9 @@ public class WorldManager {
 		if (this.renderDistance != renderDistance || worldChanged) {
 			this.renderDistance = renderDistance;
 			this.worldObj = world;
-
-			this.sectionSet.clearSectionSet();
 		}
 
 		IChunkProvider provider = world.getChunkProvider();
-
-		if (provider instanceof ClientChunkListener) {
-			((ClientChunkListener) provider).processAllQueuedSections(this);
-		}
 
 		EntityClientPlayerMP playerLocal = Minecraft.getMinecraft().thePlayer;
 		InventoryPlayer inventory = playerLocal.inventory;
@@ -176,10 +174,12 @@ public class WorldManager {
 			playerItem = inventory.getCurrentItem().getItem();
 		}
 
+		this.bfsCuller.clearUpdateIndices();
+
 		// For debugging occ culling.
 		//noinspection ConstantValue
 		if ((playerItem != DEBUG_ITEM || DEBUG_ITEM == null) && shouldUpdateGraph) {
-			this.bfsCuller.init(this.regionManager);
+			this.bfsCuller.resetRegionCounters(this.regionManager);
 			this.bfsCuller.updateRenderList(this, this.camera);
 			this.graphUpdated = true;
 		} else {
@@ -249,7 +249,7 @@ public class WorldManager {
 			int sectionY = MathExt.decodeY(position);
 			int sectionZ = MathExt.decodeZ(position);
 
-			SectionRender section = this.sectionSet.getSection(sectionX, sectionY, sectionZ);
+			SectionRender section = this.sectionSet.getSectionInstance(this, sectionX, sectionY, sectionZ);
 
 			if (section == null) {
 				continue;
@@ -298,10 +298,6 @@ public class WorldManager {
 		int dZ = render.blockZ - camera.intZ + 8;
 
 		return MathExt.square(dX) + MathExt.square(dY) + MathExt.square(dZ);
-	}
-
-	private void clearRenderer() {
-		this.regionManager.clear();
 	}
 
 	public void drawRenderPass(int renderPass) {

@@ -152,21 +152,21 @@ public class RegionAllocation {
 		return this.firstEntry == null;
 	}
 
-	private long createAllocation(SectionRender render, long vertexData, int size) {
+	private long createAllocation(long position, long vertexData, int size) {
 		Allocation alloc = this.fitInFree(size);
 
 		if (alloc == null) {
-			alloc = this.addAllocation(render, size);
+			alloc = this.addAllocation(position, size);
 		}
 
-		alloc.position = render.globalPosition;
+		alloc.position = position;
 		WorldManager.getCurrentInstance().addUsedMemory(alloc.vertices * STRIDE);
 
 		this.sumbitToBuffer(alloc, vertexData, size);
 		return packDrawData(size, (int) alloc.first);
 	}
 
-	private Allocation addAllocation(SectionRender render, int size) {
+	private Allocation addAllocation(long position, int size) {
 		long maxOffset = this.offset / STRIDE;
 		int sizeInBytes = size * STRIDE;
 
@@ -178,7 +178,7 @@ public class RegionAllocation {
 
 		WorldManager.getCurrentInstance().addMemory((int) this.capacity);
 
-		Allocation newAlloc = new Allocation(render.globalPosition, maxOffset, size);
+		Allocation newAlloc = new Allocation(position, maxOffset, size);
 		Allocation first = this.firstEntry;
 		this.offset += sizeInBytes;
 
@@ -194,8 +194,8 @@ public class RegionAllocation {
 		return newAlloc;
 	}
 
-	public long allocate(SectionRender render, long data, int vertices) {
-		Allocation alloc = this.findPrevAlloc(render);
+	public long allocate(long position, long data, int vertices) {
+		Allocation alloc = this.findPrevAlloc(position);
 		long drawData;
 
 		if (alloc != null && alloc.vertices >= vertices) {
@@ -203,9 +203,9 @@ public class RegionAllocation {
 			drawData = packDrawData(vertices, (int) alloc.first);
 		} else {
 			if (alloc != null) {
-				this.remove(render);
+				this.remove(position);
 			}
-			drawData = this.createAllocation(render, data, vertices);
+			drawData = this.createAllocation(position, data, vertices);
 		}
 
 		return drawData;
@@ -247,10 +247,10 @@ public class RegionAllocation {
 	}
 
 	// Searches for a previous allocation.
-	public Allocation findPrevAlloc(SectionRender render) {
+	public Allocation findPrevAlloc(long position) {
 		Allocation alloc = this.firstEntry;
 
-		while (alloc != null && alloc.position != render.globalPosition) {
+		while (alloc != null && alloc.position != position) {
 			alloc = alloc.next;
 		}
 
@@ -270,7 +270,7 @@ public class RegionAllocation {
 	}
 
 	// Removes allocation from the main pool, and saves in the free pool.
-	public void remove(SectionRender render) {
+	public void remove(long position) {
 		Allocation alloc = this.firstEntry;
 
 		// shouldn't happen
@@ -280,11 +280,11 @@ public class RegionAllocation {
 
 		// The allocation shouldn't be null as we are removing an existent
 		// allocation.
-		if (alloc.position == render.globalPosition) {
+		if (alloc.position == position) {
 			this.firstEntry = this.firstEntry.next;
 			this.addToFreeList(alloc);
 		} else {
-			while (alloc.next != null && alloc.next.position != render.globalPosition) {
+			while (alloc.next != null && alloc.next.position != position) {
 				alloc = alloc.next;
 			}
 

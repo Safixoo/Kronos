@@ -1,6 +1,7 @@
 package dev.safixo.client.util;
 
 import dev.safixo.client.render.pipelines.terrain.WorldManager;
+import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ChunkProviderClient;
@@ -13,8 +14,7 @@ import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.world.ChunkEvent;
 
 public class ClientChunkListener extends ChunkProviderClient {
-	private final FastLongHashMap chunkMap = new FastLongHashMap(512);
-	private final LongArrayList chunksToSend = new LongArrayList();
+	private final Long2ReferenceOpenHashMap<ChunkMetadata> chunkMap = new Long2ReferenceOpenHashMap<>(128);
 
 	private final World world;
 	private final EmptyChunk blankChunk;
@@ -34,7 +34,7 @@ public class ClientChunkListener extends ChunkProviderClient {
 
 	@Override
 	public String makeString() {
-		return "KronosChunkCache: " + this.chunkMap.getSize();
+		return "KronosChunkCache: " + this.chunkMap.size();
 	}
 
 	public boolean canLoadChunk(int x, int z) {
@@ -79,23 +79,6 @@ public class ClientChunkListener extends ChunkProviderClient {
 		return meta == null ? this.blankChunk : meta.chunk;
 	}
 
-	public void processAllQueuedSections(WorldManager worldManager) {
-		if (this.chunksToSend.isEmpty()) {
-			return;
-		}
-
-		for (long position : this.chunksToSend) {
-			int x = MathExt.decodeX(position);
-			int z = MathExt.decodeZ(position);
-
-			for (int y = 0; y < 16; y++) {
-				worldManager.markDirty(x, y, z);
-			}
-		}
-
-		this.chunksToSend.clear();
-	}
-
 	// Tests the 3x3 chunk surrounding area for existence of chunks, if the whole area is already
 	// created, send the notice to the client that it should consider it for rendering.
 	private void testNeighborArea(ChunkMetadata currentNode, boolean erase) {
@@ -133,24 +116,22 @@ public class ClientChunkListener extends ChunkProviderClient {
 				if (currentNode.adjacentMask == 0b111_111_111 && prevCurrentMask != 0b111_111_111) {
 					WorldManager manager = WorldManager.getCurrentInstance();
 					Minecraft mc = Minecraft.getMinecraft();
+
 					if (mc.skipRenderWorld) {
 						for (int y = 0; y < 16; y++) {
 							manager.markDirty(chunk.xPosition, y, chunk.zPosition);
 						}
-					} else {
-						this.chunksToSend.add(MathExt.asLong(chunk.xPosition, chunk.zPosition));
 					}
 				}
 
 				if (neighborNode.adjacentMask == 0b111_111_111 && prevNeighborMask != 0b111_111_111) {
 					WorldManager manager = WorldManager.getCurrentInstance();
 					Minecraft mc = Minecraft.getMinecraft();
+
 					if (mc.skipRenderWorld) {
 						for (int y = 0; y < 16; y++) {
 							manager.markDirty(x, y, z);
 						}
-					} else {
-						this.chunksToSend.add(MathExt.asLong(x, z));
 					}
 				}
 			}

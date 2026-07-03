@@ -44,15 +44,6 @@ public class MathExt {
 		return a;
 	}
 
-	public static int floorDiv(int x, int y) {
-		int r = x / y;
-		// if the signs are different and modulo not zero, round down
-		if ((x ^ y) < 0 && (r * y != x)) {
-			r--;
-		}
-		return r;
-	}
-
 	public static int getLightmapCoord(int skyLight, int blockLight) {
 		return skyLight << 20 | blockLight << 4;
 	}
@@ -81,11 +72,11 @@ public class MathExt {
 	private static final int Y_BITS = 12;
 
 	public static int decodeX(long pos) {
-		return (int) (pos << (64 - X_BITS - 34) >> (64 - X_BITS));
+		return (int) (pos << (64 - Y_BITS - Z_BITS - X_BITS) >> (64 - X_BITS));
 	}
 
 	public static int decodeZ(long pos) {
-		return (int) (pos << (64 - Z_BITS - 12) >> (64 - Z_BITS));
+		return (int) (pos << (64 - Y_BITS - Z_BITS) >> (64 - Z_BITS));
 	}
 
 	public static int decodeY(long pos) {
@@ -94,6 +85,15 @@ public class MathExt {
 
 	public static long asLong(int x, int y, int z) {
 		return (x & 0x3FFFFFL) << (Z_BITS + Y_BITS) | (z & 0x3FFFFFL) << Y_BITS | y & 0xFFFL;
+	}
+
+	public static int floorDiv(int x, int y) {
+		int r = x / y;
+		// if the signs are different and modulo not zero, round down
+		if ((x ^ y) < 0 && (r * y != x)) {
+			r--;
+		}
+		return r;
 	}
 
 	public static int decodeX(int pos) {
