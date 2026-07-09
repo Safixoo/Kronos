@@ -34,6 +34,8 @@ public class AdvancedModelRenderer {
 	private static final FloatBuffer BUFFER = NativeBuffer.wrap(PTR_BUFFER).asFloatBuffer();
 	private static final Matrix4f MATRIX = new Matrix4f();
 
+	private static final FloatBuffer TEMP_BUFFER = NativeBuffer.memAllocFloat(16);
+
 	// Global vertex buffer/array for model rendering.
 	public static GlVertexBuffer VERTEX_BUFFER;
 	public static GlVertexArrayObject VERTEX_ARRAY_FPP;
@@ -217,7 +219,7 @@ public class AdvancedModelRenderer {
 			}
 			GL11.glPushMatrix();
 
-			GlMatrixTracker.CURRENT_STACK.top().mul(modelView, GlMatrixTracker.CURRENT_STACK.top());
+			GL11.glMultMatrix(modelView.get(TEMP_BUFFER));
 
 			GL30.glBindVertexArray(VERTEX_ARRAY_FPP.getHandle());
 			GL11.glDrawArrays(GL11.GL_QUADS, offset, vertices);

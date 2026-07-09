@@ -16,8 +16,9 @@ public class TerrainFormat extends GlVertexFormat {
 	static final int UV_BITS = 16;
 	static final float UV_PRECISION = (1 << UV_BITS);
 
-	public static final float RADIUS = 0.5f;
-	public static final float SCALE = (1 << POSITION_BITS) / (RegionConstants.DIAMETER_X + RADIUS * 2.0f);
+	// This assumes for now that all sides of the region have the same length.
+	public static final float RADIUS = RegionConstants.DIAMETER_X >> 1;
+	public static final float SCALE = (1 << POSITION_BITS) / (RegionConstants.DIAMETER_X + RADIUS * 2);
 
 	public TerrainFormat(ImmutableList<GlVertexAttribute> vertexProperties) {
 		super(vertexProperties);

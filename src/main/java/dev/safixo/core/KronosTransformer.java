@@ -83,11 +83,8 @@ public class KronosTransformer implements IClassTransformer {
 			case RENDER:
 				replaceClassMethod(MINECRAFT_HOOK, "bindTexture", "a", "(D)V", reference, true);
 				break;
-			case TEXTURE_MANAGER:
-				changeHashMap(reference);
-				break;
 			case PROFILER:
-				setFieldInProfiling(reference, "", "");
+				setFieldInProfiling(reference);
 				break;
 			case ENTITY_RENDERER:
 				avoidDoublePassBullshit(reference);
@@ -171,6 +168,7 @@ public class KronosTransformer implements IClassTransformer {
 
 	static final String ASYNC_BLOCK_HOOK = "dev.safixo.core.hooks";
 
+	// TODO: Check what makes it that mess up in some instances.
 	static void changeHashMap(byte[][] basicClass) {
 		ClassReader reader = new ClassReader(basicClass[0]);
 		ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
@@ -214,7 +212,7 @@ public class KronosTransformer implements IClassTransformer {
 		basicClass[0] = writer.toByteArray();
 	}
 
-	static void setFieldInProfiling(byte[][] basicClass, String runtimeName, String descriptor) {
+	static void setFieldInProfiling(byte[][] basicClass) {
 		ClassReader reader = new ClassReader(basicClass[0]);
 
 		ClassNode classNode = new ClassNode();
@@ -223,7 +221,7 @@ public class KronosTransformer implements IClassTransformer {
 		for (int i = 0; i < classNode.methods.size(); i++) {
 			MethodNode method = (MethodNode) classNode.methods.get(i);
 
-			if ((!method.name.equals("startSection") && ((!method.name.equals(runtimeName)) || !method.desc.contains(descriptor)))) {
+			if ((!method.name.equals("startSection") && ((!method.name.equals("a")) || !method.desc.contains("(Ljava/lang/String;)V")))) {
 				continue;
 			}
 

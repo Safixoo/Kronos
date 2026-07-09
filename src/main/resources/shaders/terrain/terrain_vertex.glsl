@@ -13,7 +13,7 @@ uniform mat4 u_ProjModelViewMat;
 
 uniform sampler2D u_LightTex;
 
-vec3 extractBlockPos(uvec2 atPosition) {
+vec3 getEyePosition(uvec2 atPosition) {
     uvec2 xy = atPosition & 0x1FFFFFu;
     uvec2 z = atPosition >> 21u;
 
@@ -24,19 +24,17 @@ ivec2 lightmapTexelCoord(uint light) {
     return ivec2(light) >> ivec2(4, 0) & 0xF;
 }
 
-#define PRECISION_BITS 21u
-#define REGION_SIZE 128.0
-#define RADIUS 1.0
-#define SCALE ((REGION_SIZE + RADIUS * 2.0) / float(1u << PRECISION_BITS))
+vec3 getLightColor(uint light) {
+    return texelFetch(u_LightTex, lightmapTexelCoord(light), 0).rgb;
+}
 
 void main() {
-    vec3 blockPosition = extractBlockPos(a_Position);
-    gl_Position = u_ProjModelViewMat * vec4(blockPosition, 1.0);
+    vec3 eyePosition = getEyePosition(a_Position);
+    gl_Position = u_ProjModelViewMat * vec4(eyePosition, 1.0);
 
     vec3 color = vec3(a_ColorAndLight.xyz) * (1.0 / 255.0);
-    uint light = a_ColorAndLight.w;
 
-    v_Color = color * texelFetch(u_LightTex, lightmapTexelCoord(light), 0).rgb;
+    v_Color = color * getLightColor(a_ColorAndLight.w);
+    v_Distance = length(eyePosition);
     v_TextureUv = a_Uv * (1.0 / 65536.0);
-    v_Distance = length(blockPosition * SCALE);
 }

@@ -16,6 +16,7 @@ import net.minecraft.world.biome.BiomeGenBase;
 import net.minecraft.world.biome.BiomeGenSwamp;
 
 import java.lang.reflect.Method;
+import java.util.Arrays;
 
 /**
  * Uses multiple arrays to pre-compute flags, avoid extra indirection in hot code, and skip dynamic dispatch when
@@ -50,6 +51,9 @@ public class PrimitivesFlags {
 	public static void computeFlagArrays() {
 		LEAVES_TOP_INDEX = 0;
 
+		Arrays.fill(RENDER_PASS, (short) -777);
+		Arrays.fill(MATERIAL, Material.air);
+
 		for (int i = 0; i < 4096; i++) {
 			Block block = Block.blocksList[i];
 
@@ -57,13 +61,21 @@ public class PrimitivesFlags {
 				LEAVES_INDICES[LEAVES_TOP_INDEX++] = i;
 			}
 
-			SOLID[i] = ((block != null && block.isOpaqueCube()) || block instanceof BlockLeaves);
-			NORMAL_BLOCK[i] = ((block != null && block.blockMaterial.isOpaque() && block.renderAsNormalBlock() && !block.canProvidePower()));
-			MATERIAL[i] = (block == null || i == 0) ? Material.air : block.blockMaterial;
-			SOLID_CULL_MASK[i] = (byte) (((block != null && block.isOpaqueCube()) || block instanceof BlockLeaves) ? 1 : 0);
-			SOLID_LIGHT_MASK[i] = (byte) (((block != null && block.isOpaqueCube() && Block.lightValue[i] <= 5) || block instanceof BlockLeaves || Block.lightOpacity[i] >= 14) ? 1 : 0);
-			TILE_ENTITY[i] = block != null && block.hasTileEntity(0);
-			RENDER_PASS[i] = block == null ? -777 : (short) block.getRenderBlockPass();
+			if (block == null) {
+				continue;
+			}
+
+			SOLID[i] = block.isOpaqueCube();
+
+			NORMAL_BLOCK[i] = block.blockMaterial.isOpaque() && block.renderAsNormalBlock() && !block.canProvidePower();
+			MATERIAL[i] = block.blockMaterial;
+
+			SOLID_CULL_MASK[i] = (byte) (SOLID[i] ? 1 : 0);
+			SOLID_LIGHT_MASK[i] = (byte) ((block.isOpaqueCube() && Block.lightValue[i] <= 5) || block instanceof BlockLeaves || Block.lightOpacity[i] >= 14 ? 1 : 0);
+
+			// To skip virtual overhead.
+			TILE_ENTITY[i] = block.hasTileEntity(0);
+			RENDER_PASS[i] = (short) block.getRenderBlockPass();
 		}
 
 		for (int i = 0; i < 256; i++) {
@@ -145,7 +157,7 @@ public class PrimitivesFlags {
 	}
 
 	public static void processLeavesSolid() {
-		// Fixes water lighting issues??
+		// Fixes water lighting issues maybe??
 		Block.canBlockGrass[Block.waterMoving.blockID] = false;
 		Block.canBlockGrass[Block.waterStill.blockID] = false;
 
@@ -159,6 +171,7 @@ public class PrimitivesFlags {
 
 		for (int i = 0; i < LEAVES_TOP_INDEX; i++) {
 			SOLID_CULL_MASK[LEAVES_INDICES[i]] = (byte) (fastGraphics ? 1 : 0);
+			SOLID[LEAVES_INDICES[i]] = fastGraphics;
 		}
 	}
 

@@ -6,6 +6,8 @@ import dev.safixo.client.render.pipelines.terrain.meshing.model.ModelColorizer;
 import dev.safixo.client.render.pipelines.terrain.region.RegionConstants;
 import dev.safixo.client.util.MathExt;
 import net.minecraft.block.Block;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.texture.TextureMap;
 import net.minecraft.util.Icon;
 import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
 import dev.safixo.client.util.data.PrimitivesFlags;
@@ -32,6 +34,7 @@ public class VoxelMesher {
 	public static final float[] SIDE_LIGHT_MULTIPLIER = new float[] { 0.5F, 1.0F, 0.8F, 0.8F, 0.6F, 0.6F };
 
 	protected static final int BLOCK_GRASS_ID = Block.grass.blockID;
+	protected static final Icon MISSING = ((TextureMap) Minecraft.getMinecraft().getTextureManager().getTexture(TextureMap.locationBlocksTexture)).getAtlasSprite("missingno");
 
 	public static void meshVoxel(Block block, SectionCache cache, int x, int y, int z, boolean ambient, int drawSet, int blockId) {
 		if (!PrimitivesFlags.DIRECT_CULL[blockId]) {
@@ -62,7 +65,7 @@ public class VoxelMesher {
 				}
 			}
 
-			Icon tex = block.getBlockTexture(cache, x, y, z, dir);
+			Icon tex = getIconSafe(block.getBlockTexture(cache, x, y, z, dir));
 			boolean sideGrass = tex == SIDE_GRASS_NON_OVERLAY;
 
 			TEX_UVS[0] = TerrainFormat.deNormalizeTexCoordinate(tex.getMinU());
@@ -81,6 +84,10 @@ public class VoxelMesher {
 				renderFaceNoSmooth(writer, render, cache, x, y, z, blockColor, overlayColor, sideGrass);
 			}
 		}
+	}
+
+	public static Icon getIconSafe(Icon texture) {
+		return texture == null ? MISSING : texture;
 	}
 
 	public static void renderFace(VertexWriter writer, FacingData face, SectionCache cache, int x, int y, int z, int blockColor, int overlayColor, boolean sideGrass) {
@@ -238,16 +245,13 @@ public class VoxelMesher {
 		int blockZ = z - cache.blockZ;
 
 		int sectionIndex = SectionCache.sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
-		int solidBlock = PrimitivesFlags.SOLID_LIGHT_MASK[MathExt.byteToUnsigned(SectionCache.SECTION_BLOCKS[sectionIndex][blockIndex])];
+		int solidBlock = PrimitivesFlags.SOLID_LIGHT_MASK[cache.getBlockId(sectionIndex, blockIndex)];
 
 		if (solidBlock == 1) {
 			return 1;
 		}
 
-		int skyLight = SectionCache.getNibble(SectionCache.SKY_LIGHT[sectionIndex], blockIndex);
-		int blockLight = SectionCache.getNibble(SectionCache.BLOCK_LIGHT[sectionIndex], blockIndex);
-
-		return MathExt.getLightmapCoord(skyLight, blockLight);
+		return cache.getLightmap(sectionIndex, blockIndex);
 	}
 
 	private static Vector3i createVec3i(int x, int y, int z) {

@@ -10,6 +10,7 @@ import it.unimi.dsi.fastutil.longs.*;
 import java.util.Arrays;
 
 // Most of the useful section data saved in a couple of arrays, because of reasons (*performance*).
+// TODO: Remove byte[] sections and use only byte[] fastSections instead, much simpler and performant.
 public class SectionSet {
 	// All the changes are queued until the camera and context is updated.
 	private final LongSet updatesQueued = new LongOpenHashSet();
@@ -18,8 +19,8 @@ public class SectionSet {
 	// for heavy accesses it can be we worse.
 	private byte[] sections;
 
-	// Uses a more useful and faster system of indexing to save section data, it has some tricks
-	// that make it more useful in heavy access scenarios, although it is slower to update
+	// Uses a more useful and fast system of indexing to save section data, it has some tricks
+	// that make it more useful in heavy access scenarios, although it is slow to update
 	// as it is easily invalidated with movement.
 	public byte[] fastSections;
 
@@ -242,6 +243,10 @@ public class SectionSet {
 	}
 
 	private boolean isInBounds(int sectionX, int sectionZ) {
+		if (this.camera == null) {
+			return false;
+		}
+
 		int diffChunkX = sectionX - (this.camera.intX >> 4);
 		int diffChunkZ = sectionZ - (this.camera.intZ >> 4);
 

@@ -3,12 +3,10 @@ package dev.safixo.client.render.pipelines.terrain.meshing.builders;
 import dev.safixo.client.render.pipelines.terrain.meshing.data.FacingData;
 import dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache;
 import dev.safixo.client.render.pipelines.terrain.region.RegionConstants;
-import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
 import dev.safixo.client.render.vertex.VertexWriter;
 import dev.safixo.client.render.vertex.writers.TerrainFormat;
 import dev.safixo.client.util.ColorBGRManager;
 import dev.safixo.client.util.Direction;
-import dev.safixo.client.util.MathExt;
 import dev.safixo.client.util.data.PrimitivesFlags;
 import net.minecraft.block.Block;
 import net.minecraft.util.Icon;
@@ -49,8 +47,7 @@ public class VoxelMesherCenter  {
 				}
 			}
 
-			Icon tex = block.getBlockTexture(cache, x, y, z, dir);
-
+			Icon tex = getIconSafe(block.getBlockTexture(cache, x, y, z, dir));
 			boolean sideGrass = tex == SIDE_GRASS_NON_OVERLAY;
 
 			TEX_UVS[0] = TerrainFormat.deNormalizeTexCoordinate(tex.getMinU());
@@ -77,18 +74,18 @@ public class VoxelMesherCenter  {
 
 		blockIndex += face.dirPacked;
 
-		int posZ = getBlockCached(blockIndex + p2);
-		int negZ = getBlockCached(blockIndex - p2);
-		int posX = getBlockCached(blockIndex + p1);
-		int negX = getBlockCached(blockIndex - p1);
+		int posZ = getBlockCached(cache, blockIndex + p2);
+		int negZ = getBlockCached(cache, blockIndex - p2);
+		int posX = getBlockCached(cache, blockIndex + p1);
+		int negX = getBlockCached(cache, blockIndex - p1);
 
 		int p12 = p1 + p2;
 		int pd12 = p1 - p2;
 
-		int cornerPP = fullFace(posZ & posX) == 0 ? getBlockCached(blockIndex + p12) : 1;
-		int cornerPN = fullFace(negZ & posX) == 0 ? getBlockCached(blockIndex + pd12) : 1;
-		int cornerNP = fullFace(posZ & negX) == 0 ? getBlockCached(blockIndex - pd12) : 1;
-		int cornerNN = fullFace(negZ & negX) == 0 ? getBlockCached(blockIndex - p12) : 1;
+		int cornerPP = fullFace(posZ & posX) == 0 ? getBlockCached(cache, blockIndex + p12) : 1;
+		int cornerPN = fullFace(negZ & posX) == 0 ? getBlockCached(cache, blockIndex + pd12) : 1;
+		int cornerNP = fullFace(posZ & negX) == 0 ? getBlockCached(cache, blockIndex - pd12) : 1;
+		int cornerNN = fullFace(negZ & negX) == 0 ? getBlockCached(cache, blockIndex - p12) : 1;
 
 		int lightMap = cache.getLightmapCenter(blockIndex);
 		int light0 = avg(avgU(cornerPP, lightMap), avg(posZ, posX)); // 0 vertex
@@ -163,33 +160,23 @@ public class VoxelMesherCenter  {
 
 	}
 
-	public static int getBlockCached(int blockIndex) {
-		int solidBlock = PrimitivesFlags.SOLID_LIGHT_MASK[SectionCache.CENTER_BLOCKS[blockIndex] & 0xFF];
+	public static int getBlockCached(SectionCache cache, int blockIndex) {
+		int solidBlock = PrimitivesFlags.SOLID_LIGHT_MASK[cache.getBlockIdCenter(blockIndex)];
 
 		if (solidBlock == 1) {
 			return 1;
 		}
 
-		int skyLight = SectionCache.getNibble(SectionCache.CENTER_SKYLIGHT, blockIndex);
-		int blockLight = SectionCache.getNibble(SectionCache.CENTER_BLOCKLIGHT, blockIndex);
-
-		return MathExt.getLightmapCoord(skyLight, blockLight);
+		return cache.getLightmapCenter(blockIndex);
 	}
 
-	public static int getBlockCached(int blockIndex, int lightMap) {
-		int solidBlock = PrimitivesFlags.SOLID_LIGHT_MASK[SectionCache.CENTER_BLOCKS[blockIndex] & 0xFF];
+	public static int getBlockCached(SectionCache cache, int blockIndex, int lightMap) {
+		int solidBlock = PrimitivesFlags.SOLID_LIGHT_MASK[cache.getBlockIdCenter(blockIndex)];
 
 		if (solidBlock == 1) {
 			return lightMap;
 		}
 
-		int skyLight = SectionCache.getNibble(SectionCache.CENTER_SKYLIGHT, blockIndex);
-		int blockLight = SectionCache.getNibble(SectionCache.CENTER_BLOCKLIGHT, blockIndex);
-
-		return (MathExt.getLightmapCoord(skyLight, blockLight) + lightMap) >> 1;
-	}
-
-	public static int fullVoxel(int blockIndex) {
-		return PrimitivesFlags.SOLID_LIGHT_MASK[SectionCache.CENTER_BLOCKS[blockIndex] & 0xFF];
+		return (cache.getLightmapCenter(blockIndex) + lightMap) >> 1;
 	}
 }

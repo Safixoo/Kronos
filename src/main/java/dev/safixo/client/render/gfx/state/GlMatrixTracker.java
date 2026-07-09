@@ -20,8 +20,8 @@ public class GlMatrixTracker {
 
 	private static final Matrix4f TEMP_MATRIX = new Matrix4f();
 
-	public static final boolean EMULATE_STACK = true;
-	private static boolean STACK_CHANGED = true;
+	public static final boolean EMULATE_STACK = false;
+	private static boolean STACK_CHANGED = false;
 
 	public static void gluPerspective(float fovy, float aspect, float zNear, float zFar) {
 		CURRENT_STACK.top().mul(TEMP_MATRIX.setPerspective((float) Math.toRadians(fovy), aspect, zNear, zFar));
@@ -75,7 +75,7 @@ public class GlMatrixTracker {
 	private static final FloatBuffer BUFFER = NativeBuffer.memAllocFloat(16);
 
 	public static void loadCurrentMatrix() {
-		if (EMULATE_STACK || STACK_CHANGED) {
+		if (EMULATE_STACK && STACK_CHANGED) {
 			STACK_CHANGED = false;
 
 			if (CURRENT_STACK == TEXTURE_STACK) {

@@ -8,8 +8,8 @@ uniform sampler2D u_TexId;
 uniform vec3 u_FogColor;
 
 #ifdef FOG_LINEAR
-uniform float u_FogEndInvRad;
-uniform float u_FogNegInvRadius;
+uniform float u_FogAdd;
+uniform float u_FogMul;
 #else
 uniform float u_FogDensity;
 #endif
@@ -17,24 +17,14 @@ uniform float u_FogDensity;
 out vec4 fragColor;
 
 void main() {
-    float dist = v_Distance;
-
     #ifdef FOG_LINEAR
     // Optimized GL_LINEAR formula.
-    // = (end - dist) / (end - start)
-    // = (end - dist) / radius
-    // = (end - dist) * invRadius
-    // = constant -> (end * invRadius) + (-dist * invRadius)
-    // = endInvRad + (dist * -invRadius)
-    // = fma(dist, -invRadius, endInvRad).
-    float factor = clamp((u_FogNegInvRadius * dist) + u_FogEndInvRad, 0.0, 1.0);
+    float factor = clamp(u_FogMul * v_Distance + u_FogAdd, 0.0, 1.0);
     #else
     // GL_EXP
-    float factor = clamp(exp(-u_FogDensity * dist), 0.0, 1.0);
+    float factor = clamp(exp(-u_FogDensity * v_Distance), 0.0, 1.0);
     #endif
 
-    vec4 texColor = texture(u_TexId, v_TextureUv);
-    vec3 rgbColor = texColor.rgb * v_Color;
-
-    fragColor = vec4(mix(u_FogColor, rgbColor, factor), texColor.a);
+    vec4 textureColor = texture(u_TexId, v_TextureUv);
+    fragColor = vec4(mix(u_FogColor, textureColor.rgb * v_Color, factor), textureColor.a);
 }

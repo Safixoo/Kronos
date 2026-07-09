@@ -69,7 +69,7 @@ public class MinecraftHook {
 
 		boolean fastPath = FAST_ENTITY_PATH;
 
-		FAST_ENTITY_PATH = prof.equals("entities") && PROFILING_TARGET.equals("global");
+		FAST_ENTITY_PATH = prof.equals("entities") && PROFILING_TARGET.equals("global") && GlMatrixTracker.EMULATE_STACK;
 		PROFILING_TARGET = prof;
 
 		if (fastPath && !FAST_ENTITY_PATH) {

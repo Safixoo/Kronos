@@ -37,20 +37,24 @@ public class SectionCache implements IBlockAccess {
 	private static final int BIOME_CHUNK_WIDTH = 16 + (BIOME_RADIUS * 2);
 
 	private static final BiomeGenBase[] BIOMES = new BiomeGenBase[BIOME_CHUNK_WIDTH * BIOME_CHUNK_WIDTH];
-	private static final int[] BIOMES_COLOR = new int[BIOME_CHUNK_WIDTH * BIOME_CHUNK_WIDTH];
 
-	public static final byte[][] SECTION_BLOCKS = new byte[3 * 3 * 3][];
-	public static final byte[][] SECTION_DATA = new byte[3 * 3 * 3][];
-	public static final byte[][] SKY_LIGHT = new byte[3 * 3 * 3][];
-	public static final byte[][] BLOCK_LIGHT = new byte[3 * 3 * 3][];
+	private static final byte[][] SECTION_BLOCKS = new byte[3 * 3 * 3][];
+	private static final byte[][] SECTION_BLOCKS_MSB = new byte[3 * 3 * 3][];
 
-	public static byte[] CENTER_BLOCKS;
-	public static byte[] CENTER_METADATA;
+	private static final byte[][] SECTION_DATA = new byte[3 * 3 * 3][];
 
-	public static byte[] CENTER_SKYLIGHT;
-	public static byte[] CENTER_BLOCKLIGHT;
+	private static final byte[][] SKY_LIGHT = new byte[3 * 3 * 3][];
+	private static final byte[][] BLOCK_LIGHT = new byte[3 * 3 * 3][];
+
+	private static byte[] CENTER_BLOCKS;
+	private static byte[] CENTER_BLOCK_MSB;
+
+	private static byte[] CENTER_SKYLIGHT;
+	private static byte[] CENTER_BLOCKLIGHT;
 
 	public static final byte[] VISITED_CENTER_BLOCKS = new byte[4096];
+
+	private static int MSB_SECTIONS = 0;
 
 	private boolean centerSectEmpty;
 	public int[] biomeColors = new int[ModelColorizer.MAX_COLOR_TYPES];
@@ -92,11 +96,14 @@ public class SectionCache implements IBlockAccess {
 			return;
 		}
 
-		for (int sect = 0; sect < 27; sect++) {
-			SECTION_BLOCKS[sect] = DEFAULT_BYTE_ARRAY;
-			SECTION_DATA[sect] = DEFAULT_BYTE_ARRAY;
-			SKY_LIGHT[sect] = DEFAULT_FULL_BYTE_ARRAY;
-			BLOCK_LIGHT[sect] = DEFAULT_BYTE_ARRAY;
+		for (int section = 0; section < 27; section++) {
+			MSB_SECTIONS = 0b0;
+
+			SECTION_BLOCKS_MSB[section] = DEFAULT_BYTE_ARRAY;
+			SECTION_BLOCKS[section] = DEFAULT_BYTE_ARRAY;
+			SECTION_DATA[section] = DEFAULT_BYTE_ARRAY;
+			SKY_LIGHT[section] = DEFAULT_FULL_BYTE_ARRAY;
+			BLOCK_LIGHT[section] = DEFAULT_BYTE_ARRAY;
 		}
 
 		Arrays.fill(CHUNKS, null);
@@ -123,6 +130,10 @@ public class SectionCache implements IBlockAccess {
 							if (section.getBlockLSBArray() != null) {
 								SECTION_BLOCKS[sectionIndex] = section.getBlockLSBArray();
 							}
+							if (section.getBlockMSBArray() != null) {
+								SECTION_BLOCKS_MSB[sectionIndex] = section.getBlockMSBArray().data;
+								MSB_SECTIONS |= 1 << sectionIndex;
+							}
 							if (section.getMetadataArray() != null) {
 								SECTION_DATA[sectionIndex] = section.getMetadataArray().data;
 							}
@@ -147,7 +158,7 @@ public class SectionCache implements IBlockAccess {
 			int centerBlockX = centerX << 4;
 			int centerBlockZ = centerZ << 4;
 
-			BiomeGenBase biome = null;
+			BiomeGenBase lastBiome = null;
 			boolean uniformed = true;
 
 			for (int biomeX = centerBlockX - BIOME_RADIUS; biomeX < centerBlockX + 16 + BIOME_RADIUS; biomeX++) {
@@ -167,21 +178,25 @@ public class SectionCache implements IBlockAccess {
 						biomeGenBase = chunk.getBiomeGenForWorldCoords(biomeX & 15, biomeZ & 15, manager);
 					}
 
-					if (biome == null || biome != biomeGenBase) {
+					if (lastBiome == null) {
+						lastBiome = biomeGenBase;
+					}
+
+					if (lastBiome != biomeGenBase) {
 						uniformed = false;
 					}
 
-					biome = biomeGenBase;
+					lastBiome = biomeGenBase;
 					BIOMES[relBiomeX + relBiomeZ * BIOME_CHUNK_WIDTH] = biomeGenBase;
 				}
 			}
 
 			this.uniformBiome = uniformed;
 
-			if (uniformed) {
-				int grassColor = COLORIZER.getBlockGrassColor(this, this.blockX + 16, this.blockY + 16, this.blockZ + 16);
-				int foliageColor = COLORIZER.getBlockLeavesColor(this, this.blockX + 16, this.blockY + 16, this.blockZ + 16);
-				int waterColor = COLORIZER.getBlockWaterColor(this, this.blockX + 16, this.blockY + 16, this.blockZ + 16);
+			if (uniformed && lastBiome != null) {
+				int grassColor = lastBiome.getBiomeGrassColor();
+				int foliageColor = lastBiome.getBiomeFoliageColor();
+				int waterColor = lastBiome.getWaterColorMultiplier();
 
 				this.biomeColors[ModelColorizer.GRASS_COLOR] = grassColor;
 				this.biomeColors[ModelColorizer.LEAVES_COLOR] = foliageColor;
@@ -196,8 +211,8 @@ public class SectionCache implements IBlockAccess {
 		CENTER_SKYLIGHT = SKY_LIGHT[sectionIndex(1, 1, 1)];
 		CENTER_BLOCKLIGHT = BLOCK_LIGHT[sectionIndex(1, 1, 1)];
 
+		CENTER_BLOCK_MSB = SECTION_BLOCKS_MSB[sectionIndex(1, 1, 1)];
 		CENTER_BLOCKS = SECTION_BLOCKS[sectionIndex(1, 1, 1)];
-		CENTER_METADATA = SECTION_DATA[sectionIndex(1, 1, 1)];
 	}
 
 	public static int sectionIndex(int x, int y, int z) {
@@ -207,7 +222,7 @@ public class SectionCache implements IBlockAccess {
 	public static int getNibble(byte[] nibbleArray, int blockIndex) {
 		int nibbleIndex = blockIndex >> 1;
 		int nibblePart = (blockIndex << 2) & 0b100;
-		return nibbleArray[nibbleIndex] >>> nibblePart & 15;
+		return (nibbleArray[nibbleIndex] >>> nibblePart) & 0xF;
 	}
 
 	public static int makeBlockIndex(int x, int y, int z) {
@@ -220,10 +235,28 @@ public class SectionCache implements IBlockAccess {
 		int blockY = y - this.blockY;
 		int blockZ = z - this.blockZ;
 
-		int sectInd = sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
-		int blockInd = makeBlockIndex(blockX & 15, blockY & 15, blockZ & 15);
+		int sectionIndex = sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
+		int blockIndex = makeBlockIndex(blockX & 15, blockY & 15, blockZ & 15);
 
-		return MathExt.byteToUnsigned(SECTION_BLOCKS[sectInd][blockInd]);
+		int blockIdLsb = MathExt.byteToUnsigned(SECTION_BLOCKS[sectionIndex][blockIndex]);
+		int blockIdMsb = getMsbNibble(sectionIndex, blockIndex);
+
+		return blockIdLsb | blockIdMsb << 8;
+	}
+
+	public int getBlockId(int sectionIndex, int blockIndex) {
+		int blockIdLsb = MathExt.byteToUnsigned(SECTION_BLOCKS[sectionIndex][blockIndex]);
+		int blockIdMsb = getMsbNibble(sectionIndex, blockIndex);
+
+		return blockIdLsb | blockIdMsb << 8;
+	}
+
+	private static int getMsbNibble(int sectionIndex, int blockIndex) {
+		return (MSB_SECTIONS & sectionIndex) != 0 ? getNibble(SECTION_BLOCKS_MSB[sectionIndex], blockIndex) : 0;
+	}
+
+	private static int getMsbNibbleCenter(int blockIndex) {
+		return (MSB_SECTIONS & sectionIndex(1, 1, 1)) != 0 ? getNibble(CENTER_BLOCK_MSB, blockIndex) : 0;
 	}
 
 	public boolean isBiomeUniform() {
@@ -253,13 +286,18 @@ public class SectionCache implements IBlockAccess {
 		return extractLightNibbles(SKY_LIGHT[sectionIndex], BLOCK_LIGHT[sectionIndex], blockIndex, defBlockLight);
 	}
 
+	public int getLightmap(int sectionIndex, int blockIndex) {
+		return extractLightNibbles(SKY_LIGHT[sectionIndex], BLOCK_LIGHT[sectionIndex], blockIndex, 0);
+	}
+
 	public int getLightmap(int x, int y, int z) {
-		int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
 		int blockX = x - this.blockX;
 		int blockY = y - this.blockY;
 		int blockZ = z - this.blockZ;
 
+		int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
 		int sectionIndex = sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
+
 		return extractLightNibbles(SKY_LIGHT[sectionIndex], BLOCK_LIGHT[sectionIndex], blockIndex);
 	}
 
@@ -280,11 +318,14 @@ public class SectionCache implements IBlockAccess {
 	}
 
 	public int getBlockIdCenter(int x, int y, int z) {
-		return MathExt.byteToUnsigned(CENTER_BLOCKS[makeBlockIndex(x & 15, y & 15, z & 15)]);
+		return this.getBlockIdCenter(makeBlockIndex(x & 15, y & 15, z & 15));
 	}
 
 	public int getBlockIdCenter(int blockIndex) {
-		return MathExt.byteToUnsigned(CENTER_BLOCKS[blockIndex]);
+		int blockIdLsb = MathExt.byteToUnsigned(CENTER_BLOCKS[blockIndex]);
+		int blockIdMsb = getMsbNibbleCenter(blockIndex);
+
+		return blockIdLsb | blockIdMsb << 8;
 	}
 
 	// AFAIK, not used for rendering.
@@ -308,14 +349,10 @@ public class SectionCache implements IBlockAccess {
 		int blockY = y - this.blockY;
 		int blockZ = z - this.blockZ;
 
-		int sectInd = sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
-		int blockInd = makeBlockIndex(blockX & 15, blockY & 15, blockZ & 15);
+		int sectionIndex = sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
+		int blockIndex = makeBlockIndex(blockX & 15, blockY & 15, blockZ & 15);
 
-		return getNibble(SECTION_DATA[sectInd], blockInd);
-	}
-
-	public int getBlockMetadataCenter(int x, int y, int z) {
-		return getNibble(CENTER_METADATA, makeBlockIndex(x & 15, y & 15, z & 15));
+		return getNibble(SECTION_DATA[sectionIndex], blockIndex);
 	}
 
 	@Override
@@ -326,26 +363,25 @@ public class SectionCache implements IBlockAccess {
 	}
 
 	public int isVoxelFull(int x, int y, int z) {
-		int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
-
 		int blockX = x - this.blockX;
 		int blockY = y - this.blockY;
 		int blockZ = z - this.blockZ;
 
+		int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
 		int sectionIndex = sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
 
-		return PrimitivesFlags.SOLID_CULL_MASK[MathExt.byteToUnsigned(SECTION_BLOCKS[sectionIndex][blockIndex])];
+		return PrimitivesFlags.SOLID_CULL_MASK[this.getBlockId(sectionIndex, blockIndex)];
 	}
 
-	public int isVoxelFullRelative(int x, int y, int z) {
+	public int isVoxelFullRel(int x, int y, int z) {
 		int sectionIndex = sectionIndex(x >> 4, y >> 4, z >> 4);
-		int blockInd = makeBlockIndex(x & 15, y & 15, z & 15);
+		int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
 
 		if (sectionIndex == sectionIndex(1, 1, 1)) {
-			return this.isVoxelFullFromCenter(blockInd);
+			return this.isVoxelFullRel(blockIndex);
 		}
 
-		return PrimitivesFlags.SOLID_CULL_MASK[SECTION_BLOCKS[sectionIndex][blockInd] & 0xFF];
+		return PrimitivesFlags.SOLID_CULL_MASK[this.getBlockId(sectionIndex, blockIndex)];
 	}
 
 	@Override
@@ -353,7 +389,7 @@ public class SectionCache implements IBlockAccess {
 		return this.isVoxelFull(x, y, z) != 0;
 	}
 
-	public int isVoxelFullFromCenter(int blockIndex) {
+	public int isVoxelFullRel(int blockIndex) {
 		return SectionCache.VISITED_CENTER_BLOCKS[blockIndex];
 	}
 

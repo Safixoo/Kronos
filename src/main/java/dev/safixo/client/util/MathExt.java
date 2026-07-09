@@ -31,6 +31,10 @@ public class MathExt {
 		return Math.abs(a - b) < (1.0f / 8192.0f);
 	}
 
+	public static boolean equals(double a, double b) {
+		return Math.abs(a - b) < (1.0f / 8192.0f);
+	}
+
 	public static int nextPOT(int a) {
 		a--;
 

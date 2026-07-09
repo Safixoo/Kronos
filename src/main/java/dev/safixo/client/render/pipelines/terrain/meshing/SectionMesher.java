@@ -61,7 +61,7 @@ public class SectionMesher {
 			RenderBlocks renderBlocks = new RenderBlocks(sectionCache);
 
 			WorldRenderer.chunksUpdated++;
-			section.setFlags(SectionFlags.setSolidFaces(section.flags, CullSetGenerator.floodFillSection(section, camera)));
+			section.setFlags(SectionFlags.setSolidFaces(section.flags, CullSetGenerator.floodFillSection(sectionCache, section, camera)));
 
 			// +-X face
 			for (int y = 0; y < 16; y++) {
@@ -148,26 +148,29 @@ public class SectionMesher {
 		return !airEmpty;
 	}
 
+	private static boolean skipBlock(SectionCache cache, int blockId, int blockIndex) {
+		return cache.isVoxelFullRel(blockIndex) == CullSetGenerator.NOT_VISITED && !PrimitivesFlags.SOLID[blockId];
+	}
+
 	private void meshBlockCenter(SectionRender section, RenderBlocks renderBlocks, SectionCache cache, int x, int y, int z, boolean ambient) {
 		int blockIndex = makeBlockIndex(x, y, z);
 		int blockId = cache.getBlockIdCenter(blockIndex);
 
-		if (blockId == AIR_ID) {
+		if (blockId == AIR_ID || skipBlock(cache, blockId, blockIndex)) {
 			return;
 		}
 
-		int blockRenderPass = PrimitivesFlags.RENDER_PASS[blockId];
 		int blockX = x + section.blockX, blockY = y + section.blockY, blockZ = z + section.blockZ;
 
-		if (cache.isVoxelFullFromCenter(blockIndex) == 1 || PrimitivesFlags.SOLID[blockId]) {
+		if (PrimitivesFlags.SOLID[blockId]) {
 			int drawBitSet = 0;
 
-			drawBitSet |= cache.isVoxelFullFromCenter(blockIndex + makeBlockIndex(0,1,0)) << UP;
-			drawBitSet |= cache.isVoxelFullFromCenter(blockIndex - makeBlockIndex(0,1,0)) << DOWN;
-			drawBitSet |= cache.isVoxelFullFromCenter(blockIndex - makeBlockIndex(0,0,1)) << NORTH;
-			drawBitSet |= cache.isVoxelFullFromCenter(blockIndex + makeBlockIndex(0,0,1)) << SOUTH;
-			drawBitSet |= cache.isVoxelFullFromCenter(blockIndex - makeBlockIndex(1,0,0)) << WEST;
-			drawBitSet |= cache.isVoxelFullFromCenter(blockIndex + makeBlockIndex(1,0,0)) << EAST;
+			drawBitSet |= cache.isVoxelFullRel(blockIndex + makeBlockIndex(0,1,0)) << UP;
+			drawBitSet |= cache.isVoxelFullRel(blockIndex - makeBlockIndex(0,1,0)) << DOWN;
+			drawBitSet |= cache.isVoxelFullRel(blockIndex - makeBlockIndex(0,0,1)) << NORTH;
+			drawBitSet |= cache.isVoxelFullRel(blockIndex + makeBlockIndex(0,0,1)) << SOUTH;
+			drawBitSet |= cache.isVoxelFullRel(blockIndex - makeBlockIndex(1,0,0)) << WEST;
+			drawBitSet |= cache.isVoxelFullRel(blockIndex + makeBlockIndex(1,0,0)) << EAST;
 			drawBitSet ^= 0x3F;
 
 			if (drawBitSet != 0b0) {
@@ -182,12 +185,14 @@ public class SectionMesher {
 				}
 			}
 
-			if (blockRenderPass != 0) {
+			int blockRenderPass = PrimitivesFlags.RENDER_PASS[blockId];
+			if (blockRenderPass == 1) {
 				VertexWriter.setCurrentInstance(VertexWriter.TRANSLUCENT);
 			} else {
 				VertexWriter.setCurrentInstance(VertexWriter.SOLID[MeshDirection.GENERIC]);
 			}
 
+			setupTranslation(section, VertexWriter.getCurrentInstance());
 			renderBlocks.renderBlockByRenderType(Block.blocksList[blockId], blockX, blockY, blockZ);
 		}
 	}
@@ -196,30 +201,29 @@ public class SectionMesher {
 		int blockIndex = makeBlockIndex(x, y, z);
 		int blockId = cache.getBlockIdCenter(blockIndex);
 
-		if (blockId == AIR_ID) {
+		if (blockId == AIR_ID || skipBlock(cache, blockId, blockIndex)) {
 			return;
 		}
 
-		int blockRenderPass = PrimitivesFlags.RENDER_PASS[blockId];
 		int blockX = x + section.blockX;
 		int blockY = y + section.blockY;
 		int blockZ = z + section.blockZ;
 
-		if (cache.isVoxelFullFromCenter(blockIndex) == 1 || PrimitivesFlags.SOLID[blockId]) {
+		if (PrimitivesFlags.SOLID[blockId]) {
 			int rX = x + 16;
 			int rY = y + 16;
 			int rZ = z + 16;
 			int drawBitSet = 0;
 
-			drawBitSet |= cache.isVoxelFullRelative(rX, rY + 1, rZ) << UP;
-			drawBitSet |= cache.isVoxelFullRelative(rX, rY - 1, rZ) << DOWN;
-			drawBitSet |= cache.isVoxelFullRelative(rX, rY, rZ - 1) << NORTH;
-			drawBitSet |= cache.isVoxelFullRelative(rX, rY, rZ + 1) << SOUTH;
-			drawBitSet |= cache.isVoxelFullRelative(rX - 1, rY, rZ) << WEST;
-			drawBitSet |= cache.isVoxelFullRelative(rX + 1, rY, rZ) << EAST;
+			drawBitSet |= cache.isVoxelFullRel(rX, rY + 1, rZ) << UP;
+			drawBitSet |= cache.isVoxelFullRel(rX, rY - 1, rZ) << DOWN;
+			drawBitSet |= cache.isVoxelFullRel(rX, rY, rZ - 1) << NORTH;
+			drawBitSet |= cache.isVoxelFullRel(rX, rY, rZ + 1) << SOUTH;
+			drawBitSet |= cache.isVoxelFullRel(rX - 1, rY, rZ) << WEST;
+			drawBitSet |= cache.isVoxelFullRel(rX + 1, rY, rZ) << EAST;
 			drawBitSet ^= 0x3F;
 
-			if (drawBitSet != 0) {
+			if (drawBitSet != 0b0) {
 				VoxelMesher.meshVoxel(Block.blocksList[blockId], cache, blockX, blockY, blockZ, ambient, drawBitSet, blockId);
 			}
 		} else {
@@ -231,12 +235,14 @@ public class SectionMesher {
 				}
 			}
 
-			if (blockRenderPass != 0) {
+			int blockRenderPass = PrimitivesFlags.RENDER_PASS[blockId];
+			if (blockRenderPass == 1) {
 				VertexWriter.setCurrentInstance(VertexWriter.TRANSLUCENT);
 			} else {
 				VertexWriter.setCurrentInstance(VertexWriter.SOLID[MeshDirection.GENERIC]);
 			}
 
+			setupTranslation(section, VertexWriter.getCurrentInstance());
 			renderBlocks.renderBlockByRenderType(Block.blocksList[blockId], blockX, blockY, blockZ);
 		}
 	}
@@ -337,15 +343,18 @@ public class SectionMesher {
 		return drawData;
 	}
 
-	private static void prepareWriterForTerrain(SectionRender section, VertexWriter writerManager) {
-		writerManager.startDrawing();
+	private static void prepareWriterForTerrain(SectionRender section, VertexWriter writer) {
+		writer.startDrawing();
+		writer.setVertexFormat(DefaultVertexFormats.TERRAIN_FORMAT);
 
+		setupTranslation(section, writer);
+	}
+
+	private static void setupTranslation(SectionRender section, VertexWriter writer) {
 		// Region translation-offset.
-		writerManager.trasX = -(section.blockX & ~RegionConstants.BLOCK_BITS_X);
-		writerManager.trasY = -(section.blockY & ~RegionConstants.BLOCK_BITS_Y);
-		writerManager.trasZ = -(section.blockZ & ~RegionConstants.BLOCK_BITS_Z);
-
-		writerManager.setVertexFormat(DefaultVertexFormats.TERRAIN_FORMAT);
+		writer.trasX = -(section.blockX & ~RegionConstants.BLOCK_BITS_X);
+		writer.trasY = -(section.blockY & ~RegionConstants.BLOCK_BITS_Y);
+		writer.trasZ = -(section.blockZ & ~RegionConstants.BLOCK_BITS_Z);
 	}
 
 	private static int getAdjacentMask(int sectionY) {

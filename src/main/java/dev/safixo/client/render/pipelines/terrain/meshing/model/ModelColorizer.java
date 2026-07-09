@@ -146,15 +146,15 @@ public class ModelColorizer {
 		return (b & 0xFF0000) | (g & 0x00FF00) | (r & 0x0000FF);
 	}
 
-	private int getBiomeGrassColor(BiomeGenBase biome) {
+	public int getBiomeGrassColor(BiomeGenBase biome) {
 		return this.getGrassColorEvent(biome, PrimitivesFlags.GRASS_COLOR[biome.biomeID]);
 	}
 
-	private int getBiomeFoliageColor(BiomeGenBase biome) {
+	public int getBiomeFoliageColor(BiomeGenBase biome) {
 		return this.getFoliageColorEvent(biome, PrimitivesFlags.LEAVES_COLOR[biome.biomeID]);
 	}
 
-	private int getWaterColorEvent(BiomeGenBase biome) {
+	public int getWaterColorEvent(BiomeGenBase biome) {
 		if (biome != this.waterEvent.biome) {
 			populateEvent(this.grassEvent, biome, biome.waterColorMultiplier);
 			MinecraftForge.EVENT_BUS.post(this.waterEvent);
