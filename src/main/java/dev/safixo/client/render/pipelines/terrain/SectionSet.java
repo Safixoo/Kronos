@@ -13,9 +13,6 @@ public class SectionSet {
 	// section position of the player making it easily invalidated to movement.
 	private byte[] sections;
 
-	// Temporary array to make the process of copying sections easier.
-	byte[] tempArray;
-
 	// Saves the visibility value from each section in the radius, which is quantized
 	// as "grid factor" (the term used in BFSCuller).
 	private short[] visibilitySet;
@@ -92,7 +89,6 @@ public class SectionSet {
 
 		if (this.sections == null || this.sections.length != size) {
 			this.sections = new byte[size];
-			this.tempArray = new byte[size];
 		}
 
 		int cameraChunkX = this.camera.intX >> 4;
@@ -236,41 +232,47 @@ public class SectionSet {
 			return;
 		}
 
+		int signX = MathExt.sign(diffCameraX);
+		int signZ = MathExt.sign(diffCameraZ);
+
 		// Iterates the whole array volume.
 		for (int x = -radius; x <= radius; x++) {
 			for (int z = -radius; z <= radius; z++) {
 				int chunkX = cameraChunkX + x;
 				int chunkZ = cameraChunkZ + z;
 
-				// Manage the part of the volume that the array NOW represents as *inside*.
-				if (Math.abs(x + diffCameraX) > radius || Math.abs(z + diffCameraZ) > radius) {
-					this.initializeSectionInfo(chunkX, chunkZ);
-					continue;
-				}
+				// It has to iterate from the same direction from diffXZ to avoid overwriting
+				// the data we are copying in the process.
+				int xi = signX * x;
+				int zi = signZ * z;
 
-				// Manage the part of the volume that the array NOW represents as *outside*.
-				if (Math.abs(x - diffCameraX) > radius || Math.abs(z - diffCameraZ) > radius) {
-					// The outside part of the volume can't be represented.
-					continue;
-				}
-
-				// Copy part of the volume that now its inside and before it was also.
-				for (int sectionY = 0; sectionY < 16; sectionY++) {
-					int lastSectionIndex = this.getSectionIndexRelative(x + diffCameraX, sectionY, z + diffCameraZ);
-					int sectionIndex = this.getSectionIndexRelative(x, sectionY, z);
-
-					this.tempArray[sectionIndex] = this.sections[lastSectionIndex];
-				}
+				this.handleSectionInVolume(chunkX, chunkZ, diffCameraX, diffCameraZ, xi, zi);
 			}
 		}
 
-		// Swap arrays.
-		byte[] newSection = this.tempArray;
-		this.tempArray = this.sections;
-		this.sections = newSection;
-
 		this.lastCameraChunkX = cameraChunkX;
 		this.lastCameraChunkZ = cameraChunkZ;
+	}
+
+	private void handleSectionInVolume(int chunkX, int chunkZ, int diffCameraX, int diffCameraZ, int xi, int zi) {
+		// Manage the part of the volume that the array NOW represents as *inside*.
+		if (Math.abs(xi + diffCameraX) > this.radius || Math.abs(zi + diffCameraZ) > this.radius) {
+			this.initializeSectionInfo(chunkX, chunkZ);
+			return;
+		}
+
+		// Skip the part of the volume that the array NOW represents as *outside*.
+		if (Math.abs(xi - diffCameraX) > this.radius || Math.abs(zi - diffCameraZ) > this.radius) {
+			return;
+		}
+
+		// Copy part of the volume that now its inside and before it was also.
+		for (int sectionY = 0; sectionY < 16; sectionY++) {
+			int lastSectionIndex = this.getSectionIndexRelative(xi + diffCameraX, sectionY, zi + diffCameraZ);
+			int sectionIndex = this.getSectionIndexRelative(xi, sectionY, zi);
+
+			this.sections[sectionIndex] = this.sections[lastSectionIndex];
+		}
 	}
 
 	public int getRadius() {

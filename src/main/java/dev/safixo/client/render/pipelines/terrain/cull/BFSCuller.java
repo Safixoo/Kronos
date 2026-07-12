@@ -17,7 +17,7 @@ public class BFSCuller {
 	public static final int PRECISION_BITS = 28;
 	public static final int MAX_PRECISION = 1 << PRECISION_BITS;
 
-	public static final int MAX_GRID_FACTOR = 0x4000;
+	public static final int MAX_GRID_FACTOR = 0xFFF;
 
 	private static final int TOLERANCE = (int) (0.15f * MAX_GRID_FACTOR);
 
@@ -380,9 +380,9 @@ public class BFSCuller {
 		diffY = Math.abs(diffY);
 		diffZ = Math.abs(diffZ);
 
-		gradInd += diffX * (visSet[sectionIndex - signX]);
-		gradInd += diffY * (visSet[sectionIndex - signY]);
-		gradInd += diffZ * (visSet[sectionIndex - signZ]);
+		gradInd += diffX * (visSet[sectionIndex - signX] & MAX_GRID_FACTOR);
+		gradInd += diffY * (visSet[sectionIndex - signY] & MAX_GRID_FACTOR);
+		gradInd += diffZ * (visSet[sectionIndex - signZ] & MAX_GRID_FACTOR);
 
 		return visSet[sectionIndex] = (short) (((gradInd * INV_DIVS[diffX + diffY + diffZ]) >> PRECISION_BITS) & 0xFFFF);
 	}
@@ -438,7 +438,7 @@ public class BFSCuller {
 				}
 			}
 
-			int visFact = visSet[sectionIndex] & 0x7FFF;
+			int visFact = visSet[sectionIndex] & MAX_GRID_FACTOR;
 
 			if (visFact < TOLERANCE && ++valid >= 4) {
 				return true;
