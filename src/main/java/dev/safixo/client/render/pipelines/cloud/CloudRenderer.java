@@ -3,7 +3,6 @@ package dev.safixo.client.render.pipelines.cloud;
 import dev.safixo.client.render.ImprovedTessellator;
 import dev.safixo.client.render.gfx.buffer.GlVertexBuffer;
 import dev.safixo.client.render.gfx.state.GlFogTracker;
-import dev.safixo.client.render.gfx.util.RenderBuffer;
 import dev.safixo.client.render.gfx.vertex.GlVertexArrayObject;
 import dev.safixo.client.render.pipelines.terrain.cull.FrustumCuller;
 import dev.safixo.client.util.ColorBGRManager;
@@ -12,9 +11,10 @@ import dev.safixo.client.util.MathExt;
 import dev.safixo.client.render.vertex.VertexWriter;
 import dev.safixo.client.render.vertex.DefaultVertexFormats;
 import dev.safixo.core.HookUtils;
-import dev.safixo.client.render.gfx.state.GlStateTracker;
+import net.minecraft.block.Block;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.WorldClient;
+import net.minecraft.client.renderer.ActiveRenderInfo;
 import net.minecraft.client.renderer.RenderGlobal;
 import net.minecraft.client.resources.Resource;
 import net.minecraft.client.resources.ResourceManager;
@@ -96,6 +96,7 @@ public class CloudRenderer {
 
 	private static void setupRender(World world, ResourceManager manager, float partialTick, int distance) {
 		Vec3 cloudColor = world.getCloudColour(partialTick);
+
 		float r = (float) cloudColor.xCoord;
 		float g = (float) cloudColor.yCoord;
 		float b = (float) cloudColor.zCoord;
@@ -134,6 +135,15 @@ public class CloudRenderer {
 		Minecraft mc = Minecraft.getMinecraft();
 		WorldClient world = mc.theWorld;
 
+		int cameraBlockId = ActiveRenderInfo.getBlockIdAtEntityViewpoint(mc.theWorld, mc.renderViewEntity, partialTick);
+
+		// Don't render clouds underwater.
+		if (cameraBlockId != 0 && Block.blocksList[cameraBlockId].blockMaterial.isLiquid()) {
+			return;
+		}
+
+		Vec3 cameraPosition = ActiveRenderInfo.projectViewFromEntity(mc.renderViewEntity, partialTick);
+
 		int renderDistance = MathExt.getCanonicalRenderDistance(mc.gameSettings);
 		int cellDistance = Math.max((int) (GlFogTracker.FOG_END / CLOUD_WIDTH), (renderDistance * 16) / CLOUD_WIDTH) - 1;
 		cellDistance = Math.min(cellDistance + 3, MAX_CELL_DISTANCE);
@@ -147,44 +157,54 @@ public class CloudRenderer {
 		float playerZ = (float) MathExt.lerp(player.lastTickPosZ, player.posZ, partialTick);
 
 		float cloudHeight = world.provider.getCloudHeight();
-		float viewY = cloudHeight - playerY + 0.33F;
 
-		int maxDistance = (int) (MathExt.square(cellDistance) - MathExt.square(viewY / CLOUD_WIDTH));
+		float cloudY = cloudHeight - playerY + 0.33F;
+		float cloudCameraY = cloudHeight - (float) cameraPosition.yCoord + 0.33F;
+
+		int maxDistance = (int) (MathExt.square(cellDistance) - MathExt.square(cloudY / CLOUD_WIDTH));
 		cellDistance = (int) Math.sqrt(maxDistance);
 
 		int cloudTickCounter = getCloudTickCounter(mc.renderGlobal);
 		double tickPosition = cloudTickCounter + partialTick;
 
-		double worldX = (playerX + tickPosition * 0.03F) / CLOUD_WIDTH;
-		double worldZ = (playerZ + 3.96F) / CLOUD_WIDTH;
+		double cloudX = MathExt.floorMod((playerX + tickPosition * 0.03F) / CLOUD_WIDTH, 2048);
+		double cloudZ = MathExt.floorMod(((playerZ + 3.96F) / CLOUD_WIDTH), 2048);
 
-		int regionX = MathExt.floor(worldX / 2048.0F);
-		int regionZ = MathExt.floor(worldZ / 2048.0F);
-
-		worldX -= regionX * 2048;
-		worldZ -= regionZ * 2048;
-
-		int worldFloorX = MathExt.floor(worldX);
-		int worldFloorZ = MathExt.floor(worldZ);
-
-		float worldFracX = (float) (worldX - worldFloorX);
-		float worldFracZ = (float) (worldZ - worldFloorZ);
+		int cloudIntX = MathExt.floor(cloudX); float cloudFracX = (float) (cloudX - cloudIntX);
+		int cloudIntZ = MathExt.floor(cloudZ); float cloudFracZ = (float) (cloudZ - cloudIntZ);
 
 		VertexWriter writer = VertexWriter.getCurrentInstance();
+		FrustumCuller.prepareCloudFrustum(cloudFracX, cloudY, cloudFracZ);
 
-		FrustumCuller.prepareCloudFrustum(worldFracX, viewY, worldFracZ);
+		int insideIndex = getInsideIndex(cloudCameraY);
+
+		double cloudCamX = MathExt.floorMod((cameraPosition.xCoord + tickPosition * 0.03F) / CLOUD_WIDTH, 2048);
+		double cloudCamZ = MathExt.floorMod(((cameraPosition.zCoord + 3.96F) / CLOUD_WIDTH), 2048);
+
+		int cloudCamIntX = MathExt.floor(cloudCamX); float cloudCamFracX = (float) (cloudCamX - cloudCamIntX);
+		int cloudCamIntZ = MathExt.floor(cloudCamZ); float cloudCamFracZ = (float) (cloudCamZ - cloudCamIntZ);
 
 		// Generate and write the clouds' geometry.
-		buildGeometry(writer, cellDistance, worldFracX, worldFracZ, worldFloorX, worldFloorZ, viewY);
+		buildGeometry(writer, cellDistance, cloudCamFracX, cloudCamFracZ, cloudIntX, cloudIntZ, cloudCamIntX, cloudCamIntZ, cloudCameraY, insideIndex);
 
 		// Upload the geometry.
 		ImprovedTessellator.INSTANCE.getVertexBuffer().bufferData(writer.getWriterNio(), writer.getOffset());
 
 		// Draw the clouds.
-		drawClouds(writer.getVertices(), worldFracX, viewY, worldFracZ);
+		drawClouds(writer.getVertices(), cloudFracX, cloudY, cloudFracZ);
 
 		// Clear the state.
 		clearState(writer);
+	}
+
+	private static int getInsideIndex(float cloudCameraY) {
+		boolean insideClouds = (-cloudCameraY >= -EPSILON) && (-cloudCameraY <= CLOUD_HEIGHT + EPSILON);
+
+		if (!insideClouds) {
+			return -1;
+		}
+
+		return MAX_DISTANCE_INDEX[1];
 	}
 
 	private static void drawClouds(int vertices, float worldFracX, float viewY, float worldFracZ) {
@@ -202,25 +222,27 @@ public class CloudRenderer {
 		GL11.glEnable(GL11.GL_ALPHA_TEST);
 	}
 
-	private static final float EPSILON = 1E-1F;
+	private static final float EPSILON = 2E-1F;
 
 	// Meshes a colored voxel for each cell/texel of the cloud texture, in contrast Vanilla generates a giant
 	// tessellated mesh that covers all the texture in a way that only knowing the texture size it can
 	// generate a 3D model of the texture without having info of the texture data (just like item rendering).
 	private static void buildGeometry(VertexWriter writer, int cellDistance,
-									  float worldFracX, float worldFracZ,
-									  int worldFloorX, int worldFloorZ, float viewY) {
+									  float fracX, float fracZ, int cloudX, int cloudZ,
+									  int cloudCamX, int cloudCamZ, float viewY, int insideCellIndex) {
 		writer.ensureCapacity(CLOUD_STRIDE * 32768);
 
 		int maxIteration = MAX_DISTANCE_INDEX[cellDistance];
 
-		int startX = (worldFracX < 0.5f ? 0 : 1) + MAX_CELL_DISTANCE;
-		int startZ = (worldFracZ < 0.5f ? 0 : 1) + MAX_CELL_DISTANCE;
+		int startX = (fracX < 0.5f ? 0 : 1) + MAX_CELL_DISTANCE;
+		int startZ = (fracZ < 0.5f ? 0 : 1) + MAX_CELL_DISTANCE;
 
-		worldFloorX -= MAX_CELL_DISTANCE;
-		worldFloorZ -= MAX_CELL_DISTANCE;
+		int cloudDiffX = MathExt.floorDiv(-cloudX + cloudCamX, CLOUD_WIDTH);
+		int cloudDiffZ = MathExt.floorDiv(-cloudZ + cloudCamZ, CLOUD_WIDTH);
 
-		int insideCellsInd = -viewY >= EPSILON && -viewY <= CLOUD_HEIGHT + EPSILON ? MAX_DISTANCE_INDEX[1] : -1;
+		cloudX -= MAX_CELL_DISTANCE;
+		cloudZ -= MAX_CELL_DISTANCE;
+
 		long ptr = writer.getWriterPtr();
 
 		for (int i = 0; i <= maxIteration; i++) {
@@ -229,9 +251,14 @@ public class CloudRenderer {
 			int cellX = cellData >>> 8;
 			int cellZ = cellData & 0xFF;
 
-			int width = (cellX + worldFloorX) & 0xFF;
-			int height = (cellZ + worldFloorZ) & 0xFF;
-			int color = getCloudColor(width, height);
+			int texU = (cellX + cloudX) & 0xFF;
+			int texV = (cellZ + cloudZ) & 0xFF;
+
+			int color = getCloudColor(texU, texV);
+			long cellVertex = formatPosition(cellX, 0, cellZ);
+
+			cellX -= cloudDiffX;
+			cellZ -= cloudDiffZ;
 
 			// If the cloud texture is empty or is outside the frustum bounds, skip cell.
 			if (color == EMPTY_CLOUD || !FrustumCuller.cloudWithinFrustumBounds(cellX, cellZ)) {
@@ -239,7 +266,6 @@ public class CloudRenderer {
 			}
 
 			int visibleMask = color >>> 24;
-			long cellVertex = formatPosition(cellX, 0, cellZ);
 
 			if (cellX < startX) { // back-face cull check
 				if ((visibleMask & (1 << XP)) != 0) {
@@ -293,8 +319,8 @@ public class CloudRenderer {
 			}
 
 			// If were inside a cloud, build its interior geometry.
-			if (i <= insideCellsInd) {
-				ptr += buildCenterCells(ptr, worldFloorX, worldFloorZ, viewY, i);
+			if (i <= insideCellIndex) {
+				ptr += buildCenterCells(ptr, cloudX, cloudZ, viewY, i);
 			}
 		}
 
