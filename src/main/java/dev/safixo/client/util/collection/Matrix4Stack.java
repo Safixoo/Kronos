@@ -1,4 +1,4 @@
-package dev.safixo.client.util;
+package dev.safixo.client.util.collection;
 
 import dev.safixo.client.util.memory.UnsafeUtil;
 import org.joml.Matrix4f;

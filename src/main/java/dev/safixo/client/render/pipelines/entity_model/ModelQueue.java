@@ -5,14 +5,11 @@ import dev.safixo.client.render.gfx.state.GlMatrixTracker;
 import dev.safixo.client.render.gfx.state.GlTextureTracker;
 import dev.safixo.client.render.gfx.vertex.GlVertexArrayObject;
 import dev.safixo.client.render.vertex.writers.TerrainFormat;
-import dev.safixo.client.util.Matrix4Stack;
+import dev.safixo.client.util.collection.Matrix4Stack;
 import dev.safixo.client.util.memory.NativeBuffer;
 import dev.safixo.core.HookUtils;
 import dev.safixo.core.hooks.MinecraftHook;
-import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
-import it.unimi.dsi.fastutil.objects.Reference2IntLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Reference2IntOpenHashMap;
-import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.EntityRenderer;
 import net.minecraft.client.renderer.OpenGlHelper;
@@ -23,7 +20,6 @@ import org.lwjgl.opengl.*;
 import java.nio.ByteBuffer;
 
 import static dev.safixo.client.util.memory.UnsafeUtil.*;
-import static dev.safixo.core.hooks.MinecraftHook.LIGHTMAP_RESOURCE;
 
 // TODO:
 //  - Extract all entity textures (excluding players) to its own texture atlas.
@@ -145,7 +141,7 @@ public class ModelQueue {
 		OpenGlHelper.setActiveTexture(OpenGlHelper.lightmapTexUnit);
 		GL11.glEnable(GL11.GL_TEXTURE_2D);
 
-		mc.getTextureManager().bindTexture((ResourceLocation) HookUtils.getFieldValue(LIGHTMAP_RESOURCE, render));
+		mc.getTextureManager().bindTexture(render.locationLightMap);
 
 		OpenGlHelper.setActiveTexture(OpenGlHelper.defaultTexUnit);
 		GL11.glEnable(GL11.GL_TEXTURE_2D);

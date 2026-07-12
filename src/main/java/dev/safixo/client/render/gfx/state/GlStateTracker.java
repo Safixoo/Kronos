@@ -1,6 +1,7 @@
 package dev.safixo.client.render.gfx.state;
 
 import dev.safixo.client.render.ImprovedTessellator;
+import dev.safixo.client.util.data.FrameTimer;
 import org.lwjgl.opengl.*;
 
 import java.nio.Buffer;
@@ -20,6 +21,8 @@ public class GlStateTracker {
 	public static void update(boolean processMessages) {
 		flushDrawState();
 		Display.update(processMessages);
+
+		FrameTimer.getInstance().addFrame();
 	}
 
 	public static void update() {

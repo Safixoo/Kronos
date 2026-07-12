@@ -32,8 +32,6 @@ public  class RenderGlobalHook {
 	public static boolean OPTIFINE_CHECKED = false;
 	public static boolean OPTIFINE_ACTIVE = false;
 
-	private static final Field RENDERERS_BEING_LOADED = HookUtils.getField(RenderGlobal.class, "renderersBeingRendered", "field_72746_N");
-
 	public static float PARTIAL_TICK;
 
 	public static void loadRenderers(RenderGlobal renderGlobal) {
@@ -56,13 +54,11 @@ public  class RenderGlobalHook {
 		Block.leaves.setGraphicsLevel(gameSettings.fancyGraphics);
 		int renderDistance = gameSettings.renderDistance;
 
-		((List<?>) HookUtils.getFieldObj(renderGlobal, "tileEntities", "field_72762_a")).clear();
+		renderGlobal.tileEntities.clear();
+		renderGlobal.renderEntitiesStartupCounter = 2;
+		renderGlobal.renderDistance = renderDistance;
 
 		VertexWriter.startDefaults();
-
-		HookUtils.setField(renderGlobal, "renderEntitiesStartupCounter", "field_72740_G", 2);
-		HookUtils.setField(renderGlobal, "renderDistance", "field_72739_F", renderDistance);
-
 		SHOULD_RELOAD = true;
 	}
 
@@ -100,9 +96,6 @@ public  class RenderGlobalHook {
 		PARTIAL_TICK = partialTick;
 	}
 
-	static long samples = 0;
-	static long time;
-
 	public static void renderCloudsFancy(RenderGlobal renderGlobal, float partialTick) {
 		CloudRenderer.renderCloudsFancy(partialTick);
 	}
@@ -114,12 +107,11 @@ public  class RenderGlobalHook {
 		minecraft.entityRenderer.enableLightmap(partialTick);
 		GL11.glEnable(GL11.GL_CULL_FACE);
 
-
 		if (!OPTIFINE_ACTIVE) {
 			if (renderPass == 0) {
 				// Render solid pass.
 				MANAGER.drawRenderPass(0);
-				HookUtils.setFieldValue(RENDERERS_BEING_LOADED, global, MANAGER.drawnSolidRenderers);
+				global.renderersBeingRendered = MANAGER.drawnSolidRenderers;
 				MANAGER.drawnSolidRenderers = 0;
 			} else {
 				// Render translucent pass.
@@ -131,7 +123,7 @@ public  class RenderGlobalHook {
 		} else {
 			// Render solid pass.
 			MANAGER.drawRenderPass(0);
-			HookUtils.setFieldValue(RENDERERS_BEING_LOADED, global, MANAGER.drawnSolidRenderers);
+			global.renderersBeingRendered = MANAGER.drawnSolidRenderers;
 			MANAGER.drawnSolidRenderers = 0;
 
 			// Render translucent pass.

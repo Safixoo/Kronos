@@ -52,8 +52,6 @@ public class CloudRenderer {
 	private static GlVertexArrayObject VERTEX_ARRAY;
 	private static CloudProgram CLOUD_SHADER;
 
-	private static Field CLOUD_TICK_COUNTER;
-
 	private static final int XP = Direction.EAST;
 	private static final int XN = Direction.WEST;
 
@@ -113,8 +111,6 @@ public class CloudRenderer {
 
 		if (CLOUD_SHADER == null) {
 			processCloudTexture(manager);
-			CLOUD_TICK_COUNTER = HookUtils.getField(Minecraft.getMinecraft().renderGlobal, "cloudTickCounter", "field_72773_u");
-
 			CLOUD_SHADER = new CloudProgram();
 		}
 
@@ -128,7 +124,7 @@ public class CloudRenderer {
 	}
 
 	private static int getCloudTickCounter(RenderGlobal renderGlobal) {
-		return (Integer) HookUtils.getFieldValue(CLOUD_TICK_COUNTER, renderGlobal);
+		return renderGlobal.cloudTickCounter;
 	}
 
 	public static void renderCloudsFancy(float partialTick) {

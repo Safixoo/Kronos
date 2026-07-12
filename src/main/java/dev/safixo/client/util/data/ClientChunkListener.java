@@ -1,8 +1,8 @@
-package dev.safixo.client.util;
+package dev.safixo.client.util.data;
 
 import dev.safixo.client.render.pipelines.terrain.WorldManager;
+import dev.safixo.client.util.MathExt;
 import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
-import it.unimi.dsi.fastutil.longs.LongArrayList;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ChunkProviderClient;
 import net.minecraft.client.multiplayer.WorldClient;

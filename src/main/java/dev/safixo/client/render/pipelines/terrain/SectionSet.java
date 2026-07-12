@@ -2,7 +2,7 @@ package dev.safixo.client.render.pipelines.terrain;
 
 import dev.safixo.client.render.pipelines.terrain.cull.BFSCuller;
 import dev.safixo.client.render.pipelines.terrain.cull.BFSQueues;
-import dev.safixo.client.util.ClientChunkListener;
+import dev.safixo.client.util.data.ClientChunkListener;
 import dev.safixo.client.util.MathExt;
 import dev.safixo.client.util.data.CameraData;
 

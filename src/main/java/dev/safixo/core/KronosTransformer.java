@@ -9,6 +9,7 @@ import net.minecraft.launchwrapper.IClassTransformer;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.tree.*;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
 

@@ -16,7 +16,7 @@ public class LongHashMapHook {
 
 		// private final FastLongHashMap map;
 		cw.visitField(ACC_PRIVATE | ACC_FINAL, "map",
-			"Ldev/safixo/client/util/FastLongHashMap;",
+			"Ldev/safixo/client/util/collection/FastLongHashMap;",
 			null,
 			null).visitEnd();
 
@@ -30,17 +30,17 @@ public class LongHashMapHook {
 		mv.visitMethodInsn(INVOKESPECIAL, "java/lang/Object", "<init>", "()V");
 
 		mv.visitVarInsn(ALOAD, 0);
-		mv.visitTypeInsn(NEW, "dev/safixo/client/util/FastLongHashMap");
+		mv.visitTypeInsn(NEW, "dev/safixo/client/util/collection/FastLongHashMap");
 		mv.visitInsn(DUP);
 		mv.visitMethodInsn(INVOKESPECIAL,
-			"dev/safixo/client/util/FastLongHashMap",
+			"dev/safixo/client/util/collection/FastLongHashMap",
 			"<init>",
 			"()V");
 
 		mv.visitFieldInsn(PUTFIELD,
 			"net/minecraft/util/LongHashMap",
 			"map",
-			"Ldev/safixo/client/util/FastLongHashMap;");
+			"Ldev/safixo/client/util/collection/FastLongHashMap;");
 
 		mv.visitInsn(RETURN);
 		mv.visitMaxs(0, 0);
@@ -54,10 +54,10 @@ public class LongHashMapHook {
 		mv.visitFieldInsn(GETFIELD,
 			"net/minecraft/util/LongHashMap",
 			"map",
-			"Ldev/safixo/client/util/FastLongHashMap;");
+			"Ldev/safixo/client/util/collection/FastLongHashMap;");
 
 		mv.visitMethodInsn(INVOKEVIRTUAL,
-			"dev/safixo/client/util/FastLongHashMap",
+			"dev/safixo/client/util/collection/FastLongHashMap",
 			"getSize",
 			"()I");
 
@@ -73,12 +73,12 @@ public class LongHashMapHook {
 		mv.visitFieldInsn(GETFIELD,
 			"net/minecraft/util/LongHashMap",
 			"map",
-			"Ldev/safixo/client/util/FastLongHashMap;");
+			"Ldev/safixo/client/util/collection/FastLongHashMap;");
 
 		mv.visitVarInsn(LLOAD, 1);
 
 		mv.visitMethodInsn(INVOKEVIRTUAL,
-			"dev/safixo/client/util/FastLongHashMap",
+			"dev/safixo/client/util/collection/FastLongHashMap",
 			"get",
 			"(J)Ljava/lang/Object;");
 
@@ -94,12 +94,12 @@ public class LongHashMapHook {
 		mv.visitFieldInsn(GETFIELD,
 			"net/minecraft/util/LongHashMap",
 			"map",
-			"Ldev/safixo/client/util/FastLongHashMap;");
+			"Ldev/safixo/client/util/collection/FastLongHashMap;");
 
 		mv.visitVarInsn(LLOAD, 1);
 
 		mv.visitMethodInsn(INVOKEVIRTUAL,
-			"dev/safixo/client/util/FastLongHashMap",
+			"dev/safixo/client/util/collection/FastLongHashMap",
 			"contains",
 			"(J)Z");
 
@@ -115,13 +115,13 @@ public class LongHashMapHook {
 		mv.visitFieldInsn(GETFIELD,
 			"net/minecraft/util/LongHashMap",
 			"map",
-			"Ldev/safixo/client/util/FastLongHashMap;");
+			"Ldev/safixo/client/util/collection/FastLongHashMap;");
 
 		mv.visitVarInsn(LLOAD, 1);
 		mv.visitVarInsn(ALOAD, 3);
 
 		mv.visitMethodInsn(INVOKEVIRTUAL,
-			"dev/safixo/client/util/FastLongHashMap",
+			"dev/safixo/client/util/collection/FastLongHashMap",
 			"put",
 			"(JLjava/lang/Object;)V");
 
@@ -137,12 +137,12 @@ public class LongHashMapHook {
 		mv.visitFieldInsn(GETFIELD,
 			"net/minecraft/util/LongHashMap",
 			"map",
-			"Ldev/safixo/client/util/FastLongHashMap;");
+			"Ldev/safixo/client/util/collection/FastLongHashMap;");
 
 		mv.visitVarInsn(LLOAD, 1);
 
 		mv.visitMethodInsn(INVOKEVIRTUAL,
-			"dev/safixo/client/util/FastLongHashMap",
+			"dev/safixo/client/util/collection/FastLongHashMap",
 			"remove",
 			"(J)Ljava/lang/Object;");
 

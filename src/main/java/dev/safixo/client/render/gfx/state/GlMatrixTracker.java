@@ -1,6 +1,6 @@
 package dev.safixo.client.render.gfx.state;
 
-import dev.safixo.client.util.Matrix4Stack;
+import dev.safixo.client.util.collection.Matrix4Stack;
 import dev.safixo.client.util.memory.NativeBuffer;
 import org.joml.Matrix4f;
 import org.lwjgl.opengl.GL11;

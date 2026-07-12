@@ -1,4 +1,6 @@
-package dev.safixo.client.util;
+package dev.safixo.client.util.collection;
+
+import dev.safixo.client.util.MathExt;
 
 import java.util.Arrays;
 

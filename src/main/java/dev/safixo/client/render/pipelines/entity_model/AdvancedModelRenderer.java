@@ -2,13 +2,10 @@ package dev.safixo.client.render.pipelines.entity_model;
 
 import dev.safixo.client.render.gfx.buffer.GlVertexBuffer;
 import dev.safixo.client.render.gfx.state.GlMatrixTracker;
-import dev.safixo.client.render.gfx.state.GlTextureTracker;
-import dev.safixo.client.render.gfx.util.GlBufferUtil;
 import dev.safixo.client.render.gfx.vertex.GlVertexArrayObject;
 import dev.safixo.client.render.vertex.DefaultVertexFormats;
 import dev.safixo.client.render.vertex.VertexWriter;
-import dev.safixo.client.util.Direction;
-import dev.safixo.client.util.Matrix4Stack;
+import dev.safixo.client.util.collection.Matrix4Stack;
 import dev.safixo.client.util.memory.NativeBuffer;
 import dev.safixo.client.util.memory.UnsafeUtil;
 import dev.safixo.core.hooks.MinecraftHook;
@@ -19,9 +16,7 @@ import net.minecraft.client.renderer.Tessellator;
 import org.joml.Matrix4f;
 import org.lwjgl.opengl.*;
 
-import java.nio.Buffer;
 import java.nio.FloatBuffer;
-import java.nio.IntBuffer;
 
 import static dev.safixo.client.util.data.PrimitivesFlags.*;
 

@@ -4,16 +4,13 @@ import dev.safixo.client.render.pipelines.terrain.meshing.model.ModelColorizer;
 import dev.safixo.client.render.pipelines.terrain.meshing.data.FacingData;
 import dev.safixo.client.render.pipelines.terrain.meshing.model.ModelHelper;
 import dev.safixo.client.render.pipelines.terrain.meshing.model.ModelLighter;
-import dev.safixo.client.render.vertex.VertexWriter;
-import dev.safixo.client.render.vertex.writers.TerrainFormat;
-import dev.safixo.client.util.AtlasSpriteUnsafe;
 import dev.safixo.client.util.Direction;
 import dev.safixo.client.util.data.PrimitivesFlags;
 import net.minecraft.block.Block;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderBlocks;
 import net.minecraft.client.renderer.Tessellator;
-import net.minecraft.util.Icon;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.world.IBlockAccess;
 import org.joml.Vector3i;
 
@@ -87,12 +84,12 @@ public class VanillaBlockMesher {
 				dirColor = VoxelMesher.SHADE_FULL_COLOR[dir];
 			}
 
-			Icon currentTex = blocks.overrideBlockTexture != null ? blocks.overrideBlockTexture : block.getBlockTexture(cache, x, y, z, dir);
+			TextureAtlasSprite currentTex = (TextureAtlasSprite) (blocks.overrideBlockTexture != null ? blocks.overrideBlockTexture : block.getBlockTexture(cache, x, y, z, dir));
 
-			float minU = AtlasSpriteUnsafe.minU(currentTex);
-			float minV = AtlasSpriteUnsafe.minV(currentTex);
-			float maxU = AtlasSpriteUnsafe.maxU(currentTex) - minU;
-			float maxV = AtlasSpriteUnsafe.maxV(currentTex) - minV;
+			float minU = currentTex.minU;
+			float minV = currentTex.minV;
+			float maxU = currentTex.maxU - minU;
+			float maxV = currentTex.maxV - minV;
 			FacingData face = FACE_RENDER[dir];
 
 			// TODO: The methods names are incorrect and misleading, fix it.

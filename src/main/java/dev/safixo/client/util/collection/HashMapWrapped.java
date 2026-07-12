@@ -1,16 +1,11 @@
-package dev.safixo.client.util;
+package dev.safixo.client.util.collection;
 
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
-import it.unimi.dsi.fastutil.objects.Reference2ReferenceOpenHashMap;
 import org.jetbrains.annotations.NotNull;
 
-import java.io.Serializable;
-import java.util.ConcurrentModificationException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.BiConsumer;
-import java.util.function.BiFunction;
 
 public class HashMapWrapped<K, V> extends HashMap<K, V> {
 	Object2ObjectOpenHashMap<K, V> hashMap = new Object2ObjectOpenHashMap<>();

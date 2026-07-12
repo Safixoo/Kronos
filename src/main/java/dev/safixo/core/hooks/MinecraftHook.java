@@ -2,10 +2,9 @@ package dev.safixo.core.hooks;
 
 import dev.safixo.client.render.ImprovedTessellator;
 import dev.safixo.client.render.gfx.state.GlMatrixTracker;
-import dev.safixo.client.render.gfx.state.GlTextureTracker;
 import dev.safixo.client.render.pipelines.entity_model.ModelQueue;
 import dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache;
-import dev.safixo.client.util.ClientChunkListener;
+import dev.safixo.client.util.data.ClientChunkListener;
 import dev.safixo.client.util.Direction;
 import dev.safixo.client.util.MathExt;
 import dev.safixo.client.util.data.PrimitivesFlags;
@@ -17,6 +16,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.WorldClient;
 import net.minecraft.client.renderer.EntityRenderer;
 import net.minecraft.client.renderer.OpenGlHelper;
+import net.minecraft.client.renderer.RenderHelper;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.entity.Render;
 import net.minecraft.util.ResourceLocation;
@@ -34,8 +34,6 @@ import java.lang.reflect.Field;
 @SuppressWarnings("unused")
 public class MinecraftHook {
 	private static final int ITEM_STRIDE = 24;
-	public static final Field LIGHTMAP_RESOURCE = HookUtils.getField(EntityRenderer.class,
-		"locationLightMap", "field_110922_T");
 
 
 	public static String PROFILING_TARGET;
@@ -239,10 +237,7 @@ public class MinecraftHook {
 	}
 
 	public static IChunkProvider createChunkProvider(WorldClient worldClient) {
-		ClientChunkListener listener = new ClientChunkListener(worldClient);
-		HookUtils.setField(worldClient, "clientChunkProvider", "field_73033_b", listener);
-
-		return listener;
+		return worldClient.clientChunkProvider = new ClientChunkListener(worldClient);
 	}
 
 	public static boolean shouldSideBeRendered(BlockSnow blockSnow, IBlockAccess worldAccess, int x, int y, int z, int dir) {
@@ -270,7 +265,7 @@ public class MinecraftHook {
 
 	public static void enableLightmap(EntityRenderer render, double partialTick) {
 		OpenGlHelper.setActiveTexture(OpenGlHelper.lightmapTexUnit);
-		Minecraft.getMinecraft().getTextureManager().bindTexture((ResourceLocation) HookUtils.getFieldValue(LIGHTMAP_RESOURCE, render));
+		Minecraft.getMinecraft().getTextureManager().bindTexture(render.locationLightMap);
 
 		if (!SETUP_LIGHTING) {
 			float scale = 1.0f / 256.0f;

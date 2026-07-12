@@ -188,17 +188,17 @@ public class BFSCuller {
 		int diameter = radius * 2 + 1;
 		int readIndex = 0;
 
+		int magicConstant = (int) Math.ceil((1 << 20) / (double) diameter);
+
 		while (readIndex < BFSQueues.bfsIndex) {
 			int sectionIndex = BFSQueues.GRAPH_INDICES[readIndex++];
 			int flags = MathExt.byteToUnsigned(sectionFlags[sectionIndex]);
 
 			// kind of ugly indexing but it works fine.
-			int offsetX = sectionIndex;
-
-			int sectionY = offsetX / diameter;
-			offsetX %= diameter;
-
+			int sectionY = (sectionIndex * magicConstant) >> 20;
+			int offsetX = sectionIndex - (sectionY * diameter);
 			int offsetZ = sectionY >> 4;
+
 			sectionY &= 15;
 
 			int diffSectX = offsetX - radius;
