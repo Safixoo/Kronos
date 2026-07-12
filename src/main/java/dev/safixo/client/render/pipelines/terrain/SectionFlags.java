@@ -23,6 +23,10 @@ public class SectionFlags {
 		return (flags & PASSES) != 0;
 	}
 
+	public static boolean hasRenderTasks(int flags) {
+		return (flags & (PASSES | DIRTY)) != 0;
+	}
+
 	public static int getSolidFaces(int flags) {
 		return (flags & SOLID_FACES) >>> SOLID_FACES_OFFSET;
 	}

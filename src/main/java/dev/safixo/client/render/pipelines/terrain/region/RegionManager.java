@@ -20,6 +20,9 @@ public class RegionManager {
 	private double lastUpdateX;
 	private double lastUpdateZ;
 
+	private RegionRender[] indexedRegions;
+	private CameraData regionCamera;
+
 	public RegionManager() {
 		String vendor = GL11.glGetString(GL11.GL_VENDOR);
 		SUPPORT_INDIRECT = GLContext.getCapabilities().GL_ARB_multi_draw_indirect && !vendor.contains("Intel");
@@ -41,12 +44,16 @@ public class RegionManager {
 		return region;
 	}
 
+	static int getRenderDiameter(CameraData camera) {
+		return camera.renderDistance * 2 + 1 + (2 << 3);
+	}
+
 	// Creates a mapping between position and regions, useful for BFS only.
-	public RegionRender[] getIndexedRegions(CameraData camera) {
+	public void saveIndexedRegions(CameraData camera) {
 		int regionCameraX = camera.intX >> RegionConstants.BLOCK_SHIFT_X;
 		int regionCameraZ = camera.intZ >> RegionConstants.BLOCK_SHIFT_Z;
 
-		int renderDiameter = camera.renderDistance * 2 + 1 + (2 << 3);
+		int renderDiameter = getRenderDiameter(camera);
 
 		int factorXZ = renderDiameter >> 3;
 		int factorY = 256 >> RegionConstants.BLOCK_SHIFT_Y;
@@ -66,17 +73,27 @@ public class RegionManager {
 			indexedRegions[regionX + (regionY + regionZ * factorY) * factorXZ] = region;
 		}
 
-		return indexedRegions;
+		this.regionCamera = camera;
+		this.indexedRegions = indexedRegions;
 	}
 
-	public static RegionRender getRegionFromIndexed(RegionRender[] indexedRegions, int renderDiameter, int regionX, int regionY, int regionZ) {
+	public RegionRender getRegionFromIndexed( int sectionX, int sectionY, int sectionZ) {
+		int renderDiameter = getRenderDiameter(this.regionCamera);
+
 		int factorXZ = renderDiameter >> 3;
 		int factorY = 256 >> RegionConstants.BLOCK_SHIFT_Y;
+
+		int regionCameraX = this.regionCamera.intX >> RegionConstants.BLOCK_SHIFT_X;
+		int regionCameraZ = this.regionCamera.intZ >> RegionConstants.BLOCK_SHIFT_Z;
+
+		int regionX = (sectionX >> (RegionConstants.BLOCK_SHIFT_X - 4)) - regionCameraX;
+		int regionY = (sectionY >> (RegionConstants.BLOCK_SHIFT_Y - 4));
+		int regionZ = (sectionZ >> (RegionConstants.BLOCK_SHIFT_Z - 4)) - regionCameraZ;
 
 		regionX += factorXZ;
 		regionZ += factorXZ;
 
-		return indexedRegions[regionX + (regionY + regionZ * factorY) * factorXZ];
+		return this.indexedRegions[regionX + (regionY + regionZ * factorY) * factorXZ];
 	}
 
 	public void clear() {

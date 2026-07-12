@@ -1,11 +1,11 @@
 package dev.safixo.client.render.pipelines.terrain;
 
 import dev.safixo.client.render.gfx.state.GlFogTracker;
+import dev.safixo.client.render.pipelines.terrain.cull.BFSQueues;
 import dev.safixo.client.render.pipelines.terrain.meshing.SectionMesher;
 import dev.safixo.client.render.pipelines.terrain.shader.ExpFogProgram;
 import dev.safixo.client.render.pipelines.terrain.shader.LinearFogProgram;
 import dev.safixo.client.render.pipelines.terrain.shader.TerrainProgram;
-import dev.safixo.client.util.ClientChunkListener;
 import dev.safixo.core.hooks.RenderGlobalHook;
 import dev.safixo.core.hooks.VertexRedirector;
 import net.minecraft.client.Minecraft;
@@ -20,7 +20,6 @@ import net.minecraft.world.chunk.IChunkProvider;
 import org.lwjgl.input.Keyboard;
 import dev.safixo.client.render.pipelines.terrain.cull.BFSCuller;
 import dev.safixo.client.render.pipelines.terrain.cull.FrustumCuller;
-import dev.safixo.client.render.pipelines.terrain.cull.RebuildList;
 import dev.safixo.client.util.data.PrimitivesFlags;
 import dev.safixo.client.util.data.CameraData;
 import dev.safixo.client.render.pipelines.terrain.region.RegionManager;
@@ -226,7 +225,7 @@ public class WorldManager {
 	}
 
 	private void queueRebuilds() {
-		int rebuildSize = RebuildList.size();
+		int rebuildSize = BFSQueues.getRebuildIndex();
 		int maxSize = Math.min(WorldManager.MAX_UPDATES_TRIES, rebuildSize);
 
 		if (rebuildSize == 0) {
@@ -243,7 +242,7 @@ public class WorldManager {
 		int updateIndex = 0, nonEmptyUpdates = 0;
 
 		while (updateIndex < maxSize && nonEmptyUpdates < WorldManager.MAX_FULL_UPDATES) {
-			long position = RebuildList.getSectionPos(this.camera, updateIndex++);
+			long position = BFSQueues.getSectionPos(this.camera, updateIndex++);
 
 			int sectionX = MathExt.decodeX(position);
 			int sectionY = MathExt.decodeY(position);

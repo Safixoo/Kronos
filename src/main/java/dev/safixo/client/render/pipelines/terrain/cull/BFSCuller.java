@@ -2,22 +2,23 @@ package dev.safixo.client.render.pipelines.terrain.cull;
 
 import dev.safixo.client.render.gfx.state.GlFogTracker;
 import dev.safixo.client.render.pipelines.terrain.*;
-import dev.safixo.client.render.pipelines.terrain.region.RegionConstants;
 import dev.safixo.client.util.data.CameraData;
 import dev.safixo.client.render.pipelines.terrain.region.RegionManager;
 import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
 import dev.safixo.client.util.Direction;
 import dev.safixo.client.util.MathExt;
+import org.lwjgl.opengl.GL11;
 
 import static dev.safixo.client.render.pipelines.terrain.SectionFlags.*;
 
 public class BFSCuller {
 	private static final long[] INV_DIVS = new long[256];
 
-	public static final int PRECISION_BITS = 25;
+	public static final int PRECISION_BITS = 28;
 	public static final int MAX_PRECISION = 1 << PRECISION_BITS;
 
-	public static final int MAX_GRID_FACTOR = 1 << 12;
+	public static final int MAX_GRID_FACTOR = 0x4000;
+
 	private static final int TOLERANCE = (int) (0.15f * MAX_GRID_FACTOR);
 
 	static {
@@ -27,8 +28,7 @@ public class BFSCuller {
 	}
 
 	public void clearUpdateIndices() {
-		RebuildList.clear();
-		BFSQueue.clear();
+		BFSQueues.clear();
 	}
 
 	public void resetRegionCounters(RegionManager regionManager) {
@@ -50,31 +50,98 @@ public class BFSCuller {
 		SectionRender origin = sectionSet.getSectionInstance(manager, blockX >> 4, blockY >> 4, blockZ >> 4);
 
 		int radius = sectionSet.getRadius();
-		int cameraIndex = sectionSet.getFlagIndex(radius, blockY >> 4, radius);
+		int cameraIndex = sectionSet.getSectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
 
-		short[] visibilitySet = sectionSet.visibilitySet;
+		short[] visibilitySet = sectionSet.getVisibilitySet();
+		visibilitySet[cameraIndex] = MAX_GRID_FACTOR;
+
+		int diameter = radius * 2 + 1;
 
 		if (origin != null) {
 			int flags = origin.flags;
 
-			int diameter = radius * 2 + 1;
 			int directions = 0x3F;
 			traverseNeighbors(visibilitySet, cameraIndex, diameter, directions);
 
 			if (SectionFlags.isDirty(flags)) {
-				RebuildList.addToList(MathExt.asInt(0, blockY >> 4, 0));
+				BFSQueues.addToRebuildList(0, blockY >> 4, 0);
 			}
 
-			queueRegionNode(origin, flags);
+			setupAxisVisibility(camera, sectionSet, cameraIndex, diameter);
+			queueRenderTasks(origin, flags);
 		}
 
 		int maxDistSquared = (int) MathExt.square(getFogDistance(camera));
 		iterateGraph(sectionSet, camera.intX, camera.intY, camera.intZ, maxDistSquared);
 
+		clearAxisVisibility(camera, sectionSet, cameraIndex, diameter);
+
 		this.enqueueRegionData(camera);
 	}
 
+	private static void setupAxisVisibility(CameraData camera, SectionSet sectionSet, int cameraIndex, int renderDiameter) {
+		int offsetX = 1;
+		int offsetY = renderDiameter;
+		int offsetZ = renderDiameter << 4;
+
+		fillAxisVisibility(sectionSet, camera, cameraIndex, offsetX, Direction.EAST, (short) -1);
+		fillAxisVisibility(sectionSet, camera, cameraIndex, offsetY, Direction.UP, (short) -1);
+		fillAxisVisibility(sectionSet, camera, cameraIndex, offsetZ, Direction.SOUTH, (short) -1);
+	}
+
+	private static void clearAxisVisibility(CameraData camera, SectionSet sectionSet, int cameraIndex, int renderDiameter) {
+		int offsetX = 1;
+		int offsetY = renderDiameter;
+		int offsetZ = renderDiameter << 4;
+
+		fillAxisVisibility(sectionSet, camera, cameraIndex, offsetX, Direction.EAST, (short) 0);
+		fillAxisVisibility(sectionSet, camera, cameraIndex, offsetY, Direction.UP, (short) 0);
+		fillAxisVisibility(sectionSet, camera, cameraIndex, offsetZ, Direction.SOUTH, (short) 0);
+	}
+
+	private static void fillAxisVisibility(SectionSet sectionSet, CameraData camera, int cameraIndex, int offset, int direction, short gridFactor) {
+		int renderDistance = camera.renderDistance;
+
+		byte[] sectionData = sectionSet.getSections();
+		short[] visSet = sectionSet.getVisibilitySet();
+
+		int index = cameraIndex;
+
+		// Negative direction.
+		for (int a = 0; a <= renderDistance; a++) {
+			int section = sectionData[index];
+
+			visSet[index] = gridFactor;
+			index -= offset;
+
+			if (Direction.hasSet(getSolidFaces(section), Direction.opposite(direction))) {
+				break;
+			}
+		}
+		index = cameraIndex;
+
+		// Positive direction.
+		for (int a = 0; a <= renderDistance; a++) {
+			int section = sectionData[index];
+
+			visSet[index] = gridFactor;
+			index += offset;
+
+			if (Direction.hasSet(getSolidFaces(section), direction)) {
+				break;
+			}
+		}
+	}
+
+	// Constant used for the equation to find the distance from the fog density where everything is seen
+	// as occluded by the fog.
+	private static final float LN_0 = (float) Math.log(1.0 / 255.0);
+
 	public static float getFogDistance(CameraData camera) {
+		if (GlFogTracker.FOG_MODE == GL11.GL_EXP) {
+			return LN_0 / GlFogTracker.FOG_DENSITY;
+		}
+
 		return Math.max(3 << 4, Math.min(GlFogTracker.FOG_END, camera.renderDistance << 4));
 	}
 
@@ -84,27 +151,20 @@ public class BFSCuller {
 	 */
 	private void enqueueRegionData(CameraData camera) {
 		RegionManager regionManager = WorldManager.getRegionManager();
-		RegionRender[] regions = regionManager.getIndexedRegions(camera);
 
-		int renderDiameter = camera.renderDistance * 2 + 1 + (2 << 3);
-		int regionCameraX = camera.intX >> RegionConstants.BLOCK_SHIFT_X;
-		int regionCameraZ = camera.intZ >> RegionConstants.BLOCK_SHIFT_Z;
+		regionManager.saveIndexedRegions(camera);
 
 		int cameraChunkX = camera.intX >> 4;
 		int cameraChunkZ = camera.intZ >> 4;
 
-		for (int i = 0; i < BFSQueue.renderIndex; i++) {
-			int position = BFSQueue.RENDER_INDICES[i];
+		for (int i = 0; i < BFSQueues.getRenderIndex(); i++) {
+			int position = BFSQueues.RENDER_INDICES[i];
 
 			int sectionX = MathExt.decodeX(position) + cameraChunkX;
 			int sectionY = MathExt.decodeY(position);
 			int sectionZ = MathExt.decodeZ(position) + cameraChunkZ;
 
-			int distRegionX = (sectionX >> (RegionConstants.BLOCK_SHIFT_X - 4)) - regionCameraX;
-			int distRegionY = (sectionY >> (RegionConstants.BLOCK_SHIFT_Y - 4));
-			int distRegionZ = (sectionZ >> (RegionConstants.BLOCK_SHIFT_Z - 4)) - regionCameraZ;
-
-			RegionRender region = RegionManager.getRegionFromIndexed(regions, renderDiameter, distRegionX, distRegionY, distRegionZ);
+			RegionRender region = regionManager.getRegionFromIndexed(sectionX, sectionY, sectionZ);
 
 			if (region == null) {
 				continue;
@@ -121,15 +181,15 @@ public class BFSCuller {
 	 * different ideas to avoid section queueing during the search.
 	 */
 	private static void iterateGraph(SectionSet sectionSet, int playerX, int playerY, int playerZ, int maxDistSquared) {
-		byte[] sectionFlags = sectionSet.getFastSectionsSet();
+		byte[] sectionFlags = sectionSet.getSections();
 		short[] visSet = sectionSet.getVisibilitySet();
 
 		int radius = sectionSet.getRadius();
 		int diameter = radius * 2 + 1;
 		int readIndex = 0;
 
-		while (readIndex < BFSQueue.bfsIndex) {
-			int sectionIndex = BFSQueue.GRAPH_INDICES[readIndex++];
+		while (readIndex < BFSQueues.bfsIndex) {
+			int sectionIndex = BFSQueues.GRAPH_INDICES[readIndex++];
 			int flags = MathExt.byteToUnsigned(sectionFlags[sectionIndex]);
 
 			// kind of ugly indexing but it works fine.
@@ -161,9 +221,9 @@ public class BFSCuller {
 			int directions = ~getSolidFaces(flags) & outwardDirections;
 			int angleMask = getAngleVisibilityMask(diffX, diffY, diffZ);
 
-			// I don't save the incoming direction info so I can directly use the angle mask to
-			// restrict the direction bit-set, but in some cases like when traversable faces are
-			// narrowed the angle-mask can be useful.
+			// The incoming direction isn't saved, so it can't directly use the angle to
+			// restrict the direction bit-set, but in some cases like when traversable faces
+			// are very narrowed down the angle trick can be useful.
 			if ((directions & angleMask) != 0b0) {
 				traverseNeighbors(visSet, sectionIndex, diameter, directions);
 			}
@@ -184,27 +244,12 @@ public class BFSCuller {
 			return true;
 		}
 
-		if (diffSectX != 0 && diffSectY != 0 && diffSectZ != 0 &&
-			genGridFactor(visSet, sectionIndex, diameter, diffSectX, diffSectY, diffSectZ) < TOLERANCE) {
+		if (setGridFactor(visSet, sectionIndex, diameter, diffSectX, diffSectY, diffSectZ) < TOLERANCE) {
 			return true;
 		}
 
 		return distance >= 70 * 70 && hasPassesNonEmpty(flags) &&
 			rayNotVisible(visSet, sectionIndex, diameter, -diffX-8, -diffY-8, -diffZ-8);
-	}
-
-	/**
-	 * Based in the flag data and position relative to the camera, saves positions to be later
-	 * retrieved and processed for region rendering and meshing.
-	 */
-	private static void queueRenderTasks(int flags, int diffSectX, int diffSectY, int diffSectZ) {
-		if (isDirty(flags)) {
-			RebuildList.addToList(MathExt.asInt(diffSectX, diffSectY, diffSectZ));
-		}
-
-		if (hasPassesNonEmpty(flags)) {
-			BFSQueue.RENDER_INDICES[BFSQueue.renderIndex++] = MathExt.asInt(diffSectX, diffSectY, diffSectZ);
-		}
 	}
 
 	/**
@@ -217,17 +262,31 @@ public class BFSCuller {
 		planes |= (diffSectY >> 31) & Direction.UP_BIT    | (-diffSectY >> 31) & Direction.DOWN_BIT;
 		planes |= (diffSectZ >> 31) & Direction.SOUTH_BIT | (-diffSectZ >> 31) & Direction.NORTH_BIT;
 
-		return planes ^ 0b111_111;
+		return planes ^ 0x3F;
 	}
 
 	/**
 	 * For non-empty renderable sections that has been visited by the graph, their indices are saved in their respective
 	 * region to later be rendered in order.
 	 */
-	private static void queueRegionNode(SectionRender section, int flags) {
+	private static void queueRenderTasks(SectionRender section, int flags) {
 		if (SectionFlags.hasPassesNonEmpty(flags)) {
 			RegionRender region = section.region;
 			region.addToRenderList(section.regionIndex);
+		}
+	}
+
+	/**
+	 * Based in the flag data and position relative to the camera, saves positions to be later
+	 * retrieved and processed for region rendering and meshing.
+	 */
+	private static void queueRenderTasks(int flags, int diffSectX, int diffSectY, int diffSectZ) {
+		if (isDirty(flags)) {
+			BFSQueues.addToRebuildList(diffSectX, diffSectY, diffSectZ);
+		}
+
+		if (hasPassesNonEmpty(flags)) {
+			BFSQueues.addToRenderList(diffSectX, diffSectY, diffSectZ);
 		}
 	}
 
@@ -240,40 +299,42 @@ public class BFSCuller {
 		int offsetY = renderDiameter;
 		int offsetZ = renderDiameter << 4;
 
-		int index = BFSQueue.bfsIndex;
-		final int[] graphIndices = BFSQueue.GRAPH_INDICES;
+		final int[] graphIndices = BFSQueues.GRAPH_INDICES;
 
-		if (Direction.hasSet(directions, Direction.DOWN) && visSet[sectionIndex - offsetY] == 0) {
+		int index = BFSQueues.bfsIndex;
+		short gridFactor = visSet[sectionIndex];
+
+		if (Direction.hasSet(directions, Direction.DOWN) && visSet[sectionIndex - offsetY] <= 0) {
 			graphIndices[index++] = sectionIndex - offsetY;
-			visSet[sectionIndex - offsetY] = MAX_GRID_FACTOR;
+			visSet[sectionIndex - offsetY] = gridFactor;
 		}
 
-		if (Direction.hasSet(directions, Direction.UP) && visSet[sectionIndex + offsetY] == 0) {
+		if (Direction.hasSet(directions, Direction.UP) && visSet[sectionIndex + offsetY] <= 0) {
 			graphIndices[index++] = sectionIndex + offsetY;
-			visSet[sectionIndex + offsetY] = MAX_GRID_FACTOR;
+			visSet[sectionIndex + offsetY] = gridFactor;
 		}
 
-		if (Direction.hasSet(directions, Direction.NORTH) && visSet[sectionIndex - offsetZ] == 0) {
+		if (Direction.hasSet(directions, Direction.NORTH) && visSet[sectionIndex - offsetZ] <= 0) {
 			graphIndices[index++] = sectionIndex - offsetZ;
-			visSet[sectionIndex - offsetZ] = MAX_GRID_FACTOR;
+			visSet[sectionIndex - offsetZ] = gridFactor;
 		}
 
-		if (Direction.hasSet(directions, Direction.SOUTH) && visSet[sectionIndex + offsetZ] == 0) {
+		if (Direction.hasSet(directions, Direction.SOUTH) && visSet[sectionIndex + offsetZ] <= 0) {
 			graphIndices[index++] = sectionIndex + offsetZ;
-			visSet[sectionIndex + offsetZ] = MAX_GRID_FACTOR;
+			visSet[sectionIndex + offsetZ] = gridFactor;
 		}
 
-		if (Direction.hasSet(directions, Direction.WEST) && visSet[sectionIndex - offsetX] == 0) {
+		if (Direction.hasSet(directions, Direction.WEST) && visSet[sectionIndex - offsetX] <= 0) {
 			graphIndices[index++] = sectionIndex - offsetX;
-			visSet[sectionIndex - offsetX] = MAX_GRID_FACTOR;
+			visSet[sectionIndex - offsetX] = gridFactor;
 		}
 
-		if (Direction.hasSet(directions, Direction.EAST) && visSet[sectionIndex + offsetX] == 0) {
+		if (Direction.hasSet(directions, Direction.EAST) && visSet[sectionIndex + offsetX] <= 0) {
 			graphIndices[index++] = sectionIndex + offsetX;
-			visSet[sectionIndex + offsetX] = MAX_GRID_FACTOR;
+			visSet[sectionIndex + offsetX] = gridFactor;
 		}
 
-		BFSQueue.bfsIndex = index;
+		BFSQueues.bfsIndex = index;
 	}
 
 	// Sodium 0.6 (Polyform Shield) code.
@@ -302,7 +363,13 @@ public class BFSCuller {
 	 * optimized, but it helps a ton when there's a lot of occluders.
 	 * @return Grid Visibility Factor
 	 */
-	private static short genGridFactor(short[] visSet, int sectionIndex, int renderDiameter, int diffX, int diffY, int diffZ) {
+	private static short setGridFactor(short[] visSet, int sectionIndex, int renderDiameter, int diffX, int diffY, int diffZ) {
+		int gridFactor = visSet[sectionIndex];
+
+		if (gridFactor == -1) {
+			return visSet[sectionIndex] = (short) MAX_GRID_FACTOR;
+		}
+
 		int gradInd = 0;
 
 		int signX = MathExt.sign(diffX);
@@ -317,7 +384,7 @@ public class BFSCuller {
 		gradInd += diffY * (visSet[sectionIndex - signY]);
 		gradInd += diffZ * (visSet[sectionIndex - signZ]);
 
-		return visSet[sectionIndex] = ((short) ((gradInd * INV_DIVS[diffX + diffY + diffZ]) >> PRECISION_BITS));
+		return visSet[sectionIndex] = (short) (((gradInd * INV_DIVS[diffX + diffY + diffZ]) >> PRECISION_BITS) & 0xFFFF);
 	}
 
 	/**
@@ -371,7 +438,7 @@ public class BFSCuller {
 				}
 			}
 
-			int visFact = visSet[sectionIndex];
+			int visFact = visSet[sectionIndex] & 0x7FFF;
 
 			if (visFact < TOLERANCE && ++valid >= 4) {
 				return true;

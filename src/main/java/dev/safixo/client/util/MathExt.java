@@ -91,10 +91,10 @@ public class MathExt {
 		return (x & 0x3FFFFFL) << (Z_BITS + Y_BITS) | (z & 0x3FFFFFL) << Y_BITS | y & 0xFFFL;
 	}
 
-	public static int floorDiv(int x, int y) {
-		int r = x / y;
+	public static int floorDiv(int a, int b) {
+		int r = a / b;
 		// if the signs are different and modulo not zero, round down
-		if ((x ^ y) < 0 && (r * y != x)) {
+		if ((a ^ b) < 0 && (r * b != a)) {
 			r--;
 		}
 		return r;
@@ -136,6 +136,10 @@ public class MathExt {
 	public static int floor(double num) {
 		int integral = (int) num;
 		return num < integral ? integral - 1 : integral;
+	}
+
+	public static double floorMod(double num, double mod) {
+		return num - (floor(num / mod) * mod);
 	}
 
 	public static float clamp(float value, float min, float max) {
