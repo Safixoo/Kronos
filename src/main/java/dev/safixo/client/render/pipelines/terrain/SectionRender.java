@@ -51,6 +51,6 @@ public class SectionRender {
 	}
 
 	public void sendFlagsToSet() {
-		this.sectionSet.updateSectionData(this.blockX >> 4, this.blockY >> 4, this.blockZ >> 4, this.flags);
+		this.sectionSet.setSectionInfo(this.blockX >> 4, this.blockY >> 4, this.blockZ >> 4, this.flags);
 	}
 }
