@@ -1,6 +1,7 @@
 package dev.safixo.core;
 
 import dev.safixo.core.hooks.LongHashMapHook;
+import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.launchwrapper.Launch;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
@@ -18,6 +19,7 @@ import static org.objectweb.asm.Opcodes.*;
 public class KronosTransformer implements IClassTransformer {
 	static final boolean DISABLE_INJECTION = false;
 
+	static final String ASYNC_BLOCK_HOOK = "dev/safixo/core/hooks/AsyncBlockHook";
 	static final String RENDER_GLOBAL_HOOK = "dev/safixo/core/hooks/RenderGlobalHook";
 	static final String DEBUG_SCREEN_HOOK = "dev/safixo/core/hooks/DebugScreenHook";
 	static final String FONT_RENDERER_HOOK = "dev/safixo/core/hooks/FontRendererHook";
@@ -30,6 +32,7 @@ public class KronosTransformer implements IClassTransformer {
 	static final String VANILLA_MESHER = "dev/safixo/client/render/pipelines/terrain/meshing/builders/VanillaBlockMesher";
 
 	static final String RENDER = "net.minecraft.client.renderer.entity.Render";
+	static final String VEC3_POOL = "net.minecraft.util.Vec3Pool";
 	static final String STRING_TRANSLATE = "net.minecraft.util.StringTranslate";
 	static final String DATA_WATCHER = "net.minecraft.entity.DataWatcher";
 	static final String TEXTURE_MANAGER = "net.minecraft.client.renderer.texture.TextureManager";
@@ -50,7 +53,6 @@ public class KronosTransformer implements IClassTransformer {
 	static final String WORLD = "net.minecraft.world.World";
 
 	static HashMap<String, String> FUNCTION_NAMES;
-	static HashSet<String> BLOCK_TYPES;
 
 	public static boolean IN_DEV;
 	static boolean CHECKED_FOR_DEV;
@@ -75,12 +77,13 @@ public class KronosTransformer implements IClassTransformer {
 		}
 
 		checkDevEnvironment();
-//		startBlockCollection(basicClass);
-//		redirectAsyncBlocksCalls(reference);
 
 		// Overwrites classes methods completely with a function call with the same
 		// args and with the instance of the original class.
 		switch (transformedName) {
+			case VEC3_POOL:
+				replaceClassMethod(MINECRAFT_HOOK, "getVecFromPool", "", "", reference, false);
+				break;
 			case RENDER:
 				replaceClassMethod(MINECRAFT_HOOK, "bindTexture", "a", "(D)V", reference, true);
 				break;
@@ -160,6 +163,10 @@ public class KronosTransformer implements IClassTransformer {
 
 		fillStateMachineFunctions();
 
+		if (!transformedName.equals("net.minecraft.client.renderer.Tessellator")){
+			replaceTessellatorsInstances(reference);
+		}
+
 		if (!transformedName.contains("dev.safixo.client.render.gfx.state") && !transformedName.equals("dev.safixo.core.hooks.GLFunctions")) {
 			redirectGlCalls(reference);
 		}
@@ -167,7 +174,6 @@ public class KronosTransformer implements IClassTransformer {
 		return reference[0];
 	}
 
-	static final String ASYNC_BLOCK_HOOK = "dev.safixo.core.hooks";
 
 	// TODO: Check what makes it that mess up in some instances.
 	static void changeHashMap(byte[][] basicClass) {
@@ -236,9 +242,8 @@ public class KronosTransformer implements IClassTransformer {
 		basicClass[0] = writer.toByteArray();
 	}
 
-	public static void redirectAsyncBlocksCalls(byte[][] basicClass) {
+	static void replaceTessellatorsInstances(byte[][] basicClass) {
 		ClassReader reader = new ClassReader(basicClass[0]);
-		ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
 
 		ClassNode classNode = new ClassNode();
 		reader.accept(classNode, 0);
@@ -249,105 +254,27 @@ public class KronosTransformer implements IClassTransformer {
 			InsnList inns = node.instructions;
 			AbstractInsnNode insn = inns.getFirst();
 
-			boolean skip = false;
-
-			while (insn != null && !skip) {
+			while (insn != null) {
 				int opcode = insn.getOpcode();
 
-				if (opcode == GETFIELD || opcode == PUTFIELD) {
-					FieldInsnNode m = (FieldInsnNode) insn;
+				if (opcode == GETSTATIC) {
+					FieldInsnNode fieldInsn = (FieldInsnNode) insn;
 
-					if (m.name.startsWith("m") && BLOCK_TYPES.contains(m.owner) && isField(m.name)) {
-						String name;
-						String desc = IN_DEV
-							? "(Lnet/minecraft/src/Block;D)V"
-							: "(Laqz;D)V";
-
-						if (opcode == GETFIELD) {
-							name = "get" + getField(m.name);
-						} else {
-							name = "set" + getField(m.name);
-						}
-
-						System.out.println("Rewriting!!");
-						node.instructions.set(m, new MethodInsnNode(INVOKESTATIC, ASYNC_BLOCK_HOOK, name, desc));
+					if (fieldInsn.owner.equals("net/minecraft/client/renderer/Tessellator") &&
+						(fieldInsn.name.equals("instance") || fieldInsn.name.equals("field_78398_a"))) {
+						inns.set(fieldInsn, new MethodInsnNode(INVOKESTATIC, "dev/safixo/client/render/ImprovedTessellator",
+							"getTessellator",
+							"()Ldev/safixo/client/render/ImprovedTessellator;"));
 					}
-
 				}
 				insn = insn.getNext();
 			}
 		}
 
-		classNode.accept(writer);
-		basicClass[0] = writer.toByteArray();
-	}
-
-	public static boolean isField(String name) {
-		switch (name) {
-			case "minX":
-			case "minY":
-			case "minZ":
-			case "maxX":
-			case "maxY":
-			case "maxZ": return true;
-
-			default:
-				return false;
-		}
-	}
-
-	public static String getField(String name) {
-		switch (name) {
-			case "minX": return "MinX";
-			case "minY": return "MinY";
-			case "minZ": return "MinZ";
-			case "maxX": return "MaxX";
-			case "maxY": return "MaxY";
-			case "maxZ": return "MaxZ";
-			default:
-				return null;
-		}
-	}
-
-	public static void setupAsyncFields(byte[][] basicClass) {
-		ClassReader reader = new ClassReader(basicClass[0]);
 		ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
-
-		ClassNode classNode = new ClassNode();
-		reader.accept(classNode, 0);
-
-		addField(classNode, "minXMT");
-		addField(classNode, "minYMT");
-		addField(classNode, "minZMT");
-
-		addField(classNode, "maxXMT");
-		addField(classNode, "maxYMT");
-		addField(classNode, "maxZMT");
-
 		classNode.accept(writer);
+
 		basicClass[0] = writer.toByteArray();
-	}
-	private static final Double NULL_DOUBLE = (double) 0;
-
-	private static void addField(ClassNode classNode, String name) {
-		classNode.visitField(Opcodes.ACC_PUBLIC, name, "D", null, NULL_DOUBLE);
-	}
-
-	static void startBlockCollection(byte[] basicClass) {
-		if (BLOCK_TYPES == null) {
-			BLOCK_TYPES = new HashSet<>();
-			BLOCK_TYPES.add(IN_DEV ? "net/minecraft/src/Block" : "aqz");
-		}
-
-		ClassReader reader = new ClassReader(basicClass);
-
-		ClassNode classNode = new ClassNode();
-		reader.accept(classNode, 0);
-
-		if (BLOCK_TYPES.contains(classNode.superName)) {
-			System.out.println(classNode.name);
-			BLOCK_TYPES.add(classNode.name);
-		}
 	}
 
 	static void addFunction(String className, String function) {
@@ -577,38 +504,6 @@ public class KronosTransformer implements IClassTransformer {
 		}
 
 		classNode.accept(writer);
-		basicClass[0] = writer.toByteArray();
-	}
-
-	static void catchBlockBounds(byte[][] basicClass) {
-		ClassReader reader = new ClassReader(basicClass[0]);
-
-		ClassNode classNode = new ClassNode();
-		reader.accept(classNode, 0);
-
-		for (int i = 0; i < classNode.methods.size(); i++) {
-			MethodNode method = (MethodNode) classNode.methods.get(i);
-
-			if (!method.name.equals(IN_DEV ? "setBlockBounds" : "func_71905_a")) {
-				continue;
-			}
-
-			InsnList ins = method.instructions;
-
-			String argument = IN_DEV ? "(Lnet/minecraft/block/Block;FFFFFF)V" : "(Laqz;FFFFFF)V";
-			method.instructions.insertBefore(ins.getFirst(), new MethodInsnNode(INVOKESTATIC, SIDE_CULLER, "calculateSolidSides", argument));
-			method.instructions.insertBefore(ins.getFirst(), new VarInsnNode(FLOAD, 6));
-			method.instructions.insertBefore(ins.getFirst(), new VarInsnNode(FLOAD, 5));
-			method.instructions.insertBefore(ins.getFirst(), new VarInsnNode(FLOAD, 4));
-			method.instructions.insertBefore(ins.getFirst(), new VarInsnNode(FLOAD, 3));
-			method.instructions.insertBefore(ins.getFirst(), new VarInsnNode(FLOAD, 2));
-			method.instructions.insertBefore(ins.getFirst(), new VarInsnNode(FLOAD, 1));
-			method.instructions.insertBefore(ins.getFirst(), new VarInsnNode(ALOAD, 0));
-		}
-
-		ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
-		classNode.accept(writer);
-
 		basicClass[0] = writer.toByteArray();
 	}
 

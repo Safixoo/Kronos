@@ -1,15 +1,14 @@
 package dev.safixo.client.render.pipelines.terrain.meshing.builders;
 
+import dev.safixo.client.render.pipelines.terrain.meshing.task.SectionTask;
 import dev.safixo.client.render.pipelines.terrain.meshing.data.FacingData;
 import dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache;
 import dev.safixo.client.render.pipelines.terrain.meshing.model.ModelColorizer;
 import dev.safixo.client.render.pipelines.terrain.region.RegionConstants;
-import dev.safixo.client.util.MathExt;
 import net.minecraft.block.Block;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.TextureMap;
 import net.minecraft.util.Icon;
-import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
 import dev.safixo.client.util.data.PrimitivesFlags;
 import dev.safixo.client.util.ColorBGRManager;
 import dev.safixo.client.util.Direction;
@@ -27,8 +26,9 @@ public class VoxelMesher {
 
 	public static final int[] SHADE_FULL_COLOR = new int[Direction.COUNT];
 	public static final int[] SHADE_FULL_FACTOR = new int[Direction.COUNT];
-	protected static final int[] TEX_UVS = new int[4];
+
 	public static final int[] OVERLAY_UVS = new int[4];
+	protected static final int[] TEX_UVS = new int[4];
 
 	public static Icon SIDE_GRASS_NON_OVERLAY = Block.grass.getIcon(5, 5);
 	public static final float[] SIDE_LIGHT_MULTIPLIER = new float[] { 0.5F, 1.0F, 0.8F, 0.8F, 0.6F, 0.6F };
@@ -36,7 +36,9 @@ public class VoxelMesher {
 	protected static final int BLOCK_GRASS_ID = Block.grass.blockID;
 	protected static final Icon MISSING = ((TextureMap) Minecraft.getMinecraft().getTextureManager().getTexture(TextureMap.locationBlocksTexture)).getAtlasSprite("missingno");
 
-	public static void meshVoxel(Block block, SectionCache cache, int x, int y, int z, boolean ambient, int drawSet, int blockId) {
+	public static void meshVoxel(SectionTask task, Block block, int x, int y, int z, boolean ambient, int drawSet, int blockId) {
+		SectionCache cache = task.cache;
+
 		if (!PrimitivesFlags.DIRECT_CULL[blockId]) {
 			drawSet |= block.shouldSideBeRendered(cache, x, y - 1, z, 0) ? 1 << DOWN : 0;
 			drawSet |= block.shouldSideBeRendered(cache, x, y + 1, z, 1) ? 1 << UP : 0;
@@ -74,7 +76,7 @@ public class VoxelMesher {
 			TEX_UVS[3] = TerrainFormat.deNormalizeTexCoordinate(tex.getMaxV());
 
 			FacingData render = FACE_RENDER[dir];
-			VertexWriter writer = VertexWriter.SOLID[dir];
+			VertexWriter writer = task.getSolidWriter(dir);
 
 			writer.ensureCapacity(TerrainFormat.STRIDE * 8);
 

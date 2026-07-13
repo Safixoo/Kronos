@@ -20,6 +20,8 @@ import net.minecraft.client.renderer.RenderHelper;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.entity.Render;
 import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.Vec3;
+import net.minecraft.util.Vec3Pool;
 import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
@@ -58,6 +60,10 @@ public class MinecraftHook {
 		}
 
 		Minecraft.getMinecraft().renderEngine.bindTexture(resource);
+	}
+
+	public static Vec3 getVecFromPool(Vec3Pool pool, double x, double y, double z) {
+		return Vec3.createVectorHelper(x, y, z);
 	}
 
 	public static void setProfilerTarget(String prof) {

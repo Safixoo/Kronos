@@ -7,9 +7,7 @@ import dev.safixo.client.render.vertex.DefaultVertexFormats;
 import dev.safixo.client.render.vertex.VertexWriter;
 import dev.safixo.client.util.collection.Matrix4Stack;
 import dev.safixo.client.util.memory.NativeBuffer;
-import dev.safixo.client.util.memory.UnsafeUtil;
 import dev.safixo.core.hooks.MinecraftHook;
-import it.unimi.dsi.fastutil.objects.ReferenceArrayList;
 import net.minecraft.client.model.ModelBox;
 import net.minecraft.client.model.ModelRenderer;
 import net.minecraft.client.renderer.Tessellator;
@@ -22,9 +20,6 @@ import static dev.safixo.client.util.data.PrimitivesFlags.*;
 
 @SuppressWarnings("unused")
 public class AdvancedModelRenderer {
-	private static final long DISPLAY_LIST_OFFSET;
-	private static final long COMPILED;
-
 	private static final long PTR_BUFFER = NativeBuffer.nmemAlloc(16 * 4);
 	private static final FloatBuffer BUFFER = NativeBuffer.wrap(PTR_BUFFER).asFloatBuffer();
 	private static final Matrix4f MATRIX = new Matrix4f();
@@ -38,41 +33,9 @@ public class AdvancedModelRenderer {
 
 	// Current offset for writing in the vertex buffer.
 	private static int OFFSET = 0;
-	private static final ReferenceArrayList<ModelRenderer> MODELS = new ReferenceArrayList<>();
-
-	static {
-		long offset;
-		long compiled;
-
-		try {
-			offset = UnsafeUtil.getFieldOffset(ModelRenderer.class.getDeclaredField(DEV_ENVIRONMENT ? "displayList" : "field_78811_r"));
-			compiled = UnsafeUtil.getFieldOffset(ModelRenderer.class.getDeclaredField(DEV_ENVIRONMENT ? "compiled" : "field_78812_q"));
-		} catch (NoSuchFieldException e) {
-			throw new RuntimeException(e);
-		}
-
-		DISPLAY_LIST_OFFSET = offset;
-		COMPILED = compiled;
-	}
-
-	private static boolean isCompiled(ModelRenderer model) {
-		return UnsafeUtil.UNSAFE.getBoolean(model, COMPILED);
-	}
-
-	private static void setCompiled(ModelRenderer model, boolean cond) {
-		UnsafeUtil.UNSAFE.putBoolean(model, COMPILED, cond);
-	}
-
-	private static int getDisplayList(ModelRenderer model) {
-		return UnsafeUtil.UNSAFE.getInt(model, DISPLAY_LIST_OFFSET);
-	}
-
-	private static void setDisplayList(ModelRenderer model, int displayList) {
-		UnsafeUtil.UNSAFE.putInt(model, DISPLAY_LIST_OFFSET, displayList);
-	}
 
 	private static void queueModel(ModelRenderer model, float scale, float offX, float offY, float offZ) {
-		int displayList = getDisplayList(model);
+		int displayList = model.displayList;
 
 		boolean rotY = model.rotateAngleY != 0.0F;
 		boolean rotX = model.rotateAngleX != 0.0F;
@@ -135,7 +98,7 @@ public class AdvancedModelRenderer {
 			return;
 		}
 
-		if (!isCompiled(model)) {
+		if (!model.compiled) {
 			compileDisplayList(model, scale);
 		}
 
@@ -155,7 +118,7 @@ public class AdvancedModelRenderer {
 			return;
 		}
 
-		if (!isCompiled(model)) {
+		if (!model.compiled) {
 			compileDisplayList(model, scale);
 		}
 
@@ -167,7 +130,7 @@ public class AdvancedModelRenderer {
 	}
 
 	public static void renderModel(ModelRenderer model, float scale, float offX, float offY, float offZ) {
-		int displayList = getDisplayList(model);
+		int displayList = model.displayList;
 		int vertices = displayList & 0xFFFF;
 		int offset = displayList >>> 16;
 
@@ -234,7 +197,7 @@ public class AdvancedModelRenderer {
 			return;
 		}
 
-		if (!isCompiled(model)) {
+		if (!model.compiled) {
 			compileDisplayList(model, scale);
 		}
 
@@ -261,7 +224,6 @@ public class AdvancedModelRenderer {
 		VertexWriter writer = new VertexWriter(4096);
 
 		REDIRECT_DRAWING = true;
-		MODELS.add(model);
 
 		writer.startDrawing();
 		writer.setVertexFormat(DefaultVertexFormats.ENTITY_FORMAT);
@@ -307,25 +269,7 @@ public class AdvancedModelRenderer {
 		writer.delete();
 		REDIRECT_DRAWING = false;
 
-		setCompiled(model, true);
-		setDisplayList(model, drawData);
-	}
-
-	public static void cleanupEntityModelPool() {
-		if (VERTEX_BUFFER != null) VERTEX_BUFFER.delete();
-		if (VERTEX_ARRAY_FPP != null) VERTEX_ARRAY_FPP.delete();
-		if (VERTEX_ARRAY_GL20 != null) VERTEX_ARRAY_GL20.delete();
-
-		VERTEX_ARRAY_GL20 = null;
-		VERTEX_ARRAY_FPP = null;
-		VERTEX_BUFFER = null;
-		OFFSET = 0;
-
-		for (ModelRenderer model : MODELS) {
-			setCompiled(model, false);
-			setDisplayList(model, 0);
-		}
-
-		MODELS.clear();
+		model.compiled = true;
+		model.displayList = drawData;
 	}
 }

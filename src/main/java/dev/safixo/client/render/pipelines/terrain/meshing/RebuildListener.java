@@ -1,13 +1,11 @@
 package dev.safixo.client.render.pipelines.terrain.meshing;
 
 import dev.safixo.client.render.pipelines.terrain.WorldManager;
-import dev.safixo.client.util.ClientChunkListener;
+import dev.safixo.client.util.data.ClientChunkListener;
 import dev.safixo.client.util.MathExt;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.WorldClient;
 import net.minecraft.client.renderer.RenderGlobal;
-import net.minecraft.world.chunk.IChunkProvider;
 
+@SuppressWarnings("unused")
 public class RebuildListener {
 	public static void notifyBlockUpdateRange(int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
 		minY = MathExt.clamp(minY, 0, 255);

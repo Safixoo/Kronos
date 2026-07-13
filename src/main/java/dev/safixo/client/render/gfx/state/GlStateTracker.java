@@ -115,6 +115,6 @@ public class GlStateTracker {
 	}
 
 	public static void flushDrawState() {
-		ImprovedTessellator.INSTANCE.flushState();
+		ImprovedTessellator.getTessellator().flushState();
 	}
 }

@@ -1,13 +1,10 @@
 package dev.safixo.client.render.pipelines.terrain;
 
 import dev.safixo.client.render.gfx.state.GlFogTracker;
-import dev.safixo.client.render.pipelines.terrain.cull.BFSQueues;
-import dev.safixo.client.render.pipelines.terrain.meshing.SectionMesher;
+import dev.safixo.client.render.pipelines.terrain.meshing.MesherManager;
 import dev.safixo.client.render.pipelines.terrain.shader.ExpFogProgram;
 import dev.safixo.client.render.pipelines.terrain.shader.LinearFogProgram;
 import dev.safixo.client.render.pipelines.terrain.shader.TerrainProgram;
-import dev.safixo.core.hooks.RenderGlobalHook;
-import dev.safixo.core.hooks.VertexRedirector;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.EntityClientPlayerMP;
 import net.minecraft.client.multiplayer.WorldClient;
@@ -20,11 +17,9 @@ import net.minecraft.world.chunk.IChunkProvider;
 import org.lwjgl.input.Keyboard;
 import dev.safixo.client.render.pipelines.terrain.cull.BFSCuller;
 import dev.safixo.client.render.pipelines.terrain.cull.FrustumCuller;
-import dev.safixo.client.util.data.PrimitivesFlags;
 import dev.safixo.client.util.data.CameraData;
 import dev.safixo.client.render.pipelines.terrain.region.RegionManager;
 import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
-import dev.safixo.client.util.MathExt;
 import org.lwjgl.opengl.GL11;
 
 import java.util.List;
@@ -32,18 +27,21 @@ import java.util.List;
 public class WorldManager {
 	private static final boolean DELETE_SHADERS = false;
 
-	public static final int MAX_FULL_UPDATES = 7;
+	public static final int MAX_FULL_UPDATES = 11;
 	public static final int MAX_UPDATES_TRIES = 48;
+	public static final int MAX_TASK_CONCURRENTLY = 18;
+
 	private static final Item DEBUG_ITEM = null;
 
 	private LinearFogProgram linearFogProgram;
 	private ExpFogProgram expFogProgram;
 
-	private final SectionMesher mesher = new SectionMesher();
+	private final MesherManager mesherManager = new MesherManager();
 	private final SectionSet sectionSet = new SectionSet();
 	private final BFSCuller bfsCuller = new BFSCuller();
 	private final RegionManager regionManager = new RegionManager();
-	private World worldObj;
+
+	public World worldObj;
 	private CameraData camera;
 
 	private long vramUsed, vramAllocated;
@@ -55,6 +53,7 @@ public class WorldManager {
 	private boolean terrainDirty;
 
 	private static WorldManager INSTANCE;
+
 
 	public WorldManager(WorldClient world) {
 		INSTANCE = this;
@@ -137,6 +136,7 @@ public class WorldManager {
 			}
 		}
 
+		this.mesherManager.clear();
 		this.regionManager.clear();
 	}
 
@@ -188,7 +188,7 @@ public class WorldManager {
 		profiler.endStartSection("updatechunks");
 
 		this.regionManager.update(this.camera, renderDistance, worldChanged);
-		this.queueRebuilds();
+		this.mesherManager.queueRebuilds(this);
 
 		profiler.endStartSection("ticking");
 
@@ -203,100 +203,8 @@ public class WorldManager {
 		return this.sectionSet;
 	}
 
-	private long lastFrameNano;
-	private long lastFrameBuildTime;
-	private long lerpFrameBudget;
-
-	private static final long MAX_TIME = (long) (1E+9D / 240);
-
-	private long calculateFrameBudgetNs(long current) {
-		long currentFrameTimeNs = (current - this.lastFrameNano) - this.lastFrameBuildTime;
-		long budget = Math.min(currentFrameTimeNs / 8, MAX_TIME);
-
-		// If the budget is over the one in the current frame, start giving more budget slowly,
-		// but if the budget is lower simply give lower budget.
-		if (budget > this.lerpFrameBudget && this.lerpFrameBudget != 0L) {
-			// adds 10ms of budget per sec.
-			budget = (long) Math.min(budget, this.lerpFrameBudget + (RenderGlobalHook.PARTIAL_TICK * 1E+7));
-		}
-
-		this.lerpFrameBudget = budget;
-		return budget;
-	}
-
-	private void queueRebuilds() {
-		int rebuildSize = BFSQueues.getRebuildIndex();
-		int maxSize = Math.min(WorldManager.MAX_UPDATES_TRIES, rebuildSize);
-
-		if (rebuildSize == 0) {
-			this.terrainDirty = false;
-		}
-
-		long current = System.nanoTime();
-		long budget = calculateFrameBudgetNs(current);
-
-		PrimitivesFlags.processLeavesSolid();
-		PrimitivesFlags.REDIRECT_DRAWING = true;
-		VertexRedirector.ORGANIZE_NORMALS = true;
-
-		int updateIndex = 0, nonEmptyUpdates = 0;
-
-		while (updateIndex < maxSize && nonEmptyUpdates < WorldManager.MAX_FULL_UPDATES) {
-			long position = BFSQueues.getSectionPos(this.camera, updateIndex++);
-
-			int sectionX = MathExt.decodeX(position);
-			int sectionY = MathExt.decodeY(position);
-			int sectionZ = MathExt.decodeZ(position);
-
-			SectionRender section = this.sectionSet.getSectionInstance(this, sectionX, sectionY, sectionZ);
-
-			if (section == null) {
-				continue;
-			}
-
-			if (section.isDirty()) {
-				boolean nonEmpty = this.mesher.buildMesh(section, this.camera, this, this.worldObj);
-
-				if (nonEmpty) {
-					nonEmptyUpdates++;
-				}
-			}
-
-			if (this.isBudgetOver(current, budget)) {
-				int distance = distanceToSection(section, this.camera);
-				int minUpdates = distance <= 20*20 ? 2 : 1;
-
-				if (nonEmptyUpdates >= minUpdates) {
-					break;
-				}
-			}
-		}
-
-		VertexRedirector.ORGANIZE_NORMALS = false;
-		PrimitivesFlags.REDIRECT_DRAWING = false;
-
-		long diff = System.nanoTime() - current;
-		float partialTick = RenderGlobalHook.PARTIAL_TICK;
-
-		this.lastFrameBuildTime = diff > this.lastFrameBuildTime
-			? diff
-			: (long) Math.max(diff, this.lastFrameBuildTime - 5 * 1E+6D * partialTick);
-		this.lastFrameNano = current;
-	}
-
-	private boolean isBudgetOver(long current, long budget) {
-		long timeBuilding = System.nanoTime() - current;
-		// if we are over budget, or we have passed 0.2ms more time building than last
-		// frame, stop it.
-		return timeBuilding >= budget || timeBuilding - (1E+6 / 5) >= this.lastFrameBuildTime;
-	}
-
-	private static int distanceToSection(SectionRender render, CameraData camera) {
-		int dX = render.blockX - camera.intX + 8;
-		int dY = render.blockY - camera.intY + 8;
-		int dZ = render.blockZ - camera.intZ + 8;
-
-		return MathExt.square(dX) + MathExt.square(dY) + MathExt.square(dZ);
+	public void setTerrainDirty(boolean flag) {
+		this.terrainDirty = flag;
 	}
 
 	public void drawRenderPass(int renderPass) {

@@ -4,13 +4,13 @@ import dev.safixo.client.render.gfx.buffer.GlVertexBuffer;
 import dev.safixo.client.util.data.PrimitivesFlags;
 import dev.safixo.client.util.memory.NativeBuffer;
 import dev.safixo.client.util.memory.UnsafeUtil;
+import dev.safixo.core.hooks.AsyncBlockHook;
 import dev.safixo.core.hooks.VertexRedirector;
 import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.Tessellator;
 import org.lwjgl.opengl.*;
 
 import java.nio.*;
-import java.util.Arrays;
 
 // TODO: Use newer LWJGL to abuse persistent mapped buffers to improve uploading overhead
 //  and use u16 o i16 to compact UVs representations (idk).
@@ -21,10 +21,10 @@ import java.util.Arrays;
 // - Compacts vertex format based in the used attributes (vanilla uses 32-byte at all times).
 // - Overall more optimized and clean code.
 public class ImprovedTessellator extends Tessellator {
-	public static final ImprovedTessellator INSTANCE = new ImprovedTessellator();
+	private static final ThreadLocal<ImprovedTessellator> TESSELLATORS = new ThreadLocal<>();
 
 	static {
-		Tessellator.instance = INSTANCE;
+		Tessellator.instance = getTessellator();
 	}
 
 	private static final int UNDEFINED_FORMAT = 12; // start position after position attribute.
@@ -36,7 +36,7 @@ public class ImprovedTessellator extends Tessellator {
 
 	private static final int MIN_ALLOC = 1024 * 128;
 
-	private final GlVertexBuffer vertexBuffer = new GlVertexBuffer(MIN_ALLOC, GL15.GL_DYNAMIC_DRAW);
+	private GlVertexBuffer vertexBuffer;
 
 	private boolean disabledColor, canDraw;
 	public int drawMode, flags, capacity = MIN_ALLOC;
@@ -50,6 +50,8 @@ public class ImprovedTessellator extends Tessellator {
 
 	public long vertexPtr = NativeBuffer.nmemAlloc(MIN_ALLOC);
 	private ByteBuffer vertexPtrNio = NativeBuffer.wrap(this.vertexPtr);
+
+	private final VertexRedirector redirector = new VertexRedirector();
 
 	private static final byte[] STRIDES = new byte[0b1111 + 1];
 
@@ -68,7 +70,21 @@ public class ImprovedTessellator extends Tessellator {
 
 	// The vertex buffer is reused in cloud rendering, to avoid re-binding vertex-buffers
 	public GlVertexBuffer getVertexBuffer() {
+		if (this.vertexBuffer == null) {
+			this.vertexBuffer = new GlVertexBuffer(MIN_ALLOC, GL15.GL_DYNAMIC_DRAW);
+		}
+
 		return this.vertexBuffer;
+	}
+
+	public static ImprovedTessellator getTessellator() {
+		ImprovedTessellator tes = TESSELLATORS.get();
+
+		if (tes == null) {
+			TESSELLATORS.set(tes = new ImprovedTessellator());
+		}
+
+		return tes;
 	}
 
 	private void setupVertexState(int flags, int offset) {
@@ -202,8 +218,8 @@ public class ImprovedTessellator extends Tessellator {
 	public void setTextureUV(double u, double v) {
 		this.flags |= VERTEX_UV;
 
-		if (PrimitivesFlags.REDIRECT_DRAWING) {
-			VertexRedirector.setTextureUV(u, v);
+		if (PrimitivesFlags.REDIRECT_DRAWING || AsyncBlockHook.isAsync()) {
+			this.redirector.setTextureUV(u, v);
 			return;
 		}
 
@@ -256,8 +272,8 @@ public class ImprovedTessellator extends Tessellator {
 
 	@Override
 	public void addVertexWithUV(double x, double y, double z, double u, double v) {
-		if (PrimitivesFlags.REDIRECT_DRAWING) {
-			VertexRedirector.addVertexWithUV(x + this.xOff, y + this.yOff, z + this.zOff, u, v);
+		if (PrimitivesFlags.REDIRECT_DRAWING || AsyncBlockHook.isAsync()) {
+			this.redirector.addVertexWithUV(x, y, z, u, v);
 			return;
 		}
 
@@ -307,8 +323,8 @@ public class ImprovedTessellator extends Tessellator {
 
 	@Override
 	public void addVertex(double x, double y, double z) {
-		if (PrimitivesFlags.REDIRECT_DRAWING) {
-			VertexRedirector.addVertex(x + this.xOff, y + this.yOff, z + this.zOff);
+		if (PrimitivesFlags.REDIRECT_DRAWING || AsyncBlockHook.isAsync()) {
+			this.redirector.addVertex(x + this.xOff, y + this.yOff, z + this.zOff);
 			return;
 		}
 

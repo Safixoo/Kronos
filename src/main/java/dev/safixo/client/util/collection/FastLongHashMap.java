@@ -5,7 +5,7 @@ import dev.safixo.client.util.MathExt;
 import java.util.Arrays;
 
 // Linear probing, robin-hood hash-map, should have a very performant get.
-public class FastLongHashMap {
+public class FastLongHashMap<T> {
 	private static final long LONG_PHI = 0x9E3779B97F4A7C15L;
 
 	// use a very unlikely value to mark unused keys.
@@ -15,7 +15,7 @@ public class FastLongHashMap {
 	private static final int INITIAL_SIZE = 16;
 
 	private long[] keys;
-	private Object[] values;
+	private T[] values;
 	private int size, mask, count, tombstones;
 
 	private long lastKey = NULL;
@@ -30,7 +30,7 @@ public class FastLongHashMap {
 		size = MathExt.nextPOT(size);
 
 		this.keys = new long[size];
-		this.values = new Object[size];
+		this.values = (T[]) new Object[size];
 		Arrays.fill(this.keys, NULL);
 
 		this.size = size;
@@ -175,10 +175,10 @@ public class FastLongHashMap {
 		int newSize = MathExt.nextPOT(getNewSize(this.size));
 
 		long[] newKeys = new long[newSize];
-		Object[] newValues = new Object[newSize];
+		T[] newValues = (T[]) new Object[newSize];
 
 		long[] oldKeys = this.keys;
-		Object[] oldValues = this.values;
+		T[] oldValues = this.values;
 
 		this.keys = newKeys;
 		this.values = newValues;
@@ -200,7 +200,7 @@ public class FastLongHashMap {
 			count--;
 
 			long key = oldKeys[index];
-			Object value = oldValues[index];
+			T value = oldValues[index];
 
 			{
 				int slot = hash(key) & mask;

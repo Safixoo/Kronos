@@ -3,17 +3,14 @@ package dev.safixo.client.render.vertex;
 import dev.safixo.client.render.gfx.vertex.GlVertexFormat;
 import dev.safixo.client.util.memory.NativeBuffer;
 import dev.safixo.client.util.memory.UnsafeUtil;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import dev.safixo.client.util.MeshDirection;
 
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 
 public class VertexWriter {
-	public static final VertexWriter DEFAULT_INSTANCE = new VertexWriter(false);
-	private static final int DEFAULT_CAPACITY = (1 << 16);
+	public static final VertexWriter GLOBAL = new VertexWriter();
+	private static final int DEFAULT_CAPACITY = 4096;
 
-	public static final ObjectArrayList<VertexWriter> VERTEX_WRITERS = new ObjectArrayList<>();
 	public static final VertexWriter[] SOLID = new VertexWriter[MeshDirection.COUNT];
 	public static VertexWriter TRANSLUCENT = new VertexWriter();
 
@@ -31,38 +28,17 @@ public class VertexWriter {
 
 	public int offset;
 	public int vertices;
-	public boolean isDrawing = false;
 
-	private static VertexWriter CURRENT_INSTANCE = DEFAULT_INSTANCE;
-
-	public VertexWriter(int capacity) {
-		this(capacity, true);
-	}
-
-	public VertexWriter(boolean tracked) {
-		this(DEFAULT_CAPACITY, tracked);
-	}
-
-	public VertexWriter(int capacity, boolean tracked) {
-		if (tracked) {
-			VERTEX_WRITERS.add(this);
-		}
-
-		this.capacity = capacity;
-		this.vertexPtr = NativeBuffer.nmemAlloc(capacity);
-		this.vertexPtrNio = NativeBuffer.wrap(this.vertexPtr);
-	}
+	private static final ThreadLocal<VertexWriter> threadWriter = new ThreadLocal<>();
 
 	public VertexWriter() {
 		this(DEFAULT_CAPACITY);
 	}
 
-	public static VertexWriter getCurrentInstance() {
-		return CURRENT_INSTANCE;
-	}
-
-	public static boolean isCurrentDrawing() {
-		return getCurrentInstance().isDrawing;
+	public VertexWriter(int capacity) {
+		this.capacity = capacity;
+		this.vertexPtr = NativeBuffer.nmemAlloc(capacity);
+		this.vertexPtrNio = NativeBuffer.wrap(this.vertexPtr);
 	}
 
 	public static void startDefaults() {
@@ -72,15 +48,28 @@ public class VertexWriter {
 		TRANSLUCENT = new VertexWriter();
 	}
 
+	public static VertexWriter getCurrentInstance() {
+		return threadWriter.get();
+	}
+
 	public static void setCurrentInstance(VertexWriter manager) {
-		CURRENT_INSTANCE = manager;
+		threadWriter.set(manager);
 	}
 
 	public void startDrawing() {
 		this.offset = 0;
 		this.vertices = 0;
-		this.isDrawing = true;
-		this.disableColor = false;
+	}
+
+	public VertexWriter copy() {
+		VertexWriter writer = new VertexWriter(this.offset);
+
+		UnsafeUtil.memCopy(this.vertexPtr, writer.vertexPtr, this.offset);
+		writer.offset = this.offset;
+		writer.vertices = this.vertices;
+		writer.vertexFormat = this.vertexFormat;
+
+		return writer;
 	}
 
 	public void ensureCapacity(int offset) {
@@ -112,28 +101,18 @@ public class VertexWriter {
 	public void stopDrawing() {
 		this.offset = 0;
 		this.vertices = 0;
-		this.isDrawing = false;
-		this.disableColor = false;
 	}
 
 	public void delete() {
-		NativeBuffer.nmemFree(this.vertexPtr);
+		if (this.vertexPtr != UnsafeUtil.NULL){
+			NativeBuffer.nmemFree(this.vertexPtr);
+			this.vertexPtr = UnsafeUtil.NULL;
+		}
 
-		this.vertexPtr = UnsafeUtil.NULL;
 		this.vertexPtrNio = null;
 		this.offset = 0;
 		this.vertices = 0;
-	}
-
-	public static void clearBuffers() {
-		for (VertexWriter manager : VERTEX_WRITERS) {
-			manager.delete();
-		}
-
-		VERTEX_WRITERS.clear();
-
-		Arrays.fill(VertexWriter.SOLID, null);
-		VertexWriter.TRANSLUCENT = null;
+		this.capacity = 0;
 	}
 
 	private void grow(long minSize) {

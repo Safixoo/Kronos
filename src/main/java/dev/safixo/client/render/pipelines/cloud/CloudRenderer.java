@@ -10,7 +10,6 @@ import dev.safixo.client.util.Direction;
 import dev.safixo.client.util.MathExt;
 import dev.safixo.client.render.vertex.VertexWriter;
 import dev.safixo.client.render.vertex.DefaultVertexFormats;
-import dev.safixo.core.HookUtils;
 import net.minecraft.block.Block;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.WorldClient;
@@ -28,7 +27,6 @@ import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -99,7 +97,7 @@ public class CloudRenderer {
 		float g = (float) cloudColor.yCoord;
 		float b = (float) cloudColor.zCoord;
 
-		VertexWriter.setCurrentInstance(VertexWriter.DEFAULT_INSTANCE);
+		VertexWriter.setCurrentInstance(VertexWriter.GLOBAL);
 		VertexWriter writer = VertexWriter.getCurrentInstance();
 
 		writer.startDrawing();
@@ -184,7 +182,7 @@ public class CloudRenderer {
 		buildGeometry(writer, cellDistance, cloudCamFracX, cloudCamFracZ, cloudIntX, cloudIntZ, cloudCamIntX, cloudCamIntZ, cloudCameraY, insideIndex);
 
 		// Upload the geometry.
-		ImprovedTessellator.INSTANCE.getVertexBuffer().bufferData(writer.getWriterNio(), writer.getOffset());
+		ImprovedTessellator.getTessellator().getVertexBuffer().bufferData(writer.getWriterNio(), writer.getOffset());
 
 		// Draw the clouds.
 		drawClouds(writer.getVertices(), cloudFracX, cloudY, cloudFracZ);
@@ -209,9 +207,9 @@ public class CloudRenderer {
 		GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
 
 		CLOUD_SHADER.setOffset(-worldFracX - MAX_CELL_DISTANCE, viewY, -worldFracZ - MAX_CELL_DISTANCE);
-		VERTEX_ARRAY.bind(ImprovedTessellator.INSTANCE.getVertexBuffer());
+		VERTEX_ARRAY.bind(ImprovedTessellator.getTessellator().getVertexBuffer());
 
-		GlVertexBuffer vertexBuffer = ImprovedTessellator.INSTANCE.getVertexBuffer();
+		GlVertexBuffer vertexBuffer = ImprovedTessellator.getTessellator().getVertexBuffer();
 		vertexBuffer.draw(vertices, 0);
 
 		GL11.glDisable(GL11.GL_BLEND);

@@ -13,7 +13,7 @@ import java.lang.reflect.Field;
 
 // To handle async meshing, some fields from the Block class are
 public class AsyncBlockHook {
-	public static Thread MESHING_THREAD;
+	public static Thread MESHING_THREAD = null;
 	private static final long minX, minXMT;
 	private static final long minY, minYMT;
 	private static final long minZ, minZMT;
@@ -107,7 +107,11 @@ public class AsyncBlockHook {
 		return UnsafeUtil.UNSAFE.getDouble(block, isAsync() ? maxZMT : maxZ);
 	}
 
-	private static boolean isAsync() {
+	public static boolean isAsync() {
 		return Thread.currentThread() == MESHING_THREAD;
+	}
+
+	public static void setMeshingThread(Thread thread) {
+		MESHING_THREAD = thread;
 	}
 }

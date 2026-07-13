@@ -2,7 +2,6 @@ package dev.safixo.core.hooks;
 
 import dev.safixo.client.render.gfx.util.GpuFlags;
 import dev.safixo.client.render.pipelines.cloud.CloudRenderer;
-import dev.safixo.client.render.pipelines.entity_model.AdvancedModelRenderer;
 import dev.safixo.client.render.pipelines.terrain.WorldManager;
 import dev.safixo.client.render.vertex.VertexWriter;
 import dev.safixo.client.util.MathExt;
@@ -15,13 +14,6 @@ import net.minecraft.client.renderer.culling.ICamera;
 import net.minecraft.client.settings.GameSettings;
 import net.minecraft.entity.EntityLivingBase;
 import org.lwjgl.opengl.GL11;
-
-import java.lang.reflect.Field;
-import java.util.List;
-
-// The way it works is kind of hacky, it tries to work around the two pass
-// EntityRenderer.renderWorld system by using some trivial global state, it sucks,
-// but it is worth it.
 
 // TODO: Replace the current system now by a simpler one, now that the two pass has been patched.
 @SuppressWarnings("unused")
@@ -38,6 +30,8 @@ public  class RenderGlobalHook {
 		// Check capabilities (TODO: This check is probably implemented too late)
 		GpuFlags.checkModSupport();
 
+		PrimitivesFlags.processLeavesSolid();
+
 		if (!OPTIFINE_CHECKED) {
 			checkOptifineExistence();
 			OPTIFINE_CHECKED = true;
@@ -45,7 +39,6 @@ public  class RenderGlobalHook {
 
 		if (MANAGER != null) {
 			WorldManager.freeInstance();
-			clearBuffers();
 		}
 
 		MANAGER = WorldManager.getCurrentInstance();
@@ -64,11 +57,6 @@ public  class RenderGlobalHook {
 
 	private static void checkOptifineExistence() {
 		OPTIFINE_ACTIVE = HookUtils.existsField(Minecraft.getMinecraft().gameSettings, "ofRenderDistanceFine");
-	}
-
-	private static void clearBuffers() {
-		VertexWriter.clearBuffers();
-		AdvancedModelRenderer.cleanupEntityModelPool();
 	}
 
 	// Executed only in the first pass of renderWorld.

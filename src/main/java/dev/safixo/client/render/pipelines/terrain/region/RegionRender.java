@@ -427,7 +427,7 @@ public class RegionRender {
 		return planes;
 	}
 
-	public void addMeshOrderMask(int regionIndex, int mask) {
+	public void setMeshOrder(int regionIndex, int mask) {
 		this.meshDirectionsOrdered[regionIndex] = mask;
 	}
 

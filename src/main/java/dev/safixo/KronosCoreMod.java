@@ -1,6 +1,7 @@
 package dev.safixo;
 
 import cpw.mods.fml.relauncher.IFMLLoadingPlugin;
+import dev.safixo.core.BlockTransformer;
 import dev.safixo.core.KronosAccessTransformer;
 import dev.safixo.core.KronosTransformer;
 
@@ -19,6 +20,7 @@ public class KronosCoreMod implements IFMLLoadingPlugin {
 	public String[] getASMTransformerClass() {
 		return new String[] {
 			KronosTransformer.class.getName(),
+			BlockTransformer.class.getName(),
 			KronosAccessTransformer.class.getName()
 		};
 	}

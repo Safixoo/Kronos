@@ -1,15 +1,15 @@
 package dev.safixo.client.util.memory;
 
-import it.unimi.dsi.fastutil.longs.Long2ReferenceMap;
-import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
+import com.google.common.collect.MapMaker;
 import org.lwjgl.MemoryUtil;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
+import java.util.concurrent.ConcurrentMap;
 
 public class NativeBuffer {
-	private static final Long2ReferenceMap<ByteBuffer> BUFFER_TO_PTR = new Long2ReferenceOpenHashMap<>(16, 0.5f);
+	private static final ConcurrentMap<Long, ByteBuffer> BUFFER_TO_PTR = new MapMaker().concurrencyLevel(2).makeMap();
 
 	public static FloatBuffer memAllocFloat(int size) {
 		return memAlloc(size * 4).asFloatBuffer();

@@ -1,8 +1,14 @@
 package dev.safixo.client.render.pipelines.terrain;
 
+import dev.safixo.client.render.pipelines.terrain.meshing.task.SectionResult;
 import dev.safixo.client.render.pipelines.terrain.region.RegionConstants;
+import dev.safixo.client.render.vertex.VertexWriter;
 import dev.safixo.client.util.MathExt;
 import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
+import net.minecraft.tileentity.TileEntity;
+
+import static dev.safixo.client.util.Direction.DOWN_BIT;
+import static dev.safixo.client.util.Direction.UP_BIT;
 
 public class SectionRender {
 	private final SectionSet sectionSet;
@@ -21,6 +27,15 @@ public class SectionRender {
 
 	// Section main data structures.
 	public RegionRender region = RegionConstants.NULL;
+
+	private TileEntity[] tileEntityArray;
+
+	private int meshOrder;
+	private int drawMask;
+	private long[] solidDrawData;
+
+	private VertexWriter solidWriter;
+	private VertexWriter translucentWriter;
 
 	public SectionRender(WorldManager manager, SectionSet sectionSet, int blockX, int blockY, int blockZ, int flags) {
 		this.sectionSet = sectionSet;
@@ -52,5 +67,71 @@ public class SectionRender {
 
 	public void sendFlagsToSet() {
 		this.sectionSet.setSectionInfo(this.blockX >> 4, this.blockY >> 4, this.blockZ >> 4, this.flags);
+	}
+
+	public void sendBuildResult(WorldManager manager, SectionResult result) {
+		VertexWriter solidWriter = result.getSolidWriter();
+		VertexWriter translucentWriter = result.getTranslucentWriter();
+
+		boolean nonNullWriter = solidWriter != null || translucentWriter != null;
+
+		this.uploadMeshesToRegion(manager, result);
+		this.region.setDrawMask(this.regionIndex, result.getDrawMask());
+
+		this.setFlags(SectionFlags.setSolidFaces(this.flags, result.getSolidMask() & getAdjacentMask(this.blockY >> 4)));
+		this.setFlags(SectionFlags.setPassesNonEmpty(this.flags, nonNullWriter ? 1 : 0));
+
+		result.delete();
+
+		this.uploadAllTileEntities(manager, result);
+		this.sendFlagsToSet();
+	}
+
+	public static int getAdjacentMask(int sectionY) {
+		int adjacentMask = 0x3F;
+
+		if (sectionY == 0) {
+			adjacentMask &= ~DOWN_BIT;
+		} else if (sectionY == 15) {
+			adjacentMask &= ~UP_BIT;
+		}
+
+		return adjacentMask;
+	}
+
+	private void uploadMeshesToRegion(WorldManager manager, SectionResult result) {
+		VertexWriter solidWriter = result.getSolidWriter();
+		VertexWriter translucentWriter = result.getTranslucentWriter();
+
+		if (solidWriter != null && solidWriter.getOffset() != 0) {
+			if (this.region == RegionConstants.NULL) {
+				this.region = manager.getRegion(this.blockX >> 4, this.blockY >> 4, this.blockZ >> 4);
+			}
+
+			this.region.setMeshOrder(this.regionIndex, result.getMeshOrder());
+			this.region.addSolidMesh(this, solidWriter, result.getDrawData());
+		}
+
+		if (translucentWriter != null && translucentWriter.getOffset() != 0) {
+			if (this.region == RegionConstants.NULL) {
+				this.region = manager.getRegion(this.blockX >> 4, this.blockY >> 4, this.blockZ >> 4);
+			}
+
+			this.region.addTranslucentMesh(this, translucentWriter);
+		}
+	}
+
+	private void uploadAllTileEntities(WorldManager manager, SectionResult result) {
+		if (result.getTileEntities() == null) {
+			if (this.region != RegionConstants.NULL) {
+				this.region.getTileEntityManager().removeTileEntities(this.regionIndex);
+			}
+			return;
+		}
+
+		if (this.region == RegionConstants.NULL) {
+			this.region = manager.getRegion(this.blockX >> 4, this.blockY >> 4, this.blockZ >> 4);
+		}
+		this.region.getTileEntityManager().addTileEntities(result.getTileEntities(), this.regionIndex);
 	}
 }

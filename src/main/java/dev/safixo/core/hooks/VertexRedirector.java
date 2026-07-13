@@ -18,8 +18,8 @@ import dev.safixo.client.util.memory.UnsafeUtil;
 // 24b : brightness
 public class VertexRedirector {
 	public static final long VERTEX_SIZE = 32;
-	public static final long PTR_QUAD = NativeBuffer.nmemAlloc(VERTEX_SIZE * 4);
-	public static int VERT_INDEX;
+	public final long ptrQuad = NativeBuffer.nmemAlloc(VERTEX_SIZE * 4);
+	public int vertIndex;
 
 	public static final long X      = 0;
 	public static final long Y      = 4;
@@ -32,20 +32,20 @@ public class VertexRedirector {
 
 	public static boolean ORGANIZE_NORMALS;
 
-	public static void setTextureUV(double u, double v) {
-		long ptr = PTR_QUAD + VERTEX_SIZE * VERT_INDEX;
+	public void setTextureUV(double u, double v) {
+		long ptr = ptrQuad + VERTEX_SIZE * vertIndex;
 		UnsafeUtil.memPutFloat(ptr + U, (float) u);
 		UnsafeUtil.memPutFloat(ptr + V, (float) v);
 	}
 
-	public static void addVertexWithUV(double x, double y, double z, double u, double v) {
-		setTextureUV(u, v);
-		addVertex(x, y, z);
+	public void addVertexWithUV(double x, double y, double z, double u, double v) {
+		this.setTextureUV(u, v);
+		this.addVertex(x, y, z);
 	}
 
-	public static void addVertex(double x, double y, double z) {
-		long ptr = PTR_QUAD + VERTEX_SIZE * VERT_INDEX;
-		ImprovedTessellator tes = ImprovedTessellator.INSTANCE;
+	public void addVertex(double x, double y, double z) {
+		long ptr = ptrQuad + VERTEX_SIZE * vertIndex;
+		ImprovedTessellator tes = ImprovedTessellator.getTessellator();
 
 		UnsafeUtil.memPutFloat(ptr + X, (float) (x + tes.xOff));
 		UnsafeUtil.memPutFloat(ptr + Y, (float) (y + tes.yOff));
@@ -55,28 +55,24 @@ public class VertexRedirector {
 		UnsafeUtil.memPutInt(ptr + LIGHT, tes.light);
 		UnsafeUtil.memPutInt(ptr + NORMAL, tes.normal);
 
-		VERT_INDEX++;
+		this.vertIndex++;
 
-		if (VERT_INDEX == 4) {
-			bufferQuad();
-			VERT_INDEX = 0;
+		if (this.vertIndex == 4) {
+			this.bufferQuad();
+			this.vertIndex = 0;
 		}
 	}
 
-	private static void bufferQuad() {
+	private void bufferQuad() {
 		VertexWriter instance = VertexWriter.getCurrentInstance();
 
-		if (!ORGANIZE_NORMALS || instance != VertexWriter.SOLID[MeshDirection.GENERIC]) {
-			for (int i = 0; i < 4; i++) {
-				bufferVertex(instance, PTR_QUAD + i * VERTEX_SIZE);
-			}
-		} else {
-			assignNormalAndBuffer();
+		for (int i = 0; i < 4; i++) {
+			this.bufferVertex(instance, this.ptrQuad + i * VERTEX_SIZE);
 		}
 	}
 
-	private static void assignNormalAndBuffer() {
-		long ptr = PTR_QUAD;
+	private void assignNormalAndBuffer() {
+		long ptr = this.ptrQuad;
 
 		float x0 = UnsafeUtil.memGetFloat(ptr + X);
 		float y0 = UnsafeUtil.memGetFloat(ptr + Y);
@@ -96,11 +92,11 @@ public class VertexRedirector {
 		VertexWriter writer = VertexWriter.SOLID[normalDir];
 
 		for (int i = 0; i < 4; i++) {
-			bufferVertex(writer, PTR_QUAD + i * VERTEX_SIZE);
+			bufferVertex(writer, this.ptrQuad + i * VERTEX_SIZE);
 		}
 	}
 
-	private static void bufferVertex(VertexWriter writer, long ptr) {
+	private void bufferVertex(VertexWriter writer, long ptr) {
 		writer.x = UnsafeUtil.memGetFloat(ptr + X);
 		writer.y = UnsafeUtil.memGetFloat(ptr + Y);
 		writer.z = UnsafeUtil.memGetFloat(ptr + Z);

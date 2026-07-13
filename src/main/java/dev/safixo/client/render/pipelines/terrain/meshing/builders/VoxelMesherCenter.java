@@ -1,5 +1,6 @@
 package dev.safixo.client.render.pipelines.terrain.meshing.builders;
 
+import dev.safixo.client.render.pipelines.terrain.meshing.task.SectionTask;
 import dev.safixo.client.render.pipelines.terrain.meshing.data.FacingData;
 import dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache;
 import dev.safixo.client.render.pipelines.terrain.region.RegionConstants;
@@ -17,7 +18,9 @@ import static dev.safixo.client.render.pipelines.terrain.meshing.model.ModelHelp
 import static dev.safixo.client.util.Direction.*;
 
 public class VoxelMesherCenter  {
-	public static void meshVoxel(Block block, SectionCache cache, int x, int y, int z, boolean ambient, int drawSet, int blockId) {
+	public static void meshVoxel(SectionTask task, Block block, int x, int y, int z, boolean ambient, int drawSet, int blockId) {
+		SectionCache cache = task.cache;
+
 		if (!PrimitivesFlags.DIRECT_CULL[blockId]) {
 			drawSet |= block.shouldSideBeRendered(cache, x, y - 1, z, 0) ? 1 << DOWN : 0;
 			drawSet |= block.shouldSideBeRendered(cache, x, y + 1, z, 1) ? 1 << UP : 0;
@@ -56,7 +59,7 @@ public class VoxelMesherCenter  {
 			TEX_UVS[3] = TerrainFormat.deNormalizeTexCoordinate(tex.getMaxV());
 
 			FacingData render = FACE_RENDER[dir];
-			VertexWriter writer = VertexWriter.SOLID[dir];
+			VertexWriter writer = task.getSolidWriter(dir);
 
 			writer.ensureCapacity(TerrainFormat.STRIDE * 8);
 
