@@ -1,6 +1,8 @@
 package dev.safixo.core.hooks;
 
 import dev.safixo.client.util.memory.UnsafeUtil;
+import dev.safixo.core.BlockTransformer;
+import dev.safixo.core.KronosTransformer;
 import net.minecraft.block.Block;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
@@ -13,7 +15,7 @@ import java.lang.reflect.Field;
 
 // To handle async meshing, some fields from the Block class are
 public class AsyncBlockHook {
-	public static Thread MESHING_THREAD = null;
+	private static Thread MESHING_THREAD;
 	private static final long minX, minXMT;
 	private static final long minY, minYMT;
 	private static final long minZ, minZMT;
@@ -23,13 +25,14 @@ public class AsyncBlockHook {
 
 	static {
 		try {
-			Field minXF = Block.class.getDeclaredField("minX");
-			Field minYF = Block.class.getDeclaredField("minY");
-			Field minZF = Block.class.getDeclaredField("minZ");
 
-			Field maxXF = Block.class.getDeclaredField("maxX");
-			Field maxYF = Block.class.getDeclaredField("maxY");
-			Field maxZF = Block.class.getDeclaredField("maxZ");
+			Field minXF = Block.class.getDeclaredField(KronosTransformer.IN_DEV ? "minX" : BlockTransformer.MINX_SRG);
+			Field minYF = Block.class.getDeclaredField(KronosTransformer.IN_DEV ? "minY" : BlockTransformer.MINY_SRG);
+			Field minZF = Block.class.getDeclaredField(KronosTransformer.IN_DEV ? "minZ" : BlockTransformer.MINZ_SRG);
+
+			Field maxXF = Block.class.getDeclaredField(KronosTransformer.IN_DEV ? "maxX" : BlockTransformer.MAXX_SRG);
+			Field maxYF = Block.class.getDeclaredField(KronosTransformer.IN_DEV ? "maxY" : BlockTransformer.MAXY_SRG);
+			Field maxZF = Block.class.getDeclaredField(KronosTransformer.IN_DEV ? "maxZ" : BlockTransformer.MAXZ_SRG);
 
 			Field minXFMT = Block.class.getDeclaredField("minXMT");
 			Field minYFMT = Block.class.getDeclaredField("minYMT");

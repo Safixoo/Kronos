@@ -1,7 +1,7 @@
 package dev.safixo.client.render.pipelines.terrain.meshing.data;
 
-import dev.safixo.client.render.pipelines.terrain.meshing.model.ModelColorizer;
 import dev.safixo.client.util.MathExt;
+import dev.safixo.client.util.collection.ObjectPooler;
 import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;
 import net.minecraft.tileentity.TileEntity;
@@ -18,32 +18,26 @@ import dev.safixo.client.util.data.PrimitivesFlags;
 import java.util.Arrays;
 
 public class SectionCache implements IBlockAccess {
-	private static final boolean USE_UNIFORM_BIOME = false;
+	public static final byte[] BYTE_ARRAY = new byte[16 * 16 * 16];
+	public static final byte[] NIBBLE_ARRAY = new byte[16 * 16 * 16 / 2];
 
-	private final FakeInlinedBiome FAKE_BIOME = new FakeInlinedBiome(Integer.MAX_VALUE);
-	// private final ModelColorizer COLORIZER = new ModelColorizer();
-
-	public static final byte[] DEFAULT_BYTE_ARRAY = new byte[16 * 16 * 16];
-	public static final byte[] DEFAULT_NIBBLE_ARRAY = new byte[16 * 16 * 8];
-
-	public static final byte[] DEFAULT_FULL_ARRAY = new byte[16 * 16 * 16];
-	public static final byte[] DEFAULT_FULL_NIBBLE_ARRAY = new byte[16 * 16 * 8];
+	public static final byte[] FULL_BYTE_ARRAY = new byte[16 * 16 * 16];
+	public static final byte[] FULL_NIBBLE_ARRAY = new byte[16 * 16 * 16 / 2];
 
 	public static final int BIOME_RADIUS = 1;
 	private static final int BIOME_CHUNK_WIDTH = 16 + (BIOME_RADIUS * 2);
 
 	static {
-		Arrays.fill(DEFAULT_FULL_ARRAY, (byte) 0xFF);
-		Arrays.fill(DEFAULT_FULL_NIBBLE_ARRAY, (byte) 0xFF);
+		Arrays.fill(FULL_BYTE_ARRAY, (byte) 0xFF);
+		Arrays.fill(FULL_NIBBLE_ARRAY, (byte) 0xFF);
 	}
 
 	private final Chunk[] chunks = new Chunk[3 * 3];
 
 	private World worldObj;
 	public int blockX, blockY, blockZ;
-	private boolean uniformBiome;
 
-	private final BiomeGenBase[] biomes = new BiomeGenBase[BIOME_CHUNK_WIDTH * BIOME_CHUNK_WIDTH];
+	private final byte[] biomes = new byte[BIOME_CHUNK_WIDTH * BIOME_CHUNK_WIDTH];
 
 	private final byte[][] sectionBlocks = new byte[3 * 3 * 3][4096];
 	private final byte[][] sectionBlocksMsb = new byte[3 * 3 * 3][2048];
@@ -62,12 +56,11 @@ public class SectionCache implements IBlockAccess {
 	public byte[] visitedSectionBlocks;
 
 	private boolean centerSectEmpty;
-	public int[] biomeColors = new int[ModelColorizer.MAX_COLOR_TYPES];
 
-	public SectionCache() {
-	}
+	private final ObjectPooler<byte[]> byteArrays = new ObjectPooler<>(null, 27);
+	private final ObjectPooler<byte[]> nibbleArrays = new ObjectPooler<>(null, 27 * 4);
 
-	public void fillData(World world, int blockX, int blockY, int blockZ) {
+	public void setupCache(Chunk centerChunk, World world, int blockX, int blockY, int blockZ) {
 		this.worldObj = world;
 
 		this.blockX = blockX - 16;
@@ -84,14 +77,8 @@ public class SectionCache implements IBlockAccess {
 		int maxSectionY = centerY + 1;
 		int maxSectionZ = centerZ + 1;
 
-		Chunk centerChunk = world.getChunkFromChunkCoords(centerX, centerZ);
 		ExtendedBlockStorage centerSection = centerChunk.getBlockStorageArray()[centerY];
-
 		this.centerSectEmpty = centerSection == null || centerSection.isEmpty();
-
-		if (this.centerSectEmpty) {
-			return;
-		}
 
 		Arrays.fill(this.chunks, null);
 
@@ -117,40 +104,44 @@ public class SectionCache implements IBlockAccess {
 
 					if (section != null) {
 						if (!section.isEmpty()) {
-							if (section.getBlockLSBArray() != null) {
-								copy(this.sectionBlocks[sectionIndex], section.getBlockLSBArray(), minIndex, maxIndex);
-							}
+							this.sectionBlocks[sectionIndex] = this.popByteArray(this.sectionBlocks[sectionIndex]);
+							this.sectionData[sectionIndex] = this.popNibbleArray(this.sectionData[sectionIndex]);
+
 							if (section.getBlockMSBArray() != null) {
+								this.sectionBlocksMsb[sectionIndex] = this.popNibbleArray(this.sectionBlocksMsb[sectionIndex]);
 								copy(this.sectionBlocksMsb[sectionIndex], section.getBlockMSBArray().data, minIndex, maxIndex);
 							}
-							if (section.getMetadataArray() != null) {
-								copy(this.sectionData[sectionIndex], section.getMetadataArray().data, minIndex, maxIndex);
-							}
+							copy(this.sectionBlocks[sectionIndex], section.getBlockLSBArray(), minIndex, maxIndex);
+							copy(this.sectionData[sectionIndex], section.getMetadataArray().data, minIndex, maxIndex);
+						} else {
+							this.sectionBlocks[sectionIndex] = this.pushByteArray(this.sectionBlocks[sectionIndex]);
+							this.sectionBlocksMsb[sectionIndex] = this.pushNibbleArray(this.sectionBlocksMsb[sectionIndex]);
+							this.sectionData[sectionIndex] = this.pushNibbleArray(this.sectionData[sectionIndex]);
 						}
 
-						if (section.getSkylightArray() == null || section.getSkylightArray().data == null || this.worldObj.provider.hasNoSky) {
-							// Case where dimension doesn't support lighting (nether for example).
-							copy(this.skyLight[sectionIndex], DEFAULT_NIBBLE_ARRAY, minIndex, maxIndex);
-						} else if (section.getSkylightArray().data != null) {
-							// Base case, there is lighting.
+						if (!this.worldObj.provider.hasNoSky) {
+							this.skyLight[sectionIndex] = this.popSkyArray(this.skyLight[sectionIndex]);
 							copy(this.skyLight[sectionIndex], section.getSkylightArray().data, minIndex, maxIndex);
-						}
-						if (section.getBlocklightArray() == null || section.getBlocklightArray().data == null) {
-							copy(this.blockLight[sectionIndex], DEFAULT_NIBBLE_ARRAY, minIndex, maxIndex);
 						} else {
-							copy(this.blockLight[sectionIndex], section.getBlocklightArray().data, minIndex, maxIndex);
+							this.skyLight[sectionIndex] = this.pushSkyArray(this.skyLight[sectionIndex], NIBBLE_ARRAY);
 						}
+
+						this.blockLight[sectionIndex] = this.popNibbleArray(this.blockLight[sectionIndex]);
+						copy(this.blockLight[sectionIndex], section.getBlocklightArray().data, minIndex, maxIndex);
+					} else {
+						this.skyLight[sectionIndex] = this.pushSkyArray(this.skyLight[sectionIndex], FULL_NIBBLE_ARRAY);
+
+						this.sectionBlocks[sectionIndex] = this.pushByteArray(this.sectionBlocks[sectionIndex]);
+						this.sectionBlocksMsb[sectionIndex] = this.pushNibbleArray(this.sectionBlocksMsb[sectionIndex]);
+						this.sectionData[sectionIndex] = this.pushNibbleArray(this.sectionData[sectionIndex]);
+
+						this.blockLight[sectionIndex] = this.pushNibbleArray(this.blockLight[sectionIndex]);
 					}
 				}
 			}
 
-			WorldChunkManager manager = this.worldObj.getWorldChunkManager();
-
 			int centerBlockX = centerX << 4;
 			int centerBlockZ = centerZ << 4;
-
-			BiomeGenBase lastBiome = null;
-			boolean uniformed = true;
 
 			for (int biomeX = centerBlockX - BIOME_RADIUS; biomeX < centerBlockX + 16 + BIOME_RADIUS; biomeX++) {
 				for (int biomeZ = centerBlockZ - BIOME_RADIUS; biomeZ < centerBlockZ + 16 + BIOME_RADIUS; biomeZ++) {
@@ -163,40 +154,21 @@ public class SectionCache implements IBlockAccess {
 					int chunkIndex = sectionIndex(actChunkX, 0, actChunkZ);
 
 					Chunk chunk = this.chunks[chunkIndex];
-					BiomeGenBase biomeGenBase = BiomeGenBase.plains;
 
-					if (chunk != null) {
-						biomeGenBase = chunk.getBiomeGenForWorldCoords(biomeX & 15, biomeZ & 15, manager);
+					if (chunk == null) {
+						this.biomes[relBiomeX + relBiomeZ * BIOME_CHUNK_WIDTH] = (byte) BiomeGenBase.plains.biomeID;
+						continue;
 					}
 
-//					if (lastBiome == null) {
-//						lastBiome = biomeGenBase;
-//					}
-//
-//					if (lastBiome != biomeGenBase) {
-//						uniformed = false;
-//					}
-//
-//					lastBiome = biomeGenBase;
+					int biome = chunk.getBiomeArray()[biomeIndex(biomeX & 15, biomeZ & 15)] & 0xFF;
 
-					this.biomes[relBiomeX + relBiomeZ * BIOME_CHUNK_WIDTH] = biomeGenBase;
+					if (biome == 0xFF) {
+						this.copyBiomeFromLayer(world, chunk);
+						biome = chunk.getBiomeArray()[biomeIndex(biomeX & 15, biomeZ & 15)] & 0xFF;
+					}
+
+					this.biomes[relBiomeX + relBiomeZ * BIOME_CHUNK_WIDTH] = (byte) biome;
 				}
-			}
-
-			if (uniformed && lastBiome != null && USE_UNIFORM_BIOME) {
-				int grassColor = lastBiome.getBiomeGrassColor();
-				int foliageColor = lastBiome.getBiomeFoliageColor();
-				int waterColor = lastBiome.getWaterColorMultiplier();
-
-				this.biomeColors[ModelColorizer.GRASS_COLOR] = grassColor;
-				this.biomeColors[ModelColorizer.LEAVES_COLOR] = foliageColor;
-				this.biomeColors[ModelColorizer.WATER_COLOR] = waterColor;
-				this.biomeColors[ModelColorizer.DEFAULT_COLOR] = 0xFFFFFFFF;
-
-				FAKE_BIOME.setColors(waterColor, foliageColor, grassColor);
-				Arrays.fill(this.biomes, FAKE_BIOME);
-
-				this.uniformBiome = uniformed;
 			}
 		}
 
@@ -207,23 +179,77 @@ public class SectionCache implements IBlockAccess {
 		this.centerBlocks = this.sectionBlocks[sectionIndex(1, 1, 1)];
 	}
 
-	private static void copy(byte[] to, byte[] from) {
-		if (from.length != to.length) {
-			throw new RuntimeException("Incompatible array copy!");
-		}
+	private void copyBiomeFromLayer(World world, Chunk chunk) {
+		WorldChunkManager chunkManager = world.getWorldChunkManager();
+		byte[] chunkBiomes = chunk.getBiomeArray();
+		int[] layerBiomes = chunkManager.genBiomes.getInts(chunk.xPosition, chunk.zPosition, 16, 16);
 
-		System.arraycopy(from, 0, to, 0, from.length);
+		for (int i = 0; i < 256; i++) {
+			chunkBiomes[i] = (byte) layerBiomes[i];
+		}
+	}
+
+	private static int biomeIndex(int x, int z) {
+		return x | z << 4;
+	}
+
+	private byte[] popSkyArray(byte[] array) {
+		if (array == NIBBLE_ARRAY || array == FULL_NIBBLE_ARRAY) {
+			return this.nibbleArrays.poll();
+		}
+		return array;
+	}
+
+	private byte[] pushSkyArray(byte[] array, byte[] defaultArray) {
+		if (array != FULL_NIBBLE_ARRAY && array != NIBBLE_ARRAY) {
+			this.nibbleArrays.push(array);
+		}
+		return defaultArray;
+	}
+
+	private byte[] popNibbleArray(byte[] array) {
+		if (array == NIBBLE_ARRAY) {
+			return this.nibbleArrays.poll();
+		}
+		return array;
+	}
+
+	private byte[] popByteArray(byte[] array) {
+		if (array == BYTE_ARRAY) {
+			return this.byteArrays.poll();
+		}
+		return array;
+	}
+
+	private byte[] pushNibbleArray(byte[] array) {
+		if (array != NIBBLE_ARRAY) {
+			this.nibbleArrays.push(array);
+		}
+		return NIBBLE_ARRAY;
+	}
+
+	private byte[] pushByteArray(byte[] array) {
+		if (array != BYTE_ARRAY) {
+			this.byteArrays.push(array);
+		}
+		return BYTE_ARRAY;
 	}
 
 	private static final int RADIUS = 1;
 
 	private void copy(byte[] to, byte[] from, int minIndex, int maxIndex) {
+		maxIndex++;
+
 		if (from.length == 2048) {
 			minIndex >>= 1;
 			maxIndex >>= 1;
 		}
 
-		System.arraycopy(from, minIndex, to, minIndex, maxIndex - minIndex + 1);
+		if (maxIndex - minIndex == 1) {
+			to[minIndex] = from[minIndex];
+		} else {
+			System.arraycopy(from, minIndex, to, minIndex, maxIndex - minIndex);
+		}
 	}
 
 	private int getMinBlockIndex(int sectionIndex) {
@@ -311,10 +337,6 @@ public class SectionCache implements IBlockAccess {
 
 	private int getMsbNibbleCenter(int blockIndex) {
 		return this.centerBlocksMsb != null ? getNibble(this.centerBlocksMsb, blockIndex) : 0;
-	}
-
-	public boolean isBiomeUniform() {
-		return this.uniformBiome;
 	}
 
 	@Override
@@ -461,7 +483,7 @@ public class SectionCache implements IBlockAccess {
 		int biomeX = x - (this.blockX + 16 - BIOME_RADIUS);
 		int biomeZ = z - (this.blockZ + 16 - BIOME_RADIUS);
 
-		return this.biomes[biomeX + biomeZ * BIOME_CHUNK_WIDTH];
+		return BiomeGenBase.biomeList[this.biomes[biomeX + biomeZ * BIOME_CHUNK_WIDTH] & 0xFF];
 	}
 
 	@Override

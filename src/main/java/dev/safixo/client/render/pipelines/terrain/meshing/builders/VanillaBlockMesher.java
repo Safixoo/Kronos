@@ -33,12 +33,6 @@ public class VanillaBlockMesher {
 		return renderStandardBlock(render, render.blockAccess, block, BOUNDS, x, y, z);
 	}
 
-	/**
-	 * Total rewrite of the pipeline for rendering most of the blocks of the game. The main improvements that come
-	 * are lighting fixes, much better performance and improved culling by analyzing block model, also the code should
-	 * be much more readable and compact in contrast to the inlined field hell that RenderBlocks has which doesn't help
-	 * performance.
-	 */
 	public static boolean renderStandardBlock(RenderBlocks blocks, IBlockAccess cache, Block block, float[] bounds, int x, int y, int z) {
 		Tessellator tes = Tessellator.instance;
 

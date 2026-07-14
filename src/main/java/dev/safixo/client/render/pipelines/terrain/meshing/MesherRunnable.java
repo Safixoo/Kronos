@@ -18,7 +18,9 @@ public class MesherRunnable implements Runnable {
 
 	@Override
 	public void run() {
-		while (!Thread.currentThread().isInterrupted()) {
+		Thread thread = Thread.currentThread();
+
+		while (!thread.isInterrupted()) {
 			try {
 				SectionTask[] tasks = this.tasks.take();
 
@@ -27,7 +29,7 @@ public class MesherRunnable implements Runnable {
 					this.results.put(result);
 				}
 			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
+				thread.interrupt();
 				break;
 			}
 		}

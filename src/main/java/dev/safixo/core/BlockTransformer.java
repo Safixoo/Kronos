@@ -1,5 +1,6 @@
 package dev.safixo.core;
 
+import cpw.mods.fml.common.asm.transformers.deobf.FMLDeobfuscatingRemapper;
 import net.minecraft.launchwrapper.IClassTransformer;
 import net.minecraft.launchwrapper.Launch;
 import org.objectweb.asm.ClassReader;
@@ -7,12 +8,32 @@ import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.*;
 
+import java.util.HashMap;
 import java.util.HashSet;
 
 import static org.objectweb.asm.Opcodes.*;
 
 public class BlockTransformer implements IClassTransformer {
 	static HashSet<String> BLOCK_TYPES;
+
+	public static String MINX_SRG = "field_72026_ch";
+	public static String MINY_SRG = "field_72023_ci";
+	public static String MINZ_SRG = "field_72024_cj";
+
+	public static String MAXX_SRG = "field_72021_ck";
+	public static String MAXY_SRG = "field_72022_cl";
+	public static String MAXZ_SRG = "field_72019_cm";
+
+	public static String MINX = "cM";
+	public static String MINY = "cN";
+	public static String MINZ = "cO";
+
+	public static String MAXX = "cP";
+	public static String MAXY = "cQ";
+	public static String MAXZ = "cR";
+
+	public static HashMap<String, String> FIELDS;
+	public static HashMap<String, String> SOURCE_TO_RUNTIME;
 
 	@Override
 	public byte[] transform(String name, String transformedName, byte[] basicClass) {
@@ -45,17 +66,19 @@ public class BlockTransformer implements IClassTransformer {
 				if (opcode == GETFIELD || opcode == PUTFIELD) {
 					FieldInsnNode m = (FieldInsnNode) insn;
 
-					if (m.name.startsWith("m") && BLOCK_TYPES.contains(m.owner) && isField(m.name)) {
+					if (BLOCK_TYPES.contains(m.owner) && FIELDS.containsKey(m.name)) {
+						String fieldCanon = FIELDS.get(m.name);
+
 						String name;
 						String desc;
 
 						if (opcode == GETFIELD) {
-							name = "get" + getField(m.name);
+							name = "get" + getField(fieldCanon);
 							desc = KronosTransformer.IN_DEV
 								? "(Lnet/minecraft/block/Block;)D"
 								: "(Laqz;)D";
 						} else {
-							name = "set" + getField(m.name);
+							name = "set" + getField(fieldCanon);
 							desc = KronosTransformer.IN_DEV
 								? "(Lnet/minecraft/block/Block;D)V"
 								: "(Laqz;D)V";
@@ -151,5 +174,32 @@ public class BlockTransformer implements IClassTransformer {
 		Object deObf = Launch.blackboard.get("fml.deobfuscatedEnvironment");
 
 		IN_DEV = deObf != null && (Boolean) deObf;
+		FIELDS = new HashMap<>();
+		SOURCE_TO_RUNTIME = new HashMap<>();
+
+		if (!IN_DEV) {
+			FIELDS.put(MINX, "minX");
+			FIELDS.put(MINY, "minY");
+			FIELDS.put(MINZ, "minZ");
+
+			FIELDS.put(MAXY, "maxX");
+			FIELDS.put(MAXZ, "maxY");
+			FIELDS.put(MAXX, "maxZ");
+
+			FIELDS.put(MINX_SRG, "minX");
+			FIELDS.put(MINY_SRG, "minY");
+			FIELDS.put(MINZ_SRG, "minZ");
+
+			FIELDS.put(MAXY_SRG, "maxX");
+			FIELDS.put(MAXZ_SRG, "maxY");
+			FIELDS.put(MAXX_SRG, "maxZ");
+		} else {
+			FIELDS.put("minX", "minX");
+			FIELDS.put("minY", "minY");
+			FIELDS.put("minZ", "minZ");
+			FIELDS.put("maxX", "maxX");
+			FIELDS.put("maxY", "maxY");
+			FIELDS.put("maxZ", "maxZ");
+		}
 	}
 }

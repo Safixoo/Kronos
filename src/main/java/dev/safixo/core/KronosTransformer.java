@@ -28,7 +28,6 @@ public class KronosTransformer implements IClassTransformer {
 	static final String ADV_MODEL_RENDERER = "dev/safixo/client/render/pipelines/entity_model/AdvancedModelRenderer";
 
 	static final String REBUILD_LISTENER = "dev/safixo/client/render/pipelines/terrain/meshing/RebuildListener";
-	static final String SIDE_CULLER = "dev/safixo/client/render/pipelines/terrain/meshing/SideCuller";
 	static final String VANILLA_MESHER = "dev/safixo/client/render/pipelines/terrain/meshing/builders/VanillaBlockMesher";
 
 	static final String RENDER = "net.minecraft.client.renderer.entity.Render";
@@ -39,7 +38,6 @@ public class KronosTransformer implements IClassTransformer {
 	static final String PROFILER = "net.minecraft.profiler.Profiler";
 	static final String RENDER_BLOCKS = "net.minecraft.client.renderer.RenderBlocks";
 	static final String BLOCK_SNOW = "net.minecraft.block.BlockSnow";
-	static final String BLOCK = "net.minecraft.block.Block";
 	static final String RENDER_GLOBAL = "net.minecraft.client.renderer.RenderGlobal";
 	static final String ENTITY_RENDERER = "net.minecraft.client.renderer.EntityRenderer";
 	static final String ITEM_RENDERER = "net.minecraft.client.renderer.ItemRenderer";
@@ -82,7 +80,7 @@ public class KronosTransformer implements IClassTransformer {
 		// args and with the instance of the original class.
 		switch (transformedName) {
 			case VEC3_POOL:
-				replaceClassMethod(MINECRAFT_HOOK, "getVecFromPool", "", "", reference, false);
+				replaceClassMethod(MINECRAFT_HOOK, "getVecFromPool", "a", "(DDD)Latc", reference, false);
 				break;
 			case RENDER:
 				replaceClassMethod(MINECRAFT_HOOK, "bindTexture", "a", "(D)V", reference, true);
@@ -94,10 +92,6 @@ public class KronosTransformer implements IClassTransformer {
 				avoidDoublePassBullshit(reference);
 				replaceClassMethod(MINECRAFT_HOOK, "disableLightmap", "a", "(D)V", reference, true);
 				replaceClassMethod(MINECRAFT_HOOK, "enableLightmap", "b", "(D)V", reference, true);
-			case BLOCK:
-				replaceClassMethod(SIDE_CULLER, "shouldSideBeRendered", "a", "(Lacf;IIII)Z", reference, false);
-//				catchBlockBounds(reference);
-//				setupAsyncFields(reference);
 				break;
 			case BLOCK_SNOW:
 				replaceClassMethod(MINECRAFT_HOOK, "shouldSideBeRendered", "a", "(Lacf;IIII)Z", reference, false);
@@ -163,7 +157,7 @@ public class KronosTransformer implements IClassTransformer {
 
 		fillStateMachineFunctions();
 
-		if (!transformedName.equals("net.minecraft.client.renderer.Tessellator")){
+		if (!transformedName.equals("net.minecraft.client.renderer.Tessellator")) {
 			replaceTessellatorsInstances(reference);
 		}
 
@@ -259,9 +253,10 @@ public class KronosTransformer implements IClassTransformer {
 
 				if (opcode == GETSTATIC) {
 					FieldInsnNode fieldInsn = (FieldInsnNode) insn;
+					String owner = IN_DEV ? "net/minecraft/client/renderer/Tessellator" : "bfq";
+					String desc = "L" + owner + ";";
 
-					if (fieldInsn.owner.equals("net/minecraft/client/renderer/Tessellator") &&
-						(fieldInsn.name.equals("instance") || fieldInsn.name.equals("field_78398_a"))) {
+					if (fieldInsn.owner.equals(owner) && fieldInsn.desc.equals(desc)) {
 						inns.set(fieldInsn, new MethodInsnNode(INVOKESTATIC, "dev/safixo/client/render/ImprovedTessellator",
 							"getTessellator",
 							"()Ldev/safixo/client/render/ImprovedTessellator;"));

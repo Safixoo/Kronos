@@ -3,7 +3,6 @@ package dev.safixo.core.hooks;
 import dev.safixo.client.render.ImprovedTessellator;
 import dev.safixo.client.render.pipelines.terrain.meshing.model.NormalUtil;
 import dev.safixo.client.render.vertex.VertexWriter;
-import dev.safixo.client.util.MeshDirection;
 import dev.safixo.client.util.memory.NativeBuffer;
 import dev.safixo.client.util.memory.UnsafeUtil;
 

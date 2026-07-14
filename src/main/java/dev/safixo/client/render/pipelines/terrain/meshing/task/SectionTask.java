@@ -17,10 +17,6 @@ public class SectionTask {
 
 	public SectionTask(VertexWriter[] writers) {
 		this.writers = writers;
-
-		for (VertexWriter writer : writers) {
-			writer.startDrawing();
-		}
 	}
 
 	public VertexWriter getSolidWriter(int dir) {

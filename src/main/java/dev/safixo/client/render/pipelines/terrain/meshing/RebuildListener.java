@@ -20,10 +20,6 @@ public class RebuildListener {
 
 		for (int x = minX; x <= maxX; x++) {
 			for (int z = minZ; z <= maxZ; z++) {
-				if (!provider.canLoadChunk(x, z)) {
-					continue;
-				}
-
 				for (int y = minY; y <= maxY; y++) {
 					manager.markDirty(x, y, z);
 				}

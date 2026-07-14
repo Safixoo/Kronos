@@ -38,12 +38,12 @@ public class ClientChunkListener extends ChunkProviderClient {
 	}
 
 	public boolean canLoadChunk(int x, int z) {
-		ChunkMetadata meta = (ChunkMetadata) this.chunkMap.get(MathExt.asLong(x, z));
+		ChunkMetadata meta = this.chunkMap.get(MathExt.asLong(x, z));
 		return meta != null && meta.adjacentMask == 0b111_111_111;
 	}
 
 	public void unloadChunk(int x, int z) {
-		ChunkMetadata meta = (ChunkMetadata) this.chunkMap.get(MathExt.asLong(x, z));
+		ChunkMetadata meta = this.chunkMap.get(MathExt.asLong(x, z));
 
 		if (meta == null) {
 			return;
@@ -75,7 +75,7 @@ public class ClientChunkListener extends ChunkProviderClient {
 	@Override
 	public Chunk provideChunk(int x, int z) {
 		long position = MathExt.asLong(x, z);
-		ChunkMetadata meta = (ChunkMetadata) this.chunkMap.get(position);
+		ChunkMetadata meta = this.chunkMap.get(position);
 		return meta == null ? this.blankChunk : meta.chunk;
 	}
 
@@ -90,7 +90,7 @@ public class ClientChunkListener extends ChunkProviderClient {
 					continue;
 				}
 
-				ChunkMetadata neighborNode = (ChunkMetadata) this.chunkMap.get(MathExt.asLong(x, z));
+				ChunkMetadata neighborNode = this.chunkMap.get(MathExt.asLong(x, z));
 
 				int currentX = x - chunk.xPosition + 1;
 				int currentZ = z - chunk.zPosition + 1;

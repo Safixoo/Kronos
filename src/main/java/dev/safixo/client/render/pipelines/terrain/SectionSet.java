@@ -148,11 +148,15 @@ public class SectionSet {
 	}
 
 	public void markDirty(int sectionX, int sectionY, int sectionZ) {
-		if (!ClientChunkListener.getChunkListener().canLoadChunk(sectionX, sectionZ) || !this.isInBounds(sectionX, sectionZ)) {
+		if (!this.isInBounds(sectionX, sectionZ)) {
 			return;
 		}
 
-		this.sections[this.getSectionIndex(sectionX, sectionY, sectionZ)] |= (byte) SectionFlags.DIRTY_FLAG;
+		if (!ClientChunkListener.getChunkListener().canLoadChunk(sectionX, sectionZ)) {
+			this.sections[this.getSectionIndex(sectionX, sectionY, sectionZ)] &= (byte) ~SectionFlags.DIRTY_FLAG;
+		} else {
+			this.sections[this.getSectionIndex(sectionX, sectionY, sectionZ)] |= (byte) SectionFlags.DIRTY_FLAG;
+		}
 	}
 
 	private void resetVisibilityState() {

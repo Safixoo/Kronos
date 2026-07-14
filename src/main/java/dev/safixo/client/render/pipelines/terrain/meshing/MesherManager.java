@@ -38,7 +38,7 @@ public class MesherManager {
 		public SectionCache create() {
 			return new SectionCache();
 		}
-	}, WorldManager.MAX_TASK_CONCURRENTLY + 4);
+	}, WorldManager.MAX_TASK_CONCURRENTLY * 2);
 
 	private final LinkedBlockingQueue<SectionTask[]> tasks = new LinkedBlockingQueue<>();
 	private final LinkedBlockingQueue<SectionResult> results = new LinkedBlockingQueue<>();
@@ -112,8 +112,8 @@ public class MesherManager {
 				}
 			}
 
-			// Batch some tasks before sending.
-			if (nonEmptyTasks.size() >= 4 || currentTasks == 0) {
+			// Try to batch some tasks before processing, if possible.
+			if (!nonEmptyTasks.isEmpty() && this.tasks.isEmpty()) {
 				this.tasks.add(nonEmptyTasks.toArray(new SectionTask[0]));
 				nonEmptyTasks.clear();
 			}
@@ -128,6 +128,7 @@ public class MesherManager {
 			}
 		}
 
+		// Send remaining tasks.
 		if (!nonEmptyTasks.isEmpty()) {
 			this.tasks.add(nonEmptyTasks.toArray(new SectionTask[0]));
 		}
@@ -161,8 +162,11 @@ public class MesherManager {
 	private boolean queueTask(List<SectionTask> tasks, SectionRender section, CameraData camera, World world) {
 		Chunk.isLit = false;
 
-		if (this.nullSection(section, world)) {
+		Chunk chunk = world.getChunkFromChunkCoords(section.blockX >> 4, section.blockZ >> 4);
+
+		if (this.nullSection(chunk, section)) {
 			section.setFlags(SectionFlags.setSolidFaces(section.flags, 0b0));
+			section.setFlags(SectionFlags.setPassesNonEmpty(section.flags, 0b0));
 			section.setFlags(SectionFlags.setDirty(section.flags, false));
 			section.sendFlagsToSet();
 			return false;
@@ -172,7 +176,7 @@ public class MesherManager {
 		}
 
 		SectionCache cache = this.caches.poll();
-		cache.fillData(world, section.blockX, section.blockY, section.blockZ);
+		cache.setupCache(chunk, world, section.blockX, section.blockY, section.blockZ);
 
 		WorldRenderer.chunksUpdated++;
 		SectionTask task = new SectionTask(this.writers);
@@ -187,10 +191,8 @@ public class MesherManager {
 		return true;
 	}
 
-	private boolean nullSection(SectionRender section, World world) {
-		Chunk centerChunk = world.getChunkFromChunkCoords(section.blockX >> 4, section.blockZ >> 4);
-		ExtendedBlockStorage centerSection = centerChunk.getBlockStorageArray()[section.blockY >> 4];
-
+	private boolean nullSection(Chunk chunk, SectionRender section) {
+		ExtendedBlockStorage centerSection = chunk.getBlockStorageArray()[section.blockY >> 4];
 		return centerSection == null || centerSection.isEmpty();
 	}
 

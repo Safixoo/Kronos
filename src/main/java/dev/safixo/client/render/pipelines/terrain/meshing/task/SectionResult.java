@@ -61,9 +61,7 @@ public class SectionResult {
 		int sum = 0;
 
 		for (int dir = 0; dir < MeshDirection.COUNT; dir++) {
-			if (writers[dir] != null) {
-				sum += writers[dir].getOffset();
-			}
+			sum += writers[dir].getOffset();
 		}
 
 		return sum;
@@ -73,12 +71,12 @@ public class SectionResult {
 		VertexWriter translucentWriter = writers[MeshDirection.COUNT];
 		int drawMask = 0b0;
 
-		if (translucentWriter != null && translucentWriter.getOffset() != 0) {
+		if (translucentWriter.getOffset() != 0) {
 			drawMask |= 0b1;
 		}
 
 		for (int dir = 0; dir < MeshDirection.COUNT; dir++) {
-			if (writers[dir] != null && writers[dir].getOffset() != 0) {
+			if (writers[dir].getOffset() != 0) {
 				drawMask |= 1 << (dir + 1);
 			}
 		}

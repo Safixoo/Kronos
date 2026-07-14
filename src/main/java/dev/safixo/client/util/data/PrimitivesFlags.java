@@ -46,8 +46,6 @@ public class PrimitivesFlags {
 	public static final int[] LEAVES_COLOR = new int[256];
 	public static final int[] GRASS_COLOR = new int[256];
 
-	public static final byte[] FULL_FACES = new byte[4096];
-
 	public static void computeFlagArrays() {
 		LEAVES_TOP_INDEX = 0;
 
@@ -76,6 +74,8 @@ public class PrimitivesFlags {
 			// To skip virtual overhead.
 			TILE_ENTITY[i] = block.hasTileEntity(0);
 			RENDER_PASS[i] = (short) block.getRenderBlockPass();
+
+			AsyncBlockHook.setupAsyncBounds(block);
 		}
 
 		for (int i = 0; i < 256; i++) {

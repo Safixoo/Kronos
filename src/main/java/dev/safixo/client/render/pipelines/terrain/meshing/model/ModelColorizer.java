@@ -8,6 +8,7 @@ import net.minecraft.block.Block;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.world.ColorizerFoliage;
 import net.minecraft.world.ColorizerGrass;
+import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.biome.BiomeGenBase;
 import net.minecraft.world.biome.BiomeGenSwamp;
 import net.minecraftforge.common.MinecraftForge;
@@ -31,34 +32,24 @@ public class ModelColorizer {
 	private final BiomeEvent.GetFoliageColor foliageEvent = new BiomeEvent.GetFoliageColor(null, 0);
 
 	static final long ORIGINAL_COLOR_OFF;
-	static final long NEW_COLOR_OFF;
-	static final long BIOME_OFF;
 
 	static {
 		try {
 			Field originalColor = BiomeEvent.BiomeColor.class.getDeclaredField("originalColor");
-			Field newColor = BiomeEvent.BiomeColor.class.getDeclaredField("newColor");
-			Field biome = BiomeEvent.class.getDeclaredField("biome");
 			ORIGINAL_COLOR_OFF = UnsafeUtil.getFieldOffset(originalColor);
-			NEW_COLOR_OFF = UnsafeUtil.getFieldOffset(newColor);
-			BIOME_OFF = UnsafeUtil.getFieldOffset(biome);
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
 	}
 
 	public static void populateEvent(BiomeEvent event, BiomeGenBase biome, int color) {
-		UnsafeUtil.UNSAFE.putObject(event, BIOME_OFF, biome);
+		event.biome = biome;
+		((BiomeEvent.BiomeColor) event).newColor = color;
 		UnsafeUtil.UNSAFE.putInt(event, ORIGINAL_COLOR_OFF, color);
-		UnsafeUtil.UNSAFE.putInt(event, NEW_COLOR_OFF, color);
 	}
 
 	public int getColor(SectionCache cache, int x, int y, int z, Block block) {
 		int colorizeType = PrimitivesFlags.COLOR_MODULATOR[block.blockID];
-
-		if (cache.isBiomeUniform()) {
-			return cache.biomeColors[colorizeType];
-		}
 
 		switch (colorizeType) {
 			case DEFAULT_COLOR: return 0xFFFFFF;

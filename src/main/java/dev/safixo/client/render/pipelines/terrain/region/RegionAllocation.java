@@ -7,12 +7,10 @@ import dev.safixo.client.render.pipelines.terrain.SectionSet;
 import dev.safixo.client.render.pipelines.terrain.WorldManager;
 import dev.safixo.client.util.MathExt;
 import org.lwjgl.opengl.*;
-import dev.safixo.client.render.pipelines.terrain.SectionRender;
 import dev.safixo.client.render.vertex.writers.TerrainFormat;
 
 public class RegionAllocation {
 	private static final int SPARE_BUFFER_ALLOC = 1024 * 1024 * 32;
-	private static final int MIN_ALLOC = 1024 * 1024 * 4;
 	private static final int STRIDE = TerrainFormat.STRIDE;
 
 	private static final int TRANSLUCENT_MIN_ALLOC = 1024 * 512;
@@ -27,10 +25,6 @@ public class RegionAllocation {
 	private Allocation freeAllocations;
 
 	public static GlVertexBuffer SPARE_BUFFER;
-
-	public RegionAllocation() {
-		this(MIN_ALLOC);
-	}
 
 	public RegionAllocation(int size, int pass) {
 		this(Math.max(size, pass == 0 ? SOLID_MIN_ALLOC : TRANSLUCENT_MIN_ALLOC));
@@ -139,7 +133,7 @@ public class RegionAllocation {
 			int sectionZ = MathExt.decodeZ(position);
 
 			sectionSet.markDirty(sectionX, sectionY, sectionZ);
-			worldManager.removeUsedMemory(alloc.vertices * STRIDE);
+			worldManager.removeUsedMemory(alloc.count * STRIDE);
 
 			alloc = alloc.next;
 		}
@@ -160,7 +154,7 @@ public class RegionAllocation {
 		}
 
 		alloc.position = position;
-		WorldManager.getCurrentInstance().addUsedMemory(alloc.vertices * STRIDE);
+		WorldManager.getCurrentInstance().addUsedMemory(alloc.count * STRIDE);
 
 		this.sumbitToBuffer(alloc, vertexData, size);
 		return packDrawData(size, (int) alloc.first);
@@ -178,7 +172,7 @@ public class RegionAllocation {
 
 		WorldManager.getCurrentInstance().addMemory((int) this.capacity);
 
-		Allocation newAlloc = new Allocation(position, maxOffset, size);
+		Allocation newAlloc = new Allocation(position, (int) maxOffset, size);
 		Allocation first = this.firstEntry;
 		this.offset += sizeInBytes;
 
@@ -198,7 +192,7 @@ public class RegionAllocation {
 		Allocation alloc = this.findPrevAlloc(position);
 		long drawData;
 
-		if (alloc != null && alloc.vertices >= vertices) {
+		if (alloc != null && alloc.count >= vertices) {
 			this.sumbitToBuffer(alloc, data, vertices);
 			drawData = packDrawData(vertices, (int) alloc.first);
 		} else {
@@ -221,14 +215,14 @@ public class RegionAllocation {
 		}
 
 		// Base case: first meets the criteria.
-		if (alloc.vertices >= spaceNeeded) {
+		if (alloc.count >= spaceNeeded) {
 			this.freeAllocations = this.freeAllocations.next;
 			alloc.next = null;
 
 			return alloc;
 		}
 
-		while (alloc.next != null && alloc.next.vertices < spaceNeeded) {
+		while (alloc.next != null && alloc.next.count < spaceNeeded) {
 			alloc = alloc.next;
 		}
 
@@ -305,7 +299,7 @@ public class RegionAllocation {
 	private void addToFreeList(Allocation alloc) {
 		Allocation free = this.freeAllocations;
 
-		WorldManager.getCurrentInstance().removeUsedMemory(alloc.vertices * STRIDE);
+		WorldManager.getCurrentInstance().removeUsedMemory(alloc.count * STRIDE);
 
 		alloc.position = Long.MIN_VALUE;
 		alloc.next = null;
@@ -323,24 +317,22 @@ public class RegionAllocation {
 	}
 
 	public void sumbitToBuffer(Allocation alloc, long data, int size) {
-		this.vertexBuffer.upload(data, (int) (alloc.first * STRIDE), size * STRIDE);
+		this.vertexBuffer.upload(data, (alloc.first * STRIDE), size * STRIDE);
 	}
 
 	public static class Allocation {
-		public static final int UNDEFINED = 0x8000000;
-
 		public Allocation next;
 		public long position;
 
-		public Allocation(long render, long offset, int size) {
+		public Allocation(long render, int first, int count) {
 			this.position = render;
-			this.first = offset;
-			this.vertices = size;
+			this.first = first;
+			this.count = count;
 		}
 
 		// Size and offset are written in vertex amount and not bytes to
 		// avoid division to translate byte sizes to vertex counts.
-		public long first;
-		public int vertices;
+		public int first;
+		public int count;
 	}
 }

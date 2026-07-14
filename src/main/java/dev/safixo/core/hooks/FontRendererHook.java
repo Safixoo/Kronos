@@ -3,6 +3,7 @@ package dev.safixo.core.hooks;
 import dev.safixo.client.render.ImprovedTessellator;
 import dev.safixo.client.util.ColorBGRManager;
 import dev.safixo.client.util.memory.UnsafeUtil;
+import dev.safixo.core.HookUtils;
 import it.unimi.dsi.fastutil.objects.ObjectArrayFIFOQueue;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
@@ -10,6 +11,8 @@ import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.util.ChatAllowedCharacters;
 import net.minecraft.util.ResourceLocation;
 import org.lwjgl.opengl.GL11;
+
+import java.lang.reflect.Field;
 
 @SuppressWarnings("unused")
 public class FontRendererHook {
@@ -25,9 +28,17 @@ public class FontRendererHook {
 		}
 	}
 
+	private static final Field CHAR_WIDTH_OF = HookUtils.getField(FontRenderer.class, "d", "d");
+
 	public static int renderString(FontRenderer fr, String text, int posX, int posZ, int color, boolean margin) {
 		if (text == null) {
 			return 0;
+		}
+
+		if (RenderGlobalHook.OPTIFINE_ACTIVE && CHAR_WIDTH_OF != null) {
+			charWidthOf = (float[]) HookUtils.getFieldValue(CHAR_WIDTH_OF, fr);
+		} else {
+			charWidth = fr.charWidth;
 		}
 
 		return renderStringFast(fr, text, posX, posZ, color, margin);
@@ -115,6 +126,12 @@ public class FontRendererHook {
 	}
 
 	static int currentColor;
+	static float[] charWidthOf;
+	static int[] charWidth;
+
+	static float charWidth(int index) {
+		return charWidth != null ? charWidth[index] : charWidthOf[index];
+	}
 
 	private static float renderStringAtPos(FontRenderer fr, ImprovedTessellator tes, float posX, float posY, String text, boolean cond) {
 		char[] textArr = text.toCharArray();
@@ -139,7 +156,7 @@ public class FontRendererHook {
 				int randCh;
 				do {
 					randCh = fr.fontRandom.nextInt(ChatAllowedCharacters.allowedCharacters.length());
-				} while (fr.charWidth[allowedIndex + 32] != fr.charWidth[randCh + 32]);
+				} while (charWidth(allowedIndex + 32) != charWidth(randCh + 32));
 
 				allowedIndex = randCh;
 			}
@@ -253,7 +270,7 @@ public class FontRendererHook {
 
 		bindTexture(fr.locationFontTexture);
 
-		float width = fr.charWidth[textChar] - 0.01F - 1.0f;
+		float width = charWidth(textChar) - 0.01F - 1.0f;
 		float invTex = 1.0f / 128.0f;
 
 		int color = ColorBGRManager.rgbToBgr(currentColor) | 0xFF_000000;
@@ -262,7 +279,7 @@ public class FontRendererHook {
 		addVertexWithUV(tes, posX + width - margin, posY + 7.99F, (u + width) * invTex, (v + 7.99F) * invTex, color);
 		addVertexWithUV(tes, posX + width + margin, posY, (u + width) * invTex, v * invTex, color);
 
-		return fr.charWidth[textChar];
+		return charWidth(textChar);
 	}
 
 

@@ -27,9 +27,9 @@ import java.util.List;
 public class WorldManager {
 	private static final boolean DELETE_SHADERS = false;
 
-	public static final int MAX_FULL_UPDATES = 11;
-	public static final int MAX_UPDATES_TRIES = 48;
-	public static final int MAX_TASK_CONCURRENTLY = 18;
+	public static final int MAX_FULL_UPDATES = 7;
+	public static final int MAX_UPDATES_TRIES = 40;
+	public static final int MAX_TASK_CONCURRENTLY = 9;
 
 	private static final Item DEBUG_ITEM = null;
 
