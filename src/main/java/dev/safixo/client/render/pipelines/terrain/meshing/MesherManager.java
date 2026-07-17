@@ -18,19 +18,18 @@ import dev.safixo.client.util.data.PrimitivesFlags;
 import dev.safixo.core.hooks.AsyncBlockHook;
 import dev.safixo.core.hooks.RenderGlobalHook;
 import it.unimi.dsi.fastutil.objects.ReferenceArrayList;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.WorldRenderer;
+import net.minecraft.profiler.Profiler;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.storage.ExtendedBlockStorage;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.LinkedBlockingQueue;
 
 public class MesherManager {
 	private static final long MAX_TIME = (long) (1E+9D / 240);
 
-	private final SectionMesher mesher = new SectionMesher();
 	private final VertexWriter[] writers = new VertexWriter[MeshDirection.COUNT + 1];
 
 	private final ObjectPooler<SectionCache> caches = new ObjectPooler<>(new ObjectPooler.ObjectFactory<SectionCache>() {
@@ -40,15 +39,14 @@ public class MesherManager {
 		}
 	}, WorldManager.MAX_TASK_CONCURRENTLY * 2);
 
-	private final LinkedBlockingQueue<SectionTask[]> tasks = new LinkedBlockingQueue<>();
-	private final LinkedBlockingQueue<SectionResult> results = new LinkedBlockingQueue<>();
-
-	private final MesherRunnable mesherRunnable = new MesherRunnable(this.tasks, this.results);
+	private final MesherRunnable mesherRunnable = new MesherRunnable();
 	private final Thread meshThread;
 
 	private long lastFrameNano;
 	private long lastFrameBuildTime;
 	private long lerpFrameBudget;
+
+	private int currentTaskId;
 
 	public MesherManager() {
 		for (int i = 0; i < this.writers.length; i++) {
@@ -67,7 +65,6 @@ public class MesherManager {
 	public void queueRebuilds(WorldManager manager) {
 		int rebuildSize = BFSQueues.getRebuildIndex();
 		int maxSize = Math.min(WorldManager.MAX_UPDATES_TRIES, rebuildSize);
-		int currentTasks = this.tasks.size();
 
 		SectionSet sectionSet = manager.getSectionSet();
 
@@ -80,18 +77,9 @@ public class MesherManager {
 		long budget = calculateFrameBudgetNs(current);
 
 		int updateIndex = 0, nonEmptyUpdates = 0;
-
-		List<SectionTask> nonEmptyTasks = new ReferenceArrayList<>();
+		List<SectionRender> sectionForTasks = new ReferenceArrayList<>();
 
 		while (updateIndex < maxSize && nonEmptyUpdates < WorldManager.MAX_FULL_UPDATES) {
-			if (nonEmptyUpdates + currentTasks > WorldManager.MAX_TASK_CONCURRENTLY) {
-				currentTasks = this.tasks.size();
-
-				if (nonEmptyUpdates + currentTasks > WorldManager.MAX_TASK_CONCURRENTLY) {
-					break;
-				}
-			}
-
 			long position = BFSQueues.getSectionPos(manager.getCamera(), updateIndex++);
 
 			int sectionX = MathExt.decodeX(position);
@@ -104,18 +92,16 @@ public class MesherManager {
 				continue;
 			}
 
+			if (this.mesherRunnable.getTaskCount() >= WorldManager.MAX_TASK_CONCURRENTLY) {
+				break;
+			}
+
 			if (section.isDirty()) {
-				boolean nonEmpty = this.queueTask(nonEmptyTasks, section, manager.getCamera(), manager.worldObj);
+				boolean nonEmpty = this.setupTask(manager, sectionForTasks, section);
 
 				if (nonEmpty) {
 					nonEmptyUpdates++;
 				}
-			}
-
-			// Try to batch some tasks before processing, if possible.
-			if (!nonEmptyTasks.isEmpty() && this.tasks.isEmpty()) {
-				this.tasks.add(nonEmptyTasks.toArray(new SectionTask[0]));
-				nonEmptyTasks.clear();
 			}
 
 			if (this.isBudgetOver(current, budget)) {
@@ -128,11 +114,6 @@ public class MesherManager {
 			}
 		}
 
-		// Send remaining tasks.
-		if (!nonEmptyTasks.isEmpty()) {
-			this.tasks.add(nonEmptyTasks.toArray(new SectionTask[0]));
-		}
-
 		long diff = System.nanoTime() - current;
 		float partialTick = RenderGlobalHook.PARTIAL_TICK;
 
@@ -141,16 +122,45 @@ public class MesherManager {
 			: (long) Math.max(diff, this.lastFrameBuildTime - 5 * 1E+6D * partialTick);
 		this.lastFrameNano = current;
 
+		this.queueTasks(manager, sectionForTasks);
 		this.readAsyncResults(manager);
 	}
 
-	private void readAsyncResults(WorldManager manager) {
-		List<SectionResult> results = new ArrayList<>();
-		int size = this.results.drainTo(results);
+	private void queueTasks(WorldManager manager, List<SectionRender> sectionForTasks) {
+		List<SectionTask> tasks = new ReferenceArrayList<>(sectionForTasks.size());
+		boolean firstTask = true;
 
-		for (int i = 0; i < size; i++) {
-			SectionResult result = results.get(i);
+		for (SectionRender section : sectionForTasks) {
+			SectionTask task = this.createTask(manager.getWorld(), section, manager.getCamera());
+			tasks.add(task);
+
+			if (firstTask) {
+				this.mesherRunnable.addTasks(tasks);
+				tasks.clear();
+				firstTask = false;
+			}
+		}
+
+		if (!tasks.isEmpty()) {
+			this.mesherRunnable.addTasks(tasks);
+		}
+	}
+
+
+	private static SectionTask.TaskType getTypeByDistance(int squareDistance) {
+		return squareDistance <= 20*20 ? SectionTask.TaskType.IMPORTANT : SectionTask.TaskType.REGULAR;
+	}
+
+	private void readAsyncResults(WorldManager manager) {
+		List<SectionResult> results = this.mesherRunnable.getResults();
+
+		for (SectionResult result : results) {
 			SectionTask task = result.task;
+
+			if (task.taskId != this.currentTaskId) {
+				result.delete();
+				continue;
+			}
 
 			task.section.sendBuildResult(manager, result);
 			this.caches.push(task.cache);
@@ -159,9 +169,10 @@ public class MesherManager {
 		}
 	}
 
-	private boolean queueTask(List<SectionTask> tasks, SectionRender section, CameraData camera, World world) {
+	private boolean setupTask(WorldManager manager, List<SectionRender> tasks, SectionRender section) {
 		Chunk.isLit = false;
 
+		World world = manager.getWorld();
 		Chunk chunk = world.getChunkFromChunkCoords(section.blockX >> 4, section.blockZ >> 4);
 
 		if (this.nullSection(chunk, section)) {
@@ -169,13 +180,25 @@ public class MesherManager {
 			section.setFlags(SectionFlags.setPassesNonEmpty(section.flags, 0b0));
 			section.setFlags(SectionFlags.setDirty(section.flags, false));
 			section.sendFlagsToSet();
+
+			manager.setTerrainDirty(true);
 			return false;
 		} else {
 			section.setFlags(SectionFlags.setDirty(section.flags, false));
 			section.sendFlagsToSet();
+
+			tasks.add(section);
+
+			return true;
 		}
+	}
+
+	public SectionTask createTask(World world, SectionRender section, CameraData camera) {
+		SectionTask.TaskType taskType = getTypeByDistance(distanceToSection(section, camera));
 
 		SectionCache cache = this.caches.poll();
+		Chunk chunk = world.getChunkFromChunkCoords(section.blockX >> 4, section.blockZ >> 4);
+
 		cache.setupCache(chunk, world, section.blockX, section.blockY, section.blockZ);
 
 		WorldRenderer.chunksUpdated++;
@@ -184,11 +207,11 @@ public class MesherManager {
 		task.section = section;
 		task.camera = camera;
 		task.cache = cache;
-		task.mesherManager = this;
+		task.taskId = this.currentTaskId;
+		task.meshManager = this;
+		task.taskType = taskType;
 
-		tasks.add(task);
-
-		return true;
+		return task;
 	}
 
 	private boolean nullSection(Chunk chunk, SectionRender section) {
@@ -227,7 +250,7 @@ public class MesherManager {
 	}
 
 	public void clear() {
-		this.tasks.clear();
-		this.results.clear();
+		this.mesherRunnable.clear();
+		this.currentTaskId++;
 	}
 }

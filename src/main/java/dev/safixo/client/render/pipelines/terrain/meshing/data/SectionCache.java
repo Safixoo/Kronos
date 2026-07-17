@@ -109,10 +109,10 @@ public class SectionCache implements IBlockAccess {
 
 							if (section.getBlockMSBArray() != null) {
 								this.sectionBlocksMsb[sectionIndex] = this.popNibbleArray(this.sectionBlocksMsb[sectionIndex]);
-								copy(this.sectionBlocksMsb[sectionIndex], section.getBlockMSBArray().data, minIndex, maxIndex);
+								copyNibble(this.sectionBlocksMsb[sectionIndex], section.getBlockMSBArray().data, minIndex, maxIndex);
 							}
 							copy(this.sectionBlocks[sectionIndex], section.getBlockLSBArray(), minIndex, maxIndex);
-							copy(this.sectionData[sectionIndex], section.getMetadataArray().data, minIndex, maxIndex);
+							copyNibble(this.sectionData[sectionIndex], section.getMetadataArray().data, minIndex, maxIndex);
 						} else {
 							this.sectionBlocks[sectionIndex] = this.pushByteArray(this.sectionBlocks[sectionIndex]);
 							this.sectionBlocksMsb[sectionIndex] = this.pushNibbleArray(this.sectionBlocksMsb[sectionIndex]);
@@ -121,13 +121,13 @@ public class SectionCache implements IBlockAccess {
 
 						if (!this.worldObj.provider.hasNoSky) {
 							this.skyLight[sectionIndex] = this.popSkyArray(this.skyLight[sectionIndex]);
-							copy(this.skyLight[sectionIndex], section.getSkylightArray().data, minIndex, maxIndex);
+							copyNibble(this.skyLight[sectionIndex], section.getSkylightArray().data, minIndex, maxIndex);
 						} else {
 							this.skyLight[sectionIndex] = this.pushSkyArray(this.skyLight[sectionIndex], NIBBLE_ARRAY);
 						}
 
 						this.blockLight[sectionIndex] = this.popNibbleArray(this.blockLight[sectionIndex]);
-						copy(this.blockLight[sectionIndex], section.getBlocklightArray().data, minIndex, maxIndex);
+						copyNibble(this.blockLight[sectionIndex], section.getBlocklightArray().data, minIndex, maxIndex);
 					} else {
 						this.skyLight[sectionIndex] = this.pushSkyArray(this.skyLight[sectionIndex], FULL_NIBBLE_ARRAY);
 
@@ -152,7 +152,6 @@ public class SectionCache implements IBlockAccess {
 					int relBiomeZ = biomeZ - (centerBlockZ - BIOME_RADIUS);
 
 					int chunkIndex = sectionIndex(actChunkX, 0, actChunkZ);
-
 					Chunk chunk = this.chunks[chunkIndex];
 
 					if (chunk == null) {
@@ -160,11 +159,12 @@ public class SectionCache implements IBlockAccess {
 						continue;
 					}
 
-					int biome = chunk.getBiomeArray()[biomeIndex(biomeX & 15, biomeZ & 15)] & 0xFF;
+					byte[] biomes = chunk.getBiomeArray();
+					int biome = biomes[biomeIndex(biomeX & 15, biomeZ & 15)] & 0xFF;
 
 					if (biome == 0xFF) {
 						this.copyBiomeFromLayer(world, chunk);
-						biome = chunk.getBiomeArray()[biomeIndex(biomeX & 15, biomeZ & 15)] & 0xFF;
+						biome = biomes[biomeIndex(biomeX & 15, biomeZ & 15)] & 0xFF;
 					}
 
 					this.biomes[relBiomeX + relBiomeZ * BIOME_CHUNK_WIDTH] = (byte) biome;
@@ -238,18 +238,74 @@ public class SectionCache implements IBlockAccess {
 	private static final int RADIUS = 1;
 
 	private void copy(byte[] to, byte[] from, int minIndex, int maxIndex) {
-		maxIndex++;
+		int copyLength = maxIndex - minIndex + 1;
 
-		if (from.length == 2048) {
-			minIndex >>= 1;
-			maxIndex >>= 1;
-		}
-
-		if (maxIndex - minIndex == 1) {
+		if (copyLength == 1){
 			to[minIndex] = from[minIndex];
+		} else if (copyLength == 16*16*16 || copyLength == 16*16) {
+			System.arraycopy(from, minIndex, to, minIndex, maxIndex - minIndex + 1);
 		} else {
-			System.arraycopy(from, minIndex, to, minIndex, maxIndex - minIndex);
+			int minX = blockX(minIndex);
+			int minY = blockY(minIndex);
+			int minZ = blockZ(minIndex);
+
+			int maxX = blockX(maxIndex);
+			int maxY = blockY(maxIndex);
+			int maxZ = blockZ(maxIndex);
+
+			for (int y = minY; y <= maxY; y++) {
+				for (int z = minZ; z <= maxZ; z++) {
+					for (int x = minX; x <= maxX; x++) {
+						int blockIndex = makeBlockIndex(x, y, z);
+						to[blockIndex] = from[blockIndex];
+					}
+				}
+			}
 		}
+	}
+
+	private void copyNibble(byte[] to, byte[] from, int minIndex, int maxIndex) {
+		int copyLength = maxIndex - minIndex + 1;
+
+		if (copyLength == 1){
+			to[minIndex >>> 1] = from[minIndex >>> 1];
+		} else if (copyLength == 16*16*16 || copyLength == 16*16) {
+			maxIndex++;
+			maxIndex >>>= 1;
+			minIndex >>>= 1;
+
+			copyLength = maxIndex - minIndex;
+			System.arraycopy(from, minIndex, to, minIndex, copyLength);
+		} else {
+			int minX = blockX(minIndex);
+			int minY = blockY(minIndex);
+			int minZ = blockZ(minIndex);
+
+			int maxX = blockX(maxIndex);
+			int maxY = blockY(maxIndex);
+			int maxZ = blockZ(maxIndex);
+
+			for (int y = minY; y <= maxY; y++) {
+				for (int z = minZ; z <= maxZ; z++) {
+					for (int x = minX; x <= maxX; x++) {
+						int blockIndex = makeBlockIndex(x, y, z) >>> 1;
+						to[blockIndex] = from[blockIndex];
+					}
+				}
+			}
+		}
+	}
+
+	static int blockX(int index) {
+		return index & 0xF;
+	}
+
+	static int blockY(int index) {
+		return (index >>> 8) & 0xF;
+	}
+
+	static int blockZ(int index) {
+		return (index >>> 4) & 0xF;
 	}
 
 	private int getMinBlockIndex(int sectionIndex) {

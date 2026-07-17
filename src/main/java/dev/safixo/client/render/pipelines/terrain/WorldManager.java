@@ -29,7 +29,7 @@ public class WorldManager {
 
 	public static final int MAX_FULL_UPDATES = 7;
 	public static final int MAX_UPDATES_TRIES = 40;
-	public static final int MAX_TASK_CONCURRENTLY = 9;
+	public static final int MAX_TASK_CONCURRENTLY = 10;
 
 	private static final Item DEBUG_ITEM = null;
 
@@ -41,7 +41,7 @@ public class WorldManager {
 	private final BFSCuller bfsCuller = new BFSCuller();
 	private final RegionManager regionManager = new RegionManager();
 
-	public World worldObj;
+	private World worldObj;
 	private CameraData camera;
 
 	private long vramUsed, vramAllocated;
@@ -54,7 +54,6 @@ public class WorldManager {
 
 	private static WorldManager INSTANCE;
 
-
 	public WorldManager(WorldClient world) {
 		INSTANCE = this;
 		this.worldObj = world;
@@ -66,6 +65,10 @@ public class WorldManager {
 		}
 
 		return INSTANCE;
+	}
+
+	public World getWorld() {
+		return this.worldObj;
 	}
 
 	public CameraData getCamera() {

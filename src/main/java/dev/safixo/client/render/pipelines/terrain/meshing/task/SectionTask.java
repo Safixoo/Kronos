@@ -9,9 +9,13 @@ import dev.safixo.client.util.data.CameraData;
 
 public class SectionTask {
 	public SectionCache cache;
-	public MesherManager mesherManager;
+	public MesherManager meshManager;
 	public SectionRender section;
 	public CameraData camera;
+
+	public TaskType taskType;
+
+	public int taskId;
 
 	private final VertexWriter[] writers;
 
@@ -29,5 +33,10 @@ public class SectionTask {
 
 	public VertexWriter[] getWriters() {
 		return this.writers;
+	}
+
+	public enum TaskType {
+		IMPORTANT,
+		REGULAR
 	}
 }

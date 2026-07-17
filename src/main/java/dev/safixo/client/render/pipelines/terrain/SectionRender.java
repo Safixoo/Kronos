@@ -28,15 +28,6 @@ public class SectionRender {
 	// Section main data structures.
 	public RegionRender region = RegionConstants.NULL;
 
-	private TileEntity[] tileEntityArray;
-
-	private int meshOrder;
-	private int drawMask;
-	private long[] solidDrawData;
-
-	private VertexWriter solidWriter;
-	private VertexWriter translucentWriter;
-
 	public SectionRender(WorldManager manager, SectionSet sectionSet, int blockX, int blockY, int blockZ, int flags) {
 		this.sectionSet = sectionSet;
 		this.flags = flags;
