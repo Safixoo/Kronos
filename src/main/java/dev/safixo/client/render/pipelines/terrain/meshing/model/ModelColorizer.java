@@ -47,9 +47,9 @@ public class ModelColorizer {
 	public int getColor(SectionCache cache, int x, int y, int z, Block block) {
 		int colorizeType = PrimitivesFlags.COLOR_MODULATOR[block.blockID];
 
-//		if (cache.hasUniformBiomes()) {
-//			return cache.getColorByType(colorizeType);
-//		}
+		if (cache.hasUniformBiomes()) {
+			return cache.getColorByType(colorizeType);
+		}
 
 		switch (colorizeType) {
 			case DEFAULT_COLOR: return 0xFFFFFF;
