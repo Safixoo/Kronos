@@ -7,6 +7,8 @@ import dev.safixo.client.render.vertex.VertexWriter;
 import dev.safixo.client.render.vertex.writers.TerrainFormat;
 import dev.safixo.client.util.MeshDirection;
 import dev.safixo.client.util.data.CameraData;
+import dev.safixo.client.util.memory.MemoryPool;
+import dev.safixo.client.util.memory.MemoryReference;
 import dev.safixo.client.util.memory.UnsafeUtil;
 import net.minecraft.tileentity.TileEntity;
 
@@ -22,7 +24,7 @@ public class SectionResult {
 
 	private final VertexWriter solidWriter, translucentWriter;
 
-	public SectionResult(TileEntity[] tileEntityArray, VertexWriter[] writers, SectionTask task, int solidMask) {
+	public SectionResult(MemoryPool pool, TileEntity[] tileEntityArray, VertexWriter[] writers, SectionTask task, int solidMask) {
 		CameraData camera = task.camera;
 		SectionRender section = task.section;
 
@@ -30,13 +32,24 @@ public class SectionResult {
 		this.solidMask = solidMask;
 
 		if ((drawMask & 0b1) != 0) {
-			this.translucentWriter = task.getTranslucentWriter().copy();
+			VertexWriter translucentWriter = task.getTranslucentWriter();
+			MemoryReference translucentBuffer = pool.allocate(translucentWriter.getOffset());
+			this.translucentWriter = translucentBuffer != null ? translucentWriter.copy(translucentBuffer) : translucentWriter.copy();
 		} else {
 			this.translucentWriter = null;
 		}
 
 		if ((drawMask & ~0b1) != 0) {
-			VertexWriter joined = new VertexWriter(sumAllSolidOffsets(writers));
+			int offsetSum = sumAllSolidOffsets(writers);
+
+			MemoryReference solidBuffer = pool.allocate(offsetSum);
+			VertexWriter joined;
+
+			if (solidBuffer == null) {
+				joined = new VertexWriter(offsetSum);
+			} else {
+				joined = new VertexWriter(solidBuffer);
+			}
 
 			int solidDrawMask = drawMask >>> 1;
 			int visibleFaces = RegionRender.getSectionVisibleFaces(camera.intX, camera.intY, camera.intZ, section.blockX, section.blockY, section.blockZ);
@@ -99,7 +112,7 @@ public class SectionResult {
 			int writerOffset = writer.getOffset();
 			drawData[realMeshDir] = RegionAllocation.packDrawData(writerOffset / TerrainFormat.STRIDE, joiner.getOffset() / TerrainFormat.STRIDE);
 
-			UnsafeUtil.memCopy(writer.getWriterPtr(), joiner.getWriterPtr() + joiner.getOffset(), writerOffset);
+			UnsafeUtil.memCopy(writer.getPtr(), joiner.getPtr() + joiner.getOffset(), writerOffset);
 			joiner.offset += writerOffset;
 		}
 

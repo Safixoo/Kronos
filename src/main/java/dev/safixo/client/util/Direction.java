@@ -28,15 +28,15 @@ public class Direction {
 	public static final Vector2i[] HORIZONTAL = new Vector2i[4];
 
 	static {
-		X = new byte[COUNT];
+		X = new byte[MeshDirection.COUNT];
 		X[WEST] = -1;
 		X[EAST] = 1;
 
-		Y = new byte[COUNT];
+		Y = new byte[MeshDirection.COUNT];
 		Y[DOWN] = -1;
 		Y[UP] = 1;
 
-		Z = new byte[COUNT];
+		Z = new byte[MeshDirection.COUNT];
 		Z[NORTH] = -1;
 		Z[SOUTH] = 1;
 

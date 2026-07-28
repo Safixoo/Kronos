@@ -1,4 +1,4 @@
-package dev.safixo.client.render.pipelines.entity_model;
+package dev.safixo.client.render.pipelines.entity;
 
 import dev.safixo.client.render.gfx.shader.GlProgram;
 import dev.safixo.client.render.gfx.state.GlFogTracker;

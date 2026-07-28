@@ -1,5 +1,7 @@
 package dev.safixo.client.render.pipelines.terrain.meshing.model;
 
+import dev.safixo.client.render.pipelines.terrain.meshing.data.Quad;
+import dev.safixo.client.util.MathExt;
 import dev.safixo.client.util.data.PrimitivesFlags;
 import net.minecraft.client.renderer.RenderBlocks;
 import net.minecraft.world.IBlockAccess;
@@ -23,14 +25,7 @@ public class ModelHelper {
 	public static final int SIZE = 7;
 
 	public static int processModel(RenderBlocks blocks, float[] bounds, boolean partial) {
-		bounds[MIN_Y] = (float) (blocks.renderMinY);
-		bounds[MAX_Y] = (float) (blocks.renderMaxY);
-
-		bounds[MIN_Z] = (float) (blocks.renderMinZ);
-		bounds[MAX_Z] = (float) (blocks.renderMaxZ);
-
-		bounds[MIN_X] = (float) (blocks.renderMinX);
-		bounds[MAX_X] = (float) (blocks.renderMaxX);
+		setBounds(blocks, bounds);
 
 		if (!partial) {
 			return 0b0;
@@ -42,6 +37,17 @@ public class ModelHelper {
 		flag |= blocks.renderMinZ >= 0.025f || blocks.renderMaxZ <= 0.975f ? 0b110011 : 0;
 
 		return flag;
+	}
+
+	public static void setBounds(RenderBlocks blocks, float[] bounds) {
+		bounds[MIN_Y] = (float) (blocks.renderMinY);
+		bounds[MAX_Y] = (float) (blocks.renderMaxY);
+
+		bounds[MIN_Z] = (float) (blocks.renderMinZ);
+		bounds[MAX_Z] = (float) (blocks.renderMaxZ);
+
+		bounds[MIN_X] = (float) (blocks.renderMinX);
+		bounds[MAX_X] = (float) (blocks.renderMaxX);
 	}
 
 	public static int getBlockCached(IBlockAccess cache, int x, int y, int z) {
@@ -86,5 +92,25 @@ public class ModelHelper {
 		}
 
 		return (a + b) >>> 1;
+	}
+
+	public static boolean checkPartial(Quad quad, int blockX, int blockY, int blockZ) {
+		for (int i = 0; i < 4; i++) {
+			float x = quad.getPosRelX(blockX, i);
+			float y = quad.getPosRelY(blockY, i);
+			float z = quad.getPosRelZ(blockZ, i);
+
+			if (!MathExt.equals(x, 0.0F) && !MathExt.equals(x, 1.0F)) {
+				return true;
+			}
+			if (!MathExt.equals(y, 0.0F) && !MathExt.equals(y, 1.0F)) {
+				return true;
+			}
+			if (!MathExt.equals(z, 0.0F) && !MathExt.equals(z, 1.0F)) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 }

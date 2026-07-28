@@ -1,12 +1,13 @@
 package dev.safixo.client.util;
 
-import dev.safixo.client.render.pipelines.terrain.SectionRender;
 import dev.safixo.client.render.pipelines.terrain.region.RegionConstants;
 import dev.safixo.client.util.data.CameraData;
 import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
 import dev.safixo.core.HookUtils;
 import dev.safixo.core.hooks.RenderGlobalHook;
 import net.minecraft.client.settings.GameSettings;
+import org.joml.Vector3f;
+import org.joml.Vector3i;
 
 import java.lang.reflect.Field;
 
@@ -49,7 +50,15 @@ public class MathExt {
 	}
 
 	public static int getLightmapCoord(int skyLight, int blockLight) {
-		return skyLight << 20 | blockLight << 4;
+		return (skyLight & 0xF) << 20 | (blockLight & 0xF) << 4;
+	}
+
+	public static int getSkylight(int light) {
+		return light >>> 20 & 0xF;
+	}
+
+	public static int getBlocklight(int light) {
+		return light >>> 4 & 0xF;
 	}
 
 	public static float fma(float a, float b, float c) {
@@ -138,6 +147,10 @@ public class MathExt {
 		return num < integral ? integral - 1 : integral;
 	}
 
+	public static int ceilDiv(int a, int b) {
+		return (a + b - 1) / b;
+	}
+
 	public static double floorMod(double num, double mod) {
 		return num - (floor(num / mod) * mod);
 	}
@@ -183,12 +196,41 @@ public class MathExt {
 		return (start + (end - start) * t);
 	}
 
+	static final float PI = 3.1415927f;
+	static final float PI_2 = PI / 2f;
+
+	public static float fastAtan2(float y, float x) {
+		float ax = x >= 0.0 ? x : -x, ay = y >= 0.0 ? y : -y;
+		float a = ay > ax ? ax / ay : ay / ax;
+		float s = a * a;
+		float r = ((-0.0464964749F * s + 0.15931422F) * s - 0.327622764F) * s * a + a;
+
+		if (ay > ax) {
+			r = PI_2 - r;
+		}
+		if (x < 0.0) {
+			r = PI - r;
+		}
+
+		return y >= 0 ? r : -r;
+	}
+
 	public static int packedNormal(float normalX, float normalY, float normalZ) {
 		int nX = (byte) (normalX * 0x7F);
 		int nY = (byte) (normalY * 0x7F);
 		int nZ = (byte) (normalZ * 0x7F);
 
 		return (nX & 0xFF) << 0 | (nY & 0xFF) << 8 | (nZ & 0xFF) << 16;
+	}
+
+	public static Vector3f unpackNormal(int normal, Vector3f normalVec) {
+		normalVec.x = ((normal & 0xFF) - 128) * (1.0f / 0x7F);
+		normal >>>= 8;
+		normalVec.y = ((normal & 0xFF) - 128) * (1.0f / 0x7F);
+		normal >>>= 8;
+		normalVec.z = ((normal & 0xFF) - 128) * (1.0f / 0x7F);
+
+		return normalVec;
 	}
 
 	public static int posToSectionIntegral(double position) {

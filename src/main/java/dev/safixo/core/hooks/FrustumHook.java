@@ -1,16 +1,10 @@
 package dev.safixo.core.hooks;
 
 import dev.safixo.client.render.gfx.state.GlMatrixTracker;
-import dev.safixo.client.render.gfx.state.GlStateTracker;
 import dev.safixo.client.render.pipelines.terrain.cull.FrustumCuller;
-import dev.safixo.core.HookUtils;
-import net.minecraft.client.renderer.ActiveRenderInfo;
 import net.minecraft.client.renderer.culling.ClippingHelper;
 import net.minecraft.client.renderer.culling.ClippingHelperImpl;
 import org.joml.Matrix4f;
-
-import java.nio.Buffer;
-import java.nio.FloatBuffer;
 
 @SuppressWarnings("unused")
 public class FrustumHook {

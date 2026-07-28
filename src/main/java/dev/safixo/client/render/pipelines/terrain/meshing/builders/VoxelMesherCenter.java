@@ -115,7 +115,7 @@ public class VoxelMesherCenter  {
 		y &= RegionConstants.BLOCK_BITS_Y;
 		z &= RegionConstants.BLOCK_BITS_Z;
 
-		long ptr = writer.getTotalOffset();
+		long ptr = writer.getPtr() + writer.getOffset();
 		long quadOffs = face.quadVert;
 
 		boolean flip = ao0 + ao2 > ao3 + ao1 || light0 + light2 <= light3 + light1;

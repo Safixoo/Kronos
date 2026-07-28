@@ -1,31 +1,51 @@
 package dev.safixo.client.render.pipelines.terrain.meshing;
 
 import dev.safixo.client.render.pipelines.terrain.WorldManager;
+import dev.safixo.client.render.pipelines.terrain.meshing.model.light.LightMode;
+import dev.safixo.client.render.pipelines.terrain.meshing.model.light.LightPipeline;
+import dev.safixo.client.render.pipelines.terrain.meshing.model.light.LightPipelineProvider;
+import dev.safixo.client.render.pipelines.terrain.meshing.model.light.data.ArrayLightDataCache;
+import dev.safixo.client.render.pipelines.terrain.meshing.model.light.smooth.SmoothLightPipeline;
 import dev.safixo.client.render.pipelines.terrain.meshing.task.SectionResult;
 import dev.safixo.client.render.pipelines.terrain.meshing.task.SectionTask;
+import dev.safixo.client.render.vertex.TerrainQuadInterceptor;
+import dev.safixo.client.util.memory.MemoryPool;
 import it.unimi.dsi.fastutil.objects.ReferenceArrayList;
+import net.minecraft.client.Minecraft;
+import net.minecraft.util.Vec3Pool;
 
 import java.util.List;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.LockSupport;
 
 public class MesherRunnable implements Runnable {
-	private final ConcurrentLinkedQueue<SectionTask> tasks = new ConcurrentLinkedQueue<>();
+	private final ConcurrentLinkedDeque<SectionTask> tasks = new ConcurrentLinkedDeque<>();
 	private final ArrayBlockingQueue<SectionResult> results = new ArrayBlockingQueue<>(WorldManager.MAX_TASK_CONCURRENTLY);
 
-	private final Semaphore semaphore = new Semaphore(0);
-	private final SectionMesher mesher = new SectionMesher();
+	private final MemoryPool memoryPool = new MemoryPool(4 << 20, WorldManager.MAX_TASK_CONCURRENTLY * 2);
 
-	public MesherRunnable() {
+	private final ArrayLightDataCache lightDataCache = new ArrayLightDataCache();
+	private final LightPipelineProvider provider = new LightPipelineProvider(this.lightDataCache);
+	private final TerrainQuadInterceptor quadInterceptor = new TerrainQuadInterceptor();
+
+	private final SectionMesher mesher = new SectionMesher(this.quadInterceptor);
+	private final Vec3Pool vecPool;
+
+	public MesherRunnable(Vec3Pool pool) {
+		this.vecPool = pool;
 	}
 
-	public void addTasks(List<SectionTask> tasks) {
-		this.tasks.addAll(tasks);
-		this.semaphore.release(tasks.size());
+	public void addTasks(Thread thread, List<SectionTask> regularTasks, List<SectionTask> importantTasks) {
+		for (SectionTask task : importantTasks) {
+			this.tasks.addFirst(task);
+		}
+
+		this.tasks.addAll(regularTasks);
+		LockSupport.unpark(thread);
 	}
 
 	public int getTaskCount() {
-		return this.semaphore.availablePermits();
+		return this.tasks.size();
 	}
 
 	public List<SectionResult> getResults() {
@@ -51,16 +71,18 @@ public class MesherRunnable implements Runnable {
 
 		while (!thread.isInterrupted()) {
 			try {
-				this.semaphore.acquire();
-				SectionTask task = this.tasks.poll();
+				SectionTask task;
 
-				if (task == null) {
-					continue;
+				while ((task = this.tasks.poll()) != null) {
+					SectionResult result = this.mesher.buildMesh(this.lightDataCache, this.provider.getLighter(LightMode.getCurrent()), this.memoryPool, task);
+
+					this.vecPool.clear();
+					this.memoryPool.tick();
+
+					this.results.put(result);
 				}
 
-				SectionResult result = this.mesher.buildMesh(task);
-
-				this.results.put(result);
+				LockSupport.park();
 			} catch (InterruptedException e) {
 				thread.interrupt();
 				break;

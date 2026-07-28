@@ -1,18 +1,14 @@
 package dev.safixo.core;
 
 import dev.safixo.core.hooks.LongHashMapHook;
-import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.launchwrapper.Launch;
-import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.ClassWriter;
 import net.minecraft.launchwrapper.IClassTransformer;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.tree.*;
 
-import java.io.IOException;
 import java.util.HashMap;
-import java.util.HashSet;
 
 import static org.objectweb.asm.Opcodes.*;
 
@@ -25,16 +21,12 @@ public class KronosTransformer implements IClassTransformer {
 	static final String FONT_RENDERER_HOOK = "dev/safixo/core/hooks/FontRendererHook";
 	static final String FRUSTUM_HOOK = "dev/safixo/core/hooks/FrustumHook";
 	static final String MINECRAFT_HOOK = "dev/safixo/core/hooks/MinecraftHook";
-	static final String ADV_MODEL_RENDERER = "dev/safixo/client/render/pipelines/entity_model/AdvancedModelRenderer";
+	static final String RENDER_BLOCKS_HOOK = "dev/safixo/core/hooks/RenderBlocksHook";
 
+	static final String ADV_MODEL_RENDERER = "dev/safixo/client/render/pipelines/entity/AdvancedModelRenderer";
 	static final String REBUILD_LISTENER = "dev/safixo/client/render/pipelines/terrain/meshing/RebuildListener";
-	static final String VANILLA_MESHER = "dev/safixo/client/render/pipelines/terrain/meshing/builders/VanillaBlockMesher";
 
 	static final String RENDER = "net.minecraft.client.renderer.entity.Render";
-	static final String VEC3_POOL = "net.minecraft.util.Vec3Pool";
-	static final String STRING_TRANSLATE = "net.minecraft.util.StringTranslate";
-	static final String DATA_WATCHER = "net.minecraft.entity.DataWatcher";
-	static final String TEXTURE_MANAGER = "net.minecraft.client.renderer.texture.TextureManager";
 	static final String PROFILER = "net.minecraft.profiler.Profiler";
 	static final String RENDER_BLOCKS = "net.minecraft.client.renderer.RenderBlocks";
 	static final String BLOCK_SNOW = "net.minecraft.block.BlockSnow";
@@ -79,9 +71,6 @@ public class KronosTransformer implements IClassTransformer {
 		// Overwrites classes methods completely with a function call with the same
 		// args and with the instance of the original class.
 		switch (transformedName) {
-			case VEC3_POOL:
-				replaceClassMethod(MINECRAFT_HOOK, "getVecFromPool", "a", "(DDD)Latc", reference, false);
-				break;
 			case RENDER:
 				replaceClassMethod(MINECRAFT_HOOK, "bindTexture", "a", "(D)V", reference, true);
 				break;
@@ -97,7 +86,7 @@ public class KronosTransformer implements IClassTransformer {
 				replaceClassMethod(MINECRAFT_HOOK, "shouldSideBeRendered", "a", "(Lacf;IIII)Z", reference, false);
 				break;
 			case RENDER_BLOCKS:
-				replaceClassMethod(VANILLA_MESHER, "renderStandardBlock", "p", "(Laqz;III)Z", reference, false);
+				replaceClassMethod(RENDER_BLOCKS_HOOK, "renderStandardBlock", "p", "(Laqz;III)Z", reference, false);
 				break;
 			case MODEL_RENDERER:
 				replaceClassMethod(ADV_MODEL_RENDERER, "render", "a", "(F)V", reference, false);

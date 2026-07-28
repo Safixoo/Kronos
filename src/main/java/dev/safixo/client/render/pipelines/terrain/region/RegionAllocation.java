@@ -9,6 +9,8 @@ import dev.safixo.client.util.MathExt;
 import org.lwjgl.opengl.*;
 import dev.safixo.client.render.vertex.writers.TerrainFormat;
 
+import java.nio.ByteBuffer;
+
 public class RegionAllocation {
 	private static final int SPARE_BUFFER_ALLOC = 1024 * 1024 * 32;
 	private static final int STRIDE = TerrainFormat.STRIDE;
@@ -146,7 +148,7 @@ public class RegionAllocation {
 		return this.firstEntry == null;
 	}
 
-	private long createAllocation(long position, long vertexData, int size) {
+	private long createAllocation(long position, ByteBuffer buffer, int size) {
 		Allocation alloc = this.fitInFree(size);
 
 		if (alloc == null) {
@@ -156,7 +158,7 @@ public class RegionAllocation {
 		alloc.position = position;
 		WorldManager.getCurrentInstance().addUsedMemory(alloc.count * STRIDE);
 
-		this.sumbitToBuffer(alloc, vertexData, size);
+		this.sumbitToBuffer(alloc, buffer, size);
 		return packDrawData(size, (int) alloc.first);
 	}
 
@@ -188,18 +190,18 @@ public class RegionAllocation {
 		return newAlloc;
 	}
 
-	public long allocate(long position, long data, int vertices) {
+	public long allocate(long position, ByteBuffer buffer, int vertices) {
 		Allocation alloc = this.findPrevAlloc(position);
 		long drawData;
 
 		if (alloc != null && alloc.count >= vertices) {
-			this.sumbitToBuffer(alloc, data, vertices);
+			this.sumbitToBuffer(alloc, buffer, vertices);
 			drawData = packDrawData(vertices, (int) alloc.first);
 		} else {
 			if (alloc != null) {
 				this.remove(position);
 			}
-			drawData = this.createAllocation(position, data, vertices);
+			drawData = this.createAllocation(position, buffer, vertices);
 		}
 
 		return drawData;
@@ -316,8 +318,8 @@ public class RegionAllocation {
 		}
 	}
 
-	public void sumbitToBuffer(Allocation alloc, long data, int size) {
-		this.vertexBuffer.upload(data, (alloc.first * STRIDE), size * STRIDE);
+	public void sumbitToBuffer(Allocation alloc, ByteBuffer buffer, int size) {
+		this.vertexBuffer.upload(buffer, (alloc.first * STRIDE), size * STRIDE);
 	}
 
 	public static class Allocation {

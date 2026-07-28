@@ -1,4 +1,4 @@
-package dev.safixo.client.render.pipelines.entity_model;
+package dev.safixo.client.render.pipelines.entity;
 
 import dev.safixo.client.render.gfx.buffer.GlVertexBuffer;
 import dev.safixo.client.render.gfx.state.GlMatrixTracker;
@@ -221,12 +221,12 @@ public class AdvancedModelRenderer {
 	}
 
 	private static void compileDisplayList(ModelRenderer model, float scale) {
-		VertexWriter writer = new VertexWriter(4096);
+		VertexWriter writer = VertexWriter.GLOBAL;
 
 		REDIRECT_DRAWING = true;
 
-		writer.startDrawing();
-		writer.setVertexFormat(DefaultVertexFormats.ENTITY_FORMAT);
+		writer.reset();
+		writer.setQuadReceiver(DefaultVertexFormats.ENTITY_FORMAT);
 		VertexWriter.setCurrentInstance(writer);
 
 		Tessellator tessellator = Tessellator.instance;
@@ -259,14 +259,13 @@ public class AdvancedModelRenderer {
 		VERTEX_ARRAY_FPP.unbind();
 		VERTEX_BUFFER.unbind();
 
-		VERTEX_BUFFER.bufferSubData(writer.getWriterNio(), OFFSET, writer.getOffset());
+		VERTEX_BUFFER.bufferSubData(writer.getNioPtr(), OFFSET, writer.getOffset());
 		int drawData = writer.getVertices() | (OFFSET / 24) << 16;
 
 		OFFSET += writer.getOffset();
 
-		writer.stopDrawing();
-		writer.setVertexFormat(null);
-		writer.delete();
+		writer.reset();
+		writer.setQuadReceiver(null);
 		REDIRECT_DRAWING = false;
 
 		model.compiled = true;

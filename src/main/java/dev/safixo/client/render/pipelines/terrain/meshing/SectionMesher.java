@@ -1,25 +1,32 @@
 package dev.safixo.client.render.pipelines.terrain.meshing;
 
 import dev.safixo.client.render.pipelines.terrain.SectionRender;
+import dev.safixo.client.render.pipelines.terrain.meshing.builders.FluidMesher;
 import dev.safixo.client.render.pipelines.terrain.meshing.builders.VoxelMesher;
 import dev.safixo.client.render.pipelines.terrain.meshing.builders.VoxelMesherCenter;
-import dev.safixo.client.render.pipelines.terrain.meshing.data.CullSetGenerator;
+import dev.safixo.client.render.pipelines.terrain.meshing.builders.CullSetGenerator;
 import dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache;
+import dev.safixo.client.render.pipelines.terrain.meshing.model.light.LightPipeline;
+import dev.safixo.client.render.pipelines.terrain.meshing.model.light.data.ArrayLightDataCache;
 import dev.safixo.client.render.pipelines.terrain.meshing.task.SectionResult;
 import dev.safixo.client.render.pipelines.terrain.meshing.task.SectionTask;
 import dev.safixo.client.render.pipelines.terrain.region.RegionConstants;
 import dev.safixo.client.render.vertex.DefaultVertexFormats;
+import dev.safixo.client.render.vertex.TerrainQuadInterceptor;
 import dev.safixo.client.render.vertex.VertexWriter;
 import dev.safixo.client.util.MeshDirection;
 import dev.safixo.client.util.data.CameraData;
 import dev.safixo.client.util.data.PrimitivesFlags;
+import dev.safixo.client.util.memory.MemoryPool;
 import dev.safixo.core.hooks.AsyncBlockHook;
 import it.unimi.dsi.fastutil.objects.ReferenceArrayList;
 import net.minecraft.block.Block;
+import net.minecraft.block.BlockFluid;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderBlocks;
 import net.minecraft.client.renderer.tileentity.TileEntityRenderer;
 import net.minecraft.tileentity.TileEntity;
+import org.joml.Vector3i;
 
 import java.util.List;
 
@@ -27,27 +34,51 @@ import static dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCac
 import static dev.safixo.client.util.Direction.*;
 
 public class SectionMesher {
-	private final CullSetGenerator generator = new CullSetGenerator();
+	private static final int AIR_ID = 0;
+	private static final int FLUID_RENDER_TYPE = 4;
+
 	private final List<TileEntity> tileEntities = new ReferenceArrayList<>();
 
-	private static final int AIR_ID = 0;
+	private final CullSetGenerator generator = new CullSetGenerator();
+	private final FluidMesher fluidMesher = new FluidMesher();
+	private final TerrainQuadInterceptor quadInterceptor;
+	private LightPipeline pipeline;
 
-	public SectionResult buildMesh(SectionTask task) {
+	private int lastPass = -1;
+
+	public SectionMesher(TerrainQuadInterceptor quadInterceptor) {
+		this.quadInterceptor = quadInterceptor;
+	}
+
+	public SectionResult buildMesh(ArrayLightDataCache lightCache, LightPipeline pipeline, MemoryPool pool, SectionTask task) {
 		if (!AsyncBlockHook.isAsync()) {
 			throw new RuntimeException("Meshing in incorrect thread!");
 		}
 
+		this.lastPass = -100;
+		this.pipeline = pipeline;
+
 		// Thread safe only because meshing happens in one thread.
 		for (VertexWriter writer : task.getWriters()) {
-			writer.startDrawing();
-			writer.setVertexFormat(DefaultVertexFormats.TERRAIN_FORMAT);
+			writer.reset();
+			writer.setQuadReceiver(DefaultVertexFormats.TERRAIN_FORMAT);
 
 			setupTranslation(task.section, writer);
 		}
 
+		task.getSolidWriter(MeshDirection.GENERIC).setQuadReceiver(this.quadInterceptor);
+
+		this.quadInterceptor.setWriters(task.getWriters(), task.getTranslucentWriter());
+
 		CameraData camera = task.camera;
 		SectionRender section = task.section;
 		SectionCache sectionCache = task.cache;
+
+		this.quadInterceptor.setContext(sectionCache.getColorizer(), sectionCache, pipeline);
+
+		lightCache.reset(sectionCache, section.blockX, section.blockY, section.blockZ);
+
+		sectionCache.checkUniformBiomes();
 
 		int cameraChunkX = camera.intX >> 4, cameraChunkY = camera.intY >> 4, cameraChunkZ = camera.intZ >> 4;
 		int sectionX = section.blockX >> 4, sectionY = section.blockY >> 4, sectionZ = section.blockZ >> 4;
@@ -55,6 +86,8 @@ public class SectionMesher {
 		boolean ambient = Minecraft.getMinecraft().gameSettings.ambientOcclusion != 0;
 
 		RenderBlocks renderBlocks = new RenderBlocks(sectionCache);
+		renderBlocks.enableAO = false; // the final ao/colorization is replaced anyway
+
 		int solidSides = this.generator.floodFillSection(sectionCache, section, camera);
 
 		// +-X face
@@ -106,7 +139,7 @@ public class SectionMesher {
 			}
 		}
 
-		SectionResult result = new SectionResult(this.getTileEntityArray(), task.getWriters(), task, solidSides);
+		SectionResult result = new SectionResult(pool, this.getTileEntityArray(), task.getWriters(), task, solidSides);
 		this.clearTileEntityList();
 
 		return result;
@@ -129,7 +162,7 @@ public class SectionMesher {
 
 		int blockX = x + section.blockX, blockY = y + section.blockY, blockZ = z + section.blockZ;
 
-		if (PrimitivesFlags.SOLID[blockId]) {
+		if (PrimitivesFlags.SOLID_LIGHT_MASK[blockId] == 1) {
 			int drawBitSet = 0;
 
 			drawBitSet |= cache.isVoxelFullRel(blockIndex + makeBlockIndex(0, 1, 0)) << UP;
@@ -161,10 +194,23 @@ public class SectionMesher {
 				writer = task.getSolidWriter(MeshDirection.GENERIC);
 			}
 
-			VertexWriter.setCurrentInstance(writer);
-			setupTranslation(section, writer);
+			if (this.lastPass != blockRenderPass) {
+				VertexWriter.setCurrentInstance(writer);
+			}
+			this.lastPass = blockRenderPass;
 
-			renderBlocks.renderBlockByRenderType(Block.blocksList[blockId], blockX, blockY, blockZ);
+			setupTranslation(section, writer);
+			Block block = Block.blocksList[blockId];
+
+			this.quadInterceptor.setCursor(block, this.pos.set(blockX, blockY, blockZ));
+
+			if (block.getRenderType() == FLUID_RENDER_TYPE) {
+				writer.setQuadReceiver(DefaultVertexFormats.TERRAIN_FORMAT);
+				this.fluidMesher.render(writer, this.pipeline, cache, (BlockFluid) block, blockX, blockY, blockZ);
+			} else {
+				writer.setQuadReceiver(this.quadInterceptor);
+				renderBlocks.renderBlockByRenderType(block, blockX, blockY, blockZ);
+			}
 		}
 	}
 
@@ -183,7 +229,7 @@ public class SectionMesher {
 		int blockY = y + section.blockY;
 		int blockZ = z + section.blockZ;
 
-		if (PrimitivesFlags.SOLID[blockId]) {
+		if (PrimitivesFlags.SOLID_LIGHT_MASK[blockId] == 1) {
 			int rX = x + 16;
 			int rY = y + 16;
 			int rZ = z + 16;
@@ -218,18 +264,33 @@ public class SectionMesher {
 				writer = task.getSolidWriter(MeshDirection.GENERIC);
 			}
 
-			VertexWriter.setCurrentInstance(writer);
-			setupTranslation(section, writer);
+			if (this.lastPass != blockRenderPass) {
+				VertexWriter.setCurrentInstance(writer);
+			}
+			this.lastPass = blockRenderPass;
 
-			renderBlocks.renderBlockByRenderType(Block.blocksList[blockId], blockX, blockY, blockZ);
+			setupTranslation(section, writer);
+			Block block = Block.blocksList[blockId];
+
+			this.quadInterceptor.setCursor(block, this.pos.set(blockX, blockY, blockZ));
+
+			if (block.getRenderType() == FLUID_RENDER_TYPE) {
+				writer.setQuadReceiver(DefaultVertexFormats.TERRAIN_FORMAT);
+				this.fluidMesher.render(writer, this.pipeline, cache, (BlockFluid) block, blockX, blockY, blockZ);
+			} else {
+				writer.setQuadReceiver(this.quadInterceptor);
+				renderBlocks.renderBlockByRenderType(block, blockX, blockY, blockZ);
+			}
 		}
 	}
 
+	private final Vector3i pos = new Vector3i();
+
 	private static void setupTranslation(SectionRender section, VertexWriter writer) {
 		// Region translation-offset.
-		writer.trasX = -(section.blockX & ~RegionConstants.BLOCK_BITS_X);
-		writer.trasY = -(section.blockY & ~RegionConstants.BLOCK_BITS_Y);
-		writer.trasZ = -(section.blockZ & ~RegionConstants.BLOCK_BITS_Z);
+		writer.dx = -(section.blockX & ~RegionConstants.BLOCK_BITS_X);
+		writer.dy = -(section.blockY & ~RegionConstants.BLOCK_BITS_Y);
+		writer.dz = -(section.blockZ & ~RegionConstants.BLOCK_BITS_Z);
 	}
 
 	public void addTileEntity(TileEntity tileEntity) {

@@ -1,6 +1,7 @@
 package dev.safixo.client.render;
 
 import dev.safixo.client.render.gfx.buffer.GlVertexBuffer;
+import dev.safixo.client.render.vertex.VertexWriter;
 import dev.safixo.client.util.data.PrimitivesFlags;
 import dev.safixo.client.util.memory.NativeBuffer;
 import dev.safixo.client.util.memory.UnsafeUtil;
@@ -51,7 +52,7 @@ public class ImprovedTessellator extends Tessellator {
 	public long vertexPtr = NativeBuffer.nmemAlloc(MIN_ALLOC);
 	private ByteBuffer vertexPtrNio = NativeBuffer.wrap(this.vertexPtr);
 
-	private final VertexRedirector redirector = new VertexRedirector();
+	private VertexWriter current;
 
 	private static final byte[] STRIDES = new byte[0b1111 + 1];
 
@@ -75,6 +76,10 @@ public class ImprovedTessellator extends Tessellator {
 		}
 
 		return this.vertexBuffer;
+	}
+
+	public void setCurrentVertexWriter(VertexWriter writer) {
+		this.current = writer;
 	}
 
 	public static ImprovedTessellator getTessellator() {
@@ -216,12 +221,12 @@ public class ImprovedTessellator extends Tessellator {
 
 	@Override
 	public void setTextureUV(double u, double v) {
-		this.flags |= VERTEX_UV;
-
 		if (PrimitivesFlags.REDIRECT_DRAWING || AsyncBlockHook.isAsync()) {
-			this.redirector.setTextureUV(u, v);
+			VertexRedirector.setTextureUV(this.current, u, v);
 			return;
 		}
+
+		this.flags |= VERTEX_UV;
 
 		long ptr = this.vertexPtr + this.offset;
 
@@ -231,6 +236,11 @@ public class ImprovedTessellator extends Tessellator {
 
 	@Override
 	public void setBrightness(int light) {
+		if (PrimitivesFlags.REDIRECT_DRAWING || AsyncBlockHook.isAsync()) {
+			VertexRedirector.setLight(this.current, light);
+			return;
+		}
+
 		this.flags |= VERTEX_LIGHT;
 		this.light = light;
 	}
@@ -261,19 +271,24 @@ public class ImprovedTessellator extends Tessellator {
 		b &= 0xFF;
 		a &= 0xFF;
 
-		this.flags |= VERTEX_COLOR;
-
 		if (ByteOrder.nativeOrder() == ByteOrder.LITTLE_ENDIAN) {
 			this.color = a << 24 | b << 16 | g << 8 | r;
 		} else {
 			this.color = r << 24 | g << 16 | b << 8 | a;
 		}
+
+		if (PrimitivesFlags.REDIRECT_DRAWING || AsyncBlockHook.isAsync()) {
+			VertexRedirector.setColor(this.current, this.color);
+			return;
+		}
+
+		this.flags |= VERTEX_COLOR;
 	}
 
 	@Override
 	public void addVertexWithUV(double x, double y, double z, double u, double v) {
 		if (PrimitivesFlags.REDIRECT_DRAWING || AsyncBlockHook.isAsync()) {
-			this.redirector.addVertexWithUV(x, y, z, u, v);
+			VertexRedirector.addVertexWithUV(this.current, x, y, z, u, v);
 			return;
 		}
 
@@ -324,7 +339,7 @@ public class ImprovedTessellator extends Tessellator {
 	@Override
 	public void addVertex(double x, double y, double z) {
 		if (PrimitivesFlags.REDIRECT_DRAWING || AsyncBlockHook.isAsync()) {
-			this.redirector.addVertex(x + this.xOff, y + this.yOff, z + this.zOff);
+			VertexRedirector.addVertex(this.current, x, y, z);
 			return;
 		}
 
@@ -394,17 +409,27 @@ public class ImprovedTessellator extends Tessellator {
 
 	@Override
 	public void setNormal(float normalX, float normalY, float normalZ) {
-		this.flags |= VERTEX_NORMAL;
-
 		int nX = (byte) (normalX * 0x7F);
 		int nY = (byte) (normalY * 0x7F);
 		int nZ = (byte) (normalZ * 0x7F);
 
 		this.normal = (nX & 0xFF) << 0 | (nY & 0xFF) << 8 | (nZ & 0xFF) << 16;
+
+		if (PrimitivesFlags.REDIRECT_DRAWING || AsyncBlockHook.isAsync()) {
+			VertexRedirector.setNormal(this.current, this.normal);
+			return;
+		}
+
+		this.flags |= VERTEX_NORMAL;
 	}
 
 	@Override
 	public void setTranslation(double offX, double offY, double offZ) {
+		if (PrimitivesFlags.REDIRECT_DRAWING || AsyncBlockHook.isAsync()) {
+			VertexRedirector.setOffset(this.current, offX, offY, offZ);
+			return;
+		}
+
 		this.xOff = (float) offX;
 		this.yOff = (float) offY;
 		this.zOff = (float) offZ;
@@ -412,6 +437,11 @@ public class ImprovedTessellator extends Tessellator {
 
 	@Override
 	public void addTranslation(float offX, float offY, float offZ) {
+		if (PrimitivesFlags.REDIRECT_DRAWING || AsyncBlockHook.isAsync()) {
+			VertexRedirector.addOffset(this.current, offX, offY, offZ);
+			return;
+		}
+
 		this.xOff += offX;
 		this.yOff += offY;
 		this.zOff += offZ;

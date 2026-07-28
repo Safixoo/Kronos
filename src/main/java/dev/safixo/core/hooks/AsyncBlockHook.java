@@ -25,7 +25,6 @@ public class AsyncBlockHook {
 
 	static {
 		try {
-
 			Field minXF = Block.class.getDeclaredField(KronosTransformer.IN_DEV ? "minX" : BlockTransformer.MINX_SRG);
 			Field minYF = Block.class.getDeclaredField(KronosTransformer.IN_DEV ? "minY" : BlockTransformer.MINY_SRG);
 			Field minZF = Block.class.getDeclaredField(KronosTransformer.IN_DEV ? "minZ" : BlockTransformer.MINZ_SRG);

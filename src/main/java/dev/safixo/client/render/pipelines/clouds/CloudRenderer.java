@@ -1,4 +1,4 @@
-package dev.safixo.client.render.pipelines.cloud;
+package dev.safixo.client.render.pipelines.clouds;
 
 import dev.safixo.client.render.ImprovedTessellator;
 import dev.safixo.client.render.gfx.buffer.GlVertexBuffer;
@@ -100,8 +100,8 @@ public class CloudRenderer {
 		VertexWriter.setCurrentInstance(VertexWriter.GLOBAL);
 		VertexWriter writer = VertexWriter.getCurrentInstance();
 
-		writer.startDrawing();
-		writer.setVertexFormat(DefaultVertexFormats.CLOUD_FORMAT);
+		writer.reset();
+		writer.setQuadReceiver(DefaultVertexFormats.CLOUD_FORMAT);
 
 		if (VERTEX_ARRAY == null) {
 			VERTEX_ARRAY = new GlVertexArrayObject(DefaultVertexFormats.CLOUD_FORMAT);
@@ -117,7 +117,7 @@ public class CloudRenderer {
 	}
 
 	private static void clearState(VertexWriter writer) {
-		writer.stopDrawing();
+		writer.reset();
 		CLOUD_SHADER.disableProgram();
 	}
 
@@ -182,7 +182,7 @@ public class CloudRenderer {
 		buildGeometry(writer, cellDistance, cloudCamFracX, cloudCamFracZ, cloudIntX, cloudIntZ, cloudCamIntX, cloudCamIntZ, cloudCameraY, insideIndex);
 
 		// Upload the geometry.
-		ImprovedTessellator.getTessellator().getVertexBuffer().bufferData(writer.getWriterNio(), writer.getOffset());
+		ImprovedTessellator.getTessellator().getVertexBuffer().bufferData(writer.getNioPtr(), writer.getOffset());
 
 		// Draw the clouds.
 		drawClouds(writer.getVertices(), cloudFracX, cloudY, cloudFracZ);
@@ -237,7 +237,7 @@ public class CloudRenderer {
 		cloudX -= MAX_CELL_DISTANCE;
 		cloudZ -= MAX_CELL_DISTANCE;
 
-		long ptr = writer.getWriterPtr();
+		long ptr = writer.getPtr() + writer.getOffset();
 
 		for (int i = 0; i <= maxIteration; i++) {
 			int cellData = CELL_XY_DATA[i];
@@ -318,7 +318,7 @@ public class CloudRenderer {
 			}
 		}
 
-		writer.offset = (int) (ptr - writer.getWriterPtr());
+		writer.offset = (int) (ptr - writer.getPtr());
 		writer.vertices = writer.offset / CLOUD_STRIDE;
 	}
 

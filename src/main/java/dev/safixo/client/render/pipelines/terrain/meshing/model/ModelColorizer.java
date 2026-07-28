@@ -5,12 +5,8 @@ import dev.safixo.client.util.MathExt;
 import dev.safixo.client.util.data.PrimitivesFlags;
 import dev.safixo.client.util.memory.UnsafeUtil;
 import net.minecraft.block.Block;
-import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.world.ColorizerFoliage;
-import net.minecraft.world.ColorizerGrass;
-import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.biome.BiomeGenBase;
-import net.minecraft.world.biome.BiomeGenSwamp;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.terraingen.BiomeEvent;
 
@@ -19,7 +15,7 @@ import java.lang.reflect.Field;
 public class ModelColorizer {
 	public static final int DYNAMIC_COLOR = 0;
 	public static final int GRASS_COLOR = 1;
-	public static final int LEAVES_COLOR = 2;
+	public static final int FOLIAGE_COLOR = 2;
 	public static final int WATER_COLOR = 3;
 	public static final int DEFAULT_COLOR = 4;
 
@@ -51,10 +47,14 @@ public class ModelColorizer {
 	public int getColor(SectionCache cache, int x, int y, int z, Block block) {
 		int colorizeType = PrimitivesFlags.COLOR_MODULATOR[block.blockID];
 
+//		if (cache.hasUniformBiomes()) {
+//			return cache.getColorByType(colorizeType);
+//		}
+
 		switch (colorizeType) {
 			case DEFAULT_COLOR: return 0xFFFFFF;
 			case GRASS_COLOR: return this.getBlockGrassColor(cache, x, y, z);
-			case LEAVES_COLOR: return this.getBlockLeavesColor(cache, x, y, z);
+			case FOLIAGE_COLOR: return this.getBlockLeavesColor(cache, x, y, z);
 			case WATER_COLOR: return this.getBlockWaterColor(cache, x, y, z);
 		}
 
@@ -147,7 +147,7 @@ public class ModelColorizer {
 
 	public int getWaterColorEvent(BiomeGenBase biome) {
 		if (biome != this.waterEvent.biome) {
-			populateEvent(this.grassEvent, biome, biome.waterColorMultiplier);
+			populateEvent(this.waterEvent, biome, biome.waterColorMultiplier);
 			MinecraftForge.EVENT_BUS.post(this.waterEvent);
 		}
 

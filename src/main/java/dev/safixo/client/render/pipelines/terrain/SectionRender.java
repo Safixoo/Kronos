@@ -5,7 +5,6 @@ import dev.safixo.client.render.pipelines.terrain.region.RegionConstants;
 import dev.safixo.client.render.vertex.VertexWriter;
 import dev.safixo.client.util.MathExt;
 import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
-import net.minecraft.tileentity.TileEntity;
 
 import static dev.safixo.client.util.Direction.DOWN_BIT;
 import static dev.safixo.client.util.Direction.UP_BIT;

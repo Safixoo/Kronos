@@ -1,19 +1,18 @@
 package dev.safixo.client.render.vertex.writers;
 
 import com.google.common.collect.ImmutableList;
+import dev.safixo.client.render.pipelines.terrain.meshing.data.Quad;
 import dev.safixo.client.render.pipelines.terrain.region.RegionConstants;
-import dev.safixo.client.util.memory.UnsafeUtil;
 import dev.safixo.client.render.vertex.VertexWriter;
+import dev.safixo.client.util.memory.UnsafeUtil;
 import dev.safixo.client.render.gfx.vertex.GlVertexFormat;
 import dev.safixo.client.render.gfx.vertex.attribute.GlVertexAttribute;
-
-import static dev.safixo.client.render.pipelines.terrain.region.RegionRender.*;
 
 public class TerrainFormat extends GlVertexFormat {
 	public static final int STRIDE = 16;
 
 	public static final int POSITION_BITS = 21;
-	static final int UV_BITS = 16;
+	static final int UV_BITS = 15;
 	static final float UV_PRECISION = (1 << UV_BITS);
 
 	// This assumes for now that all sides of the region have the same length.
@@ -25,12 +24,15 @@ public class TerrainFormat extends GlVertexFormat {
 	}
 
 	@Override
-	public void writeVertex(VertexWriter writer, long ptr, int offset) {
-		float posX = writer.x + writer.trasX;
-		float posY = writer.y + writer.trasY;
-		float posZ = writer.z + writer.trasZ;
+	public int writeQuad(Quad quad, long ptr) {
+		int offset = 0;
 
-		writeTerrainVertex(ptr, posX, posY, posZ, writer.u, writer.v, writer.color & 0xFFFFFF, writer.lightMap);
+		for (int i = 0; i < 4; i++) {
+			writeTerrainVertex(ptr + offset, quad.getX(i), quad.getY(i), quad.getZ(i), quad.getU(i), quad.getV(i), quad.getColor(i), quad.getLight(i));
+			offset += this.getStride();
+		}
+
+		return offset;
 	}
 
 	private static int extractPos(float pos) {
@@ -48,10 +50,7 @@ public class TerrainFormat extends GlVertexFormat {
 	}
 
 	public static int deNormalizeTexCoordinate(float a) {
-		int round = (int) (a * UV_PRECISION);
-		round -= (round & 0x10000) >>> 16;
-
-		return round;
+		return (int) (a * UV_PRECISION);
 	}
 
 	private static long processPosition(long x, long y, long z) {
@@ -61,7 +60,7 @@ public class TerrainFormat extends GlVertexFormat {
 		return topHalf << 32L | lowHalf;
 	}
 
-	public static void writeTerrainVertex(long ptr, float x, float y, float z, float u, float v, int color, int lightMap) {
+	public static void writeTerrainVertex(long ptr, float x, float y, float z, float u, float v, int color, int light) {
 		int intX = extractPos(x);
 		int intY = extractPos(y);
 		int intZ = extractPos(z);
@@ -69,8 +68,10 @@ public class TerrainFormat extends GlVertexFormat {
 		long position = processPosition(intX, intY, intZ);
 		long uv = processUv(u, v);
 
+		color &= 0xFF_FF_FF;
+
 		UnsafeUtil.memPutLong(ptr, position);
-		UnsafeUtil.memPutLong(ptr + 8, uv | (long) color << 32 | (long) compressLightmap(lightMap) << 56);
+		UnsafeUtil.memPutLong(ptr + 8, uv | (long) color << 32 | (long) compressLightmap(light) << 56);
 	}
 
 	public static void writeTerrainVertex(long ptr, float x, float y, float z, int u, int v, int color, int lightMap) {
@@ -91,10 +92,5 @@ public class TerrainFormat extends GlVertexFormat {
 		int blockLight4 = (lightmap & 0xF0);
 
 		return skyLight4 | blockLight4;
-	}
-
-	@Override
-	public int getStride() {
-		return STRIDE;
 	}
 }

@@ -4,7 +4,6 @@ import dev.safixo.client.render.gfx.shader.GlProgram;
 import dev.safixo.client.render.gfx.state.GlFogTracker;
 import dev.safixo.client.util.data.PrimitivesFlags;
 import dev.safixo.client.util.memory.NativeBuffer;
-import dev.safixo.client.render.gfx.state.GlStateTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiNewChat;
 import org.joml.Matrix4f;

@@ -57,7 +57,7 @@ public class ColorBGRManager {
 	}
 
 	public static int normToFactor(float color) {
-		return Math.min(256, (int) (color * NORMALIZED_TO_FACTOR + 1));
+		return (int) (color * NORMALIZED_TO_FACTOR);
 	}
 
 	public static int intToNorm(int color) {

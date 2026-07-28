@@ -1,6 +1,7 @@
-package dev.safixo.client.render.pipelines.terrain.meshing.data;
+package dev.safixo.client.render.pipelines.terrain.meshing.builders;
 
 import dev.safixo.client.render.pipelines.terrain.SectionRender;
+import dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache;
 import dev.safixo.client.util.data.CameraData;
 import dev.safixo.client.util.data.PrimitivesFlags;
 

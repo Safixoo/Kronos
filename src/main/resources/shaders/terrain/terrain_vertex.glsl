@@ -36,5 +36,5 @@ void main() {
 
     v_Color = color * getLightColor(a_ColorAndLight.w);
     v_Distance = length(eyePosition);
-    v_TextureUv = a_Uv * (1.0 / 65536.0);
+    v_TextureUv = a_Uv * (1.0 / 32768.0);
 }

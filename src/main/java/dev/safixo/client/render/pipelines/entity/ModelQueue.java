@@ -1,4 +1,4 @@
-package dev.safixo.client.render.pipelines.entity_model;
+package dev.safixo.client.render.pipelines.entity;
 
 import dev.safixo.client.render.gfx.buffer.GlShaderStorageBuffer;
 import dev.safixo.client.render.gfx.state.GlMatrixTracker;
@@ -7,7 +7,6 @@ import dev.safixo.client.render.gfx.vertex.GlVertexArrayObject;
 import dev.safixo.client.render.vertex.writers.TerrainFormat;
 import dev.safixo.client.util.collection.Matrix4Stack;
 import dev.safixo.client.util.memory.NativeBuffer;
-import dev.safixo.core.HookUtils;
 import dev.safixo.core.hooks.MinecraftHook;
 import it.unimi.dsi.fastutil.objects.Reference2IntOpenHashMap;
 import net.minecraft.client.Minecraft;

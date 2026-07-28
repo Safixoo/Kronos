@@ -1,4 +1,4 @@
-package dev.safixo.client.render.pipelines.cloud;
+package dev.safixo.client.render.pipelines.clouds;
 
 import dev.safixo.client.render.gfx.shader.GlProgram;
 import org.lwjgl.opengl.GL20;

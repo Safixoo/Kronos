@@ -22,9 +22,11 @@ public class ModelLighter {
 
 		int ao = setupCornerLighting(face, cache, dirX, dirY, dirZ, light);
 
+		/*
 		if ((partialSides & (1 << dir)) != 0) {
 			ao = processPartialAlignedLight(face, bounds, ao, light);
 		}
+		*/
 
 		return ao;
 	}
@@ -70,6 +72,7 @@ public class ModelLighter {
 		return ao;
 	}
 
+	/*
 	public static int processPartialAlignedLight(FacingData face, float[] bounds, int ao, int[] light) {
 		int ao0 = ao & 0xFF;
 		int ao1 = ao >> 8 & 0xFF;
@@ -110,4 +113,5 @@ public class ModelLighter {
 
 		return ao;
 	}
+	 */
 }

@@ -29,14 +29,6 @@ public class SectionSet {
 		this.radius = camera.renderDistance + (16 / camera.renderDistance) + 1;
 
 		this.resetVisibilityState();
-
-		int fogDistance = (int) (BFSCuller.getFogDistance(camera) * 16);
-
-		if (fogDistance != this.lastDistance) {
-			this.clampVisibilitySet(fogDistance / 16);
-			this.lastDistance = fogDistance;
-		}
-
 		this.updateSectionArray(manager, lastCamera, worldChanged);
 	}
 
@@ -56,8 +48,7 @@ public class SectionSet {
 		}
 	}
 
-	private void clampVisibilitySet(int fogDistance) {
-		float squaredDistance = Math.max(MathExt.square(8.0F), MathExt.square((fogDistance + 8) / 16.0f));
+	private void clampVisibilitySet() {
 		int radius = this.radius;
 
 		final short[] visibilitySet = this.visibilitySet;
@@ -67,7 +58,7 @@ public class SectionSet {
 
 		for (int x = 0; x <= radius; x++) {
 			for (int z = 0; z <= radius; z++) {
-				short overDistance = (short) (MathExt.square(x) + MathExt.square(z) >= squaredDistance ? 1 : 0);
+				short overDistance = (short) (Math.max(x, z) >= radius ? 1 : 0);
 
 				for (int y = 0; y < 16; y++) {
 					int sectIndexPP = this.getSectionIndex(x + cameraChunkX, y, z + cameraChunkZ);
@@ -164,6 +155,7 @@ public class SectionSet {
 
 		if (this.visibilitySet == null || this.visibilitySet.length != size) {
 			this.visibilitySet = new short[size];
+			this.clampVisibilitySet();
 			return;
 		}
 

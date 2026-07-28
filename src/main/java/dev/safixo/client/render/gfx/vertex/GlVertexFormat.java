@@ -2,10 +2,10 @@ package dev.safixo.client.render.gfx.vertex;
 
 import com.google.common.collect.ImmutableList;
 import dev.safixo.client.render.gfx.vertex.attribute.GlVertexAttribute;
-import dev.safixo.client.render.vertex.DefaultVertexFormats;
-import dev.safixo.client.render.vertex.VertexWriter;
+import dev.safixo.client.render.pipelines.terrain.meshing.data.Quad;
+import dev.safixo.client.render.vertex.IQuadReceiver;
 
-public abstract class GlVertexFormat {
+public abstract class GlVertexFormat implements IQuadReceiver {
 	private final ImmutableList<GlVertexAttribute> vertexProperties;
 	private final int stride;
 
@@ -26,8 +26,6 @@ public abstract class GlVertexFormat {
 		this.vertexProperties = vertexProperties;
 	}
 
-	public abstract void writeVertex(VertexWriter writer, long ptr, int index);
-
 	public void setupBufferState() {
 		int offset = 0;
 		int index = 0;
@@ -46,7 +44,7 @@ public abstract class GlVertexFormat {
 		}
 	}
 
-	public int getStride() {
+	public final int getStride() {
 		return this.stride;
 	}
 }

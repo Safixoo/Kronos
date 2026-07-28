@@ -1,7 +1,7 @@
 package dev.safixo.core.hooks;
 
 import dev.safixo.client.render.gfx.util.GpuFlags;
-import dev.safixo.client.render.pipelines.cloud.CloudRenderer;
+import dev.safixo.client.render.pipelines.clouds.CloudRenderer;
 import dev.safixo.client.render.pipelines.terrain.WorldManager;
 import dev.safixo.client.render.vertex.VertexWriter;
 import dev.safixo.client.util.MathExt;

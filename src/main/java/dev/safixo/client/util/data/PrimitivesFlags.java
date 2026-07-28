@@ -37,7 +37,7 @@ public class PrimitivesFlags {
 	public static final boolean[] DIRECT_CULL = new boolean[4096];
 
 	public static final boolean[] TILE_ENTITY = new boolean[4096];
-	public static final short[] RENDER_PASS = new short[4096];
+	public static final byte[] RENDER_PASS = new byte[4096];
 
 	private static int LEAVES_TOP_INDEX = 0;
 	private static final int[] LEAVES_INDICES = new int[4096];
@@ -49,7 +49,7 @@ public class PrimitivesFlags {
 	public static void computeFlagArrays() {
 		LEAVES_TOP_INDEX = 0;
 
-		Arrays.fill(RENDER_PASS, (short) -777);
+		Arrays.fill(RENDER_PASS, (byte) -1);
 		Arrays.fill(MATERIAL, Material.air);
 
 		for (int i = 0; i < 4096; i++) {
@@ -73,9 +73,7 @@ public class PrimitivesFlags {
 
 			// To skip virtual overhead.
 			TILE_ENTITY[i] = block.hasTileEntity(0);
-			RENDER_PASS[i] = (short) block.getRenderBlockPass();
-
-			AsyncBlockHook.setupAsyncBounds(block);
+			RENDER_PASS[i] = (byte) block.getRenderBlockPass();
 		}
 
 		for (int i = 0; i < 256; i++) {
@@ -144,15 +142,15 @@ public class PrimitivesFlags {
 				COLOR_MODULATOR[i] = ModelColorizer.DEFAULT_COLOR;
 			} else if (colorized.getDeclaringClass() == BlockFluid.class) {
 				COLOR_MODULATOR[i] = ModelColorizer.WATER_COLOR;
-			} else if (colorized.getDeclaringClass() == BlockGrass.class) {
+			} else if (colorized.getDeclaringClass() == BlockGrass.class || block.blockMaterial == Material.vine) {
 				COLOR_MODULATOR[i] = ModelColorizer.GRASS_COLOR;
 			} else if (colorized.getDeclaringClass() == BlockLeaves.class) {
-				COLOR_MODULATOR[i] = ModelColorizer.LEAVES_COLOR;
+				COLOR_MODULATOR[i] = ModelColorizer.FOLIAGE_COLOR;
 			} else {
 				COLOR_MODULATOR[i] = ModelColorizer.DYNAMIC_COLOR;
 			}
 
-//			AsyncBlockHook.setupAsyncBounds(block);
+			AsyncBlockHook.setupAsyncBounds(block);
 		}
 	}
 

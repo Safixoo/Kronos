@@ -194,7 +194,7 @@ public class RegionRender {
 			this.prepareSolidPtr();
 		}
 
-		long drawData = this.solidBuffer.allocate(render.globalPosition, manager.getWriterPtr(), manager.getVertices());
+		long drawData = this.solidBuffer.allocate(render.globalPosition, manager.getNioPtr(), manager.getVertices());
 		int sectionFirst = RegionAllocation.unpackFirst(drawData);
 
 		for (int dir = 0; dir < MeshDirection.COUNT; dir++) {
@@ -223,7 +223,7 @@ public class RegionRender {
 		}
 
 		int index = (render.regionIndex * TOTAL_DRAWS) + SOLID_DRAWS;
-		this.regionDrawData[index] = this.translucentBuffer.allocate(render.globalPosition, manager.getWriterPtr(), manager.getVertices());
+		this.regionDrawData[index] = this.translucentBuffer.allocate(render.globalPosition, manager.getNioPtr(), manager.getVertices());
 	}
 
 	public void deleteRenderAllocation(long position) {

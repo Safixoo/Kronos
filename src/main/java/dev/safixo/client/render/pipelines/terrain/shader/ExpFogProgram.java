@@ -2,7 +2,6 @@ package dev.safixo.client.render.pipelines.terrain.shader;
 
 import dev.safixo.client.render.gfx.shader.ShaderDefine;
 import dev.safixo.client.render.gfx.state.GlFogTracker;
-import dev.safixo.client.render.gfx.state.GlStateTracker;
 import dev.safixo.client.render.vertex.writers.TerrainFormat;
 import org.lwjgl.opengl.GL20;
 

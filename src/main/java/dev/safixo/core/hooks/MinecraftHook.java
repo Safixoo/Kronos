@@ -2,21 +2,19 @@ package dev.safixo.core.hooks;
 
 import dev.safixo.client.render.ImprovedTessellator;
 import dev.safixo.client.render.gfx.state.GlMatrixTracker;
-import dev.safixo.client.render.pipelines.entity_model.ModelQueue;
+import dev.safixo.client.render.pipelines.entity.ModelQueue;
 import dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache;
 import dev.safixo.client.util.data.ClientChunkListener;
 import dev.safixo.client.util.Direction;
 import dev.safixo.client.util.MathExt;
 import dev.safixo.client.util.data.PrimitivesFlags;
 import dev.safixo.client.util.memory.UnsafeUtil;
-import dev.safixo.core.HookUtils;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockSnow;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.WorldClient;
 import net.minecraft.client.renderer.EntityRenderer;
 import net.minecraft.client.renderer.OpenGlHelper;
-import net.minecraft.client.renderer.RenderHelper;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.entity.Render;
 import net.minecraft.util.ResourceLocation;
@@ -30,8 +28,6 @@ import net.minecraft.world.chunk.storage.ExtendedBlockStorage;
 import org.joml.Matrix4f;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
-
-import java.lang.reflect.Field;
 
 @SuppressWarnings("unused")
 public class MinecraftHook {

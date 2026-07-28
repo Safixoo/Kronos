@@ -59,24 +59,15 @@ public class GlVertexBuffer implements GlBuffer {
 	public void bufferData(ByteBuffer buffer, int size) {
 		((Buffer) buffer).limit(size);
 
-		if (GpuFlags.EXT_DSA) {
-			EXTDirectStateAccess.glNamedBufferDataEXT(this.id, buffer, this.hint);
-		} else {
-			this.bind();
-			GL15.glBufferData(GL15.GL_ARRAY_BUFFER, buffer, this.hint);
-		}
+		this.bind();
+		GL15.glBufferData(GL15.GL_ARRAY_BUFFER, buffer, this.hint);
 	}
 
 	public void bufferSubData(ByteBuffer buffer, int offset, int size) {
-		((Buffer) buffer).limit(size);
+		((Buffer) buffer).limit(((Buffer) buffer).position() + size);
 
-		if (GpuFlags.EXT_DSA) {
-			EXTDirectStateAccess.glNamedBufferSubDataEXT(this.id, offset, buffer);
-		} else {
-			this.bind();
-			GL15.glBufferSubData(GL15.GL_ARRAY_BUFFER, offset, buffer);
-			this.unbind();
-		}
+		this.bind();
+		GL15.glBufferSubData(GL15.GL_ARRAY_BUFFER, offset, buffer);
 	}
 
 	public void draw(int vertices, int first) {

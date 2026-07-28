@@ -1,9 +1,8 @@
 package dev.safixo.client.render.pipelines.terrain.cull;
 
 
-import dev.safixo.client.render.pipelines.cloud.CloudRenderer;
+import dev.safixo.client.render.pipelines.clouds.CloudRenderer;
 import org.joml.Matrix4f;
-import org.joml.Vector3fc;
 
 import java.nio.FloatBuffer;
 

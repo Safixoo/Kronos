@@ -202,6 +202,12 @@ public class WorldManager {
 		profiler.endStartSection("updatechunks");
 	}
 
+	public void tryToUploadResults() {
+		if (this.mesherManager.areImportantResultsScheduled()) {
+			this.mesherManager.readAsyncResults(this);
+		}
+	}
+
 	public SectionSet getSectionSet() {
 		return this.sectionSet;
 	}
@@ -215,6 +221,8 @@ public class WorldManager {
 		boolean noFog = false;
 		boolean expFog = GlFogTracker.FOG_MODE == GL11.GL_EXP;
 		boolean linearFog = GlFogTracker.FOG_MODE == GL11.GL_LINEAR;
+
+		this.tryToUploadResults();
 
 		TerrainProgram terrainShader;
 

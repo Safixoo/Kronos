@@ -420,22 +420,15 @@ public class BFSCuller {
 		int valid = 0;
 
 		for (int i = 0; i < 7; i++) {
-			if (tMaxX < tMaxY) {
-				if (tMaxX < tMaxZ) {
-					sectionIndex += signX;
-					tMaxX += tDeltaX;
-				} else {
-					sectionIndex += signZ;
-					tMaxZ += tDeltaZ;
-				}
+			if (tMaxX > tMaxY && tMaxZ > tMaxY) {
+				sectionIndex += signY;
+				tMaxY += tDeltaY;
+			} else if (tMaxX < tMaxZ) {
+				sectionIndex += signX;
+				tMaxX += tDeltaX;
 			} else {
-				if (tMaxY < tMaxZ) {
-					sectionIndex += signY;
-					tMaxY += tDeltaY;
-				} else {
-					sectionIndex += signZ;
-					tMaxZ += tDeltaZ;
-				}
+				sectionIndex += signZ;
+				tMaxZ += tDeltaZ;
 			}
 
 			int visFact = visSet[sectionIndex] & MAX_GRID_FACTOR;

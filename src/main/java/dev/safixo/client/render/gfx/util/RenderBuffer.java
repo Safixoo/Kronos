@@ -6,6 +6,8 @@ import dev.safixo.client.util.memory.UnsafeUtil;
 import dev.safixo.client.render.vertex.DefaultVertexFormats;
 import dev.safixo.client.render.gfx.vertex.GlVertexFormat;
 
+import java.nio.ByteBuffer;
+
 // General purpose VBO with VAO.
 public class RenderBuffer {
 	private GlVertexBuffer vertexBuffer;
@@ -46,8 +48,8 @@ public class RenderBuffer {
 		this.vertexBuffer.allocate(UnsafeUtil.NULL, size);
 	}
 
-	public void upload(long data, int offset, int size) {
-		this.vertexBuffer.bufferSubData(data, offset, size);
+	public void upload(ByteBuffer buffer, int offset, int size) {
+		this.vertexBuffer.bufferSubData(buffer, offset, size);
 	}
 
 	public GlVertexBuffer getVertexBuffer() {

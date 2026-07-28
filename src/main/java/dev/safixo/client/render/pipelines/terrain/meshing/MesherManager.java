@@ -5,7 +5,9 @@ import dev.safixo.client.render.pipelines.terrain.SectionRender;
 import dev.safixo.client.render.pipelines.terrain.SectionSet;
 import dev.safixo.client.render.pipelines.terrain.WorldManager;
 import dev.safixo.client.render.pipelines.terrain.cull.BFSQueues;
+import dev.safixo.client.render.pipelines.terrain.meshing.data.FakeInlinedBiome;
 import dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache;
+import dev.safixo.client.render.pipelines.terrain.meshing.model.ModelColorizer;
 import dev.safixo.client.render.pipelines.terrain.meshing.task.SectionResult;
 import dev.safixo.client.render.pipelines.terrain.meshing.task.SectionTask;
 import dev.safixo.client.render.vertex.DefaultVertexFormats;
@@ -18,9 +20,8 @@ import dev.safixo.client.util.data.PrimitivesFlags;
 import dev.safixo.core.hooks.AsyncBlockHook;
 import dev.safixo.core.hooks.RenderGlobalHook;
 import it.unimi.dsi.fastutil.objects.ReferenceArrayList;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.WorldRenderer;
-import net.minecraft.profiler.Profiler;
+import net.minecraft.util.Vec3Pool;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.storage.ExtendedBlockStorage;
@@ -32,27 +33,35 @@ public class MesherManager {
 
 	private final VertexWriter[] writers = new VertexWriter[MeshDirection.COUNT + 1];
 
+	private final Vec3Pool vecPool = new Vec3Pool(300, 3000);
+	private final ModelColorizer colorizer = new ModelColorizer();
+	private final FakeInlinedBiome inlinedBiome = new FakeInlinedBiome(Integer.MAX_VALUE);
+
 	private final ObjectPooler<SectionCache> caches = new ObjectPooler<>(new ObjectPooler.ObjectFactory<SectionCache>() {
 		@Override
 		public SectionCache create() {
-			return new SectionCache();
+			return new SectionCache(colorizer, inlinedBiome, vecPool);
 		}
 	}, WorldManager.MAX_TASK_CONCURRENTLY * 2);
 
-	private final MesherRunnable mesherRunnable = new MesherRunnable();
+	private final MesherRunnable mesherRunnable = new MesherRunnable(this.vecPool);
 	private final Thread meshThread;
 
-	private long lastFrameNano;
-	private long lastFrameBuildTime;
-	private long lerpFrameBudget;
+	private long lastFrameNano, lastFrameBuildTime, lerpFrameBudget;
 
+	private final List<SectionRender> dirtySections = new ReferenceArrayList<>();
+
+	private final List<SectionTask> regularTasks = new ReferenceArrayList<>();
+	private final List<SectionTask> importantTasks = new ReferenceArrayList<>();
+
+	private int importantTasksWaiting;
 	private int currentTaskId;
 
 	public MesherManager() {
 		for (int i = 0; i < this.writers.length; i++) {
 			this.writers[i] = new VertexWriter(512);
-			this.writers[i].startDrawing();
-			this.writers[i].setVertexFormat(DefaultVertexFormats.TERRAIN_FORMAT);
+			this.writers[i].reset();
+			this.writers[i].setQuadReceiver(DefaultVertexFormats.TERRAIN_FORMAT);
 		}
 
 		this.meshThread = new Thread(this.mesherRunnable);
@@ -77,7 +86,6 @@ public class MesherManager {
 		long budget = calculateFrameBudgetNs(current);
 
 		int updateIndex = 0, nonEmptyUpdates = 0;
-		List<SectionRender> sectionForTasks = new ReferenceArrayList<>();
 
 		while (updateIndex < maxSize && nonEmptyUpdates < WorldManager.MAX_FULL_UPDATES) {
 			long position = BFSQueues.getSectionPos(manager.getCamera(), updateIndex++);
@@ -97,7 +105,7 @@ public class MesherManager {
 			}
 
 			if (section.isDirty()) {
-				boolean nonEmpty = this.setupTask(manager, sectionForTasks, section);
+				boolean nonEmpty = this.setupTask(manager, this.dirtySections, section);
 
 				if (nonEmpty) {
 					nonEmptyUpdates++;
@@ -122,36 +130,39 @@ public class MesherManager {
 			: (long) Math.max(diff, this.lastFrameBuildTime - 5 * 1E+6D * partialTick);
 		this.lastFrameNano = current;
 
-		this.queueTasks(manager, sectionForTasks);
+		this.queueTasks(manager);
 		this.readAsyncResults(manager);
 	}
 
-	private void queueTasks(WorldManager manager, List<SectionRender> sectionForTasks) {
-		List<SectionTask> tasks = new ReferenceArrayList<>(sectionForTasks.size());
-		boolean firstTask = true;
-
-		for (SectionRender section : sectionForTasks) {
+	private void queueTasks(WorldManager manager) {
+		for (SectionRender section : this.dirtySections) {
 			SectionTask task = this.createTask(manager.getWorld(), section, manager.getCamera());
-			tasks.add(task);
 
-			if (firstTask) {
-				this.mesherRunnable.addTasks(tasks);
-				tasks.clear();
-				firstTask = false;
+			switch (task.taskType) {
+				case IMPORTANT:
+					this.importantTasks.add(task);
+					break;
+				case REGULAR:
+					this.regularTasks.add(task);
+					break;
 			}
 		}
+		this.dirtySections.clear();
 
-		if (!tasks.isEmpty()) {
-			this.mesherRunnable.addTasks(tasks);
+		if (!this.regularTasks.isEmpty() || !this.importantTasks.isEmpty()) {
+			this.mesherRunnable.addTasks(this.meshThread, this.regularTasks, this.importantTasks);
 		}
-	}
+		this.importantTasksWaiting += this.importantTasks.size();
 
+		this.regularTasks.clear();
+		this.importantTasks.clear();
+	}
 
 	private static SectionTask.TaskType getTypeByDistance(int squareDistance) {
 		return squareDistance <= 20*20 ? SectionTask.TaskType.IMPORTANT : SectionTask.TaskType.REGULAR;
 	}
 
-	private void readAsyncResults(WorldManager manager) {
+	public void readAsyncResults(WorldManager manager) {
 		List<SectionResult> results = this.mesherRunnable.getResults();
 
 		for (SectionResult result : results) {
@@ -162,11 +173,19 @@ public class MesherManager {
 				continue;
 			}
 
+			if (task.taskType == SectionTask.TaskType.IMPORTANT) {
+				this.importantTasksWaiting--;
+			}
+
 			task.section.sendBuildResult(manager, result);
 			this.caches.push(task.cache);
 
 			manager.setTerrainDirty(true);
 		}
+	}
+
+	public boolean areImportantResultsScheduled() {
+		return this.importantTasksWaiting > 0;
 	}
 
 	private boolean setupTask(WorldManager manager, List<SectionRender> tasks, SectionRender section) {
@@ -197,9 +216,7 @@ public class MesherManager {
 		SectionTask.TaskType taskType = getTypeByDistance(distanceToSection(section, camera));
 
 		SectionCache cache = this.caches.poll();
-		Chunk chunk = world.getChunkFromChunkCoords(section.blockX >> 4, section.blockZ >> 4);
-
-		cache.setupCache(chunk, world, section.blockX, section.blockY, section.blockZ);
+		cache.setupCache(world, section.blockX, section.blockY, section.blockZ);
 
 		WorldRenderer.chunksUpdated++;
 		SectionTask task = new SectionTask(this.writers);
@@ -252,5 +269,6 @@ public class MesherManager {
 	public void clear() {
 		this.mesherRunnable.clear();
 		this.currentTaskId++;
+		this.importantTasksWaiting = 0;
 	}
 }

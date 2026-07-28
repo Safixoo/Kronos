@@ -1,7 +1,5 @@
 package dev.safixo.client.util.collection;
 
-import java.util.LinkedList;
-
 public class ObjectPooler<T> {
 	private final T[] references;
 	private final ObjectFactory<T> factory;
