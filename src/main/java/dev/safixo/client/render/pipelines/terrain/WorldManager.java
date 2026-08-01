@@ -161,22 +161,12 @@ public class WorldManager {
 			this.worldObj = world;
 		}
 
-		IChunkProvider provider = world.getChunkProvider();
-
-		EntityClientPlayerMP playerLocal = Minecraft.getMinecraft().thePlayer;
-		InventoryPlayer inventory = playerLocal.inventory;
-
 		profiler.endStartSection("setup_sections");
 		this.sectionSet.updateSet(this, camera, worldChanged);
 		profiler.endStartSection("culling");
-
-		Item playerItem = null;
-
-		if (inventory != null && inventory.getCurrentItem() != null) {
-			playerItem = inventory.getCurrentItem().getItem();
-		}
-
+		
 		this.bfsCuller.clearUpdateIndices();
+		Item playerItem = this.getHeldItem();
 
 		// For debugging occ culling.
 		//noinspection ConstantValue
@@ -200,6 +190,17 @@ public class WorldManager {
 		this.regionManager.iterateAllTileEntities(tileEntities);
 
 		profiler.endStartSection("updatechunks");
+	}
+
+	private Item getHeldItem() {
+		EntityClientPlayerMP playerLocal = Minecraft.getMinecraft().thePlayer;
+		InventoryPlayer inventory = playerLocal.inventory;
+
+		if (inventory != null && inventory.getCurrentItem() != null) {
+			return inventory.getCurrentItem().getItem();
+		}
+
+		return null;
 	}
 
 	public void tryToUploadResults() {
