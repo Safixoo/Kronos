@@ -24,6 +24,11 @@ public class GlClientStateTracker {
 	private static int UNIT;
 
 	public static void glEnableClientState(int cap) {
+		if (GlStateTracker.SKIP_CACHE) {
+			GL11.glEnableClientState(cap);
+			return;
+		}
+
 		if (cap == GL11.GL_VERTEX_ARRAY) {
 			VERTEX_QUEUED = true;
 			if (VERTEX_ACTIVE) {
@@ -62,6 +67,11 @@ public class GlClientStateTracker {
 	}
 
 	public static void glClientActiveTexture(int unit) {
+		if (GlStateTracker.SKIP_CACHE) {
+			GL13.glClientActiveTexture(unit);
+			return;
+		}
+
 		UNIT = unit;
 		GL13.glClientActiveTexture(unit);
 	}
@@ -69,6 +79,10 @@ public class GlClientStateTracker {
 	// Called before drawing, and before binding to vertex arrays/buffers as they are incompatible
 	// with client arrays rendering.
 	public static void invalidateAllCachedClientState() {
+		if (GlStateTracker.SKIP_CACHE) {
+			return;
+		}
+
 		if (VERTEX_ACTIVE && !VERTEX_QUEUED) {
 			invalidateState(VERTEX);
 			GL11.glDisableClientState(GL11.GL_VERTEX_ARRAY);
@@ -107,6 +121,11 @@ public class GlClientStateTracker {
 	}
 
 	public static void glDisableClientState(int cap) {
+		if (GlStateTracker.SKIP_CACHE) {
+			GL11.glDisableClientState(cap);
+			return;
+		}
+
 		if (cap == GL11.GL_VERTEX_ARRAY) {
 			VERTEX_QUEUED = false;
 			return;
@@ -130,7 +149,7 @@ public class GlClientStateTracker {
 	}
 
 	public static void glVertexPointer(int size, int type, int stride, ByteBuffer pointer) {
-		if (equal(VERTEX, size, type, stride, pointer)) {
+		if (!GlStateTracker.SKIP_CACHE && equal(VERTEX, size, type, stride, pointer)) {
 			return;
 		}
 
@@ -141,7 +160,7 @@ public class GlClientStateTracker {
 	public static void glTexCoordPointer(int size, int type, int stride, ByteBuffer pointer) {
 		ClientStateData stateByUnit = UNIT == GL13.GL_TEXTURE0 ? TEX_0 : TEX_1;
 
-		if (equal(stateByUnit, 3, type, stride, pointer)) {
+		if (!GlStateTracker.SKIP_CACHE && equal(stateByUnit, 3, type, stride, pointer)) {
 			return;
 		}
 
@@ -150,7 +169,7 @@ public class GlClientStateTracker {
 	}
 
 	public static void glColorPointer(int size, int type, int stride, ByteBuffer pointer) {
-		if (equal(COLOR, size, type, stride, pointer)) {
+		if (!GlStateTracker.SKIP_CACHE && equal(COLOR, size, type, stride, pointer)) {
 			return;
 		}
 
@@ -159,7 +178,7 @@ public class GlClientStateTracker {
 	}
 
 	public static void glNormalPointer(int type, int stride, ByteBuffer pointer) {
-		if (equal(NORMAL, 3, type, stride, pointer)) {
+		if (!GlStateTracker.SKIP_CACHE && equal(NORMAL, 3, type, stride, pointer)) {
 			return;
 		}
 

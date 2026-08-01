@@ -70,10 +70,8 @@ public class GlBooleanTracker {
 			if (cap == GL12.GL_RESCALE_NORMAL && GlMatrixTracker.MAT_MODE == GL11.GL_MODELVIEW) {
 				GlMatrixTracker.loadCurrentMatrix();
 			}
-
-			setState(cap, true);
-
 			GlStateTracker.flushDrawState();
+			setState(cap, true);
 			GL11.glEnable(cap);
 		}
 	}
@@ -84,9 +82,8 @@ public class GlBooleanTracker {
 		}
 
 		if (!isDisabled(cap) || GlStateTracker.SKIP_CACHE) {
-			setState(cap, false);
-
 			GlStateTracker.flushDrawState();
+			setState(cap, false);
 			GL11.glDisable(cap);
 		}
 	}

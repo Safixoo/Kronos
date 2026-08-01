@@ -44,20 +44,22 @@ public class GlTextureTracker {
 	}
 
 	public static void glMultiTexCoord2f(int target, float u, float v) {
-		if ((LAST_TARGET != target || MU != u || MV != v)) {
-			LAST_TARGET = target;
-			MU = u;
-			MV = v;
+		LAST_TARGET = target;
+		MU = u;
+		MV = v;
+
+		if (GlStateTracker.SKIP_CACHE) {
+			GL13.glMultiTexCoord2f(target, u, v);
 		}
 	}
 
 	// Only change the active texture when there is an operation that
 	// uses the active texture.
 	public static void glActiveTexture(int target) {
+		ACTIVE_UNIT = target - GL13.GL_TEXTURE0;
 		if (GlStateTracker.SKIP_CACHE) {
 			assertActiveTexture();
 		}
-		ACTIVE_UNIT = target - GL13.GL_TEXTURE0;
 	}
 
 

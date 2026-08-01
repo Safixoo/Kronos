@@ -10,7 +10,7 @@ import java.nio.IntBuffer;
 
 @SuppressWarnings("unused")
 public class GlStateTracker {
-	public static final boolean SKIP_CACHE = false;
+	public static final boolean SKIP_CACHE = true;
 	public static String VENDOR;
 
 	public static int LAST_DEPTH_FUNC = -1;
