@@ -3,7 +3,6 @@ package dev.safixo.client.render.vertex.writers;
 import com.google.common.collect.ImmutableList;
 import dev.safixo.client.render.pipelines.terrain.meshing.data.Quad;
 import dev.safixo.client.render.pipelines.terrain.region.RegionConstants;
-import dev.safixo.client.render.vertex.VertexWriter;
 import dev.safixo.client.util.memory.UnsafeUtil;
 import dev.safixo.client.render.gfx.vertex.GlVertexFormat;
 import dev.safixo.client.render.gfx.vertex.attribute.GlVertexAttribute;
@@ -35,8 +34,12 @@ public class TerrainFormat extends GlVertexFormat {
 		return offset;
 	}
 
-	private static int extractPos(float pos) {
+	private static int extractRadiusPos(float pos) {
 		return (int) ((pos + RADIUS) * TerrainFormat.SCALE) & 0x1FFFFF;
+	}
+
+	private static int extractPos(float pos) {
+		return (int) (pos * TerrainFormat.SCALE) & 0x1FFFFF;
 	}
 
 	private static long processUv(float u, float v) {
@@ -53,37 +56,52 @@ public class TerrainFormat extends GlVertexFormat {
 		return (int) (a * UV_PRECISION);
 	}
 
-	private static long processPosition(long x, long y, long z) {
+	private static long encodePosition(long x, long y, long z) {
 		long topHalf = y | (z & ~0x7FFL) << 10L;
 		long lowHalf = x | (z &  0x7FFL) << 21L;
 
 		return topHalf << 32L | lowHalf;
 	}
 
-	public static void writeTerrainVertex(long ptr, float x, float y, float z, float u, float v, int color, int light) {
+	public static long transformAddedPosition(int x, int y, int z) {
 		int intX = extractPos(x);
 		int intY = extractPos(y);
 		int intZ = extractPos(z);
 
-		long position = processPosition(intX, intY, intZ);
-		long uv = processUv(u, v);
-
-		color &= 0xFF_FF_FF;
-
-		UnsafeUtil.memPutLong(ptr, position);
-		UnsafeUtil.memPutLong(ptr + 8, uv | (long) color << 32 | (long) compressLightmap(light) << 56);
+		return encodePosition(intX, intY, intZ);
 	}
 
-	public static void writeTerrainVertex(long ptr, float x, float y, float z, int u, int v, int color, int lightMap) {
-		int intX = extractPos(x);
-		int intY = extractPos(y);
-		int intZ = extractPos(z);
+	public static long transformPosition(float x, float y, float z) {
+		int intX = extractRadiusPos(x);
+		int intY = extractRadiusPos(y);
+		int intZ = extractRadiusPos(z);
 
-		long position = processPosition(intX, intY, intZ);
+		return encodePosition(intX, intY, intZ);
+	}
+
+	public static long transformPosition(int x, int y, int z) {
+		int intX = extractRadiusPos(x);
+		int intY = extractRadiusPos(y);
+		int intZ = extractRadiusPos(z);
+
+		return encodePosition(intX, intY, intZ);
+	}
+
+	public static void writeTerrainVertex(long ptr, float x, float y, float z, float u, float v, int color, int light) {
+		long position = transformPosition(x, y, z);
 		long uv = processUv(u, v);
 
+		writeTerrainVertex(ptr, position, uv, color, light);
+	}
+
+	public static void writeTerrainVertex(long ptr, long position, int u, int v, int color, int light) {
+		long uv = processUv(u, v);
+		writeTerrainVertex(ptr, position, uv, color, light);
+	}
+
+	public static void writeTerrainVertex(long ptr, long position, long uv, int color, int light) {
 		UnsafeUtil.memPutLong(ptr, position);
-		UnsafeUtil.memPutLong(ptr + 8, uv | (long) color << 32 | (long) compressLightmap(lightMap) << 56);
+		UnsafeUtil.memPutLong(ptr + 8, uv | (color & 0xFFFFFFL) << 32 | (long) compressLightmap(light) << 56);
 	}
 
 	// skylight << 20 | blocklight << 4

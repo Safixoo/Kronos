@@ -44,21 +44,66 @@ public class ModelColorizer {
 		UnsafeUtil.UNSAFE.putInt(event, ORIGINAL_COLOR_OFF, color);
 	}
 
+	private static boolean isBiomeAreaUniform(SectionCache cache, int x, int y, int z) {
+		int firstBiome = cache.getBiomeRaw(x, z);
+
+		for (int relZ = -SectionCache.BIOME_RADIUS; relZ <= SectionCache.BIOME_RADIUS; relZ++) {
+			for (int relX = -SectionCache.BIOME_RADIUS; relX <= SectionCache.BIOME_RADIUS; relX++) {
+				int biome = cache.getBiomeRaw(x + relX, z + relZ);
+
+				if (biome != firstBiome) {
+					return false;
+				}
+			}
+		}
+
+		return true;
+	}
+
 	public int getColor(SectionCache cache, int x, int y, int z, Block block) {
 		int colorizeType = PrimitivesFlags.COLOR_MODULATOR[block.blockID];
 
+		if (colorizeType == DEFAULT_COLOR) {
+			return 0xFFFFFF;
+		}
+
+		if (colorizeType == DYNAMIC_COLOR) {
+			return block.colorMultiplier(cache, x, y, z);
+		}
+
+		// Check first if the whole section is uniform.
 		if (cache.hasUniformBiomes()) {
 			return cache.getColorByType(colorizeType);
 		}
 
+		// Check if the area of biome radius is uniform.
+		if (isBiomeAreaUniform(cache, x, y, z)) {
+			BiomeGenBase biome = cache.getBiomeGenForCoords(x, z);
+
+			switch (colorizeType) {
+				case GRASS_COLOR: return this.getBiomeGrassColor(biome);
+				case FOLIAGE_COLOR:
+					int meta = cache.getBlockMetadata(x, y, z);
+
+					if ((meta & 0b11) == 0b01) {
+						return ColorizerFoliage.getFoliageColorPine();
+					}
+					if ((meta & 0b11) == 0b10) {
+						return ColorizerFoliage.getFoliageColorBirch();
+					}
+
+					return this.getBiomeFoliageColor(biome);
+				case WATER_COLOR: return this.getWaterColorEvent(biome);
+			}
+		}
+
 		switch (colorizeType) {
-			case DEFAULT_COLOR: return 0xFFFFFF;
 			case GRASS_COLOR: return this.getBlockGrassColor(cache, x, y, z);
 			case FOLIAGE_COLOR: return this.getBlockLeavesColor(cache, x, y, z);
 			case WATER_COLOR: return this.getBlockWaterColor(cache, x, y, z);
 		}
 
-		return block.colorMultiplier(cache, x, y, z);
+		throw new RuntimeException("Couldn't tint the block!");
 	}
 
 	public int getBlockLeavesColor(SectionCache cache, int x, int y, int z) {

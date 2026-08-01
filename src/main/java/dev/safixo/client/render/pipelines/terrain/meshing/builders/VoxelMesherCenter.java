@@ -33,6 +33,7 @@ public class VoxelMesherCenter  {
 
 		int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
 		int modelColor = ColorBGRManager.rgbToBgr(MODEL_COLORIZER.getColor(cache, x, y, z, block));
+		long vertPos = getRegionEncodedPosition(x, y, z);
 
 		for (int dir = 0; dir < Direction.COUNT; dir++) {
 			if ((drawSet & (1 << dir)) == 0) {
@@ -64,14 +65,14 @@ public class VoxelMesherCenter  {
 			writer.ensureCapacity(TerrainFormat.STRIDE * 8);
 
 			if (ambient) {
-				renderFace(writer, render, cache, x, y, z, blockIndex, blockColor, overlayColor, sideGrass);
+				renderFace(writer, render, cache, vertPos, blockIndex, blockColor, overlayColor, sideGrass);
 			} else {
-				renderFaceNoSmooth(writer, render, cache, x, y, z, blockColor, overlayColor, sideGrass);
+				renderFaceNoSmooth(writer, render, cache, vertPos, x, y, z, blockColor, overlayColor, sideGrass);
 			}
 		}
 	}
 
-	public static void renderFace(VertexWriter writer, FacingData face, SectionCache cache, int x, int y, int z, int blockIndex, int blockColor, int overlayColor, boolean sideGrass) {
+	public static void renderFace(VertexWriter writer, FacingData face, SectionCache cache, long vertPos, int blockIndex, int blockColor, int overlayColor, boolean sideGrass) {
 		int p1 = face.aoCorner0Packed;
 		int p2 = face.aoCorner1Packed;
 
@@ -111,25 +112,20 @@ public class VoxelMesherCenter  {
 		int uv2 = face.uv2;
 		int uv3 = face.uv3;
 
-		x &= RegionConstants.BLOCK_BITS_X;
-		y &= RegionConstants.BLOCK_BITS_Y;
-		z &= RegionConstants.BLOCK_BITS_Z;
-
 		long ptr = writer.getPtr() + writer.getOffset();
-		long quadOffs = face.quadVert;
 
-		boolean flip = ao0 + ao2 > ao3 + ao1 || light0 + light2 <= light3 + light1;
+		boolean flip = ao0 > ao3 || ao2 > ao1 || light0 + light2 < light3 + light1;
 
 		if (flip) {
-			ptr = addVertex(ptr, quadOffs >> (3 * 12), x, y, z, uv3, color3, light3);
-			ptr = addVertex(ptr, quadOffs >> (0 * 12), x, y, z, uv0, color0, light0);
-			ptr = addVertex(ptr, quadOffs >> (1 * 12), x, y, z, uv1, color1, light1);
-			ptr = addVertex(ptr, quadOffs >> (2 * 12), x, y, z, uv2, color2, light2);
+			ptr = addVertex(ptr, vertPos + face.v3, uv3, color3, light3);
+			ptr = addVertex(ptr, vertPos + face.v0, uv0, color0, light0);
+			ptr = addVertex(ptr, vertPos + face.v1, uv1, color1, light1);
+			ptr = addVertex(ptr, vertPos + face.v2, uv2, color2, light2);
 		} else {
-			ptr = addVertex(ptr, quadOffs >> (0 * 12), x, y, z, uv0, color0, light0);
-			ptr = addVertex(ptr, quadOffs >> (1 * 12), x, y, z, uv1, color1, light1);
-			ptr = addVertex(ptr, quadOffs >> (2 * 12), x, y, z, uv2, color2, light2);
-			ptr = addVertex(ptr, quadOffs >> (3 * 12), x, y, z, uv3, color3, light3);
+			ptr = addVertex(ptr, vertPos + face.v0, uv0, color0, light0);
+			ptr = addVertex(ptr, vertPos + face.v1, uv1, color1, light1);
+			ptr = addVertex(ptr, vertPos + face.v2, uv2, color2, light2);
+			ptr = addVertex(ptr, vertPos + face.v3, uv3, color3, light3);
 		}
 
 		writer.offset += TerrainFormat.STRIDE * 4;
@@ -147,15 +143,15 @@ public class VoxelMesherCenter  {
 			color3 = ColorBGRManager.multiplyColor(overlayColor, ao3);
 
 			if (flip) {
-				ptr = addVertex(ptr, quadOffs >> (3 * 12), x, y, z, uv3, color3, light3);
-				ptr = addVertex(ptr, quadOffs >> (0 * 12), x, y, z, uv0, color0, light0);
-				ptr = addVertex(ptr, quadOffs >> (1 * 12), x, y, z, uv1, color1, light1);
-				addVertex(ptr, quadOffs >> (2 * 12), x, y, z, uv2, color2, light2);
+				ptr = addVertex(ptr, vertPos + face.v3, uv3, color3, light3);
+				ptr = addVertex(ptr, vertPos + face.v0, uv0, color0, light0);
+				ptr = addVertex(ptr, vertPos + face.v1, uv1, color1, light1);
+				ptr = addVertex(ptr, vertPos + face.v2, uv2, color2, light2);
 			} else {
-				ptr = addVertex(ptr, quadOffs >> (0 * 12), x, y, z, uv0, color0, light0);
-				ptr = addVertex(ptr, quadOffs >> (1 * 12), x, y, z, uv1, color1, light1);
-				ptr = addVertex(ptr, quadOffs >> (2 * 12), x, y, z, uv2, color2, light2);
-				addVertex(ptr, quadOffs >> (3 * 12), x, y, z, uv3, color3, light3);
+				ptr = addVertex(ptr, vertPos + face.v0, uv0, color0, light0);
+				ptr = addVertex(ptr, vertPos + face.v1, uv1, color1, light1);
+				ptr = addVertex(ptr, vertPos + face.v2, uv2, color2, light2);
+				ptr = addVertex(ptr, vertPos + face.v3, uv3, color3, light3);
 			}
 			writer.offset += TerrainFormat.STRIDE * 4;
 			writer.vertices += 4;

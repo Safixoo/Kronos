@@ -1,6 +1,7 @@
 package dev.safixo.client.render.pipelines.terrain.meshing.data;
 
 import dev.safixo.client.render.pipelines.terrain.meshing.builders.VoxelMesher;
+import dev.safixo.client.render.vertex.writers.TerrainFormat;
 import dev.safixo.client.util.Direction;
 import dev.safixo.client.util.collection.Vector8bi;
 import org.joml.Vector3i;
@@ -12,19 +13,25 @@ public class FacingData {
 	public byte aoCornerX0, aoCornerY0, aoCornerZ0;
 	public byte aoCornerX1, aoCornerY1, aoCornerZ1;
 
-	// (0b111 * 3) * 4
-	public long quadVert;
-	public int uv0, uv1, uv2, uv3;
-
 	public int dirPacked;
-	public int aoCorner0Packed, aoCorner1Packed;
-	public short aoCorner0, aoCorner1;
+	public short aoCorner0Packed, aoCorner1Packed;
+	public byte aoCorner0, aoCorner1;
+
+	public long v0, v1, v2, v3;
+	public int uv0, uv1, uv2, uv3;
 
 	public FacingData() {}
 
 	public void setQuadVerts(int ind, Vector3i verts) {
-		long data = (verts.x & 0xF) | (verts.y & 0xF) << 4 | (verts.z & 0xF) << 8;
-		this.quadVert |= data << (12 * ind);
+		if (ind == 0) {
+			this.v0 = TerrainFormat.transformAddedPosition(verts.x, verts.y, verts.z);
+		} else if (ind == 1) {
+			this.v1 = TerrainFormat.transformAddedPosition(verts.x, verts.y, verts.z);
+		} else if (ind == 2) {
+			this.v2 = TerrainFormat.transformAddedPosition(verts.x, verts.y, verts.z);
+		} else {
+			this.v3 = TerrainFormat.transformAddedPosition(verts.x, verts.y, verts.z);
+		}
 	}
 
 	public void processCornersDir(int dir) {
@@ -36,8 +43,8 @@ public class FacingData {
 		this.aoCornerY1 = Direction.y(this.aoCorner1);
 		this.aoCornerZ1 = Direction.z(this.aoCorner1);
 
-		this.aoCorner0Packed = SectionCache.makeBlockIndex(this.aoCornerX0, this.aoCornerY0, this.aoCornerZ0);
-		this.aoCorner1Packed = SectionCache.makeBlockIndex(this.aoCornerX1, this.aoCornerY1, this.aoCornerZ1);
+		this.aoCorner0Packed = (short) SectionCache.makeBlockIndex(this.aoCornerX0, this.aoCornerY0, this.aoCornerZ0);
+		this.aoCorner1Packed = (short) SectionCache.makeBlockIndex(this.aoCornerX1, this.aoCornerY1, this.aoCornerZ1);
 
 		this.dirX = Direction.x(dir);
 		this.dirY = Direction.y(dir);

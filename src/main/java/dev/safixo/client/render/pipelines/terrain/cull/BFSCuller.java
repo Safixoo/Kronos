@@ -100,7 +100,7 @@ public class BFSCuller {
 	}
 
 	private static void fillAxisVisibility(SectionSet sectionSet, CameraData camera, int cameraIndex, int offset, int direction, short gridFactor) {
-		int renderDistance = camera.renderDistance;
+		int radius = sectionSet.getRadius();
 
 		byte[] sectionData = sectionSet.getSections();
 		short[] visSet = sectionSet.getVisibilitySet();
@@ -108,7 +108,7 @@ public class BFSCuller {
 		int index = cameraIndex;
 
 		// Negative direction.
-		for (int a = 0; a <= renderDistance; a++) {
+		for (int a = 0; a < radius; a++) {
 			int section = sectionData[index];
 
 			visSet[index] = gridFactor;
@@ -121,7 +121,7 @@ public class BFSCuller {
 		index = cameraIndex;
 
 		// Positive direction.
-		for (int a = 0; a <= renderDistance; a++) {
+		for (int a = 0; a < radius; a++) {
 			int section = sectionData[index];
 
 			visSet[index] = gridFactor;

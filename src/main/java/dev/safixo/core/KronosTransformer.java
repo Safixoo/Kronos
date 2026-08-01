@@ -21,7 +21,6 @@ public class KronosTransformer implements IClassTransformer {
 	static final String FONT_RENDERER_HOOK = "dev/safixo/core/hooks/FontRendererHook";
 	static final String FRUSTUM_HOOK = "dev/safixo/core/hooks/FrustumHook";
 	static final String MINECRAFT_HOOK = "dev/safixo/core/hooks/MinecraftHook";
-	static final String RENDER_BLOCKS_HOOK = "dev/safixo/core/hooks/RenderBlocksHook";
 
 	static final String ADV_MODEL_RENDERER = "dev/safixo/client/render/pipelines/entity/AdvancedModelRenderer";
 	static final String REBUILD_LISTENER = "dev/safixo/client/render/pipelines/terrain/meshing/RebuildListener";
@@ -84,9 +83,6 @@ public class KronosTransformer implements IClassTransformer {
 				break;
 			case BLOCK_SNOW:
 				replaceClassMethod(MINECRAFT_HOOK, "shouldSideBeRendered", "a", "(Lacf;IIII)Z", reference, false);
-				break;
-			case RENDER_BLOCKS:
-				replaceClassMethod(RENDER_BLOCKS_HOOK, "renderStandardBlock", "p", "(Laqz;III)Z", reference, false);
 				break;
 			case MODEL_RENDERER:
 				replaceClassMethod(ADV_MODEL_RENDERER, "render", "a", "(F)V", reference, false);
@@ -385,7 +381,8 @@ public class KronosTransformer implements IClassTransformer {
 		boolean shouldReplace = false;
 
 		for (int i = 0; i < classNode.methods.size(); i++) {
-			InsnList inns = ((MethodNode) classNode.methods.get(i)).instructions;
+			MethodNode methodNode = (MethodNode) classNode.methods.get(i);
+			InsnList inns = methodNode.instructions;
 			AbstractInsnNode insn = inns.getFirst();
 
 			while (insn != null) {

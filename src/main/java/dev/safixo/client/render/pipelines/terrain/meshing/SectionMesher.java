@@ -44,6 +44,7 @@ public class SectionMesher {
 	private final TerrainQuadInterceptor quadInterceptor;
 	private LightPipeline pipeline;
 
+	private final Vector3i pos = new Vector3i();
 	private int lastPass = -1;
 
 	public SectionMesher(TerrainQuadInterceptor quadInterceptor) {
@@ -93,36 +94,36 @@ public class SectionMesher {
 		// +-X face
 		for (int y = 0; y < 16; y++) {
 			for (int z = 0; z < 16; z++) {
-				meshBlock(task, renderBlocks, 15, y, z, ambient);
+				meshBlock(task, renderBlocks, 15, y, z, ambient, false);
 			}
 		}
 		for (int y = 0; y < 16; y++) {
 			for (int z = 0; z < 16; z++) {
-				meshBlock(task, renderBlocks, 0, y, z, ambient);
+				meshBlock(task, renderBlocks, 0, y, z, ambient, false);
 			}
 		}
 
 		// -+Y face
 		for (int z = 0; z < 16; z++) {
 			for (int x = 1; x < 15; x++) {
-				meshBlock(task, renderBlocks, x, 15, z, ambient);
+				meshBlock(task, renderBlocks, x, 15, z, ambient, false);
 			}
 		}
 		for (int z = 0; z < 16; z++) {
 			for (int x = 1; x < 15; x++) {
-				meshBlock(task, renderBlocks, x, 0, z, ambient);
+				meshBlock(task, renderBlocks, x, 0, z, ambient, false);
 			}
 		}
 
 		// -+Z face
 		for (int y = 1; y < 15; y++) {
 			for (int x = 1; x < 15; x++) {
-				meshBlock(task, renderBlocks, x, y, 15, ambient);
+				meshBlock(task, renderBlocks, x, y, 15, ambient, false);
 			}
 		}
 		for (int y = 1; y < 15; y++) {
 			for (int x = 1; x < 15; x++) {
-				meshBlock(task, renderBlocks, x, y, 0, ambient);
+				meshBlock(task, renderBlocks, x, y, 0, ambient, false);
 			}
 		}
 
@@ -133,7 +134,7 @@ public class SectionMesher {
 			for (int y = 1; y < 15; y++) {
 				for (int z = 1; z < 15; z++) {
 					for (int x = 1; x < 15; x++) {
-						meshBlockCenter(task, renderBlocks, x, y, z, ambient);
+						meshBlock(task, renderBlocks, x, y, z, ambient, true);
 					}
 				}
 			}
@@ -149,79 +150,14 @@ public class SectionMesher {
 		return cache.isVoxelFullRel(blockIndex) == CullSetGenerator.NOT_VISITED && !PrimitivesFlags.SOLID[blockId];
 	}
 
-	private void meshBlockCenter(SectionTask task, RenderBlocks renderBlocks, int x, int y, int z, boolean ambient) {
+	private void meshBlock(SectionTask task, RenderBlocks renderBlocks, int x, int y, int z, boolean ambient, boolean center) {
 		SectionRender section = task.section;
 		SectionCache cache = task.cache;
 
 		int blockIndex = makeBlockIndex(x, y, z);
 		int blockId = cache.getBlockIdCenter(blockIndex);
 
-		if (blockId == AIR_ID || skipBlock(cache, blockId, blockIndex)) {
-			return;
-		}
-
-		int blockX = x + section.blockX, blockY = y + section.blockY, blockZ = z + section.blockZ;
-
-		if (PrimitivesFlags.SOLID_LIGHT_MASK[blockId] == 1) {
-			int drawBitSet = 0;
-
-			drawBitSet |= cache.isVoxelFullRel(blockIndex + makeBlockIndex(0, 1, 0)) << UP;
-			drawBitSet |= cache.isVoxelFullRel(blockIndex - makeBlockIndex(0, 1, 0)) << DOWN;
-			drawBitSet |= cache.isVoxelFullRel(blockIndex - makeBlockIndex(0, 0, 1)) << NORTH;
-			drawBitSet |= cache.isVoxelFullRel(blockIndex + makeBlockIndex(0, 0, 1)) << SOUTH;
-			drawBitSet |= cache.isVoxelFullRel(blockIndex - makeBlockIndex(1, 0, 0)) << WEST;
-			drawBitSet |= cache.isVoxelFullRel(blockIndex + makeBlockIndex(1, 0, 0)) << EAST;
-			drawBitSet ^= 0x3F;
-
-			if (drawBitSet != 0b0) {
-				VoxelMesherCenter.meshVoxel(task, Block.blocksList[blockId], blockX, blockY, blockZ, ambient, drawBitSet, blockId);
-			}
-		} else {
-			if (PrimitivesFlags.TILE_ENTITY[blockId]) {
-				TileEntity tileEntity = cache.getBlockTileEntity(blockX, blockY, blockZ);
-
-				if (TileEntityRenderer.instance.hasSpecialRenderer(tileEntity)) {
-					this.addTileEntity(tileEntity);
-				}
-			}
-
-			VertexWriter writer;
-			int blockRenderPass = PrimitivesFlags.RENDER_PASS[blockId];
-
-			if (blockRenderPass == 1) {
-				writer = task.getTranslucentWriter();
-			} else {
-				writer = task.getSolidWriter(MeshDirection.GENERIC);
-			}
-
-			if (this.lastPass != blockRenderPass) {
-				VertexWriter.setCurrentInstance(writer);
-			}
-			this.lastPass = blockRenderPass;
-
-			setupTranslation(section, writer);
-			Block block = Block.blocksList[blockId];
-
-			this.quadInterceptor.setCursor(block, this.pos.set(blockX, blockY, blockZ));
-
-			if (block.getRenderType() == FLUID_RENDER_TYPE) {
-				writer.setQuadReceiver(DefaultVertexFormats.TERRAIN_FORMAT);
-				this.fluidMesher.render(writer, this.pipeline, cache, (BlockFluid) block, blockX, blockY, blockZ);
-			} else {
-				writer.setQuadReceiver(this.quadInterceptor);
-				renderBlocks.renderBlockByRenderType(block, blockX, blockY, blockZ);
-			}
-		}
-	}
-
-	private void meshBlock(SectionTask task, RenderBlocks renderBlocks, int x, int y, int z, boolean ambient) {
-		SectionRender section = task.section;
-		SectionCache cache = task.cache;
-
-		int blockIndex = makeBlockIndex(x, y, z);
-		int blockId = cache.getBlockIdCenter(blockIndex);
-
-		if (blockId == AIR_ID || skipBlock(cache, blockId, blockIndex)) {
+		if (blockId == AIR_ID || Block.blocksList[blockId] == null | skipBlock(cache, blockId, blockIndex)) {
 			return;
 		}
 
@@ -229,22 +165,35 @@ public class SectionMesher {
 		int blockY = y + section.blockY;
 		int blockZ = z + section.blockZ;
 
-		if (PrimitivesFlags.SOLID_LIGHT_MASK[blockId] == 1) {
+		if (PrimitivesFlags.VOXEL_RENDER[blockId]) {
 			int rX = x + 16;
 			int rY = y + 16;
 			int rZ = z + 16;
 			int drawBitSet = 0;
 
-			drawBitSet |= cache.isVoxelFullRel(rX, rY + 1, rZ) << UP;
-			drawBitSet |= cache.isVoxelFullRel(rX, rY - 1, rZ) << DOWN;
-			drawBitSet |= cache.isVoxelFullRel(rX, rY, rZ - 1) << NORTH;
-			drawBitSet |= cache.isVoxelFullRel(rX, rY, rZ + 1) << SOUTH;
-			drawBitSet |= cache.isVoxelFullRel(rX - 1, rY, rZ) << WEST;
-			drawBitSet |= cache.isVoxelFullRel(rX + 1, rY, rZ) << EAST;
+			if (center) {
+				drawBitSet |= cache.isVoxelFullRel(blockIndex + makeBlockIndex(0, 1, 0)) << UP;
+				drawBitSet |= cache.isVoxelFullRel(blockIndex - makeBlockIndex(0, 1, 0)) << DOWN;
+				drawBitSet |= cache.isVoxelFullRel(blockIndex - makeBlockIndex(0, 0, 1)) << NORTH;
+				drawBitSet |= cache.isVoxelFullRel(blockIndex + makeBlockIndex(0, 0, 1)) << SOUTH;
+				drawBitSet |= cache.isVoxelFullRel(blockIndex - makeBlockIndex(1, 0, 0)) << WEST;
+				drawBitSet |= cache.isVoxelFullRel(blockIndex + makeBlockIndex(1, 0, 0)) << EAST;
+			} else {
+				drawBitSet |= cache.isVoxelFullRel(rX, rY + 1, rZ) << UP;
+				drawBitSet |= cache.isVoxelFullRel(rX, rY - 1, rZ) << DOWN;
+				drawBitSet |= cache.isVoxelFullRel(rX, rY, rZ - 1) << NORTH;
+				drawBitSet |= cache.isVoxelFullRel(rX, rY, rZ + 1) << SOUTH;
+				drawBitSet |= cache.isVoxelFullRel(rX - 1, rY, rZ) << WEST;
+				drawBitSet |= cache.isVoxelFullRel(rX + 1, rY, rZ) << EAST;
+			}
 			drawBitSet ^= 0x3F;
 
 			if (drawBitSet != 0b0) {
-				VoxelMesher.meshVoxel(task, Block.blocksList[blockId], blockX, blockY, blockZ, ambient, drawBitSet, blockId);
+				if (center) {
+					VoxelMesherCenter.meshVoxel(task, Block.blocksList[blockId], blockX, blockY, blockZ, ambient, drawBitSet, blockId);
+				} else {
+					VoxelMesher.meshVoxel(task, Block.blocksList[blockId], blockX, blockY, blockZ, ambient, drawBitSet, blockId);
+				}
 			}
 		} else {
 			if (PrimitivesFlags.TILE_ENTITY[blockId]) {
@@ -283,8 +232,6 @@ public class SectionMesher {
 			}
 		}
 	}
-
-	private final Vector3i pos = new Vector3i();
 
 	private static void setupTranslation(SectionRender section, VertexWriter writer) {
 		// Region translation-offset.

@@ -71,20 +71,25 @@ public class SmoothLightPipeline implements LightPipeline {
 
 		AoNeighborInfo neighborInfo = AoNeighborInfo.get(side);
 
-		// Only valid if side != MeshDirection.GENERIC
 		boolean aligned = this.isAligned(neighborInfo, quad, pos);
 
         if (side != MeshDirection.GENERIC && aligned) {
-            if (LightDataAccess.unpackFC(this.lightCache.get(pos))) { // TODO: Return partial check.
-                this.applyAlignedFullFace(neighborInfo, pos, side, out, shade);
-            } else {
-                this.applyAlignedPartialFace(neighborInfo, quad, pos, side, out, shade);
-            }
+			if (LightDataAccess.unpackFO(this.lightCache.get(pos))) {
+				this.applyAlignedFullFace(pos, side, out, shade);
+			} else {
+				this.applyAlignedPartialFace(neighborInfo, quad, pos, side, out, shade);
+			}
         } else if (side != MeshDirection.GENERIC) {
             this.applyParallelFace(neighborInfo, quad, pos, side, out, shade);
         } else {
             this.applyNonParallelFace(neighborInfo, quad, pos, MeshDirection.YP, out, shade);
         }
+
+		if (LightDataAccess.unpackEM(this.lightCache.get(pos))) {
+			for (int i = 0; i < 4; i++) {
+				out.br[i] = 1.0f;
+			}
+		}
     }
 
 	private boolean isAligned(AoNeighborInfo neighborInfo, Quad quad, Vector3i pos) {
@@ -101,9 +106,18 @@ public class SmoothLightPipeline implements LightPipeline {
      * have two contributing sides.
      * Flags: IS_ALIGNED, !IS_PARTIAL
      */
-    private void applyAlignedFullFace(AoNeighborInfo neighborInfo, Vector3i pos, int dir, QuadLightData out, boolean shade) {
+    private void applyAlignedFullFace(Vector3i pos, int dir, QuadLightData out, boolean shade) {
         AoFaceData faceData = this.getCachedFaceData(pos, dir, true, shade);
-        neighborInfo.mapCorners(faceData.lm, faceData.ao, out.lm, out.br);
+
+		out.lm[0] = faceData.lm[0];
+		out.lm[1] = faceData.lm[1];
+		out.lm[2] = faceData.lm[2];
+		out.lm[3] = faceData.lm[3];
+
+		out.br[0] = faceData.ao[0];
+		out.br[1] = faceData.ao[1];
+		out.br[2] = faceData.ao[2];
+		out.br[3] = faceData.ao[3];
     }
 
     /**
@@ -337,7 +351,9 @@ public class SmoothLightPipeline implements LightPipeline {
         if (!data.hasLightData()) {
             data.initLightData(this.lightCache, pos, face, offset);
 
-            this.applySidedBrightness(data, face, shade);
+			if (LightDataAccess.unpackOP(this.lightCache.get(pos))) {
+				this.applySidedBrightness(data, face, shade);
+			}
 
             data.unpackLightData();
         }

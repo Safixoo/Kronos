@@ -20,7 +20,7 @@ import java.util.concurrent.locks.LockSupport;
 
 public class MesherRunnable implements Runnable {
 	private final ConcurrentLinkedDeque<SectionTask> tasks = new ConcurrentLinkedDeque<>();
-	private final ArrayBlockingQueue<SectionResult> results = new ArrayBlockingQueue<>(WorldManager.MAX_TASK_CONCURRENTLY);
+	private final ArrayBlockingQueue<SectionResult> results = new ArrayBlockingQueue<>(WorldManager.MAX_TASK_CONCURRENTLY * 2);
 
 	private final MemoryPool memoryPool = new MemoryPool(4 << 20, WorldManager.MAX_TASK_CONCURRENTLY * 2);
 

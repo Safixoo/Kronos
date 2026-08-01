@@ -62,6 +62,6 @@ public class FlatLightPipeline implements LightPipeline {
 
         // Use light values from the offset pos, but luminance from the origin pos
         int adjWord = this.lightCache.get(pos, face);
-        return MathExt.getLightmapCoord(unpackSL(adjWord), Math.max(unpackBL(adjWord), unpackLU(word)));
+        return MathExt.getLightmapCoord(unpackSL(adjWord), unpackBL(adjWord));
     }
 }

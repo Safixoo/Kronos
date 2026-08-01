@@ -32,8 +32,16 @@ public class PrimitivesFlags {
 	public static final boolean[] SOLID = new boolean[4096];
 	public static final boolean[] NORMAL_BLOCK = new boolean[4096];
 
+	public static final boolean[] VOXEL_RENDER = new boolean[4096];
+
+	// Just as SOLID but returns {1, 0}
 	public static final byte[] SOLID_CULL_MASK = new byte[4096];
+
+	// Solid for lighting purposes.
 	public static final byte[] SOLID_LIGHT_MASK = new byte[4096];
+
+	// If Block#shouldSideBeRendered is overridden in the given Block or not.
+	// (avoids a common virtual dispatch).
 	public static final boolean[] DIRECT_CULL = new boolean[4096];
 
 	public static final boolean[] TILE_ENTITY = new boolean[4096];
@@ -63,13 +71,14 @@ public class PrimitivesFlags {
 				continue;
 			}
 
-			SOLID[i] = block.isOpaqueCube();
+			SOLID[i] = block.isOpaqueCube() || block instanceof BlockLeaves;
+			VOXEL_RENDER[i] = block.getRenderType() == 0 && (SOLID[i] && Block.lightValue[i] == 0);
 
 			NORMAL_BLOCK[i] = block.blockMaterial.isOpaque() && block.renderAsNormalBlock() && !block.canProvidePower();
 			MATERIAL[i] = block.blockMaterial;
 
 			SOLID_CULL_MASK[i] = (byte) (SOLID[i] ? 1 : 0);
-			SOLID_LIGHT_MASK[i] = (byte) ((block.isOpaqueCube() && Block.lightValue[i] <= 5) || block instanceof BlockLeaves || Block.lightOpacity[i] >= 14 ? 1 : 0);
+			SOLID_LIGHT_MASK[i] = (byte) (((block.isOpaqueCube() || Block.lightOpacity[i] >= 14) && Block.lightValue[i] == 0) || block instanceof BlockLeaves ? 1 : 0);
 
 			// To skip virtual overhead.
 			TILE_ENTITY[i] = block.hasTileEntity(0);
@@ -142,7 +151,7 @@ public class PrimitivesFlags {
 				COLOR_MODULATOR[i] = ModelColorizer.DEFAULT_COLOR;
 			} else if (colorized.getDeclaringClass() == BlockFluid.class) {
 				COLOR_MODULATOR[i] = ModelColorizer.WATER_COLOR;
-			} else if (colorized.getDeclaringClass() == BlockGrass.class || block.blockMaterial == Material.vine) {
+			} else if (colorized.getDeclaringClass() == BlockGrass.class || block.blockMaterial == Material.vine || block.blockMaterial == Material.grass) {
 				COLOR_MODULATOR[i] = ModelColorizer.GRASS_COLOR;
 			} else if (colorized.getDeclaringClass() == BlockLeaves.class) {
 				COLOR_MODULATOR[i] = ModelColorizer.FOLIAGE_COLOR;

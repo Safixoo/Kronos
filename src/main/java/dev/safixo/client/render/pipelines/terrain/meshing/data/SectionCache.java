@@ -206,7 +206,7 @@ public class SectionCache implements IBlockAccess {
 			}
 		}
 
-		this.uniformBiomes = false;
+		this.uniformBiomes = uniformBiome;
 	}
 
 	public void checkUniformBiomes() {
@@ -430,25 +430,16 @@ public class SectionCache implements IBlockAccess {
 		int blockIndex = makeBlockIndex(blockX & 15, blockY & 15, blockZ & 15);
 
 		int blockIdLsb = MathExt.byteToUnsigned(this.sectionBlocks[sectionIndex][blockIndex]);
-		int blockIdMsb = getMsbNibble(sectionIndex, blockIndex);
+		int blockIdMsb = getNibble(this.sectionBlocksMsb[sectionIndex], blockIndex);
 
 		return blockIdLsb | blockIdMsb << 8;
 	}
 
 	public int getBlockId(int sectionIndex, int blockIndex) {
 		int blockIdLsb = MathExt.byteToUnsigned(this.sectionBlocks[sectionIndex][blockIndex]);
-		int blockIdMsb = getMsbNibble(sectionIndex, blockIndex);
+		int blockIdMsb = getNibble(this.sectionBlocksMsb[sectionIndex], blockIndex);
 
 		return blockIdLsb | blockIdMsb << 8;
-	}
-
-	private int getMsbNibble(int sectionIndex, int blockIndex) {
-		byte[] msbArray = this.sectionBlocksMsb[sectionIndex];
-		return msbArray != null ? getNibble(this.sectionBlocksMsb[sectionIndex], blockIndex) : 0;
-	}
-
-	private int getMsbNibbleCenter(int blockIndex) {
-		return this.centerBlocksMsb != null ? getNibble(this.centerBlocksMsb, blockIndex) : 0;
 	}
 
 	@Override
@@ -505,13 +496,9 @@ public class SectionCache implements IBlockAccess {
 		return MathExt.getLightmapCoord(skyLight, blockLight);
 	}
 
-	public int getBlockIdCenter(int x, int y, int z) {
-		return this.getBlockIdCenter(makeBlockIndex(x & 15, y & 15, z & 15));
-	}
-
 	public int getBlockIdCenter(int blockIndex) {
 		int blockIdLsb = MathExt.byteToUnsigned(this.centerBlocks[blockIndex]);
-		int blockIdMsb = getMsbNibbleCenter(blockIndex);
+		int blockIdMsb = getNibble(this.centerBlocksMsb, blockIndex);
 
 		return blockIdLsb | blockIdMsb << 8;
 	}
@@ -590,16 +577,20 @@ public class SectionCache implements IBlockAccess {
 		return this.getBlockId(x, y, z) == 0;
 	}
 
+	public int getBiomeRaw(int x, int z) {
+		int biomeX = x - (this.blockX + 16 - BIOME_RADIUS);
+		int biomeZ = z - (this.blockZ + 16 - BIOME_RADIUS);
+
+		return this.biomes[biomeX + biomeZ * BIOME_CHUNK_WIDTH] & 0xFF;
+	}
+
 	@Override
 	public BiomeGenBase getBiomeGenForCoords(int x, int z) {
 		if (this.uniformBiomes) {
 			return this.inlinedBiome;
 		}
 
-		int biomeX = x - (this.blockX + 16 - BIOME_RADIUS);
-		int biomeZ = z - (this.blockZ + 16 - BIOME_RADIUS);
-
-		return BiomeGenBase.biomeList[this.biomes[biomeX + biomeZ * BIOME_CHUNK_WIDTH] & 0xFF];
+		return BiomeGenBase.biomeList[this.getBiomeRaw(x, z)];
 	}
 
 	@Override

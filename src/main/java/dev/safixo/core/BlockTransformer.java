@@ -41,8 +41,9 @@ public class BlockTransformer implements IClassTransformer {
 
 		checkDevEnvironment();
 
-		startBlockCollection(reference);
-		redirectAsyncBlocksCalls(reference);
+		if (startBlockCollection(reference)) {
+			redirectAsyncBlocksCalls(reference);
+		}
 
 		return reference[0];
 	}
@@ -66,7 +67,7 @@ public class BlockTransformer implements IClassTransformer {
 				if (opcode == GETFIELD || opcode == PUTFIELD) {
 					FieldInsnNode m = (FieldInsnNode) insn;
 
-					if (BLOCK_TYPES.contains(m.owner) && FIELDS.containsKey(m.name)) {
+					if (classNode.name.equals(m.owner) && FIELDS.containsKey(m.name)) {
 						String fieldCanon = FIELDS.get(m.name);
 
 						String name;
@@ -143,7 +144,7 @@ public class BlockTransformer implements IClassTransformer {
 		classNode.visitField(Opcodes.ACC_PUBLIC, name, "D", null, NULL_DOUBLE);
 	}
 
-	static void startBlockCollection(byte[][] basicClass) {
+	static boolean startBlockCollection(byte[][] basicClass) {
 		if (BLOCK_TYPES == null) {
 			BLOCK_TYPES = new HashSet<>();
 			BLOCK_TYPES.add(IN_DEV ? "net/minecraft/block/Block" : "aqz");
@@ -159,7 +160,10 @@ public class BlockTransformer implements IClassTransformer {
 
 		if (BLOCK_TYPES.contains(classNode.superName)) {
 			BLOCK_TYPES.add(classNode.name);
+			return true;
 		}
+
+		return false;
 	}
 
 	static boolean CHECKED_FOR_DEV;

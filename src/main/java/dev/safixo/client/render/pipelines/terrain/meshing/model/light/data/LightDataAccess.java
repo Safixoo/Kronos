@@ -50,7 +50,7 @@ public abstract class LightDataAccess {
     }
 
 	private static boolean testFullBlock(Block block) {
-		return block != null &&
+		return
 			block.getBlockBoundsMinX() <= 0.001F && block.getBlockBoundsMaxX() >= 0.999F &&
 			block.getBlockBoundsMinY() <= 0.001F && block.getBlockBoundsMaxY() >= 0.999F &&
 			block.getBlockBoundsMinZ() <= 0.001F && block.getBlockBoundsMaxZ() >= 0.999F;
@@ -68,26 +68,21 @@ public abstract class LightDataAccess {
         int blockId = level.getBlockId(x, y, z);
 		Block block = Block.blocksList[blockId];
 
-        boolean op = block != null && block.blockMaterial.getCanBlockGrass();
-        boolean fo = PrimitivesFlags.SOLID_LIGHT_MASK[blockId] == 1;
-        boolean fc = testFullBlock(block);
+		boolean fo = PrimitivesFlags.SOLID[blockId];
+		boolean op = fo || block != null && block.blockMaterial.isOpaque();
 
         int lu = Block.lightValue[blockId];
 		boolean em = lu != 0;
 
-        // OPTIMIZE: Do not calculate light data if the block is full and opaque and does not emit light.
-        int bl;
-        int sl;
-        if (fo && lu == 0) {
-            bl = 0;
-            sl = 0;
-        } else {
-            int light = level.getLightBrightnessForSkyBlocks(x, y, z, lu);
-			bl = MathExt.getBlocklight(light);
+        int bl = lu;
+        int sl = 0;
+		if (!fo) {
+			int light = level.getLightBrightnessForSkyBlocks(x, y, z, lu);
+			bl = Math.max(bl, MathExt.getBlocklight(light));
 			sl = MathExt.getSkylight(light);
-        }
+		}
 
-        // FIX: Do not apply AO from blocks that emit light
+		// FIX: Do not apply AO from blocks that emit light
         float ao;
         if (lu == 0 && block != null) {
             ao = block.getAmbientOcclusionLightValue(level, x, y, z);
@@ -95,7 +90,7 @@ public abstract class LightDataAccess {
             ao = 1.0f;
         }
 
-        return packFC(fc) | packFO(fo) | packOP(op) | packEM(em) | packAO(ao) | packLU(lu) | packSL(sl) | packBL(bl);
+        return packFO(fo) | packOP(op) | packEM(em) | packAO(ao) | packSL(sl) | packBL(bl);
     }
 
     public static int packBL(int blockLight) {
@@ -112,14 +107,6 @@ public abstract class LightDataAccess {
 
     public static int unpackSL(int word) {
         return (word >>> 4) & 0xF;
-    }
-
-    public static int packLU(int luminance) {
-        return (luminance & 0xF) << 8;
-    }
-
-    public static int unpackLU(int word) {
-        return (word >>> 8) & 0xF;
     }
 
     public static int packAO(float ao) {
@@ -156,16 +143,8 @@ public abstract class LightDataAccess {
         return ((word >>> 30) & 0b1) != 0;
     }
 
-    public static int packFC(boolean fullCube) {
-        return (fullCube ? 1 : 0) << 31;
-    }
-
-    public static boolean unpackFC(int word) {
-        return ((word >>> 31) & 0b1) != 0;
-    }
-
     public static int getLightmap(int word) {
-        return MathExt.getLightmapCoord(unpackSL(word), Math.max(unpackBL(word), unpackLU(word)));
+        return MathExt.getLightmapCoord(unpackSL(word), unpackBL(word));
     }
 
     public static int getEmissiveLightmap(int word) {
