@@ -1,17 +1,18 @@
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+
 plugins {
     id 'java'
-    id 'xyz.wagyourtail.unimined' version '1.4.1'
+    id 'xyz.wagyourtail.unimined' version '1.4.2-SNAPSHOT'
+    id 'com.gradleup.shadow' version '8.3.11'
 }
 
 group 'dev.safixo'
-version '1.0-SNAPSHOT'
+version '1.0'
 
-base {
-    archivesName = 'kronos'
-}
+base.archivesName = 'kronos'
 
 // this is just here so we can test the outputs easier and clean between tests
-unimined.useGlobalCache = false
+unimined.useGlobalCache = true
 
 sourceCompatibility = JavaVersion.VERSION_1_7
 targetCompatibility = JavaVersion.VERSION_1_7
@@ -26,15 +27,6 @@ unimined.minecraft {
         loader "9.11.1.1345"
         accessTransformer("src/main/resources/kronos_at.cfg")
     }
-
-    minecraftRemapper.config {
-
-        ignoreConflicts(true)
-    }
-}
-
-repositories {
-
 }
 
 dependencies {
@@ -44,39 +36,38 @@ dependencies {
     implementation("org.joml:joml:1.9.20")
     // https://mvnrepository.com/artifact/org.lwjgl.lwjgl/lwjgl
     compileOnly("org.lwjgl.lwjgl:lwjgl:2.9.1")
+
+    // https://mvnrepository.com/artifact/it.unimi.dsi/fastutil
+    shadow("it.unimi.dsi:fastutil:7.2.1")
+    // https://mvnrepository.com/artifact/org.joml/joml
+    shadow("org.joml:joml:1.9.20")
 }
+
+tasks.register("shadowRemapJar", ShadowJar) {
+    configurations = [project.configurations.shadow]
+    archiveClassifier = 'all'
+
+    from {
+        zipTree(tasks.named("remapJar").get().archiveFile)
+    }
+    getManifest().inheritFrom(jar.getManifest())
+
+    exclude 'module-info.class'
+    minimize()
+}
+
+build.dependsOn(tasks.named("shadowRemapJar"))
 
 jar {
-    manifest {
-        attributes(
-                'FMLCorePlugin': 'dev.safixo.KronosCoreMod'
-        )
-    }
-
-    from { configurations.runtimeClasspath.collect { zipTree(it) } }
-    exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA'
+    manifest.attributes([
+            "FMLCorePlugin": "dev.safixo.KronosCoreMod",
+            "FMLCorePluginContainsFMLMod": "true",
+            "ForceLoadAsMod": "true"
+    ])
 }
 
-tasks.named("runClient") {
-    jvmArgs += ["-Dfml.coreMods.load=dev.safixo.KronosCoreMod"]
-
-//    args = [
-//            "--username", "\${auth_player_name}",
-//            "--session", "\${auth_session}",
-//            "--version", "1.6.4",
-//            "--gameDir", "\${game_directory}",
-//            "--assetsDir", "\${game_assets}",
-//            "--tweakClass", "cpw.mods.fml.common.launcher.FMLTweaker",
-//            "--tweakClass", "dev.safixo.core.LWJGLTweak"
-//    ]
-}
-
-tasks.withType(JavaExec).configureEach {
-    doFirst {
-        classpath = classpath.filter { file ->
-            !file.name.contains('annotations')
-        }
-    }
+runClient {
+    jvmArgs += "-Dfml.coreMods.load=dev.safixo.KronosCoreMod"
 }
 
 processResources {
