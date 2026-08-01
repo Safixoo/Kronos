@@ -9,7 +9,6 @@ public class FastLongHashMap<T> {
 	private static final long LONG_PHI = 0x9E3779B97F4A7C15L;
 
 	// use a very unlikely value to mark unused keys.
-	private static final long TOMBSTONE = ~(1L << 62);
 	private static final long NULL = (1L << 62L) + (1L << 61L) + 5;
 
 	private static final int INITIAL_SIZE = 16;
@@ -19,7 +18,7 @@ public class FastLongHashMap<T> {
 	private int size, mask, count, tombstones;
 
 	private long lastKey = NULL;
-	private Object lastObject;
+	private T lastObject;
 
 	public FastLongHashMap() {
 		this(INITIAL_SIZE);
@@ -56,38 +55,67 @@ public class FastLongHashMap<T> {
 		return slotKey != NULL;
 	}
 
-	public Object remove(long key) {
-		int mask = this.mask;
-		long[] keys = this.keys;
+	private void shiftKeys(int pos) {
+		int last, slot;
 
+		T[] values = this.values;
+		long[] key = this.keys;
+		int mask = this.mask;
+
+		while (true) {
+			pos = ((last = pos) + 1) & mask;
+			long curr;
+
+			while (true) {
+				curr = key[pos];
+
+				if (curr == NULL) {
+					key[last] = NULL;
+					values[last] = null;
+					return;
+				}
+
+				slot = hash(curr) & mask;
+				if (last <= pos ? (last >= slot || slot > pos) : (last >= slot && slot > pos)) {
+					break;
+				}
+				pos = ++pos & mask;
+			}
+			key[last] = curr;
+			values[last] = values[pos];
+		}
+	}
+
+	public Object remove(long key) {
 		if (this.lastKey == key) {
 			this.lastKey = NULL;
 		}
 
+		int mask = this.mask;
+		long[] keys = this.keys;
+
 		int slot = hash(key) & mask;
-		long slotKey = keys[slot];
 
-		while (slotKey != NULL && slotKey != key) {
-			slot = ++slot & mask;
-			slotKey = keys[slot];
-		}
+		while (true) {
+			long slotKey = keys[slot];
 
-		Object removedObj = this.values[slot];
-
-		if (slotKey == key) {
-			this.values[slot] = null;
-			this.keys[slot] = TOMBSTONE;
-
-			this.count--;
-			this.tombstones++;
-
-			// avoids getting stuck because of too many tombstones.
-			if (getNewSize(this.tombstones + this.count) >= this.size) {
-				this.resize();
+			if (slotKey == NULL) {
+				return null;
 			}
+			if (slotKey == key) {
+				break;
+			}
+
+			slot = ++slot & mask;
 		}
 
-		return removedObj;
+		Object removed = this.values[slot];
+
+		this.values[slot] = null;
+		this.count--;
+
+		this.shiftKeys(slot);
+		return removed;
 	}
 
 	public void put(long key, Object value) {
@@ -102,7 +130,7 @@ public class FastLongHashMap<T> {
 			this.resize();
 		}
 
-		if (key == NULL || key == TOMBSTONE) {
+		if (key == NULL) {
 			throw new RuntimeException("Key is the same as the internal value!");
 		}
 
@@ -111,9 +139,7 @@ public class FastLongHashMap<T> {
 		Object[] values = this.values;
 
 		int slot = hash(key) & mask;
-
 		long slotKey = keys[slot];
-		int potentialTombstone = 0;
 
 		while (slotKey != NULL) {
 			// if the key is already put, replace the slot.
@@ -122,17 +148,8 @@ public class FastLongHashMap<T> {
 				return;
 			}
 
-			// reuse tombstones, not immediately to avoid duplicating keys.
-			if (slotKey == TOMBSTONE) {
-				potentialTombstone = slot;
-			}
-
 			slot = ++slot & mask;
 			slotKey = keys[slot];
-		}
-
-		if (potentialTombstone != 0) {
-			slot = potentialTombstone;
 		}
 
 		this.count++;
@@ -147,7 +164,7 @@ public class FastLongHashMap<T> {
 		return (int) (h ^ (h >>> 16));
 	}
 
-	public Object get(long key) {
+	public T get(long key) {
 		if (this.lastKey == key) {
 			return this.lastObject;
 		}
@@ -193,7 +210,7 @@ public class FastLongHashMap<T> {
 		Arrays.fill(this.keys, NULL);
 
 		while (count > 0) {
-			if (oldValues[++index] == null) {
+			if (oldKeys[++index] == NULL) {
 				continue;
 			}
 

@@ -2,6 +2,7 @@ package dev.safixo.client.util.data;
 
 import dev.safixo.client.render.pipelines.terrain.WorldManager;
 import dev.safixo.client.util.MathExt;
+import dev.safixo.client.util.collection.FastLongHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ChunkProviderClient;
@@ -14,7 +15,7 @@ import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.world.ChunkEvent;
 
 public class ClientChunkListener extends ChunkProviderClient {
-	private final Long2ReferenceOpenHashMap<ChunkMetadata> chunkMap = new Long2ReferenceOpenHashMap<>(128);
+	private final FastLongHashMap<ChunkMetadata> chunkMap = new FastLongHashMap<>(128);
 
 	private final World world;
 	private final EmptyChunk blankChunk;
@@ -34,7 +35,7 @@ public class ClientChunkListener extends ChunkProviderClient {
 
 	@Override
 	public String makeString() {
-		return "KronosChunkCache: " + this.chunkMap.size();
+		return "KronosChunkCache: " + this.chunkMap.getSize();
 	}
 
 	public boolean canLoadChunk(int x, int z) {
