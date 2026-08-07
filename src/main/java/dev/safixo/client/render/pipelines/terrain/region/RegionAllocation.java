@@ -29,7 +29,7 @@ public class RegionAllocation {
 	public static GlVertexBuffer SPARE_BUFFER;
 
 	public RegionAllocation(int size, int pass) {
-		this(Math.max(size, pass == 0 ? SOLID_MIN_ALLOC : TRANSLUCENT_MIN_ALLOC));
+		this(Math.max(size, pass == RegionRender.SOLID_PASS ? SOLID_MIN_ALLOC : TRANSLUCENT_MIN_ALLOC));
 	}
 
 	public RegionAllocation(int size) {
@@ -66,7 +66,7 @@ public class RegionAllocation {
 		if (newSize > SPARE_BUFFER_ALLOC) {
 			// If the region is more than 32MB avoid allocating a temporal buffer as is preferred
 			// to not duplicate that much memory.
-			if (this.offset > (32 << 20)) {
+			if (this.offset > 40 * 1024 * 1024) {
 				this.vertexBuffer.allocateSpace((int) newSize, GL15.GL_STATIC_DRAW);
 
 				Allocation alloc = this.firstEntry;

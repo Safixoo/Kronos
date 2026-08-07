@@ -71,8 +71,8 @@ public class RegionRender {
 	private int sectionsToRender;
 
 	// Pointers for the indirect drawing commands.
-	private long solidIndirectPtr;
-	private long translucentIndirectPtr;
+	private long solidIndirectPtr = UnsafeUtil.NULL;
+	private long translucentIndirectPtr = UnsafeUtil.NULL;
 
 	// Memoize drawing context to check if the result of the last draw construction is still valid to cache.
 	private final RegionDrawContext drawContext = new RegionDrawContext();
@@ -297,13 +297,8 @@ public class RegionRender {
 		}
 
 		this.drawContext.setDrawCount(pass, drawCount);
-
-		if (drawCount == 0) {
-			return;
-		}
-
-		this.drawContext.multiDrawData(this, camera, shader, pass);
 		this.drawContext.validatePass(pass);
+		this.drawContext.multiDrawData(this, camera, shader, pass);
 	}
 
 	private int prepareSolidBatch(CameraData camera, int regionIndex, int solidMask, int drawCount) {

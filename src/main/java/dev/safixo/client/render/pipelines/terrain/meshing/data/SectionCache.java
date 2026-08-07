@@ -8,6 +8,7 @@ import net.minecraft.block.*;
 import net.minecraft.block.material.Material;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.Vec3Pool;
+import net.minecraft.world.ColorizerFoliage;
 import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
 import net.minecraft.world.biome.BiomeGenBase;
@@ -237,8 +238,19 @@ public class SectionCache implements IBlockAccess {
 		return this.uniformBiomes;
 	}
 
-	public int getColorByType(int colorTypeId) {
-		return this.uniformColors[colorTypeId];
+	public int getColorByType(int x, int y, int z, int colorizeType) {
+		if (colorizeType == ModelColorizer.FOLIAGE_COLOR) {
+			int meta = this.getBlockMetadata(x, y, z);
+
+			if ((meta & 0b11) == 0b01) {
+				return ColorizerFoliage.getFoliageColorPine();
+			}
+			if ((meta & 0b11) == 0b10) {
+				return ColorizerFoliage.getFoliageColorBirch();
+			}
+		}
+
+		return this.uniformColors[colorizeType];
 	}
 
 	private static int biomeIndex(int x, int z) {
@@ -456,12 +468,13 @@ public class SectionCache implements IBlockAccess {
 	}
 
 	public int getLightmap(int x, int y, int z, int defBlockLight) {
-		int blockIndex = makeBlockIndex(x & 15, y & 15, z & 15);
 		int blockX = x - this.blockX;
 		int blockY = y - this.blockY;
 		int blockZ = z - this.blockZ;
 
+		int blockIndex = makeBlockIndex(blockX & 15, blockY & 15, blockZ & 15);
 		int sectionIndex = sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
+
 		return extractLightNibbles(this.skyLight[sectionIndex], this.blockLight[sectionIndex], blockIndex, defBlockLight);
 	}
 

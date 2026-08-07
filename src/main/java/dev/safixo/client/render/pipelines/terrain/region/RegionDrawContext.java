@@ -98,10 +98,14 @@ public class RegionDrawContext {
 	}
 
 	public void multiDrawData(RegionRender region, CameraData camera, TerrainProgram shader, int pass) {
+		int drawCount = this.drawCount[pass];
+
+		if (drawCount == 0) {
+			return;
+		}
+
 		RenderBuffer vertexBuffer = region.getRenderBuffer(pass);
 		vertexBuffer.bindState(true);
-
-		int drawCount = this.drawCount[pass];
 
 		int blockRegionX = region.regionX << RegionConstants.BLOCK_SHIFT_X;
 		int blockRegionY = region.regionY << RegionConstants.BLOCK_SHIFT_Y;

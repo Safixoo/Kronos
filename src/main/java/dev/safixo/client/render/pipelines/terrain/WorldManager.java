@@ -27,7 +27,7 @@ import java.util.List;
 public class WorldManager {
 	private static final boolean DELETE_SHADERS = false;
 
-	public static final int MAX_FULL_UPDATES = 10;
+	public static final int MAX_FULL_UPDATES = 7;
 	public static final int MAX_UPDATES_TRIES = 256;
 	public static final int MAX_TASK_CONCURRENTLY = 10;
 
@@ -164,7 +164,7 @@ public class WorldManager {
 		profiler.endStartSection("setup_sections");
 		this.sectionSet.updateSet(this, camera, worldChanged);
 		profiler.endStartSection("culling");
-		
+
 		this.bfsCuller.clearUpdateIndices();
 		Item playerItem = this.getHeldItem();
 

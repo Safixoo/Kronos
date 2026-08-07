@@ -177,10 +177,16 @@ public class MesherManager {
 				this.importantTasksWaiting--;
 			}
 
-			task.section.sendBuildResult(manager, result);
-			this.caches.push(task.cache);
+			SectionRender section = task.section;
+			SectionSet sectionSet = manager.getSectionSet();
 
-			manager.setTerrainDirty(true);
+			if (sectionSet.isInBounds(section.blockX >> 4, section.blockZ >> 4)) {
+				task.section.sendBuildResult(manager, result);
+				manager.setTerrainDirty(true);
+			} else {
+				result.delete();
+			}
+			this.caches.push(task.cache);
 		}
 	}
 

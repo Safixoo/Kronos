@@ -11,9 +11,11 @@ import net.minecraft.block.Block;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderGlobal;
 import net.minecraft.client.renderer.culling.ICamera;
+import net.minecraft.client.renderer.texture.TextureMap;
 import net.minecraft.client.settings.GameSettings;
 import net.minecraft.entity.EntityLivingBase;
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL13;
 
 // TODO: Replace the current system now by a simpler one, now that the two pass has been patched.
 @SuppressWarnings("unused")
@@ -90,6 +92,10 @@ public  class RenderGlobalHook {
 
 	public static void sortAndRender(RenderGlobal global, EntityLivingBase player, int renderPass, double partialTick) {
 		Minecraft minecraft = Minecraft.getMinecraft();
+
+		GL13.glActiveTexture(GL13.GL_TEXTURE0);
+		Minecraft.getMinecraft().getTextureManager().bindTexture(TextureMap.locationBlocksTexture);
+		GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_NEAREST_MIPMAP_NEAREST);
 
 		// Enable lightmap.
 		minecraft.entityRenderer.enableLightmap(partialTick);

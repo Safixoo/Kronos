@@ -115,7 +115,7 @@ public class SectionSet {
 		this.sections[this.getSectionIndex(sectionX, sectionY, sectionZ)] = (byte) flag;
 	}
 
-	private boolean isInBounds(int sectionX, int sectionZ) {
+	public boolean isInBounds(int sectionX, int sectionZ) {
 		if (this.camera == null) {
 			return false;
 		}

@@ -151,6 +151,16 @@ public class MathExt {
 		return (a + b - 1) / b;
 	}
 
+	private static final int[] DE_BRUIJN_BIT_POSITION = {
+		0, 1, 28, 2, 29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4, 8,
+		31, 27, 13, 23, 21, 19, 16, 7, 26, 12, 18, 6, 11, 5, 10, 9
+	};
+
+	public static int getLowestBitPosition(int v) {
+		int combined = ((v & -v) * 0x077CB531) >>> 27;
+		return DE_BRUIJN_BIT_POSITION[combined];
+	}
+
 	public static double floorMod(double num, double mod) {
 		return num - (floor(num / mod) * mod);
 	}
@@ -182,10 +192,6 @@ public class MathExt {
 
 	public static int square(int num) {
 		return num * num;
-	}
-
-	public static long lerp(long start, long end, double t) {
-		return (long) (start + (end - start) * t);
 	}
 
 	public static float lerp(float start, float end, float t) {

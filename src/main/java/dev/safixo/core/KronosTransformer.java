@@ -8,6 +8,7 @@ import net.minecraft.launchwrapper.IClassTransformer;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.tree.*;
 
+import java.awt.*;
 import java.util.HashMap;
 
 import static org.objectweb.asm.Opcodes.*;
@@ -21,13 +22,13 @@ public class KronosTransformer implements IClassTransformer {
 	static final String FONT_RENDERER_HOOK = "dev/safixo/core/hooks/FontRendererHook";
 	static final String FRUSTUM_HOOK = "dev/safixo/core/hooks/FrustumHook";
 	static final String MINECRAFT_HOOK = "dev/safixo/core/hooks/MinecraftHook";
+	static final String TEXTURE_MAP_HOOK = "dev/safixo/core/hooks/TextureMapHook";
 
 	static final String ADV_MODEL_RENDERER = "dev/safixo/client/render/pipelines/entity/AdvancedModelRenderer";
 	static final String REBUILD_LISTENER = "dev/safixo/client/render/pipelines/terrain/meshing/RebuildListener";
 
 	static final String RENDER = "net.minecraft.client.renderer.entity.Render";
 	static final String PROFILER = "net.minecraft.profiler.Profiler";
-	static final String RENDER_BLOCKS = "net.minecraft.client.renderer.RenderBlocks";
 	static final String BLOCK_SNOW = "net.minecraft.block.BlockSnow";
 	static final String RENDER_GLOBAL = "net.minecraft.client.renderer.RenderGlobal";
 	static final String ENTITY_RENDERER = "net.minecraft.client.renderer.EntityRenderer";
@@ -39,6 +40,7 @@ public class KronosTransformer implements IClassTransformer {
 	static final String LONG_HASH_MAP = "net.minecraft.util.LongHashMap";
 	static final String WORLD_CLIENT = "net.minecraft.client.multiplayer.WorldClient";
 	static final String MODEL_RENDERER = "net.minecraft.client.model.ModelRenderer";
+	static final String TEXTURE_MAP = "net.minecraft.client.renderer.texture.TextureMap";
 	static final String WORLD = "net.minecraft.world.World";
 
 	static HashMap<String, String> FUNCTION_NAMES;
@@ -70,6 +72,9 @@ public class KronosTransformer implements IClassTransformer {
 		// Overwrites classes methods completely with a function call with the same
 		// args and with the instance of the original class.
 		switch (transformedName) {
+			case TEXTURE_MAP:
+				replaceClassMethod(TEXTURE_MAP_HOOK, "loadTextureAtlas", "b", "(Lbjp;)V", reference, true);
+				break;
 			case RENDER:
 				replaceClassMethod(MINECRAFT_HOOK, "bindTexture", "a", "(D)V", reference, true);
 				break;
@@ -119,6 +124,7 @@ public class KronosTransformer implements IClassTransformer {
 			case ITEM_RENDERER:
 				// Batches all Tessellator calls to item renderer.
 				replaceClassMethod(MINECRAFT_HOOK, "renderItemIn2D", "a", "(Ljava/lang/String;III)I", reference, false);
+				break;
 			case FONT_RENDERER:
 				// Debug info.
 				replaceClassMethod(DEBUG_SCREEN_HOOK, "drawStringWithShadow", "a", "(Ljava/lang/String;III)I", reference, false);
@@ -428,6 +434,7 @@ public class KronosTransformer implements IClassTransformer {
 			// Clear method's data and replace it with a direct call to the new function.
 			method.localVariables = null;
 			method.instructions.clear();
+			method.tryCatchBlocks.clear();
 
 			Type[] types = Type.getArgumentTypes(method.desc);
 			Type returnType = Type.getReturnType(method.desc);
@@ -484,7 +491,14 @@ public class KronosTransformer implements IClassTransformer {
 			method.instructions.add(inject);
 		}
 
-		classNode.accept(writer);
+		try {
+			classNode.accept(writer);
+		} catch (Exception e) {
+			System.err.println("[ERROR] Failed to rewrite method:");
+			System.err.println("[ERROR] Method name: " + methodName);
+			System.err.println("[ERROR] Class path: " + classNode.name);
+			throw e;
+		}
 		basicClass[0] = writer.toByteArray();
 	}
 

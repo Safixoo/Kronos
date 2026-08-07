@@ -73,7 +73,7 @@ public class ModelColorizer {
 
 		// Check first if the whole section is uniform.
 		if (cache.hasUniformBiomes()) {
-			return cache.getColorByType(colorizeType);
+			return cache.getColorByType(x, y, z, colorizeType);
 		}
 
 		// Check if the area of biome radius is uniform.
