@@ -54,6 +54,8 @@ public class PrimitivesFlags {
 	public static final int[] LEAVES_COLOR = new int[256];
 	public static final int[] GRASS_COLOR = new int[256];
 
+	private static final boolean[] TICK_RANDOM = new boolean[4096];
+
 	public static void computeFlagArrays() {
 		LEAVES_TOP_INDEX = 0;
 
@@ -70,6 +72,8 @@ public class PrimitivesFlags {
 			if (block == null) {
 				continue;
 			}
+
+			TICK_RANDOM[i] = block.getTickRandomly();
 
 			SOLID[i] = block.isOpaqueCube() || block instanceof BlockLeaves;
 			VOXEL_RENDER[i] = block.getRenderType() == 0 && (SOLID[i] && Block.lightValue[i] == 0);
@@ -194,5 +198,9 @@ public class PrimitivesFlags {
 		PrimitivesFlags.processModelMethods();
 
 		PrimitivesFlags.DETECTED = true;
+	}
+
+	public static boolean getTickRandom(int blockId) {
+		return blockId != 0 && TICK_RANDOM[blockId];
 	}
 }

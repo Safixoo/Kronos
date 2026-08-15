@@ -2,6 +2,7 @@ package dev.safixo.client.render.pipelines.terrain.region;
 
 import dev.safixo.client.render.gfx.util.RenderBuffer;
 import dev.safixo.client.render.pipelines.terrain.WorldManager;
+import dev.safixo.client.render.pipelines.terrain.meshing.task.SectionResult;
 import dev.safixo.client.render.pipelines.terrain.shader.TerrainProgram;
 import dev.safixo.client.util.MathExt;
 import dev.safixo.client.util.memory.NativeBuffer;
@@ -9,7 +10,6 @@ import dev.safixo.client.util.memory.UnsafeUtil;
 import dev.safixo.client.render.pipelines.terrain.SectionRender;
 import dev.safixo.client.util.MeshDirection;
 import dev.safixo.client.util.data.CameraData;
-import dev.safixo.client.util.Direction;
 import dev.safixo.client.render.vertex.VertexWriter;
 import dev.safixo.client.render.vertex.writers.TerrainFormat;
 
@@ -20,7 +20,6 @@ import static dev.safixo.client.render.pipelines.terrain.region.RegionConstants.
 
 public class RegionRender {
 	protected static final int INDIRECT_STRUCT_SIZE = 16;
-
 	private static final int INT_BYTES = 4;
 
 	// Count of different render-passes possibly dispatched.
@@ -63,12 +62,12 @@ public class RegionRender {
 	// in the drawIndex position of renderIndices, the top is signaled by drawInd.
 	protected final short[] renderIndices = new short[REGION_SECTION_SIZE];
 
-	// This is important as the Minecraft direction enum is by default sorted in a way that fundamentally
-	// makes impossible batching draws without meshes meeting very specific criteria.
-	private final int[] meshDirectionsOrdered = new int[REGION_SECTION_SIZE];
+	// This is important as the Minecraft direction enum is layered in a way that makes it
+	// fundamentally impossible batching draws without meshes meeting very specific criteria.
+	private final int[] sortedMeshOffsets = new int[REGION_SECTION_SIZE];
 
 	// Number of sections queued for rendering in the current frame.
-	private int sectionsToRender;
+	private int queuedSections;
 
 	// Pointers for the indirect drawing commands.
 	private long solidIndirectPtr = UnsafeUtil.NULL;
@@ -92,16 +91,6 @@ public class RegionRender {
 		}
 	}
 
-	private void prepareSolidPtr() {
-		this.solidFirst = NativeBuffer.nmemAlloc(REGION_SECTION_SIZE * INT_BYTES * SOLID_DRAWS);
-		this.solidCount = NativeBuffer.nmemAlloc(REGION_SECTION_SIZE * INT_BYTES * SOLID_DRAWS);
-	}
-
-	private void prepareTranslucentPtr() {
-		this.translucentFirst = NativeBuffer.nmemAlloc(REGION_SECTION_SIZE * INT_BYTES);
-		this.translucentCount = NativeBuffer.nmemAlloc(REGION_SECTION_SIZE * INT_BYTES);
-	}
-
 	public long getFirstPtr(int pass) {
 		return pass != 0 ? this.translucentFirst : this.solidFirst;
 	}
@@ -123,15 +112,15 @@ public class RegionRender {
 	}
 
 	public void resetRenderIndex() {
-		this.sectionsToRender = 0;
+		this.queuedSections = 0;
 	}
 
 	public void addToRenderList(int regionIndex) {
-		this.renderIndices[this.sectionsToRender++] = (short) regionIndex;
+		this.renderIndices[this.queuedSections++] = (short) regionIndex;
 	}
 
 	public int getRenderIndex() {
-		return this.sectionsToRender;
+		return this.queuedSections;
 	}
 
 	public RegionTileEntities getTileEntityManager() {
@@ -183,8 +172,11 @@ public class RegionRender {
 		}
 	}
 
-	public void addSolidMesh(SectionRender render, VertexWriter manager, long[] packedDrawData) {
+	public void addSolidMesh(SectionRender render, VertexWriter manager, SectionResult buildResult) {
 		this.drawContext.invalidatePass(SOLID_PASS);
+
+		this.setMeshOrder(render.regionIndex, buildResult.getMeshOrder());
+		long[] packedDrawData = buildResult.getDrawData();
 
 		if (this.solidBuffer == null) {
 			this.solidBuffer = new RegionAllocation(manager.getVertices() * TerrainFormat.STRIDE, RegionRender.SOLID_PASS);
@@ -197,9 +189,12 @@ public class RegionRender {
 		long drawData = this.solidBuffer.allocate(render.globalPosition, manager.getNioPtr(), manager.getVertices());
 		int sectionFirst = RegionAllocation.unpackFirst(drawData);
 
+		// Instead of saving the draw data in Direction enum order, do it in the sorted order.
 		for (int dir = 0; dir < MeshDirection.COUNT; dir++) {
+			int sortedDirection = MeshDirection.getByIndex(buildResult.getMeshOrder(), dir);
+
 			int index = (render.regionIndex * TOTAL_DRAWS) + dir;
-			long relDrawData = packedDrawData[dir];
+			long relDrawData = packedDrawData[sortedDirection];
 
 			if (relDrawData != 0L) {
 				int first = RegionAllocation.unpackFirst(relDrawData);
@@ -209,6 +204,11 @@ public class RegionRender {
 				this.regionDrawData[index] = 0L;
 			}
 		}
+	}
+
+	private void prepareSolidPtr() {
+		this.solidFirst = NativeBuffer.nmemAlloc(REGION_SECTION_SIZE * INT_BYTES * SOLID_DRAWS);
+		this.solidCount = NativeBuffer.nmemAlloc(REGION_SECTION_SIZE * INT_BYTES * SOLID_DRAWS);
 	}
 
 	public void addTranslucentMesh(SectionRender render, VertexWriter manager) {
@@ -226,6 +226,11 @@ public class RegionRender {
 		this.regionDrawData[index] = this.translucentBuffer.allocate(render.globalPosition, manager.getNioPtr(), manager.getVertices());
 	}
 
+	private void prepareTranslucentPtr() {
+		this.translucentFirst = NativeBuffer.nmemAlloc(REGION_SECTION_SIZE * INT_BYTES);
+		this.translucentCount = NativeBuffer.nmemAlloc(REGION_SECTION_SIZE * INT_BYTES);
+	}
+
 	public void deleteRenderAllocation(long position) {
 		long[] drawData = this.regionDrawData;
 
@@ -233,7 +238,7 @@ public class RegionRender {
 		int sectionY = MathExt.decodeY(position);
 		int sectionZ = MathExt.decodeZ(position);
 
-		int regionIndex = RegionRender.regionIndex(sectionX, sectionY, sectionZ);
+		int regionIndex = RegionConstants.regionIndex(sectionX, sectionY, sectionZ);
 
 		int translucentDrawData = (regionIndex * TOTAL_DRAWS) + SOLID_DRAWS;
 		int solidDrawData = (regionIndex * TOTAL_DRAWS);
@@ -274,12 +279,12 @@ public class RegionRender {
 
 		// Change iteration order based in current render-pass.
 		if (pass == 1) {
-			index = this.sectionsToRender - 1;
+			index = this.queuedSections - 1;
 			end = -1;
 			inc = -1;
 		} else {
 			index = 0;
-			end = this.sectionsToRender;
+			end = this.queuedSections;
 			inc = 1;
 		}
 
@@ -290,8 +295,8 @@ public class RegionRender {
 			int drawMask = drawDataMask[regionIndex];
 
 			drawCount = pass == 0
-						  ? this.prepareSolidBatch(camera, regionIndex, drawMask >>> 1, drawCount)
-						  : this.prepareTranslucentBatch(regionIndex, drawMask & 0b1, drawCount);
+						  ? this.prepareSolidBatch(camera, regionIndex, getSolidMask(drawMask), drawCount)
+						  : this.prepareTranslucentBatch(regionIndex, getTranslucentMask(drawMask), drawCount);
 
 			index += inc;
 		}
@@ -306,53 +311,43 @@ public class RegionRender {
 			return drawCount;
 		}
 
-		int blockX = (sectionX(regionIndex) << 4) + (this.regionX << BLOCK_SHIFT_X);
-		int blockY = (sectionY(regionIndex) << 4) + (this.regionY << BLOCK_SHIFT_Y);
-		int blockZ = (sectionZ(regionIndex) << 4) + (this.regionZ << BLOCK_SHIFT_Z);
+		int blockX = (getLocalSectionX(regionIndex) << 4) + (this.regionX << BLOCK_SHIFT_X);
+		int blockY = (getLocalSectionY(regionIndex) << 4) + (this.regionY << BLOCK_SHIFT_Y);
+		int blockZ = (getLocalSectionZ(regionIndex) << 4) + (this.regionZ << BLOCK_SHIFT_Z);
 
-		int visibleFaces = getSectionVisibleFaces(camera.intX, camera.intY, camera.intZ, blockX, blockY, blockZ) & solidMask;
+		int sortedMeshOffsets = this.sortedMeshOffsets[regionIndex];
+		int visibleFaces = getSectionVisibleFaces(sortedMeshOffsets, camera.intX, camera.intY, camera.intZ, blockX, blockY, blockZ) & solidMask;
 
 		if (visibleFaces == 0) {
 			return drawCount;
 		}
 
-		int batchedFirst = -1;
-		int batchedCount = -1;
-		boolean meshRemaining = false;
+		int batchedFirst = 0;
+		int batchedCount = 0;
 
-		int orderedDirectionMask = this.meshDirectionsOrdered[regionIndex];
-
+		// This loops mostly works taking into account the properties that MeshDirection#getSortedMeshOrder
+		// allows into the draw data layout.
 		for (int dir = 0; dir < MeshDirection.COUNT; dir++) {
-			int meshCurrentDir = orderedDirectionMask & 0xF;
-			orderedDirectionMask >>= 4;
-
-			if ((visibleFaces & (1 << meshCurrentDir)) == 0) {
+			if ((visibleFaces & (1 << dir)) == 0) {
 				continue;
 			}
 
-			long drawData = this.regionDrawData[regionIndex * TOTAL_DRAWS + meshCurrentDir];
-
-			int first = RegionAllocation.unpackFirst(drawData);
+			long drawData = this.regionDrawData[regionIndex * TOTAL_DRAWS + dir];
 			int count = RegionAllocation.unpackCount(drawData);
+			int first = RegionAllocation.unpackFirst(drawData);
 
-			// Always save the last draw data and if the draw data is contiguous in memory
-			// continue batching the draw, is slower than the normal method but with the draw
-			// caching technique combined with the batching here, is a nice improvement.
 			if ((batchedFirst + batchedCount) != first) {
-				if (meshRemaining) {
+				if (batchedCount > 0) {
 					this.addCommandSolid(drawCount++, batchedFirst, batchedCount);
+					batchedCount = 0;
 				}
-
-				meshRemaining = true;
 				batchedFirst = first;
-				batchedCount = count;
-			} else /* ((first + count) == meshFirst) */ {
-				batchedCount += count;
 			}
 
+			batchedCount += count;
 		}
 
-		if (meshRemaining) {
+		if (batchedCount > 0) {
 			this.addCommandSolid(drawCount++, batchedFirst, batchedCount);
 		}
 
@@ -408,70 +403,8 @@ public class RegionRender {
 		return ++drawCount;
 	}
 
-	public static int getSectionVisibleFaces(int originX, int originY, int originZ, int chunkX, int chunkY, int chunkZ) {
-		int planes = 1 << MeshDirection.GENERIC;
-
-		planes |= greaterThan(originX, (chunkX - 3)) << Direction.EAST;
-		planes |= greaterThan(originY, (chunkY - 3)) << Direction.UP;
-		planes |= greaterThan(originZ, (chunkZ - 3)) << Direction.SOUTH;
-
-		planes |= lessThan(originX, (chunkX + 19)) << Direction.WEST;
-		planes |= lessThan(originY, (chunkY + 19)) << Direction.DOWN;
-		planes |= lessThan(originZ, (chunkZ + 19)) << Direction.NORTH;
-
-		return planes;
-	}
-
-	public void setMeshOrder(int regionIndex, int mask) {
-		this.meshDirectionsOrdered[regionIndex] = mask;
-	}
-
-	private static int lessThan(int a, int b) {
-		return (a - b) >>> 31;
-	}
-
-	private static int greaterThan(int a, int b) {
-		return (b - a) >>> 31;
-	}
-
-	public static int regionIndex(int sectionX, int sectionY, int sectionZ) {
-		int bitsX = sectionX & (BLOCK_BITS_X >> 4);
-		int bitsY = sectionY & (BLOCK_BITS_Y >> 4);
-		int bitsZ = sectionZ & (BLOCK_BITS_Z >> 4);
-
-		return (bitsX << 0) | (bitsY << 3) | (bitsZ << 6);
-	}
-
-	// Generates an order of drawing of directions that makes draw-batching more favorable.
-	public static int generateMeshDrawOrderMask(int meshBitDirections) {
-		int preferredCount = 0;
-		int restCount = 0;
-
-		int preferredDirSet = 0;
-		int restDirectionSet = 0;
-
-		for (int dir = 0; dir < MeshDirection.COUNT; dir++) {
-			// Mesh directions are always less than 0xF.
-			if ((meshBitDirections & (1 << dir)) != 0) {
-				preferredDirSet |= (dir & 0xF) << (preferredCount++ * 4);
-			} else {
-				restDirectionSet |= (dir & 0xF) << (restCount++ * 4);
-			}
-		}
-
-		return preferredDirSet | (restDirectionSet << (preferredCount * 4));
-	}
-
-	private static int sectionX(int regionIndex) {
- 		return (regionIndex & 0b000_000_111) >>> 0;
-	}
-
-	private static int sectionY(int regionIndex) {
-		return (regionIndex & 0b000_111_000) >>> 3;
-	}
-
-	private static int sectionZ(int regionIndex) {
-		return (regionIndex & 0b111_000_000) >>> 6;
+	public void setMeshOrder(int regionIndex, int meshOrder) {
+		this.sortedMeshOffsets[regionIndex] = MeshDirection.getOffsetsPerFacing(meshOrder);
 	}
 
 	public int centerBlockX() {

@@ -69,7 +69,7 @@ public abstract class LightDataAccess {
 		Block block = Block.blocksList[blockId];
 
 		boolean fo = PrimitivesFlags.SOLID[blockId];
-		boolean op = fo || block != null && block.blockMaterial.isOpaque();
+		boolean op = PrimitivesFlags.NORMAL_BLOCK[blockId];
 
         int lu = Block.lightValue[blockId];
 		boolean em = lu != 0;

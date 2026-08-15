@@ -14,7 +14,7 @@ import java.util.HashMap;
 import static org.objectweb.asm.Opcodes.*;
 
 public class KronosTransformer implements IClassTransformer {
-	static final boolean DISABLE_INJECTION = false;
+	static final boolean DEBUG_MEM_OPT = false;
 
 	static final String ASYNC_BLOCK_HOOK = "dev/safixo/core/hooks/AsyncBlockHook";
 	static final String RENDER_GLOBAL_HOOK = "dev/safixo/core/hooks/RenderGlobalHook";
@@ -42,6 +42,7 @@ public class KronosTransformer implements IClassTransformer {
 	static final String MODEL_RENDERER = "net.minecraft.client.model.ModelRenderer";
 	static final String TEXTURE_MAP = "net.minecraft.client.renderer.texture.TextureMap";
 	static final String WORLD = "net.minecraft.world.World";
+	static final String CHUNK = "net.minecraft.world.chunk.Chunk";
 
 	static HashMap<String, String> FUNCTION_NAMES;
 
@@ -62,10 +63,6 @@ public class KronosTransformer implements IClassTransformer {
 	@Override
 	public byte[] transform(String name, String transformedName, byte[] basicClass) {
 		byte[][] reference = new byte[][] { basicClass };
-
-		if (DISABLE_INJECTION) {
-			transformedName = "";
-		}
 
 		checkDevEnvironment();
 
@@ -148,11 +145,26 @@ public class KronosTransformer implements IClassTransformer {
 
 		fillStateMachineFunctions();
 
+		if (DEBUG_MEM_OPT) {
+			if (!transformedName.contains("joptsimple") && !transformedName.startsWith("dev.safixo")) {
+				changeHashMap(reference);
+				changeHashSet(reference);
+
+				if (transformedName.equals("cpw.mods.fml.common.discovery.ModCandidate")) {
+					changeListSet(reference);
+				}
+			}
+		}
+
+		if (!transformedName.endsWith("ChunkSectionStorage")){
+			changeChunkSection(reference);
+		}
+
 		if (!transformedName.equals("net.minecraft.client.renderer.Tessellator")) {
 			replaceTessellatorsInstances(reference);
 		}
 
-		if (!transformedName.contains("dev.safixo.client.render.gfx.state") && !transformedName.equals("dev.safixo.core.hooks.GLFunctions")) {
+		if (!transformedName.startsWith("dev.safixo.client.render.gfx.state") && !transformedName.equals("dev.safixo.core.hooks.GLFunctions")) {
 			redirectGlCalls(reference);
 		}
 
@@ -160,7 +172,6 @@ public class KronosTransformer implements IClassTransformer {
 	}
 
 
-	// TODO: Check what makes it that mess up in some instances.
 	static void changeHashMap(byte[][] basicClass) {
 		ClassReader reader = new ClassReader(basicClass[0]);
 		ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
@@ -171,28 +182,145 @@ public class KronosTransformer implements IClassTransformer {
 		for (int i = 0; i < classNode.methods.size(); i++) {
 			MethodNode method = (MethodNode) classNode.methods.get(i);
 
-			if (!method.name.equals("<init>")) {
-				continue;
-			}
-
 			InsnList inns = method.instructions;
 			AbstractInsnNode insn = inns.getFirst();
+
+			String hashMapWrapped = "dev/safixo/client/util/collection/HashMapWrapped";
 
 			while (insn != null) {
 				if (insn.getOpcode() == INVOKESPECIAL) {
 					MethodInsnNode m = (MethodInsnNode) insn;
 					if (m.owner.equals("java/util/HashMap")) {
-						m.owner = "dev/safixo/client/util/HashMapWrapped";
+						m.owner = hashMapWrapped;
+					}
+				}
+				if (insn.getOpcode() == NEW) {
+					TypeInsnNode t = (TypeInsnNode) insn;
+					if (t.desc.equals("java/util/HashMap")) {
+						t.desc = hashMapWrapped;
+					}
+				}
+				if (insn.getOpcode() == INVOKESTATIC) {
+					MethodInsnNode m = (MethodInsnNode) insn;
+					if (m.owner.equals("com/google/common/collect/Maps") && m.name.contains("newHashMap")) {
+						m.owner = hashMapWrapped;
+					}
+				}
+
+				insn = insn.getNext();
+			}
+		}
+
+		classNode.accept(writer);
+		basicClass[0] = writer.toByteArray();
+	}
+
+	static void changeChunkSection(byte[][] basicClass) {
+		ClassReader reader = new ClassReader(basicClass[0]);
+		ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+
+		ClassNode classNode = new ClassNode();
+		reader.accept(classNode, 0);
+
+		for (int i = 0; i < classNode.methods.size(); i++) {
+			MethodNode method = (MethodNode) classNode.methods.get(i);
+
+			InsnList inns = method.instructions;
+			AbstractInsnNode insn = inns.getFirst();
+
+			String chunkSect = "dev/safixo/client/util/memory/ChunkSectionStorage";
+			String extendedBlockStorage = IN_DEV ? "net/minecraft/world/chunk/storage/ExtendedBlockStorage"
+												: "";
+
+			while (insn != null) {
+				if (insn.getOpcode() == INVOKESPECIAL) {
+					MethodInsnNode m = (MethodInsnNode) insn;
+					if (m.owner.equals("net/minecraft/world/chunk/storage/ExtendedBlockStorage")) {
+						m.owner = chunkSect;
 					}
 				} else if (insn.getOpcode() == NEW) {
 					TypeInsnNode t = (TypeInsnNode) insn;
-					if (t.desc.equals("java/util/HashMap")) {
-						t.desc = "dev/safixo/client/util/HashMapWrapped";
+					if (t.desc.equals("net/minecraft/world/chunk/storage/ExtendedBlockStorage")) {
+						t.desc = chunkSect;
+					}
+				}
+
+				insn = insn.getNext();
+			}
+		}
+
+		classNode.accept(writer);
+		basicClass[0] = writer.toByteArray();
+	}
+
+	static void changeHashSet(byte[][] basicClass) {
+		ClassReader reader = new ClassReader(basicClass[0]);
+		ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+
+		ClassNode classNode = new ClassNode();
+		reader.accept(classNode, 0);
+
+		for (int i = 0; i < classNode.methods.size(); i++) {
+			MethodNode method = (MethodNode) classNode.methods.get(i);
+
+			InsnList inns = method.instructions;
+			AbstractInsnNode insn = inns.getFirst();
+
+			String hashMapWrapped = "dev/safixo/client/util/collection/HashSetWrapped";
+
+			while (insn != null) {
+				if (insn.getOpcode() == INVOKESPECIAL) {
+					MethodInsnNode m = (MethodInsnNode) insn;
+					if (m.owner.equals("java/util/HashSet")) {
+						m.owner = hashMapWrapped;
+					}
+				} else if (insn.getOpcode() == NEW) {
+					TypeInsnNode t = (TypeInsnNode) insn;
+					if (t.desc.equals("java/util/HashSet")) {
+						t.desc = hashMapWrapped;
 					}
 				} else if (insn.getOpcode() == INVOKESTATIC) {
 					MethodInsnNode m = (MethodInsnNode) insn;
-					if (m.owner.equals("com/google/common/collect/Maps")) {
-						m.owner = "dev/safixo/client/util/HashMapWrapped";
+					if (m.owner.equals("com/google/common/collect/Sets") && m.name.contains("newHashSet")) {
+						m.owner = hashMapWrapped;
+					}
+				}
+
+				insn = insn.getNext();
+			}
+		}
+
+		classNode.accept(writer);
+		basicClass[0] = writer.toByteArray();
+	}
+
+	static void changeListSet(byte[][] basicClass) {
+		ClassReader reader = new ClassReader(basicClass[0]);
+		ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+
+		ClassNode classNode = new ClassNode();
+		reader.accept(classNode, 0);
+
+		for (int i = 0; i < classNode.methods.size(); i++) {
+			MethodNode method = (MethodNode) classNode.methods.get(i);
+
+			InsnList inns = method.instructions;
+			AbstractInsnNode insn = inns.getFirst();
+
+			String hashMapWrapped = "dev/safixo/client/util/collection/ListSetWrapped";
+
+			while (insn != null) {
+				if (insn.getNext() != null && insn.getNext().getOpcode() == PUTFIELD) {
+					FieldInsnNode fInsnNode = (FieldInsnNode) insn.getNext();
+
+					if (fInsnNode.name.equals("packages")) {
+						if (insn.getOpcode() == INVOKESTATIC) {
+							MethodInsnNode m = (MethodInsnNode) insn;
+							if (m.owner.equals("com/google/common/collect/Lists") && m.name.contains("newArrayList")) {
+								m.owner = hashMapWrapped;
+								break;
+							}
+						}
 					}
 				}
 

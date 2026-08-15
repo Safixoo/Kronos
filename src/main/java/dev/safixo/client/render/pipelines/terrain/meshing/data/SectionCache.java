@@ -3,7 +3,9 @@ package dev.safixo.client.render.pipelines.terrain.meshing.data;
 import dev.safixo.client.render.pipelines.terrain.meshing.model.ModelColorizer;
 import dev.safixo.client.util.Direction;
 import dev.safixo.client.util.MathExt;
+import dev.safixo.client.util.NibbleUtil;
 import dev.safixo.client.util.collection.ObjectPooler;
+import dev.safixo.client.util.memory.ChunkSectionStorage;
 import net.minecraft.block.*;
 import net.minecraft.block.material.Material;
 import net.minecraft.tileentity.TileEntity;
@@ -22,17 +24,13 @@ import java.util.Arrays;
 
 public class SectionCache implements IBlockAccess {
 	public static final byte[] BYTE_ARRAY = new byte[16 * 16 * 16];
-	public static final byte[] NIBBLE_ARRAY = new byte[16 * 16 * 16 / 2];
-
 	public static final byte[] FULL_BYTE_ARRAY = new byte[16 * 16 * 16];
-	public static final byte[] FULL_NIBBLE_ARRAY = new byte[16 * 16 * 16 / 2];
 
 	public static final int BIOME_RADIUS = 3;
 	private static final int BIOME_CHUNK_WIDTH = 16 + (BIOME_RADIUS * 2);
 
 	static {
 		Arrays.fill(FULL_BYTE_ARRAY, (byte) 0xFF);
-		Arrays.fill(FULL_NIBBLE_ARRAY, (byte) 0xFF);
 	}
 
 	private final Chunk[] chunks = new Chunk[3 * 3];
@@ -47,25 +45,24 @@ public class SectionCache implements IBlockAccess {
 
 	private final byte[] biomes = new byte[BIOME_CHUNK_WIDTH * BIOME_CHUNK_WIDTH];
 
-	private final byte[][] sectionBlocks = new byte[3 * 3 * 3][4096];
+	private final byte[][] sectionBlocksLsb = new byte[3 * 3 * 3][4096];
 	private final byte[][] sectionBlocksMsb = new byte[3 * 3 * 3][2048];
 
 	private final byte[][] sectionData = new byte[3 * 3 * 3][2048];
 
-	private final byte[][] skyLight = new byte[3 * 3 * 3][2048];
-	private final byte[][] blockLight = new byte[3 * 3 * 3][2048];
+	private final byte[][] skyLight = new byte[3 * 3 * 3][];
+	private final byte[][] blockLight = new byte[3 * 3 * 3][];
 
 	private final int[] uniformColors = new int[ModelColorizer.MAX_COLOR_TYPES];
 
-	private byte[] centerBlocks, centerBlocksMsb;
+	private byte[] centerBlocksLsb, centerBlocksMsb;
 	private byte[] centerSkylight, centerBlocklight;
-
 	private byte[] visitedSectionBlocks;
 
 	private boolean centerSectEmpty;
 
 	private final ObjectPooler<byte[]> byteArrays = new ObjectPooler<>(null, 27);
-	private final ObjectPooler<byte[]> nibbleArrays = new ObjectPooler<>(null, 27 * 4);
+	private final ObjectPooler<byte[]> nibbleArrays = new ObjectPooler<>(null, 27 * 2);
 
 	public SectionCache(ModelColorizer colorizer, FakeInlinedBiome inlinedBiome, Vec3Pool pool) {
 		this.colorizer = colorizer;
@@ -96,7 +93,8 @@ public class SectionCache implements IBlockAccess {
 		ExtendedBlockStorage centerSection = centerChunk.getBlockStorageArray()[centerY];
 		this.centerSectEmpty = centerSection == null || centerSection.isEmpty();
 
-		Arrays.fill(this.chunks, null);
+		Arrays.fill(this.skyLight, BYTE_ARRAY);
+		Arrays.fill(this.blockLight, BYTE_ARRAY);
 
 		for (int x = minSectionX; x <= maxSectionX; x++) {
 			for (int z = minSectionZ; z <= maxSectionZ; z++) {
@@ -111,7 +109,14 @@ public class SectionCache implements IBlockAccess {
 						continue;
 					}
 
-					ExtendedBlockStorage section = chunk.getBlockStorageArray()[y];
+					ExtendedBlockStorage storage = chunk.getBlockStorageArray()[y];
+
+					if (storage != null && !(storage instanceof ChunkSectionStorage)) {
+						throw new RuntimeException("Wrong section storage implementation found!");
+					}
+
+					ChunkSectionStorage section = storage == null ? null : (ChunkSectionStorage) storage;
+
 					int relY = y - minSectionY;
 					int sectionIndex = sectionIndex(relX, relY, relZ);
 
@@ -120,38 +125,41 @@ public class SectionCache implements IBlockAccess {
 
 					if (section != null) {
 						if (!section.isEmpty()) {
-							this.sectionBlocks[sectionIndex] = this.popByteArray(this.sectionBlocks[sectionIndex]);
-							this.sectionData[sectionIndex] = this.popNibbleArray(this.sectionData[sectionIndex]);
+							this.sectionBlocksLsb[sectionIndex] = this.popByteArray(this.sectionBlocksLsb[sectionIndex]);
+							copy(this.sectionBlocksLsb[sectionIndex], section.getBlockLSBArray(), minIndex, maxIndex);
+
+							if (section.hasMetadata()) {
+								this.sectionData[sectionIndex] = this.popNibbleArray(this.sectionData[sectionIndex]);
+								copyNibble(this.sectionData[sectionIndex], section.getMetadataArray().data, minIndex, maxIndex);
+							} else {
+								this.sectionData[sectionIndex] = this.pushNibbleArray(this.sectionData[sectionIndex]);
+							}
 
 							if (section.getBlockMSBArray() != null) {
 								this.sectionBlocksMsb[sectionIndex] = this.popNibbleArray(this.sectionBlocksMsb[sectionIndex]);
 								copyNibble(this.sectionBlocksMsb[sectionIndex], section.getBlockMSBArray().data, minIndex, maxIndex);
+							} else {
+								this.sectionBlocksMsb[sectionIndex] = this.pushNibbleArray(this.sectionBlocksMsb[sectionIndex]);
 							}
-							copy(this.sectionBlocks[sectionIndex], section.getBlockLSBArray(), minIndex, maxIndex);
-							copyNibble(this.sectionData[sectionIndex], section.getMetadataArray().data, minIndex, maxIndex);
 						} else {
-							this.sectionBlocks[sectionIndex] = this.pushByteArray(this.sectionBlocks[sectionIndex]);
+							this.sectionBlocksLsb[sectionIndex] = this.pushByteArray(this.sectionBlocksLsb[sectionIndex]);
 							this.sectionBlocksMsb[sectionIndex] = this.pushNibbleArray(this.sectionBlocksMsb[sectionIndex]);
 							this.sectionData[sectionIndex] = this.pushNibbleArray(this.sectionData[sectionIndex]);
 						}
 
-						if (!this.world.provider.hasNoSky) {
-							this.skyLight[sectionIndex] = this.popSkyArray(this.skyLight[sectionIndex]);
-							copyNibble(this.skyLight[sectionIndex], section.getSkylightArray().data, minIndex, maxIndex);
+						if (!world.provider.hasNoSky) {
+							this.skyLight[sectionIndex] = section.getSkylightArray().data;
 						} else {
-							this.skyLight[sectionIndex] = this.pushSkyArray(this.skyLight[sectionIndex], NIBBLE_ARRAY);
+							this.skyLight[sectionIndex] = BYTE_ARRAY;
 						}
-
-						this.blockLight[sectionIndex] = this.popNibbleArray(this.blockLight[sectionIndex]);
-						copyNibble(this.blockLight[sectionIndex], section.getBlocklightArray().data, minIndex, maxIndex);
+						this.blockLight[sectionIndex] = section.getBlocklightArray().data;
 					} else {
-						this.skyLight[sectionIndex] = this.pushSkyArray(this.skyLight[sectionIndex], FULL_NIBBLE_ARRAY);
+						this.skyLight[sectionIndex] = FULL_BYTE_ARRAY;
+						this.blockLight[sectionIndex] = BYTE_ARRAY;
 
-						this.sectionBlocks[sectionIndex] = this.pushByteArray(this.sectionBlocks[sectionIndex]);
+						this.sectionBlocksLsb[sectionIndex] = this.pushByteArray(this.sectionBlocksLsb[sectionIndex]);
 						this.sectionBlocksMsb[sectionIndex] = this.pushNibbleArray(this.sectionBlocksMsb[sectionIndex]);
 						this.sectionData[sectionIndex] = this.pushNibbleArray(this.sectionData[sectionIndex]);
-
-						this.blockLight[sectionIndex] = this.pushNibbleArray(this.blockLight[sectionIndex]);
 					}
 				}
 			}
@@ -163,7 +171,18 @@ public class SectionCache implements IBlockAccess {
 		this.centerBlocklight = this.blockLight[sectionIndex(1, 1, 1)];
 
 		this.centerBlocksMsb = this.sectionBlocksMsb[sectionIndex(1, 1, 1)];
-		this.centerBlocks = this.sectionBlocks[sectionIndex(1, 1, 1)];
+		this.centerBlocksLsb = this.sectionBlocksLsb[sectionIndex(1, 1, 1)];
+	}
+
+	public void clearReferences() {
+		Arrays.fill(this.skyLight, BYTE_ARRAY);
+		Arrays.fill(this.blockLight, BYTE_ARRAY);
+
+		this.centerBlocklight = BYTE_ARRAY;
+		this.centerSkylight = BYTE_ARRAY;
+
+		Arrays.fill(this.chunks, null);
+		this.world = null;
 	}
 
 	private void copyBiomes(World world) {
@@ -178,13 +197,13 @@ public class SectionCache implements IBlockAccess {
 
 		for (int biomeX = centerBlockX - BIOME_RADIUS; biomeX < centerBlockX + 16 + BIOME_RADIUS; biomeX++) {
 			for (int biomeZ = centerBlockZ - BIOME_RADIUS; biomeZ < centerBlockZ + 16 + BIOME_RADIUS; biomeZ++) {
-				int actChunkX = (biomeX >> 4) - minSectionX;
-				int actChunkZ = (biomeZ >> 4) - minSectionZ;
+				int relChunkX = (biomeX >> 4) - minSectionX;
+				int relChunkZ = (biomeZ >> 4) - minSectionZ;
 
 				int relBiomeX = biomeX - (centerBlockX - BIOME_RADIUS);
 				int relBiomeZ = biomeZ - (centerBlockZ - BIOME_RADIUS);
 
-				int chunkIndex = sectionIndex(actChunkX, 0, actChunkZ);
+				int chunkIndex = sectionIndex(relChunkX, 0, relChunkZ);
 				Chunk chunk = this.chunks[chunkIndex];
 
 				byte[] biomes = chunk.getBiomeArray();
@@ -261,22 +280,8 @@ public class SectionCache implements IBlockAccess {
 		return this.colorizer;
 	}
 
-	private byte[] popSkyArray(byte[] array) {
-		if (array == NIBBLE_ARRAY || array == FULL_NIBBLE_ARRAY) {
-			return this.nibbleArrays.poll();
-		}
-		return array;
-	}
-
-	private byte[] pushSkyArray(byte[] array, byte[] defaultArray) {
-		if (array != FULL_NIBBLE_ARRAY && array != NIBBLE_ARRAY) {
-			this.nibbleArrays.push(array);
-		}
-		return defaultArray;
-	}
-
 	private byte[] popNibbleArray(byte[] array) {
-		if (array == NIBBLE_ARRAY) {
+		if (array == BYTE_ARRAY) {
 			return this.nibbleArrays.poll();
 		}
 		return array;
@@ -290,10 +295,10 @@ public class SectionCache implements IBlockAccess {
 	}
 
 	private byte[] pushNibbleArray(byte[] array) {
-		if (array != NIBBLE_ARRAY) {
+		if (array != BYTE_ARRAY) {
 			this.nibbleArrays.push(array);
 		}
-		return NIBBLE_ARRAY;
+		return BYTE_ARRAY;
 	}
 
 	private byte[] pushByteArray(byte[] array) {
@@ -422,12 +427,6 @@ public class SectionCache implements IBlockAccess {
 		return (sectionIndex / 3) % 3;
 	}
 
-	public static int getNibble(byte[] nibbleArray, int blockIndex) {
-		int nibbleIndex = blockIndex >> 1;
-		int nibblePart = (blockIndex << 2) & 0b100;
-		return (nibbleArray[nibbleIndex] >>> nibblePart) & 0xF;
-	}
-
 	public static int makeBlockIndex(int x, int y, int z) {
 		return y << 8 | z << 4 | x;
 	}
@@ -441,15 +440,15 @@ public class SectionCache implements IBlockAccess {
 		int sectionIndex = sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
 		int blockIndex = makeBlockIndex(blockX & 15, blockY & 15, blockZ & 15);
 
-		int blockIdLsb = MathExt.byteToUnsigned(this.sectionBlocks[sectionIndex][blockIndex]);
-		int blockIdMsb = getNibble(this.sectionBlocksMsb[sectionIndex], blockIndex);
+		int blockIdLsb = MathExt.byteToUnsigned(this.sectionBlocksLsb[sectionIndex][blockIndex]);
+		int blockIdMsb = NibbleUtil.getNibble(this.sectionBlocksMsb[sectionIndex], blockIndex);
 
 		return blockIdLsb | blockIdMsb << 8;
 	}
 
 	public int getBlockId(int sectionIndex, int blockIndex) {
-		int blockIdLsb = MathExt.byteToUnsigned(this.sectionBlocks[sectionIndex][blockIndex]);
-		int blockIdMsb = getNibble(this.sectionBlocksMsb[sectionIndex], blockIndex);
+		int blockIdLsb = MathExt.byteToUnsigned(this.sectionBlocksLsb[sectionIndex][blockIndex]);
+		int blockIdMsb = NibbleUtil.getNibble(this.sectionBlocksMsb[sectionIndex], blockIndex);
 
 		return blockIdLsb | blockIdMsb << 8;
 	}
@@ -498,20 +497,20 @@ public class SectionCache implements IBlockAccess {
 	}
 
 	private static int extractLightNibbles(byte[] skyLightArray, byte[] blockLightArray, int blockIndex, int minBlockLight) {
-		int skyLight = getNibble(skyLightArray, blockIndex);
-		int blockLight = getNibble(blockLightArray, blockIndex);
+		int skyLight = NibbleUtil.getNibble(skyLightArray, blockIndex);
+		int blockLight = NibbleUtil.getNibble(blockLightArray, blockIndex);
 		return MathExt.getLightmapCoord(skyLight, Math.max(minBlockLight, blockLight));
 	}
 
 	private static int extractLightNibbles(byte[] skyLightArray, byte[] blockLightArray, int blockIndex) {
-		int skyLight = getNibble(skyLightArray, blockIndex);
-		int blockLight = getNibble(blockLightArray, blockIndex);
+		int skyLight = NibbleUtil.getNibble(skyLightArray, blockIndex);
+		int blockLight = NibbleUtil.getNibble(blockLightArray, blockIndex);
 		return MathExt.getLightmapCoord(skyLight, blockLight);
 	}
 
 	public int getBlockIdCenter(int blockIndex) {
-		int blockIdLsb = MathExt.byteToUnsigned(this.centerBlocks[blockIndex]);
-		int blockIdMsb = getNibble(this.centerBlocksMsb, blockIndex);
+		int blockIdLsb = MathExt.byteToUnsigned(this.centerBlocksLsb[blockIndex]);
+		int blockIdMsb = NibbleUtil.getNibble(this.centerBlocksMsb, blockIndex);
 
 		return blockIdLsb | blockIdMsb << 8;
 	}
@@ -540,7 +539,7 @@ public class SectionCache implements IBlockAccess {
 		int sectionIndex = sectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
 		int blockIndex = makeBlockIndex(blockX & 15, blockY & 15, blockZ & 15);
 
-		return getNibble(this.sectionData[sectionIndex], blockIndex);
+		return NibbleUtil.getNibble(this.sectionData[sectionIndex], blockIndex);
 	}
 
 	@Override

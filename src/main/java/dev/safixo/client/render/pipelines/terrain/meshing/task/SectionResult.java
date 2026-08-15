@@ -2,7 +2,7 @@ package dev.safixo.client.render.pipelines.terrain.meshing.task;
 
 import dev.safixo.client.render.pipelines.terrain.SectionRender;
 import dev.safixo.client.render.pipelines.terrain.region.RegionAllocation;
-import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
+import dev.safixo.client.render.pipelines.terrain.region.RegionConstants;
 import dev.safixo.client.render.vertex.VertexWriter;
 import dev.safixo.client.render.vertex.writers.TerrainFormat;
 import dev.safixo.client.util.MeshDirection;
@@ -18,18 +18,18 @@ public class SectionResult {
 	private final TileEntity[] tileEntityArray;
 
 	private final int meshOrder;
-	private final int solidMask;
+	private final int cullMask;
 	private final int drawMask;
 	private final long[] solidDrawData;
 
 	private final VertexWriter solidWriter, translucentWriter;
 
-	public SectionResult(MemoryPool pool, TileEntity[] tileEntityArray, VertexWriter[] writers, SectionTask task, int solidMask) {
+	public SectionResult(MemoryPool pool, TileEntity[] tileEntityArray, VertexWriter[] writers, SectionTask task, int cullMask) {
 		CameraData camera = task.camera;
 		SectionRender section = task.section;
 
-		int drawMask = getDrawMask(writers);
-		this.solidMask = solidMask;
+		int drawMask = setupDrawMask(writers);
+		this.cullMask = cullMask;
 
 		if ((drawMask & 0b1) != 0) {
 			VertexWriter translucentWriter = task.getTranslucentWriter();
@@ -51,9 +51,10 @@ public class SectionResult {
 				joined = new VertexWriter(solidBuffer);
 			}
 
-			int solidDrawMask = drawMask >>> 1;
-			int visibleFaces = RegionRender.getSectionVisibleFaces(camera.intX, camera.intY, camera.intZ, section.blockX, section.blockY, section.blockZ);
-			int meshOrder = RegionRender.generateMeshDrawOrderMask(solidDrawMask & visibleFaces);
+			int solidMask = RegionConstants.getSolidMask(drawMask);
+			int visibleFaces = RegionConstants.getSectionVisibleFaces(camera.intX, camera.intY, camera.intZ, section.blockX, section.blockY, section.blockZ);
+			int meshOrder = MeshDirection.getSortedMeshOrder(visibleFaces & solidMask);
+
 			long[] drawData = this.joinAllSolidBuffers(writers, joined, meshOrder);
 
 			this.meshOrder = meshOrder;
@@ -80,33 +81,32 @@ public class SectionResult {
 		return sum;
 	}
 
-	private static int getDrawMask(VertexWriter[] writers) {
+	private static int setupDrawMask(VertexWriter[] writers) {
 		VertexWriter translucentWriter = writers[MeshDirection.COUNT];
-		int drawMask = 0b0;
+		int solidBits = 0b0;
+		int translucentBit = 0b0;
 
 		if (translucentWriter.getOffset() != 0) {
-			drawMask |= 0b1;
+			translucentBit = 0b1;
 		}
 
 		for (int dir = 0; dir < MeshDirection.COUNT; dir++) {
 			if (writers[dir].getOffset() != 0) {
-				drawMask |= 1 << (dir + 1);
+				solidBits |= 1 << dir;
 			}
 		}
-		return drawMask;
+		return RegionConstants.getDrawMask(solidBits, translucentBit);
 	}
 
-	public int getSolidMask() {
-		return this.solidMask;
+	public int getCullMask() {
+		return this.cullMask;
 	}
 
 	private long[] joinAllSolidBuffers(VertexWriter[] writers, VertexWriter joiner, int meshDrawOrder) {
 		long[] drawData = new long[MeshDirection.COUNT];
 
 		for (int dir = 0; dir < MeshDirection.COUNT; dir++) {
-			int realMeshDir = meshDrawOrder & 0xF;
-			meshDrawOrder >>= 4;
-
+			int realMeshDir = MeshDirection.getByIndex(meshDrawOrder, dir);
 			VertexWriter writer = writers[realMeshDir];
 
 			int writerOffset = writer.getOffset();

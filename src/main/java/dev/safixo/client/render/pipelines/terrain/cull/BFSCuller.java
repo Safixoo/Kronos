@@ -2,6 +2,7 @@ package dev.safixo.client.render.pipelines.terrain.cull;
 
 import dev.safixo.client.render.gfx.state.GlFogTracker;
 import dev.safixo.client.render.pipelines.terrain.*;
+import dev.safixo.client.render.pipelines.terrain.region.RegionConstants;
 import dev.safixo.client.util.data.CameraData;
 import dev.safixo.client.render.pipelines.terrain.region.RegionManager;
 import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
@@ -170,7 +171,7 @@ public class BFSCuller {
 				continue;
 			}
 
-			int regionIndex = RegionRender.regionIndex(sectionX, sectionY, sectionZ);
+			int regionIndex = RegionConstants.regionIndex(sectionX, sectionY, sectionZ);
 			region.addToRenderList(regionIndex);
 		}
 	}

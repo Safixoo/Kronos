@@ -143,6 +143,8 @@ public class SectionMesher {
 		SectionResult result = new SectionResult(pool, this.getTileEntityArray(), task.getWriters(), task, solidSides);
 		this.clearTileEntityList();
 
+		sectionCache.clearReferences();
+
 		return result;
 	}
 

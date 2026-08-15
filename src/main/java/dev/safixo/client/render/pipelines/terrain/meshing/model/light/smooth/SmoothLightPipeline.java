@@ -351,9 +351,7 @@ public class SmoothLightPipeline implements LightPipeline {
         if (!data.hasLightData()) {
             data.initLightData(this.lightCache, pos, face, offset);
 
-			if (LightDataAccess.unpackOP(this.lightCache.get(pos))) {
-				this.applySidedBrightness(data, face, shade);
-			}
+			this.applySidedBrightness(data, face, shade);
 
             data.unpackLightData();
         }

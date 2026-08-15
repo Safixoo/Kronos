@@ -5,6 +5,7 @@ import dev.safixo.client.render.pipelines.terrain.region.RegionConstants;
 import dev.safixo.client.render.vertex.VertexWriter;
 import dev.safixo.client.util.MathExt;
 import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
+import dev.safixo.client.util.MeshDirection;
 
 import static dev.safixo.client.util.Direction.DOWN_BIT;
 import static dev.safixo.client.util.Direction.UP_BIT;
@@ -40,7 +41,7 @@ public class SectionRender {
 		this.blockZ = blockZ;
 
 		this.globalPosition = MathExt.asLong(blockX >> 4, blockY >> 4, blockZ >> 4);
-		this.regionIndex = RegionRender.regionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
+		this.regionIndex = RegionConstants.regionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
 
 		if (SectionFlags.hasPassesNonEmpty(this.flags)) {
 			this.region = manager.getRegion(blockX >> 4, blockY >> 4, blockZ >> 4);
@@ -66,9 +67,8 @@ public class SectionRender {
 		boolean nonNullWriter = solidWriter != null || translucentWriter != null;
 
 		this.uploadMeshesToRegion(manager, result);
-		this.region.setDrawMask(this.regionIndex, result.getDrawMask());
 
-		this.setFlags(SectionFlags.setSolidFaces(this.flags, result.getSolidMask() & getAdjacentMask(this.blockY >> 4)));
+		this.setFlags(SectionFlags.setSolidFaces(this.flags, result.getCullMask() & getAdjacentMask(this.blockY >> 4)));
 		this.setFlags(SectionFlags.setPassesNonEmpty(this.flags, nonNullWriter ? 1 : 0));
 
 		result.delete();
@@ -98,8 +98,8 @@ public class SectionRender {
 				this.region = manager.getRegion(this.blockX >> 4, this.blockY >> 4, this.blockZ >> 4);
 			}
 
-			this.region.setMeshOrder(this.regionIndex, result.getMeshOrder());
-			this.region.addSolidMesh(this, solidWriter, result.getDrawData());
+			this.region.setDrawMask(this.regionIndex, getSortedDrawMask(result.getMeshOrder(), result.getDrawMask()));
+			this.region.addSolidMesh(this, solidWriter, result);
 		}
 
 		if (translucentWriter != null && translucentWriter.getOffset() != 0) {
@@ -107,8 +107,17 @@ public class SectionRender {
 				this.region = manager.getRegion(this.blockX >> 4, this.blockY >> 4, this.blockZ >> 4);
 			}
 
+			this.region.setDrawMask(this.regionIndex, getSortedDrawMask(result.getMeshOrder(), result.getDrawMask()));
 			this.region.addTranslucentMesh(this, translucentWriter);
 		}
+	}
+
+	private static int getSortedDrawMask(int meshOrder, int drawMask) {
+		int solidBits = MeshDirection.shuffleByOrder(RegionConstants.getSolidMask(drawMask),
+			MeshDirection.getOffsetsPerFacing(meshOrder));
+		int translucentBit = RegionConstants.getTranslucentMask(drawMask);
+
+		return RegionConstants.getDrawMask(solidBits, translucentBit);
 	}
 
 	private void uploadAllTileEntities(WorldManager manager, SectionResult result) {

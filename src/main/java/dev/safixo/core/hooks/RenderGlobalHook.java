@@ -7,6 +7,8 @@ import dev.safixo.client.render.vertex.VertexWriter;
 import dev.safixo.client.util.MathExt;
 import dev.safixo.client.util.data.PrimitivesFlags;
 import dev.safixo.core.HookUtils;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import net.minecraft.block.Block;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderGlobal;
@@ -14,8 +16,12 @@ import net.minecraft.client.renderer.culling.ICamera;
 import net.minecraft.client.renderer.texture.TextureMap;
 import net.minecraft.client.settings.GameSettings;
 import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.launchwrapper.Launch;
+import net.minecraft.launchwrapper.LaunchClassLoader;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
+
+import java.util.Map;
 
 // TODO: Replace the current system now by a simpler one, now that the two pass has been patched.
 @SuppressWarnings("unused")
@@ -55,6 +61,22 @@ public  class RenderGlobalHook {
 
 		VertexWriter.startDefaults();
 		SHOULD_RELOAD = true;
+
+//		if (Launch.classLoader != null) {
+//			try {
+//				HookUtils.getField(Launch.classLoader, "resourceCache", "resourceCache")
+//					.set(Launch.classLoader, new Object2ObjectOpenHashMap<>());
+//				HookUtils.getField(Launch.classLoader, "negativeResourceCache", "negativeResourceCache")
+//					.set(Launch.classLoader, new ObjectOpenHashSet<>());
+//				HookUtils.getField(Launch.classLoader, "cachedClasses", "cachedClasses")
+//					.set(Launch.classLoader, new Object2ObjectOpenHashMap<>());
+//				HookUtils.getField(Launch.classLoader, "packageManifests", "packageManifests")
+//					.set(Launch.classLoader, new Object2ObjectOpenHashMap<>());
+//				System.out.println("Clearing cache!");
+//			} catch (Exception e) {
+//				throw new RuntimeException(e);
+//			}
+//		}
 	}
 
 	private static void checkOptifineExistence() {

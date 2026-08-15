@@ -4,6 +4,7 @@ import dev.safixo.client.render.ImprovedTessellator;
 import dev.safixo.client.render.gfx.state.GlMatrixTracker;
 import dev.safixo.client.render.pipelines.entity.ModelQueue;
 import dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache;
+import dev.safixo.client.util.NibbleUtil;
 import dev.safixo.client.util.data.ClientChunkListener;
 import dev.safixo.client.util.Direction;
 import dev.safixo.client.util.MathExt;
@@ -225,11 +226,11 @@ public class MinecraftHook {
 			int blockIndex = SectionCache.makeBlockIndex(x & 15, y & 15, z & 15);
 
 			byte[] blockLightArray = blockStorage.getBlocklightArray().data;
-			blockLight = SectionCache.getNibble(blockLightArray, blockIndex);
+			blockLight = NibbleUtil.getNibble(blockLightArray, blockIndex);
 
 			if (blockStorage.getSkylightArray() != null && !world.provider.hasNoSky) {
 				byte[] skyLightArray = blockStorage.getSkylightArray().data;
-				skyLight = SectionCache.getNibble(skyLightArray, blockIndex);
+				skyLight = NibbleUtil.getNibble(skyLightArray, blockIndex);
 			}
 		} else if (chunk.canBlockSeeTheSky(x & 15, y, z & 15)) {
 			skyLight = 15;
