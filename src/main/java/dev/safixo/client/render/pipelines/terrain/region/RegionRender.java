@@ -22,16 +22,6 @@ public class RegionRender {
 	protected static final int INDIRECT_STRUCT_SIZE = 16;
 	private static final int INT_BYTES = 4;
 
-	// Count of different render-passes possibly dispatched.
-	// - SOLID (0)
-	// - TRANSLUCENT (1)
-	public static final int RENDER_PASSES = 2;
-	public static final int SOLID_PASS = 0, TRANSLUCENT_PASS = 1;
-
-	public static final int TRANSLUCENT_DRAWS = 1;
-	public static final int SOLID_DRAWS = MeshDirection.COUNT;
-	public static final int TOTAL_DRAWS = SOLID_DRAWS + TRANSLUCENT_DRAWS;
-
 	// Region coordinates in region space.
 	public int regionX, regionY, regionZ;
 
@@ -45,14 +35,17 @@ public class RegionRender {
 	private long solidFirst = UnsafeUtil.NULL, solidCount = UnsafeUtil.NULL;
 	private long translucentFirst = UnsafeUtil.NULL, translucentCount = UnsafeUtil.NULL;
 
-	// struct RegionDrawData[256] {
-	//		// Solid PASS.
-	//		uint_64_t solidDrawData[MeshDirection.COUNT];
-	//		// Translucent PASS.
-	//		uint_64_t translucentDrawData;
+	// struct SolidDrawData[REGION_SECTION_SIZE] {
+	// 		uint first;
+	//		uint count[MeshDirection.COUNT];
 	// };
-	// Each region has in total 8 possible different draw-calls.
-	private final long[] regionDrawData = new long[REGION_SECTION_SIZE * TOTAL_DRAWS];
+	private int[] solidDrawData;
+
+	// struct TranslucentDrawData[REGION_SECTION_SIZE] {
+	// 		uint first;
+	//		uint count;
+	// };
+	private long[] translucentDrawData;
 
 	// Each bit reference the visibility of the solid planes (2..8 bit) and
 	// visibility of translucent pass (1 bit).
@@ -135,13 +128,17 @@ public class RegionRender {
 		this.drawContext.invalidatePass(SOLID_PASS);
 		this.drawContext.invalidatePass(TRANSLUCENT_PASS);
 
-		Arrays.fill(this.regionDrawData, 0L);
+		if (this.solidDrawData != null){
+			Arrays.fill(this.solidDrawData, 0);
+		}
+		if (this.translucentDrawData != null) {
+			Arrays.fill(this.translucentDrawData, 0L);
+		}
 
 		if (this.solidBuffer != null) {
 			this.solidBuffer.clear();
 			this.solidBuffer = null;
 		}
-
 		if (this.translucentBuffer != null) {
 			this.translucentBuffer.clear();
 			this.translucentBuffer = null;
@@ -150,23 +147,18 @@ public class RegionRender {
 		if (this.solidFirst != UnsafeUtil.NULL) {
 			NativeBuffer.nmemFree(this.solidFirst);
 			NativeBuffer.nmemFree(this.solidCount);
-
-			this.solidFirst = UnsafeUtil.NULL;
-			this.solidCount = UnsafeUtil.NULL;
+			this.solidFirst = this.solidCount = UnsafeUtil.NULL;
 		}
 
 		if (this.translucentFirst != UnsafeUtil.NULL) {
 			NativeBuffer.nmemFree(this.translucentFirst);
 			NativeBuffer.nmemFree(this.translucentCount);
-
-			this.translucentFirst = UnsafeUtil.NULL;
-			this.translucentCount = UnsafeUtil.NULL;
+			this.translucentFirst = this.translucentCount = UnsafeUtil.NULL;
 		}
 
 		if (this.solidIndirectPtr != UnsafeUtil.NULL) {
 			NativeBuffer.nmemFree(this.solidIndirectPtr);
 		}
-
 		if (this.translucentIndirectPtr != UnsafeUtil.NULL) {
 			NativeBuffer.nmemFree(this.translucentIndirectPtr);
 		}
@@ -178,10 +170,12 @@ public class RegionRender {
 		this.setMeshOrder(render.regionIndex, buildResult.getMeshOrder());
 		long[] packedDrawData = buildResult.getDrawData();
 
-		if (this.solidBuffer == null) {
-			this.solidBuffer = new RegionAllocation(manager.getVertices() * TerrainFormat.STRIDE, RegionRender.SOLID_PASS);
+		if (this.solidDrawData == null) {
+			this.solidDrawData = new int[REGION_SECTION_SIZE * (MeshDirection.COUNT + 1)];
 		}
-
+		if (this.solidBuffer == null) {
+			this.solidBuffer = new RegionAllocation(manager.getVertices() * TerrainFormat.STRIDE, RegionConstants.SOLID_PASS);
+		}
 		if (this.solidFirst == UnsafeUtil.NULL) {
 			this.prepareSolidPtr();
 		}
@@ -189,20 +183,17 @@ public class RegionRender {
 		long drawData = this.solidBuffer.allocate(render.globalPosition, manager.getNioPtr(), manager.getVertices());
 		int sectionFirst = RegionAllocation.unpackFirst(drawData);
 
+		int drawDataIndex = render.regionIndex * TOTAL_DRAWS;
+		this.solidDrawData[drawDataIndex] = sectionFirst;
+
 		// Instead of saving the draw data in Direction enum order, do it in the sorted order.
 		for (int dir = 0; dir < MeshDirection.COUNT; dir++) {
 			int sortedDirection = MeshDirection.getByIndex(buildResult.getMeshOrder(), dir);
 
-			int index = (render.regionIndex * TOTAL_DRAWS) + dir;
-			long relDrawData = packedDrawData[sortedDirection];
+			int index = (drawDataIndex + 1) + dir;
+			int count = RegionAllocation.unpackCount(packedDrawData[sortedDirection]);
 
-			if (relDrawData != 0L) {
-				int first = RegionAllocation.unpackFirst(relDrawData);
-				int count = RegionAllocation.unpackCount(relDrawData);
-				this.regionDrawData[index] = RegionAllocation.packDrawData(count, first + sectionFirst);
-			} else {
-				this.regionDrawData[index] = 0L;
-			}
+			this.solidDrawData[index] = count;
 		}
 	}
 
@@ -214,16 +205,17 @@ public class RegionRender {
 	public void addTranslucentMesh(SectionRender render, VertexWriter manager) {
 		this.drawContext.invalidatePass(TRANSLUCENT_PASS);
 
-		if (this.translucentBuffer == null) {
-			this.translucentBuffer = new RegionAllocation(manager.getVertices() * TerrainFormat.STRIDE, RegionRender.TRANSLUCENT_PASS);
+		if (this.translucentDrawData == null) {
+			this.translucentDrawData = new long[REGION_SECTION_SIZE];
 		}
-
+		if (this.translucentBuffer == null) {
+			this.translucentBuffer = new RegionAllocation(manager.getVertices() * TerrainFormat.STRIDE, RegionConstants.TRANSLUCENT_PASS);
+		}
 		if (this.translucentFirst == UnsafeUtil.NULL) {
 			this.prepareTranslucentPtr();
 		}
 
-		int index = (render.regionIndex * TOTAL_DRAWS) + SOLID_DRAWS;
-		this.regionDrawData[index] = this.translucentBuffer.allocate(render.globalPosition, manager.getNioPtr(), manager.getVertices());
+		this.translucentDrawData[render.regionIndex] = this.translucentBuffer.allocate(render.globalPosition, manager.getNioPtr(), manager.getVertices());
 	}
 
 	private void prepareTranslucentPtr() {
@@ -231,6 +223,7 @@ public class RegionRender {
 		this.translucentCount = NativeBuffer.nmemAlloc(REGION_SECTION_SIZE * INT_BYTES);
 	}
 
+	/*
 	public void deleteRenderAllocation(long position) {
 		long[] drawData = this.regionDrawData;
 
@@ -255,6 +248,7 @@ public class RegionRender {
 			}
 		}
 	}
+	 */
 
 	// Processing draw data now and not in the BFS, allows decoupling the system and doing the extra
 	// work between draw which doesn't pressure the driver immediately, also as we work in a "small"
@@ -322,34 +316,32 @@ public class RegionRender {
 			return drawCount;
 		}
 
-		int batchedFirst = 0;
+		int[] solidDrawData = this.solidDrawData;
+
+		regionIndex *= 8;
+		int batchedFirst = solidDrawData[regionIndex++];
 		int batchedCount = 0;
 
-		// This loops mostly works taking into account the properties that MeshDirection#getSortedMeshOrder
-		// allows into the draw data layout.
-		for (int dir = 0; dir < MeshDirection.COUNT; dir++) {
-			if ((visibleFaces & (1 << dir)) == 0) {
+		visibleFaces <<= 1;
+
+		while (visibleFaces != 0) {
+			int count = solidDrawData[regionIndex++];
+			visibleFaces >>= 1;
+
+			if ((visibleFaces & 1) == 0) {
+				this.addCommandSolid(drawCount, batchedFirst, batchedCount);
+
+				drawCount += -batchedCount >>> 31;
+				batchedFirst += batchedCount + count;
+				batchedCount = 0;
 				continue;
-			}
-
-			long drawData = this.regionDrawData[regionIndex * TOTAL_DRAWS + dir];
-			int count = RegionAllocation.unpackCount(drawData);
-			int first = RegionAllocation.unpackFirst(drawData);
-
-			if ((batchedFirst + batchedCount) != first) {
-				if (batchedCount > 0) {
-					this.addCommandSolid(drawCount++, batchedFirst, batchedCount);
-					batchedCount = 0;
-				}
-				batchedFirst = first;
 			}
 
 			batchedCount += count;
 		}
 
-		if (batchedCount > 0) {
-			this.addCommandSolid(drawCount++, batchedFirst, batchedCount);
-		}
+		this.addCommandSolid(drawCount, batchedFirst, batchedCount);
+		drawCount += -batchedCount >>> 31;
 
 		return drawCount;
 	}
@@ -395,7 +387,7 @@ public class RegionRender {
 			return drawCount;
 		}
 
-		long drawData = this.regionDrawData[regionIndex * TOTAL_DRAWS + SOLID_DRAWS];
+		long drawData = this.translucentDrawData[regionIndex];
 		int first = RegionAllocation.unpackFirst(drawData);
 		int count = RegionAllocation.unpackCount(drawData);
 

@@ -29,7 +29,7 @@ public class RegionAllocation {
 	public static GlVertexBuffer SPARE_BUFFER;
 
 	public RegionAllocation(int size, int pass) {
-		this(Math.max(size, pass == RegionRender.SOLID_PASS ? SOLID_MIN_ALLOC : TRANSLUCENT_MIN_ALLOC));
+		this(Math.max(size, pass == RegionConstants.SOLID_PASS ? SOLID_MIN_ALLOC : TRANSLUCENT_MIN_ALLOC));
 	}
 
 	public RegionAllocation(int size) {

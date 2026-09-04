@@ -15,11 +15,11 @@ import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 
 public class RegionDrawContext {
-	private final boolean[] shouldCachePass = new boolean[RegionRender.RENDER_PASSES];
+	private final boolean[] shouldCachePass = new boolean[RegionConstants.RENDER_PASSES];
 
-	private final int[] drawCount = new int[RegionRender.RENDER_PASSES];
-	private final short[][] renderIndices = new short[RegionRender.RENDER_PASSES][RegionConstants.REGION_SECTION_SIZE];
-	private final int[] visibleCount = new int[RegionRender.RENDER_PASSES];
+	private final int[] drawCount = new int[RegionConstants.RENDER_PASSES];
+	private final short[][] renderIndices = new short[RegionConstants.RENDER_PASSES][RegionConstants.REGION_SECTION_SIZE];
+	private final int[] visibleCount = new int[RegionConstants.RENDER_PASSES];
 
 	private int visibleSet = -1;
 

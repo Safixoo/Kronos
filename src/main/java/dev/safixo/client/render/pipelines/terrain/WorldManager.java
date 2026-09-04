@@ -28,7 +28,7 @@ public class WorldManager {
 	private static final boolean DELETE_SHADERS = false;
 
 	public static final int MAX_FULL_UPDATES = 7;
-	public static final int MAX_UPDATES_TRIES = 256;
+	public static final int MAX_UPDATES_TRIES = 128;
 	public static final int MAX_TASK_CONCURRENTLY = 7;
 
 	private static final Item DEBUG_ITEM = null;

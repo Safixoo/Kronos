@@ -25,6 +25,16 @@ public class RegionConstants {
 	// Region total volume area in SectionRenders.
 	public static final int REGION_SECTION_SIZE = 512; // 8 * 8 * 8
 
+	// Count of different render-passes possibly dispatched.
+	// - SOLID (0)
+	// - TRANSLUCENT (1)
+	public static final int RENDER_PASSES = 2;
+	public static final int SOLID_PASS = 0, TRANSLUCENT_PASS = 1;
+
+	public static final int TRANSLUCENT_DRAWS = 1;
+	public static final int SOLID_DRAWS = MeshDirection.COUNT;
+	public static final int TOTAL_DRAWS = SOLID_DRAWS + TRANSLUCENT_DRAWS;
+
 	public static int getSolidMask(int drawMask) {
 		return drawMask >>> 1;
 	}
