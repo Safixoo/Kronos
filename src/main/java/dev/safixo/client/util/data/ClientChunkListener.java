@@ -2,6 +2,7 @@ package dev.safixo.client.util.data;
 
 import dev.safixo.client.render.pipelines.terrain.WorldManager;
 import dev.safixo.client.util.MathExt;
+import dev.safixo.client.util.collection.ChunkMap;
 import dev.safixo.client.util.collection.FastLongHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
 import net.minecraft.client.Minecraft;
@@ -15,7 +16,7 @@ import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.world.ChunkEvent;
 
 public class ClientChunkListener extends ChunkProviderClient {
-	private final FastLongHashMap<ChunkMetadata> chunkMap = new FastLongHashMap<>(128);
+	private final ChunkMap chunkMap = new ChunkMap(128);
 
 	private final World world;
 	private final EmptyChunk blankChunk;
@@ -39,51 +40,53 @@ public class ClientChunkListener extends ChunkProviderClient {
 	}
 
 	public boolean canLoadChunk(int x, int z) {
-		ChunkMetadata meta = this.chunkMap.get(MathExt.asLong(x, z));
-		return meta != null && meta.adjacentMask == 0b111_111_111;
+		int chunkIndex = this.chunkMap.getIndex(x, z);
+		int adjacentMask = this.chunkMap.getAdjacentMask(chunkIndex);
+
+		return adjacentMask == 0b111_111_111;
 	}
 
 	public void unloadChunk(int x, int z) {
-		ChunkMetadata meta = this.chunkMap.get(MathExt.asLong(x, z));
+		int index = this.chunkMap.getIndex(x, z);
+		Chunk chunk = this.chunkMap.getChunk(index);
 
-		if (meta == null) {
+		if (chunk == null) {
 			return;
 		}
 
-		Chunk chunk = meta.chunk;
-
 		if (!chunk.isEmpty()) {
 			chunk.onChunkUnload();
-			this.testNeighborArea(meta, true);
+			this.testNeighborArea(index, true);
 		}
 
-		this.chunkMap.remove(MathExt.asLong(x, z));
+		this.chunkMap.remove(x, z);
 	}
 
 	@Override
 	public Chunk loadChunk(int x, int z) {
 		Chunk chunk = new Chunk(this.world, x, z);
-		ChunkMetadata meta = new ChunkMetadata(chunk, 1 << getAdjacentMask(1, 1));
+		this.chunkMap.put(x, z, chunk);
 
-		this.chunkMap.put(MathExt.asLong(x, z), meta);
+		int currentIndex = this.chunkMap.getIndex(x, z);
+		this.chunkMap.addAdjacentDirection(currentIndex, 1 << getAdjacentMask(1, 1));
+
 		MinecraftForge.EVENT_BUS.post(new ChunkEvent.Load(chunk));
 		chunk.isChunkLoaded = true;
 
-		this.testNeighborArea(meta, false);
+		this.testNeighborArea(currentIndex, false);
 		return chunk;
 	}
 
 	@Override
 	public Chunk provideChunk(int x, int z) {
-		long position = MathExt.asLong(x, z);
-		ChunkMetadata meta = this.chunkMap.get(position);
-		return meta == null ? this.blankChunk : meta.chunk;
+		Chunk chunk = this.chunkMap.getChunk(x, z);
+		return chunk == null ? this.blankChunk : chunk;
 	}
 
 	// Tests the 3x3 chunk surrounding area for existence of chunks, if the whole area is already
 	// created, send the notice to the client that it should consider it for rendering.
-	private void testNeighborArea(ChunkMetadata currentNode, boolean erase) {
-		Chunk chunk = currentNode.chunk;
+	private void testNeighborArea(int currentIndex, boolean erase) {
+		Chunk chunk = this.chunkMap.getChunk(currentIndex);
 
 		for (int x = chunk.xPosition - 1; x <= chunk.xPosition + 1; x++) {
 			for (int z = chunk.zPosition - 1; z <= chunk.zPosition + 1; z++) {
@@ -91,7 +94,8 @@ public class ClientChunkListener extends ChunkProviderClient {
 					continue;
 				}
 
-				ChunkMetadata neighborNode = this.chunkMap.get(MathExt.asLong(x, z));
+				int neighborIndex = this.chunkMap.getIndex(x, z);
+				Chunk neighborNode = this.chunkMap.getChunk(neighborIndex);
 
 				int currentX = x - chunk.xPosition + 1;
 				int currentZ = z - chunk.zPosition + 1;
@@ -100,21 +104,21 @@ public class ClientChunkListener extends ChunkProviderClient {
 				int neighborZ = chunk.zPosition - z + 1;
 
 				if (neighborNode == null) {
-					currentNode.adjacentMask &= ~(1 << getAdjacentMask(currentX, currentZ));
+					this.chunkMap.removeAdjacentDirection(currentIndex, 1 << getAdjacentMask(currentX, currentZ));
 					continue;
 				}
 
-				int prevNeighborMask = neighborNode.adjacentMask;
-				int prevCurrentMask = currentNode.adjacentMask;
+				int prevNeighborMask = this.chunkMap.getAdjacentMask(neighborIndex);
+				int prevCurrentMask = this.chunkMap.getAdjacentMask(currentIndex);
 
 				if (erase) {
-					neighborNode.adjacentMask &= ~(1 << getAdjacentMask(neighborX, neighborZ));
+					this.chunkMap.removeAdjacentDirection(neighborIndex, 1 << getAdjacentMask(neighborX, neighborZ));
 				} else {
-					currentNode.adjacentMask |= 1 << getAdjacentMask(currentX, currentZ);
-					neighborNode.adjacentMask |= 1 << getAdjacentMask(neighborX, neighborZ);
+					this.chunkMap.addAdjacentDirection(currentIndex, 1 << getAdjacentMask(currentX, currentZ));
+					this.chunkMap.addAdjacentDirection(neighborIndex, 1 << getAdjacentMask(neighborX, neighborZ));
 				}
 
-				if (currentNode.adjacentMask == 0b111_111_111 && prevCurrentMask != 0b111_111_111) {
+				if (this.chunkMap.getAdjacentMask(currentIndex) == 0b111_111_111 && prevCurrentMask != 0b111_111_111) {
 					WorldManager manager = WorldManager.getCurrentInstance();
 					Minecraft mc = Minecraft.getMinecraft();
 
@@ -125,7 +129,7 @@ public class ClientChunkListener extends ChunkProviderClient {
 					}
 				}
 
-				if (neighborNode.adjacentMask == 0b111_111_111 && prevNeighborMask != 0b111_111_111) {
+				if (this.chunkMap.getAdjacentMask(neighborIndex) == 0b111_111_111 && prevNeighborMask != 0b111_111_111) {
 					WorldManager manager = WorldManager.getCurrentInstance();
 					Minecraft mc = Minecraft.getMinecraft();
 
@@ -141,16 +145,6 @@ public class ClientChunkListener extends ChunkProviderClient {
 
 	private static int getAdjacentMask(int x, int z) {
 		return x + z * 3;
-	}
-
-	public static class ChunkMetadata {
-		public Chunk chunk;
-		public int adjacentMask;
-
-		public ChunkMetadata(Chunk chunk, int mask) {
-			this.chunk = chunk;
-			this.adjacentMask = mask;
-		}
 	}
 }
 

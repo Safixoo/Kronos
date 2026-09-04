@@ -15,7 +15,7 @@ public class FastLongHashMap<T> {
 
 	private long[] keys;
 	private T[] values;
-	private int size, mask, count, tombstones;
+	private int size, mask, count;
 
 	private long lastKey = NULL;
 	private T lastObject;
@@ -86,7 +86,7 @@ public class FastLongHashMap<T> {
 		}
 	}
 
-	public Object remove(long key) {
+	public T remove(long key) {
 		if (this.lastKey == key) {
 			this.lastKey = NULL;
 		}
@@ -109,7 +109,7 @@ public class FastLongHashMap<T> {
 			slot = ++slot & mask;
 		}
 
-		Object removed = this.values[slot];
+		T removed = this.values[slot];
 
 		this.values[slot] = null;
 		this.count--;
@@ -185,11 +185,11 @@ public class FastLongHashMap<T> {
 	}
 
 	static int getNewSize(int size) {
-		return (size * 3) >> 1;
+		return (size * 2);
 	}
 
 	void resize() {
-		int newSize = MathExt.nextPOT(getNewSize(this.size));
+		int newSize = getNewSize(this.size);
 
 		long[] newKeys = new long[newSize];
 		T[] newValues = (T[]) new Object[newSize];

@@ -81,12 +81,14 @@ public class MinecraftHook {
 			ModelQueue.INSTANCE.viewMatrix = new Matrix4f(GlMatrixTracker.MODEL_VIEW_STACK.top()).invert();
 		}
 
-		int light = MathExt.getLightmapCoord(15, 15);
+		if (false) {
+			int light = MathExt.getLightmapCoord(15, 15);
 
-		int j = light % 65536;
-		int k = light / 65536;
+			int j = light % 65536;
+			int k = light / 65536;
 
-		GL13.glMultiTexCoord2f(GL13.GL_TEXTURE1, j, k);
+			GL13.glMultiTexCoord2f(GL13.GL_TEXTURE1, j, k);
+		}
 	}
 
 	private static final int TOP_NORMAL = MathExt.packedNormal(0.0F, 1.0F, 0.0F);

@@ -3,30 +3,31 @@ package dev.safixo.client.util.memory;
 import dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache;
 import dev.safixo.client.util.NibbleUtil;
 import dev.safixo.client.util.data.PrimitivesFlags;
-import net.minecraft.block.Block;
 import net.minecraft.world.chunk.NibbleArray;
 import net.minecraft.world.chunk.storage.ExtendedBlockStorage;
 
 public class ChunkSectionStorage extends ExtendedBlockStorage {
+	private boolean metaUniform = true;
+
 	public ChunkSectionStorage(int y, boolean hasSky) {
 		super(y, hasSky);
-
-		this.skylightArray = null;
-		this.blocklightArray = null;
-		this.blockMetadataArray = null;
 	}
 
 	public boolean hasMetadata() {
-		return this.blockMetadataArray != null;
+		return !this.metaUniform;
 	}
 
 	@Override
 	public int getExtBlockMetadata(int x, int y, int z) {
-		if (this.blockMetadataArray == null) {
+		if (this.metaUniform) {
 			return 0;
 		}
 
-		return NibbleUtil.getNibble(this.blockMetadataArray.data, SectionCache.makeBlockIndex(x, y, z));
+		return this.getBlockMetadata(SectionCache.makeBlockIndex(x, y, z));
+	}
+
+	int getBlockMetadata(int index) {
+		return NibbleUtil.getNibble(this.blockMetadataArray.data, index);
 	}
 
 	@Override
@@ -63,8 +64,10 @@ public class ChunkSectionStorage extends ExtendedBlockStorage {
 
 	@Override
 	public int getExtBlockID(int x, int y, int z) {
-		int index = SectionCache.makeBlockIndex(x, y, z);
+		return this.getBlockId(SectionCache.makeBlockIndex(x, y, z));
+	}
 
+	int getBlockId(int index) {
 		int lsbId = this.blockLSBArray[index] & 0xFF;
 		int msbId = this.blockMSBArray != null ? NibbleUtil.getNibble(this.blockMSBArray.data, index) << 8 : 0;
 
@@ -73,34 +76,16 @@ public class ChunkSectionStorage extends ExtendedBlockStorage {
 
 	@Override
 	public void setExtSkylightValue(int x, int y, int z, int value) {
-		if (this.skylightArray == null) {
-			if (value == 0) {
-				return;
-			}
-			this.skylightArray = new NibbleArray(4096, 4);
-		}
-
 		NibbleUtil.setNibble(this.skylightArray.data, SectionCache.makeBlockIndex(x, y, z), value);
 	}
 
 	@Override
 	public int getExtSkylightValue(int x, int y, int z) {
-		if (this.skylightArray == null) {
-			return 0;
-		}
-
 		return NibbleUtil.getNibble(this.skylightArray.data, SectionCache.makeBlockIndex(x, y, z));
 	}
 
 	@Override
 	public void setExtBlocklightValue(int x, int y, int z, int value) {
-		if (this.blocklightArray == null) {
-			if (value == 0) {
-				return;
-			}
-			this.blocklightArray = new NibbleArray(4096, 4);
-		}
-
 		NibbleUtil.setNibble(this.blocklightArray.data, SectionCache.makeBlockIndex(x, y, z), value);
 	}
 
@@ -115,40 +100,51 @@ public class ChunkSectionStorage extends ExtendedBlockStorage {
 
 	@Override
 	public void setExtBlockMetadata(int x, int y, int z, int value) {
-		if (this.blockMetadataArray == null) {
-			if (value == 0) {
-				return;
-			}
-			this.blockMetadataArray = new NibbleArray(4096, 4);
+		if (value != 0) {
+			this.metaUniform = false;
 		}
 
 		NibbleUtil.setNibble(this.blockMetadataArray.data, SectionCache.makeBlockIndex(x, y, z), value);
 	}
 
 	@Override
-	public NibbleArray getMetadataArray() {
-		if (this.blockMetadataArray == null) {
-			this.blockMetadataArray = new NibbleArray(4096, 4);
+	public void removeInvalidBlocks() {
+		int blockRefCount = 0;
+		int tickRefCount = 0;
+		boolean metaUniform = true;
+
+		byte[] metaArray = this.blockMetadataArray.data;
+
+		for (int i = 0; i < 16 * 16 * 16; i++) {
+			int blockId = this.getBlockId(i);
+
+			if (blockId == 0) {
+				continue;
+			}
+
+			if (i < 2048 && metaArray[i] != 0) {
+				metaUniform = false;
+			}
+
+			/* Wouldn't many things have to gone wrong to have a invalid block
+			** with a 'valid' block id?
+			if (Block.blocksList[blockId] == null) {
+				this.blockLSBArray[y << 8 | z << 4 | x] = 0;
+				if (this.blockMSBArray != null) {
+					this.blockMSBArray.set(x, y, z, 0);
+				}
+			}
+			 */
+
+			blockRefCount++;
+
+			if (PrimitivesFlags.getTickRandom(blockId)) {
+				tickRefCount++;
+			}
 		}
 
-		return this.blockMetadataArray;
-	}
-
-	@Override
-	public NibbleArray getBlocklightArray() {
-		if (this.blocklightArray == null) {
-			this.blocklightArray = new NibbleArray(4096, 4);
-		}
-
-		return this.blocklightArray;
-	}
-
-	@Override
-	public NibbleArray getSkylightArray() {
-		if (this.skylightArray == null) {
-			this.skylightArray = new NibbleArray(4096, 4);
-		}
-
-		return this.skylightArray;
+		this.metaUniform = metaUniform;
+		this.blockRefCount = blockRefCount;
+		this.tickRefCount = tickRefCount;
 	}
 }
