@@ -5,7 +5,6 @@ import dev.safixo.client.util.Direction;
 import dev.safixo.client.util.MathExt;
 import dev.safixo.client.util.NibbleUtil;
 import dev.safixo.client.util.collection.ObjectPooler;
-import dev.safixo.client.util.memory.ChunkSectionStorage;
 import net.minecraft.block.*;
 import net.minecraft.block.material.Material;
 import net.minecraft.tileentity.TileEntity;
@@ -108,14 +107,7 @@ public class SectionCache implements IBlockAccess {
 					if (y < 0 || y > 15) {
 						continue;
 					}
-
-					ExtendedBlockStorage storage = chunk.getBlockStorageArray()[y];
-
-					if (storage != null && !(storage instanceof ChunkSectionStorage)) {
-						throw new RuntimeException("Wrong section storage implementation found!");
-					}
-
-					ChunkSectionStorage section = storage == null ? null : (ChunkSectionStorage) storage;
+					ExtendedBlockStorage section = chunk.getBlockStorageArray()[y];
 
 					int relY = y - minSectionY;
 					int sectionIndex = sectionIndex(relX, relY, relZ);
@@ -128,12 +120,8 @@ public class SectionCache implements IBlockAccess {
 							this.sectionBlocksLsb[sectionIndex] = this.popByteArray(this.sectionBlocksLsb[sectionIndex]);
 							copy(this.sectionBlocksLsb[sectionIndex], section.getBlockLSBArray(), minIndex, maxIndex);
 
-							if (section.hasMetadata()) {
-								this.sectionData[sectionIndex] = this.popNibbleArray(this.sectionData[sectionIndex]);
-								copyNibble(this.sectionData[sectionIndex], section.getMetadataArray().data, minIndex, maxIndex);
-							} else {
-								this.sectionData[sectionIndex] = this.pushNibbleArray(this.sectionData[sectionIndex]);
-							}
+							this.sectionData[sectionIndex] = this.popNibbleArray(this.sectionData[sectionIndex]);
+							copyNibble(this.sectionData[sectionIndex], section.getMetadataArray().data, minIndex, maxIndex);
 
 							if (section.getBlockMSBArray() != null) {
 								this.sectionBlocksMsb[sectionIndex] = this.popNibbleArray(this.sectionBlocksMsb[sectionIndex]);

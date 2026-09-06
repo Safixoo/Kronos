@@ -59,6 +59,17 @@ public class ClientChunkListener extends ChunkProviderClient {
 			this.testNeighborArea(index, true);
 		}
 
+		WorldManager manager = WorldManager.getCurrentInstance();
+		Minecraft mc = Minecraft.getMinecraft();
+
+		if (mc.skipRenderWorld) {
+			for (int chunkX = x - 1; chunkX <= x + 1; chunkX++) {
+				for (int chunkZ = z - 1; chunkZ <= z + 1; chunkZ++) {
+					manager.unloadChunk(chunkX, chunkZ);
+				}
+			}
+		}
+
 		this.chunkMap.remove(x, z);
 	}
 
@@ -123,9 +134,7 @@ public class ClientChunkListener extends ChunkProviderClient {
 					Minecraft mc = Minecraft.getMinecraft();
 
 					if (mc.skipRenderWorld) {
-						for (int y = 0; y < 16; y++) {
-							manager.markDirty(chunk.xPosition, y, chunk.zPosition);
-						}
+						manager.loadChunk(chunk.xPosition, chunk.zPosition);
 					}
 				}
 
@@ -134,9 +143,7 @@ public class ClientChunkListener extends ChunkProviderClient {
 					Minecraft mc = Minecraft.getMinecraft();
 
 					if (mc.skipRenderWorld) {
-						for (int y = 0; y < 16; y++) {
-							manager.markDirty(x, y, z);
-						}
+						manager.loadChunk(chunk.xPosition, chunk.zPosition);
 					}
 				}
 			}

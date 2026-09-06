@@ -12,15 +12,13 @@ import org.lwjgl.opengl.GL11;
 
 import static dev.safixo.client.render.pipelines.terrain.SectionFlags.*;
 
-public class BFSCuller {
+public class GraphCuller {
 	private static final long[] INV_DIVS = new long[256];
-
 	public static final int PRECISION_BITS = 28;
 	public static final int MAX_PRECISION = 1 << PRECISION_BITS;
 
 	public static final int MAX_GRID_FACTOR = 0xFFF;
-
-	private static final int TOLERANCE = (int) (0.15f * MAX_GRID_FACTOR);
+	public static final int TOLERANCE = (int) (0.15f * MAX_GRID_FACTOR);
 
 	static {
 		for (int i = 0; i < 256; i++) {
@@ -28,8 +26,18 @@ public class BFSCuller {
 		}
 	}
 
-	public void clearUpdateIndices() {
-		BFSQueues.clear();
+	private final CullerQueue cullerQueue;
+
+	public GraphCuller() {
+		this.cullerQueue = new CullerQueue(12);
+	}
+
+	public void clearQueueIndices() {
+		this.cullerQueue.clear();
+	}
+
+	public CullerQueue getCullerQueue() {
+		return this.cullerQueue;
 	}
 
 	public void resetRegionCounters(RegionManager regionManager) {
@@ -43,41 +51,39 @@ public class BFSCuller {
 	 * of sections to start the search afterward.
 	 */
 	public void updateRenderList(WorldManager manager, CameraData camera) {
-		int blockX = camera.intX;
-		int blockY = MathExt.clamp(camera.intY, 0, 255);
-		int blockZ = camera.intZ;
+		int cameraChunkX = camera.intX >> 4;
+		int cameraChunkY = MathExt.clamp(camera.intY, 0, 255) >> 4;
+		int cameraChunkZ = camera.intZ >> 4;
 
 		SectionSet sectionSet = manager.getSectionSet();
-		SectionRender origin = sectionSet.getSectionInstance(manager, blockX >> 4, blockY >> 4, blockZ >> 4);
+		SectionRender origin = sectionSet.getSectionInstance(manager, cameraChunkX, cameraChunkY, cameraChunkZ);
 
 		int radius = sectionSet.getRadius();
-		int cameraIndex = sectionSet.getSectionIndex(blockX >> 4, blockY >> 4, blockZ >> 4);
+		int cameraIndex = sectionSet.getSectionIndex(cameraChunkX, cameraChunkY, cameraChunkZ);
 
 		short[] visibilitySet = sectionSet.getVisibilitySet();
 		visibilitySet[cameraIndex] = MAX_GRID_FACTOR;
 
 		int diameter = radius * 2 + 1;
+		this.traverseNeighbors(visibilitySet, cameraIndex, diameter, ~SectionFlags.getSolidFaces(origin.flags));
 
-		if (origin != null) {
-			int flags = origin.flags;
-
-			int directions = 0x3F;
-			traverseNeighbors(visibilitySet, cameraIndex, diameter, directions);
-
-			if (SectionFlags.isDirty(flags)) {
-				BFSQueues.addToRebuildList(0, blockY >> 4, 0);
-			}
-
-			setupAxisVisibility(camera, sectionSet, cameraIndex, diameter);
-			queueRenderTasks(origin, flags);
+		if (SectionFlags.isDirty(origin.flags)) {
+			this.cullerQueue.addToRebuildList(cameraIndex);
 		}
 
-		int maxDistSquared = (int) MathExt.square(getFogDistance(camera));
-		iterateGraph(sectionSet, camera.intX, camera.intY, camera.intZ, maxDistSquared);
+		setupAxisVisibility(camera, sectionSet, cameraIndex, diameter);
+
+		this.queueRenderTasks(origin, origin.flags);
+
+		float fogDistance = getFogDistance(camera);
+		int maxDistSquared = (int) MathExt.square(fogDistance + 1);
+
+		this.cullerQueue.resize((int) Math.ceil(fogDistance / 16.0f));
+
+		this.iterateGraph(sectionSet, camera.intX, camera.intY, camera.intZ, maxDistSquared);
+		this.prepareRenderTasks(sectionSet, camera);
 
 		clearAxisVisibility(camera, sectionSet, cameraIndex, diameter);
-
-		this.enqueueRegionData(camera);
 	}
 
 	private static void setupAxisVisibility(CameraData camera, SectionSet sectionSet, int cameraIndex, int renderDiameter) {
@@ -85,9 +91,9 @@ public class BFSCuller {
 		int offsetY = renderDiameter;
 		int offsetZ = renderDiameter << 4;
 
-		fillAxisVisibility(sectionSet, camera, cameraIndex, offsetX, Direction.EAST, (short) -1);
-		fillAxisVisibility(sectionSet, camera, cameraIndex, offsetY, Direction.UP, (short) -1);
-		fillAxisVisibility(sectionSet, camera, cameraIndex, offsetZ, Direction.SOUTH, (short) -1);
+		fillAxisVisibility(sectionSet, cameraIndex, Direction.EAST, offsetX, (short) -1);
+		fillAxisVisibility(sectionSet, cameraIndex, Direction.UP, offsetY, (short) -1);
+		fillAxisVisibility(sectionSet, cameraIndex, Direction.SOUTH, offsetZ, (short) -1);
 	}
 
 	private static void clearAxisVisibility(CameraData camera, SectionSet sectionSet, int cameraIndex, int renderDiameter) {
@@ -95,27 +101,25 @@ public class BFSCuller {
 		int offsetY = renderDiameter;
 		int offsetZ = renderDiameter << 4;
 
-		fillAxisVisibility(sectionSet, camera, cameraIndex, offsetX, Direction.EAST, (short) 0);
-		fillAxisVisibility(sectionSet, camera, cameraIndex, offsetY, Direction.UP, (short) 0);
-		fillAxisVisibility(sectionSet, camera, cameraIndex, offsetZ, Direction.SOUTH, (short) 0);
+		fillAxisVisibility(sectionSet, cameraIndex, offsetX, Direction.EAST, (short) 0);
+		fillAxisVisibility(sectionSet, cameraIndex, offsetY, Direction.UP, (short) 0);
+		fillAxisVisibility(sectionSet, cameraIndex, offsetZ, Direction.SOUTH, (short) 0);
 	}
 
-	private static void fillAxisVisibility(SectionSet sectionSet, CameraData camera, int cameraIndex, int offset, int direction, short gridFactor) {
+	private static void fillAxisVisibility(SectionSet sectionSet, int cameraIndex, int offset, int direction, short gridFactor) {
 		int radius = sectionSet.getRadius();
-
-		byte[] sectionData = sectionSet.getSections();
 		short[] visSet = sectionSet.getVisibilitySet();
+		byte[] cullData = sectionSet.getSections();
 
 		int index = cameraIndex;
 
 		// Negative direction.
 		for (int a = 0; a < radius; a++) {
-			int section = sectionData[index];
-
+			int faces = cullData[index];
 			visSet[index] = gridFactor;
 			index -= offset;
 
-			if (Direction.hasSet(getSolidFaces(section), Direction.opposite(direction))) {
+			if (Direction.hasSet(~getSolidFaces(faces), Direction.opposite(direction))) {
 				break;
 			}
 		}
@@ -123,12 +127,11 @@ public class BFSCuller {
 
 		// Positive direction.
 		for (int a = 0; a < radius; a++) {
-			int section = sectionData[index];
-
+			int faces = cullData[index];
 			visSet[index] = gridFactor;
 			index += offset;
 
-			if (Direction.hasSet(getSolidFaces(section), direction)) {
+			if (Direction.hasSet(~getSolidFaces(faces), direction)) {
 				break;
 			}
 		}
@@ -139,31 +142,43 @@ public class BFSCuller {
 	private static final float LN_0 = (float) Math.log(1.0 / 255.0);
 
 	public static float getFogDistance(CameraData camera) {
+		float distance = 48.0F;
+
 		if (GlFogTracker.FOG_MODE == GL11.GL_EXP) {
-			return LN_0 / GlFogTracker.FOG_DENSITY;
+			distance = Math.max(distance, LN_0 / GlFogTracker.FOG_DENSITY);
+		} else {
+			distance = Math.max(distance, Math.min(GlFogTracker.FOG_END, camera.renderDistance << 4));
 		}
 
-		return Math.max(3 << 4, Math.min(GlFogTracker.FOG_END, camera.renderDistance << 4));
+		return distance;
 	}
 
 	/**
 	 * Reads all the indices from the visible sections enqueued in the graph and write
 	 * their relative region indices in the region to later be used for drawing.
 	 */
-	private void enqueueRegionData(CameraData camera) {
+	private void prepareRenderTasks(SectionSet sectionSet, CameraData camera) {
 		RegionManager regionManager = WorldManager.getRegionManager();
+		regionManager.saveIndexedRegions(sectionSet, camera);
 
-		regionManager.saveIndexedRegions(camera);
+		int radius = sectionSet.getRadius();
+		int diameter = radius * 2 + 1;
+		int magicConstant = (int) Math.ceil((1 << 20) / (double) diameter);
 
-		int cameraChunkX = camera.intX >> 4;
-		int cameraChunkZ = camera.intZ >> 4;
+		int cameraChunkX = -radius + (camera.intX >> 4);
+		int cameraChunkZ = -radius + (camera.intZ >> 4);
 
-		for (int i = 0; i < BFSQueues.getRenderIndex(); i++) {
-			int position = BFSQueues.RENDER_INDICES[i];
+		for (int i = 0; i < this.cullerQueue.getRenderIndex(); i++) {
+			int sectionIndex = this.cullerQueue.getRenderId(i);
 
-			int sectionX = MathExt.decodeX(position) + cameraChunkX;
-			int sectionY = MathExt.decodeY(position);
-			int sectionZ = MathExt.decodeZ(position) + cameraChunkZ;
+			int sectionY = (sectionIndex * magicConstant) >> 20;
+			int offsetX = sectionIndex - (sectionY * diameter);
+			int offsetZ = sectionY >> 4;
+
+			sectionY &= 15;
+
+			int sectionX = offsetX + cameraChunkX;
+			int sectionZ = offsetZ + cameraChunkZ;
 
 			RegionRender region = regionManager.getRegionFromIndexed(sectionX, sectionY, sectionZ);
 
@@ -171,8 +186,7 @@ public class BFSCuller {
 				continue;
 			}
 
-			int regionIndex = RegionConstants.regionIndex(sectionX, sectionY, sectionZ);
-			region.addToRenderList(regionIndex);
+			region.addToRenderList(RegionConstants.regionIndex(sectionX, sectionY, sectionZ));
 		}
 	}
 
@@ -181,9 +195,10 @@ public class BFSCuller {
 	 * by tomcc and the Sodium implementation, with many differences as it doesn't try to find connectivity 100% and uses some
 	 * different ideas to avoid section queueing during the search.
 	 */
-	private static void iterateGraph(SectionSet sectionSet, int playerX, int playerY, int playerZ, int maxDistSquared) {
-		byte[] sectionFlags = sectionSet.getSections();
-		short[] visSet = sectionSet.getVisibilitySet();
+	private void iterateGraph(SectionSet sectionSet, int playerX, int playerY, int playerZ, int maxDistSquared) {
+		final byte[] sectionFlags = sectionSet.getSections();
+		final short[] visSet = sectionSet.getVisibilitySet();
+		final int[] graphQueue = this.cullerQueue.getGraphQueue();
 
 		int radius = sectionSet.getRadius();
 		int diameter = radius * 2 + 1;
@@ -191,8 +206,8 @@ public class BFSCuller {
 
 		int magicConstant = (int) Math.ceil((1 << 20) / (double) diameter);
 
-		while (readIndex < BFSQueues.bfsIndex) {
-			int sectionIndex = BFSQueues.GRAPH_INDICES[readIndex++];
+		while (readIndex < this.cullerQueue.getGraphIndex()) {
+			int sectionIndex = graphQueue[readIndex++];
 			int flags = MathExt.byteToUnsigned(sectionFlags[sectionIndex]);
 
 			// kind of ugly indexing but it works fine.
@@ -217,16 +232,14 @@ public class BFSCuller {
 				continue;
 			}
 
-			queueRenderTasks(flags, diffSectX, sectionY, diffSectZ);
-			int outwardDirections = getOutwardDirections(diffSectX, diffSectY, diffSectZ);
-			int directions = ~getSolidFaces(flags) & outwardDirections;
-			int angleMask = getAngleVisibilityMask(diffX, diffY, diffZ);
+			this.queueRenderTasks(flags, sectionIndex);
+			int directions = ~getSolidFaces(flags) & getOutwardDirections(diffSectX, diffSectY, diffSectZ);
 
 			// The incoming direction isn't saved, so it can't directly use the angle to
 			// restrict the direction bit-set, but in some cases like when traversable faces
 			// are very narrowed down the angle trick can be useful.
-			if ((directions & angleMask) != 0b0) {
-				traverseNeighbors(visSet, sectionIndex, diameter, directions);
+			if (directions != 0b0 && (directions & getAngleVisibilityMask(diffX, diffY, diffZ)) != 0b0) {
+				this.traverseNeighbors(visSet, sectionIndex, diameter, directions);
 			}
 		}
 	}
@@ -241,7 +254,7 @@ public class BFSCuller {
 											  int maxDistSquared, int sectionIndex, int diameter) {
 		int distance = getDistance(diffX, diffY, diffZ);
 
-		if (distance >= maxDistSquared || !FrustumCuller.withinFrustumBounds(diffX, diffY, diffZ)) {
+		if (distance > maxDistSquared || !FrustumCuller.withinFrustumBounds(diffX, diffY, diffZ)) {
 			return true;
 		}
 
@@ -256,7 +269,7 @@ public class BFSCuller {
 	/**
 	 * Generates a mask to discard invariants inward directions early in the search.
 	 */
-	private static int getOutwardDirections(int diffSectX, int diffSectY, int diffSectZ) {
+	public static int getOutwardDirections(int diffSectX, int diffSectY, int diffSectZ) {
 		int planes = 0;
 
 		planes |= (diffSectX >> 31) & Direction.EAST_BIT  | (-diffSectX >> 31) & Direction.WEST_BIT;
@@ -270,7 +283,7 @@ public class BFSCuller {
 	 * For non-empty renderable sections that has been visited by the graph, their indices are saved in their respective
 	 * region to later be rendered in order.
 	 */
-	private static void queueRenderTasks(SectionRender section, int flags) {
+	private void queueRenderTasks(SectionRender section, int flags) {
 		if (SectionFlags.hasPassesNonEmpty(flags)) {
 			RegionRender region = section.region;
 			region.addToRenderList(section.regionIndex);
@@ -281,13 +294,13 @@ public class BFSCuller {
 	 * Based in the flag data and position relative to the camera, saves positions to be later
 	 * retrieved and processed for region rendering and meshing.
 	 */
-	private static void queueRenderTasks(int flags, int diffSectX, int diffSectY, int diffSectZ) {
+	private void queueRenderTasks(int flags, int sectionIndex) {
 		if (isDirty(flags)) {
-			BFSQueues.addToRebuildList(diffSectX, diffSectY, diffSectZ);
+			this.cullerQueue.addToRebuildList(sectionIndex);
 		}
 
 		if (hasPassesNonEmpty(flags)) {
-			BFSQueues.addToRenderList(diffSectX, diffSectY, diffSectZ);
+			this.cullerQueue.addToRenderList(sectionIndex);
 		}
 	}
 
@@ -295,14 +308,14 @@ public class BFSCuller {
 	 * Searches outwards from the player position for possible visitable sections, based of the occlusion from the section faces,
 	 * skips visiting sections if they were already visited in the active frame.
 	 */
-	private static void traverseNeighbors(short[] visSet, int sectionIndex, int renderDiameter, int directions) {
+	private void traverseNeighbors(short[] visSet, int sectionIndex, int renderDiameter, int directions) {
 		int offsetX = 1;
 		int offsetY = renderDiameter;
 		int offsetZ = renderDiameter << 4;
 
-		final int[] graphIndices = BFSQueues.GRAPH_INDICES;
+		final int[] graphIndices = this.cullerQueue.getGraphQueue();
 
-		int index = BFSQueues.bfsIndex;
+		int index = this.cullerQueue.getGraphIndex();
 		short gridFactor = visSet[sectionIndex];
 
 		if (Direction.hasSet(directions, Direction.DOWN) && visSet[sectionIndex - offsetY] <= 0) {
@@ -335,7 +348,7 @@ public class BFSCuller {
 			visSet[sectionIndex + offsetX] = gridFactor;
 		}
 
-		BFSQueues.bfsIndex = index;
+		this.cullerQueue.setGraphIndex(index);
 	}
 
 	// Sodium 0.6 (Polyform Shield) code.
@@ -345,13 +358,13 @@ public class BFSCuller {
 		int dz = Math.abs(diffZ + 8);
 
 		int angleOcclusionMask = 0;
-		if (dx > dy + 32 || dz > dy + 32) {
+		if (dx > dy + 36 || dz > dy + 36) {
 			angleOcclusionMask |= 0b000011;
 		}
-		if (dx > dz + 32 || dy > dz + 32) {
+		if (dx > dz + 36 || dy > dz + 36) {
 			angleOcclusionMask |= 0b001100;
 		}
-		if (dy > dx + 32 || dz > dx + 32) {
+		if (dy > dx + 36 || dz > dx + 36) {
 			angleOcclusionMask |= 0b110000;
 		}
 
@@ -392,7 +405,7 @@ public class BFSCuller {
 	 * Squared Euclidean distance to the nearest section corner, which should return
 	 * the nearest point in cases where an axis is not intersecting with the player.
 	 */
-	private static int getDistance(int distX, int distY, int distZ) {
+	private static int  getDistance(int distX, int distY, int distZ) {
 		distX += ((distX + 8) >>> 27); // ... >>> 31) << 4
 		distY += ((distY + 8) >>> 27); // ... >>> 31) << 4
 		distZ += ((distZ + 8) >>> 27); // ... >>> 31) << 4

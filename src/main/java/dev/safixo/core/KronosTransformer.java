@@ -37,7 +37,7 @@ public class KronosTransformer implements IClassTransformer {
 	static final String CLIPPING_HELPER = "net.minecraft.client.renderer.culling.ClippingHelper";
 	static final String FONT_RENDERER = "net.minecraft.client.gui.FontRenderer";
 	static final String MINECRAFT = "net.minecraft.client.Minecraft";
-	static final String LONG_HASH_MAP = "net.minecraft.util.LongHashMap";
+	static final String LONG_HASH_MAP = DEBUG_MEM_OPT ? "net.minecraft.util.LongHashMap" : "disabled!";
 	static final String WORLD_CLIENT = "net.minecraft.client.multiplayer.WorldClient";
 	static final String MODEL_RENDERER = "net.minecraft.client.model.ModelRenderer";
 	static final String TEXTURE_MAP = "net.minecraft.client.renderer.texture.TextureMap";
@@ -140,6 +140,7 @@ public class KronosTransformer implements IClassTransformer {
 			case MINECRAFT:
 				// In many drivers in make stalls the GPU too soon in the tick loop.
 				replaceClassMethod(MINECRAFT_HOOK, "checkGLError", "c", "(Ljava/lang/String;)V", reference, true);
+				replaceClassMethod(MINECRAFT_HOOK, "isAmbientOcclusionEnabled", "", "()V", reference, false);
 				break;
 		}
 
@@ -156,10 +157,6 @@ public class KronosTransformer implements IClassTransformer {
 			}
 		}
 
-		if (!transformedName.endsWith("ChunkSectionStorage")){
-			changeChunkSection(reference);
-		}
-
 		if (!transformedName.equals("net.minecraft.client.renderer.Tessellator")) {
 			replaceTessellatorsInstances(reference);
 		}
@@ -170,7 +167,6 @@ public class KronosTransformer implements IClassTransformer {
 
 		return reference[0];
 	}
-
 
 	static void changeHashMap(byte[][] basicClass) {
 		ClassReader reader = new ClassReader(basicClass[0]);
@@ -204,44 +200,6 @@ public class KronosTransformer implements IClassTransformer {
 					MethodInsnNode m = (MethodInsnNode) insn;
 					if (m.owner.equals("com/google/common/collect/Maps") && m.name.contains("newHashMap")) {
 						m.owner = hashMapWrapped;
-					}
-				}
-
-				insn = insn.getNext();
-			}
-		}
-
-		classNode.accept(writer);
-		basicClass[0] = writer.toByteArray();
-	}
-
-	static void changeChunkSection(byte[][] basicClass) {
-		ClassReader reader = new ClassReader(basicClass[0]);
-		ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
-
-		ClassNode classNode = new ClassNode();
-		reader.accept(classNode, 0);
-
-		for (int i = 0; i < classNode.methods.size(); i++) {
-			MethodNode method = (MethodNode) classNode.methods.get(i);
-
-			InsnList inns = method.instructions;
-			AbstractInsnNode insn = inns.getFirst();
-
-			String chunkSect = "dev/safixo/client/util/memory/ChunkSectionStorage";
-			String extendedBlockStorage = IN_DEV ? "net/minecraft/world/chunk/storage/ExtendedBlockStorage"
-												: "";
-
-			while (insn != null) {
-				if (insn.getOpcode() == INVOKESPECIAL) {
-					MethodInsnNode m = (MethodInsnNode) insn;
-					if (m.owner.equals("net/minecraft/world/chunk/storage/ExtendedBlockStorage")) {
-						m.owner = chunkSect;
-					}
-				} else if (insn.getOpcode() == NEW) {
-					TypeInsnNode t = (TypeInsnNode) insn;
-					if (t.desc.equals("net/minecraft/world/chunk/storage/ExtendedBlockStorage")) {
-						t.desc = chunkSect;
 					}
 				}
 

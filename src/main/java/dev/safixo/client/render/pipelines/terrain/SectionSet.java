@@ -1,7 +1,7 @@
 package dev.safixo.client.render.pipelines.terrain;
 
-import dev.safixo.client.render.pipelines.terrain.cull.BFSCuller;
-import dev.safixo.client.render.pipelines.terrain.cull.BFSQueues;
+import dev.safixo.client.render.pipelines.terrain.cull.GraphCuller;
+import dev.safixo.client.render.pipelines.terrain.cull.CullerQueue;
 import dev.safixo.client.util.data.ClientChunkListener;
 import dev.safixo.client.util.MathExt;
 import dev.safixo.client.util.data.CameraData;
@@ -17,8 +17,7 @@ public class SectionSet {
 	// as "grid factor" (the term used in BFSCuller).
 	private short[] visibilitySet;
 
-	private int lastCameraChunkX = Integer.MIN_VALUE, lastCameraChunkZ = Integer.MIN_VALUE;
-	private int lastDistance = Integer.MIN_VALUE;
+	private int lastSectionX = Integer.MIN_VALUE, lastSectionZ = Integer.MIN_VALUE;
 
 	private CameraData camera;
 	private int radius;
@@ -28,7 +27,12 @@ public class SectionSet {
 		this.camera = camera;
 		this.radius = camera.renderDistance + (16 / camera.renderDistance) + 1;
 
-		this.resetVisibilityState();
+		if (this.lastSectionX == Integer.MIN_VALUE || this.lastSectionZ == Integer.MIN_VALUE) {
+			this.lastSectionX = this.camera.intX >> 4;
+			this.lastSectionZ = this.camera.intZ >> 4;
+		}
+
+		this.resetVisibilityState(manager.getGraphCuller().getCullerQueue());
 		this.updateSectionArray(manager, lastCamera, worldChanged);
 	}
 
@@ -58,7 +62,7 @@ public class SectionSet {
 
 		for (int x = 0; x <= radius; x++) {
 			for (int z = 0; z <= radius; z++) {
-				short overDistance = (short) (Math.max(x, z) >= radius ? 1 : 0);
+				short overDistance = (short) (Math.max(x, z) >= radius ? GraphCuller.TOLERANCE : 0);
 
 				for (int y = 0; y < 16; y++) {
 					int sectIndexPP = this.getSectionIndex(x + cameraChunkX, y, z + cameraChunkZ);
@@ -82,28 +86,35 @@ public class SectionSet {
 			this.sections = new byte[size];
 		}
 
-		int cameraChunkX = this.camera.intX >> 4;
-		int cameraChunkZ = this.camera.intZ >> 4;
+		int cameraSectionX = this.camera.intX >> 4;
+		int cameraSectionZ = this.camera.intZ >> 4;
+
+		this.lastSectionX = cameraSectionX;
+		this.lastSectionZ = cameraSectionZ;
 
 		int radius = this.radius;
+		ClientChunkListener map = ClientChunkListener.getChunkListener();
 
 		for (int x = -radius; x <= radius; x++) {
 			for (int z = -radius; z <= radius; z++) {
-				int chunkX = cameraChunkX + x;
-				int chunkZ = cameraChunkZ + z;
+				int chunkX = cameraSectionX + x;
+				int chunkZ = cameraSectionZ + z;
 
-				this.initializeSectionInfo(chunkX, chunkZ);
+				this.initializeChunkInfo(chunkX, chunkZ, map.canLoadChunk(chunkX, chunkZ));
 			}
 		}
 	}
 
-	private void initializeSectionInfo(int chunkX, int chunkZ) {
-		ClientChunkListener map = ClientChunkListener.getChunkListener();
+	private void initializeChunkInfo(int sectionX, int sectionZ, boolean canLoad) {
+		if (!this.isInBounds(sectionX, sectionZ)) {
+			return;
+		}
 
-		byte flag = (byte) (!map.canLoadChunk(chunkX, chunkZ) ? SectionFlags.SECTION_INVALID : SectionFlags.SECTION_DEFAULT_DIRTY);
+		byte flag = (byte) (canLoad ? SectionFlags.SECTION_DEFAULT_DIRTY : SectionFlags.SECTION_INVALID);
 
 		for (int sectionY = 0; sectionY < 16; sectionY++) {
-			this.sections[this.getSectionIndex(chunkX, sectionY, chunkZ)] = flag;
+			int sectionIndex = this.getSectionIndex(sectionX, sectionY, sectionZ);
+			this.sections[sectionIndex] = flag;
 		}
 	}
 
@@ -112,7 +123,12 @@ public class SectionSet {
 			return;
 		}
 
-		this.sections[this.getSectionIndex(sectionX, sectionY, sectionZ)] = (byte) flag;
+		int sectionIndex = this.getSectionIndex(sectionX, sectionY, sectionZ);
+		this.sections[sectionIndex] = (byte) flag;
+	}
+
+	private int shapeCullData(int diffX, int diffY, int diffZ, int cullData) {
+		return ~cullData & GraphCuller.getOutwardDirections(diffX, diffY, diffZ);
 	}
 
 	public boolean isInBounds(int sectionX, int sectionZ) {
@@ -120,8 +136,8 @@ public class SectionSet {
 			return false;
 		}
 
-		int diffChunkX = sectionX - (this.camera.intX >> 4);
-		int diffChunkZ = sectionZ - (this.camera.intZ >> 4);
+		int diffChunkX = sectionX - this.lastSectionX;
+		int diffChunkZ = sectionZ - this.lastSectionZ;
 
 		return Math.abs(diffChunkX) <= this.radius && Math.abs(diffChunkZ) <= this.radius;
 	}
@@ -134,7 +150,30 @@ public class SectionSet {
 		return MathExt.byteToUnsigned(this.sections[this.getSectionIndex(sectionX, sectionY, sectionZ)]);
 	}
 
+	public boolean isVisible(int sectionX, int sectionY, int sectionZ) {
+		if (!this.isInBounds(sectionX, sectionZ)) {
+			return false;
+		}
+
+		return this.visibilitySet[this.getSectionIndex(sectionX, sectionY, sectionZ)] > GraphCuller.TOLERANCE;
+	}
+
 	public SectionRender getSectionInstance(WorldManager manager, int sectionX, int sectionY, int sectionZ) {
+		return new SectionRender(manager, this, sectionX << 4, sectionY << 4, sectionZ << 4, this.getSection(sectionX, sectionY, sectionZ));
+	}
+
+	public SectionRender getSectionInstance(WorldManager manager, int sectionIndex) {
+		int diameter = this.radius * 2 + 1;
+
+		int sectionY = sectionIndex / diameter;
+		int offsetX = sectionIndex - (sectionY * diameter);
+		int offsetZ = sectionY >> 4;
+
+		sectionY &= 15;
+
+		int sectionX = offsetX + this.lastSectionX - this.radius;
+		int sectionZ = offsetZ + this.lastSectionZ - this.radius;
+
 		return new SectionRender(manager, this, sectionX << 4, sectionY << 4, sectionZ << 4, this.getSection(sectionX, sectionY, sectionZ));
 	}
 
@@ -150,7 +189,23 @@ public class SectionSet {
 		}
 	}
 
-	private void resetVisibilityState() {
+	public void loadChunk(int sectionX, int sectionZ) {
+		if (!this.isInBounds(sectionX, sectionZ)) {
+			return;
+		}
+
+		this.initializeChunkInfo(sectionX, sectionZ, true);
+	}
+
+	public void unloadChunk(int sectionX, int sectionZ) {
+		if (!this.isInBounds(sectionX, sectionZ)) {
+			return;
+		}
+
+		this.initializeChunkInfo(sectionX, sectionZ, false);
+	}
+
+	private void resetVisibilityState(CullerQueue cullerQueue) {
 		int size = MathExt.square(this.radius * 2 + 1) * 16;
 
 		if (this.visibilitySet == null || this.visibilitySet.length != size) {
@@ -160,9 +215,9 @@ public class SectionSet {
 		}
 
 		final short[] visSet = this.visibilitySet;
-		final int[] graphIndices = BFSQueues.GRAPH_INDICES;
+		final int[] graphIndices = cullerQueue.getGraphQueue();
 
-		int maxIndex = BFSQueues.bfsIndex;
+		int maxIndex = cullerQueue.getGraphIndex();
 		int i = 0;
 
 		while (i < (maxIndex & -4)) {
@@ -184,8 +239,8 @@ public class SectionSet {
 
 	// [X, Y, Z]
 	public int getSectionIndex(int sectionX, int sectionY, int sectionZ) {
-		int offsetX = sectionX - (this.camera.intX >> 4);
-		int offsetZ = sectionZ - (this.camera.intZ >> 4);
+		int offsetX = sectionX - this.lastSectionX;
+		int offsetZ = sectionZ - this.lastSectionZ;
 
 		return this.getSectionIndexRelative(offsetX, sectionY, offsetZ);
 	}
@@ -206,27 +261,24 @@ public class SectionSet {
 			return;
 		}
 
-		if (this.lastCameraChunkX == Integer.MIN_VALUE || this.lastCameraChunkZ == Integer.MIN_VALUE) {
-			this.lastCameraChunkX = this.camera.intX >> 4;
-			this.lastCameraChunkZ = this.camera.intZ >> 4;
-			return;
-		}
-
 		int radius = this.radius;
 
-		int lastCameraChunkX = this.lastCameraChunkX;
-		int lastCameraChunkZ = this.lastCameraChunkZ;
+		int lastCameraSectionX = this.lastSectionX;
+		int lastCameraSectionZ = this.lastSectionZ;
 
-		int cameraChunkX = this.camera.intX >> 4;
-		int cameraChunkZ = this.camera.intZ >> 4;
+		int cameraSectionX = this.camera.intX >> 4;
+		int cameraSectionY = this.camera.intY >> 4;
+		int cameraSectionZ = this.camera.intZ >> 4;
 
-		int diffCameraX = cameraChunkX - lastCameraChunkX;
-		int diffCameraZ = cameraChunkZ - lastCameraChunkZ;
+		int diffCameraX = cameraSectionX - lastCameraSectionX;
+		int diffCameraZ = cameraSectionZ - lastCameraSectionZ;
 
 		// No section movement since last frame.
 		if (diffCameraX == 0 && diffCameraZ == 0) {
 			return;
 		}
+
+		manager.markDirty();
 
 		int signX = MathExt.sign(diffCameraX);
 		int signZ = MathExt.sign(diffCameraZ);
@@ -234,26 +286,28 @@ public class SectionSet {
 		// Iterates the whole array volume.
 		for (int x = -radius; x <= radius; x++) {
 			for (int z = -radius; z <= radius; z++) {
-				int chunkX = cameraChunkX + x;
-				int chunkZ = cameraChunkZ + z;
+				int sectionX = cameraSectionX + x;
+				int sectionZ = cameraSectionZ + z;
 
 				// It has to iterate from the same direction from diffXZ to avoid overwriting
 				// the data we are copying in the process.
 				int xi = signX * x;
 				int zi = signZ * z;
 
-				this.handleSectionInVolume(chunkX, chunkZ, diffCameraX, diffCameraZ, xi, zi);
+				this.handleSectionInVolume(sectionX, sectionZ, diffCameraX, diffCameraZ, xi, zi);
 			}
 		}
 
-		this.lastCameraChunkX = cameraChunkX;
-		this.lastCameraChunkZ = cameraChunkZ;
+		this.lastSectionX = cameraSectionX;
+		this.lastSectionZ = cameraSectionZ;
 	}
 
 	private void handleSectionInVolume(int chunkX, int chunkZ, int diffCameraX, int diffCameraZ, int xi, int zi) {
+		ClientChunkListener map = ClientChunkListener.getChunkListener();
+
 		// Manage the part of the volume that the array NOW represents as *inside*.
 		if (Math.abs(xi + diffCameraX) > this.radius || Math.abs(zi + diffCameraZ) > this.radius) {
-			this.initializeSectionInfo(chunkX, chunkZ);
+			this.initializeChunkInfo(chunkX, chunkZ, map.canLoadChunk(chunkX, chunkZ));
 			return;
 		}
 

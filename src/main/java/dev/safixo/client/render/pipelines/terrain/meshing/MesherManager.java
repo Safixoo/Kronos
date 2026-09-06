@@ -4,7 +4,7 @@ import dev.safixo.client.render.pipelines.terrain.SectionFlags;
 import dev.safixo.client.render.pipelines.terrain.SectionRender;
 import dev.safixo.client.render.pipelines.terrain.SectionSet;
 import dev.safixo.client.render.pipelines.terrain.WorldManager;
-import dev.safixo.client.render.pipelines.terrain.cull.BFSQueues;
+import dev.safixo.client.render.pipelines.terrain.cull.CullerQueue;
 import dev.safixo.client.render.pipelines.terrain.meshing.data.FakeInlinedBiome;
 import dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache;
 import dev.safixo.client.render.pipelines.terrain.meshing.model.ModelColorizer;
@@ -71,34 +71,20 @@ public class MesherManager {
 		AsyncBlockHook.setMeshingThread(this.meshThread);
 	}
 
-	public void queueRebuilds(WorldManager manager) {
-		int rebuildSize = BFSQueues.getRebuildIndex();
+	public void queueRebuilds(CullerQueue cullerQueue, WorldManager manager) {
+		int rebuildSize = cullerQueue.getRebuildIndex();
 		int maxSize = Math.min(WorldManager.MAX_UPDATES_TRIES, rebuildSize);
 
 		SectionSet sectionSet = manager.getSectionSet();
-
-		if (rebuildSize == 0) {
-			manager.setTerrainDirty(false);
-		}
 		PrimitivesFlags.processLeavesSolid();
 
 		long current = System.nanoTime();
-		long budget = calculateFrameBudgetNs(current);
+		long budget = this.calculateFrameBudgetNs(current);
 
 		int updateIndex = 0, nonEmptyUpdates = 0;
 
 		while (updateIndex < maxSize && nonEmptyUpdates < WorldManager.MAX_FULL_UPDATES) {
-			long position = BFSQueues.getSectionPos(manager.getCamera(), updateIndex++);
-
-			int sectionX = MathExt.decodeX(position);
-			int sectionY = MathExt.decodeY(position);
-			int sectionZ = MathExt.decodeZ(position);
-
-			SectionRender section = sectionSet.getSectionInstance(manager, sectionX, sectionY, sectionZ);
-
-			if (section == null) {
-				continue;
-			}
+			SectionRender section = cullerQueue.getDirtySection(manager, sectionSet, updateIndex++);
 
 			if (this.mesherRunnable.getTaskCount() >= WorldManager.MAX_TASK_CONCURRENTLY) {
 				break;
@@ -130,8 +116,13 @@ public class MesherManager {
 			: (long) Math.max(diff, this.lastFrameBuildTime - 5 * 1E+6D * partialTick);
 		this.lastFrameNano = current;
 
+		List<SectionResult> results = this.mesherRunnable.getResults();
+		if (nonEmptyUpdates > 0) {
+			manager.markDirty();
+		}
+
 		this.queueTasks(manager);
-		this.readAsyncResults(manager);
+		this.readAsyncResults(manager, results);
 	}
 
 	private void queueTasks(WorldManager manager) {
@@ -163,7 +154,13 @@ public class MesherManager {
 	}
 
 	public void readAsyncResults(WorldManager manager) {
-		List<SectionResult> results = this.mesherRunnable.getResults();
+		this.readAsyncResults(manager, this.mesherRunnable.getResults());
+	}
+
+	public void readAsyncResults(WorldManager manager, List<SectionResult> results) {
+		if (!results.isEmpty()) {
+			manager.markDirty();
+		}
 
 		for (SectionResult result : results) {
 			SectionTask task = result.task;
@@ -182,7 +179,6 @@ public class MesherManager {
 
 			if (sectionSet.isInBounds(section.blockX >> 4, section.blockZ >> 4)) {
 				task.section.sendBuildResult(manager, result);
-				manager.setTerrainDirty(true);
 			} else {
 				result.delete();
 			}
@@ -206,7 +202,7 @@ public class MesherManager {
 			section.setFlags(SectionFlags.setDirty(section.flags, false));
 			section.sendFlagsToSet();
 
-			manager.setTerrainDirty(true);
+			manager.markDirty();
 			return false;
 		} else {
 			section.setFlags(SectionFlags.setDirty(section.flags, false));

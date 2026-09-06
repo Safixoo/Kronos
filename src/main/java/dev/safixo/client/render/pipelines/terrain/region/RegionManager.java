@@ -1,5 +1,7 @@
 package dev.safixo.client.render.pipelines.terrain.region;
 
+import dev.safixo.client.render.pipelines.terrain.SectionSet;
+import dev.safixo.client.util.collection.FastLongHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import net.minecraft.tileentity.TileEntity;
@@ -20,7 +22,8 @@ public class RegionManager {
 	private double lastUpdateZ;
 
 	private RegionRender[] indexedRegions;
-	private CameraData regionCamera;
+	private int addRegionX, addRegionZ;
+	private int factorY, factorZ;
 
 	public RegionManager() {
 		String vendor = GL11.glGetString(GL11.GL_VENDOR);
@@ -48,21 +51,29 @@ public class RegionManager {
 	}
 
 	// Creates a mapping between position and regions, useful for BFS only.
-	public void saveIndexedRegions(CameraData camera) {
-		int regionCameraX = camera.intX >> RegionConstants.BLOCK_SHIFT_X;
-		int regionCameraZ = camera.intZ >> RegionConstants.BLOCK_SHIFT_Z;
+	public void saveIndexedRegions(SectionSet sectionSet, CameraData camera) {
+		int regionCameraX = (camera.intX >> RegionConstants.BLOCK_SHIFT_X);
+		int regionCameraZ = (camera.intZ >> RegionConstants.BLOCK_SHIFT_Z);
 
-		int renderDiameter = getRenderDiameter(camera);
-
-		int factorXZ = renderDiameter >> 3;
+		int factorXZ = Integer.MIN_VALUE;
 		int factorY = 256 >> RegionConstants.BLOCK_SHIFT_Y;
+
+		for (RegionRender region : this.regionMap.values()) {
+			int regionX = Math.abs(region.regionX - regionCameraX);
+			int regionZ = Math.abs(region.regionZ - regionCameraZ);
+
+			factorXZ = Math.max(factorXZ, Math.max(regionX, regionZ));
+		}
 
 		RegionRender[] indexedRegions = new RegionRender[MathExt.square(factorXZ * 2 + 1) * factorY];
 
+		regionCameraX = -regionCameraX + factorXZ;
+		regionCameraZ = -regionCameraZ + factorXZ;
+
 		for (RegionRender region : this.regionMap.values()) {
-			int regionX = region.regionX - regionCameraX + factorXZ;
+			int regionX = region.regionX + regionCameraX;
 			int regionY = region.regionY;
-			int regionZ = region.regionZ - regionCameraZ + factorXZ;
+			int regionZ = region.regionZ + regionCameraZ;
 
 			// Region out-of-bounds.
 			if (regionX < 0 || regionX > factorXZ * 2 || regionZ < 0 || regionZ > factorXZ * 2) {
@@ -72,27 +83,21 @@ public class RegionManager {
 			indexedRegions[regionX + (regionY + regionZ * factorY) * factorXZ] = region;
 		}
 
-		this.regionCamera = camera;
+		this.factorY = factorXZ;
+		this.factorZ = factorXZ * factorY;
+
+		this.addRegionX = regionCameraX;
+		this.addRegionZ = regionCameraZ;
+
 		this.indexedRegions = indexedRegions;
 	}
 
-	public RegionRender getRegionFromIndexed( int sectionX, int sectionY, int sectionZ) {
-		int renderDiameter = getRenderDiameter(this.regionCamera);
-
-		int factorXZ = renderDiameter >> 3;
-		int factorY = 256 >> RegionConstants.BLOCK_SHIFT_Y;
-
-		int regionCameraX = this.regionCamera.intX >> RegionConstants.BLOCK_SHIFT_X;
-		int regionCameraZ = this.regionCamera.intZ >> RegionConstants.BLOCK_SHIFT_Z;
-
-		int regionX = (sectionX >> (RegionConstants.BLOCK_SHIFT_X - 4)) - regionCameraX;
+	public RegionRender getRegionFromIndexed(int sectionX, int sectionY, int sectionZ) {
+		int regionX = (sectionX >> (RegionConstants.BLOCK_SHIFT_X - 4)) + this.addRegionX;
 		int regionY = (sectionY >> (RegionConstants.BLOCK_SHIFT_Y - 4));
-		int regionZ = (sectionZ >> (RegionConstants.BLOCK_SHIFT_Z - 4)) - regionCameraZ;
+		int regionZ = (sectionZ >> (RegionConstants.BLOCK_SHIFT_Z - 4)) + this.addRegionZ;
 
-		regionX += factorXZ;
-		regionZ += factorXZ;
-
-		return this.indexedRegions[regionX + (regionY + regionZ * factorY) * factorXZ];
+		return this.indexedRegions[regionX + (regionY * this.factorY) + (regionZ * this.factorZ)];
 	}
 
 	public void clear() {
@@ -179,15 +184,15 @@ public class RegionManager {
 		}
 	}
 
-	public void iterateAllTileEntities(List<TileEntity> globalList) {
+	public void iterateAllTileEntities(SectionSet sectionSet, List<TileEntity> globalList) {
 		globalList.clear();
 
 		for (RegionRender region : this.regionMap.values()) {
-			if (!region.hasTileEntities()) {
+			if (region.getRenderIndex() == 0 || !region.hasTileEntities()) {
 				continue;
 			}
 
-			region.getTileEntityManager().iterateTileEntities(globalList);
+			region.getTileEntityManager().iterateTileEntities(sectionSet, globalList);
 		}
 	}
 

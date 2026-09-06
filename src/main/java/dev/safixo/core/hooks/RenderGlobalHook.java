@@ -3,6 +3,7 @@ package dev.safixo.core.hooks;
 import dev.safixo.client.render.gfx.util.GpuFlags;
 import dev.safixo.client.render.pipelines.clouds.CloudRenderer;
 import dev.safixo.client.render.pipelines.terrain.WorldManager;
+import dev.safixo.client.render.pipelines.terrain.region.RegionConstants;
 import dev.safixo.client.render.vertex.VertexWriter;
 import dev.safixo.client.util.MathExt;
 import dev.safixo.client.util.data.PrimitivesFlags;
@@ -126,19 +127,19 @@ public  class RenderGlobalHook {
 		if (!OPTIFINE_ACTIVE) {
 			if (renderPass == 0) {
 				// Render solid pass.
-				MANAGER.drawRenderPass(0);
+				MANAGER.drawRenderPass(RegionConstants.SOLID_PASS);
 				global.renderersBeingRendered = MANAGER.drawnSolidRenderers;
 				MANAGER.drawnSolidRenderers = 0;
 			} else {
 				// Render translucent pass.
 				GL11.glDisable(GL11.GL_ALPHA_TEST);
 				GL11.glColorMask(true, true, true, true);
-				MANAGER.drawRenderPass(1);
+				MANAGER.drawRenderPass(RegionConstants.TRANSLUCENT_PASS);
 				GL11.glEnable(GL11.GL_ALPHA_TEST);
 			}
 		} else {
 			// Render solid pass.
-			MANAGER.drawRenderPass(0);
+			MANAGER.drawRenderPass(RegionConstants.SOLID_PASS);
 			global.renderersBeingRendered = MANAGER.drawnSolidRenderers;
 			MANAGER.drawnSolidRenderers = 0;
 
@@ -148,7 +149,7 @@ public  class RenderGlobalHook {
 			GL11.glDisable(GL11.GL_ALPHA_TEST);
 
 			GL11.glColorMask(true, true, true, true);
-			MANAGER.drawRenderPass(1);
+			MANAGER.drawRenderPass(RegionConstants.TRANSLUCENT_PASS);
 
 			GL11.glEnable(GL11.GL_ALPHA_TEST);
 			GL11.glDisable(GL11.GL_BLEND);

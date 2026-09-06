@@ -13,9 +13,8 @@ import net.minecraft.item.Item;
 import net.minecraft.profiler.Profiler;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.world.World;
-import net.minecraft.world.chunk.IChunkProvider;
 import org.lwjgl.input.Keyboard;
-import dev.safixo.client.render.pipelines.terrain.cull.BFSCuller;
+import dev.safixo.client.render.pipelines.terrain.cull.GraphCuller;
 import dev.safixo.client.render.pipelines.terrain.cull.FrustumCuller;
 import dev.safixo.client.util.data.CameraData;
 import dev.safixo.client.render.pipelines.terrain.region.RegionManager;
@@ -38,8 +37,8 @@ public class WorldManager {
 
 	private final MesherManager mesherManager = new MesherManager();
 	private final SectionSet sectionSet = new SectionSet();
-	private final BFSCuller bfsCuller = new BFSCuller();
 	private final RegionManager regionManager = new RegionManager();
+	private final GraphCuller graphCuller = new GraphCuller();
 
 	private World worldObj;
 	private CameraData camera;
@@ -73,6 +72,10 @@ public class WorldManager {
 
 	public CameraData getCamera() {
 		return this.camera;
+	}
+
+	public GraphCuller getGraphCuller() {
+		return this.graphCuller;
 	}
 
 	public static RegionManager getRegionManager() {
@@ -117,7 +120,17 @@ public class WorldManager {
 		}
 
 		this.sectionSet.markDirty(sectionX, sectionY, sectionZ);
-		this.terrainDirty = true;
+		this.markDirty();
+	}
+
+	public void loadChunk(int sectionX, int sectionZ) {
+		this.sectionSet.loadChunk(sectionX, sectionZ);
+		this.markDirty();
+	}
+
+	public void unloadChunk(int sectionX, int sectionZ) {
+		this.sectionSet.unloadChunk(sectionX, sectionZ);
+		this.markDirty();
 	}
 
 	public static void freeInstance() {
@@ -165,14 +178,14 @@ public class WorldManager {
 		this.sectionSet.updateSet(this, camera, worldChanged);
 		profiler.endStartSection("culling");
 
-		this.bfsCuller.clearUpdateIndices();
+		this.graphCuller.clearQueueIndices();
 		Item playerItem = this.getHeldItem();
 
 		// For debugging occ culling.
 		//noinspection ConstantValue
-		if ((playerItem != DEBUG_ITEM || DEBUG_ITEM == null) && shouldUpdateGraph) {
-			this.bfsCuller.resetRegionCounters(this.regionManager);
-			this.bfsCuller.updateRenderList(this, this.camera);
+		if ((playerItem != DEBUG_ITEM || DEBUG_ITEM == null)) {
+			this.graphCuller.resetRegionCounters(this.regionManager);
+			this.graphCuller.updateRenderList(this, this.camera);
 			this.graphUpdated = true;
 		} else {
 			this.graphUpdated = false;
@@ -180,14 +193,19 @@ public class WorldManager {
 
 		profiler.endStartSection("updatechunks");
 
+		// TODO: Fix this generating extreme weird rendering behaviour.
+		// If there isn't any chunk geometry updated and in the next frame there wasn't any
+		// section/state update we can conserve the last terrain state.
+		this.terrainDirty = true; // false;
+
 		this.regionManager.update(this.camera, renderDistance, worldChanged);
-		this.mesherManager.queueRebuilds(this);
+		this.mesherManager.queueRebuilds(this.graphCuller.getCullerQueue(), this);
 
 		profiler.endStartSection("ticking");
 
 		@SuppressWarnings("unchecked")
 		List<TileEntity> tileEntities = (List<TileEntity>) Minecraft.getMinecraft().renderGlobal.tileEntities;
-		this.regionManager.iterateAllTileEntities(tileEntities);
+		this.regionManager.iterateAllTileEntities(this.sectionSet, tileEntities);
 
 		profiler.endStartSection("updatechunks");
 	}
@@ -213,8 +231,8 @@ public class WorldManager {
 		return this.sectionSet;
 	}
 
-	public void setTerrainDirty(boolean flag) {
-		this.terrainDirty = flag;
+	public void markDirty() {
+		this.terrainDirty = true;
 	}
 
 	public void drawRenderPass(int renderPass) {

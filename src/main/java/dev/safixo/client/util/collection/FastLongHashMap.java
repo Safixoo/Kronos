@@ -1,11 +1,14 @@
 package dev.safixo.client.util.collection;
 
 import dev.safixo.client.util.MathExt;
+import org.jetbrains.annotations.NotNull;
 
+import java.lang.reflect.Array;
 import java.util.Arrays;
+import java.util.Iterator;
 
 // Linear probing, robin-hood hash-map, should have a very performant get.
-public class FastLongHashMap<T> {
+public class FastLongHashMap<T> implements Iterable<T> {
 	private static final long LONG_PHI = 0x9E3779B97F4A7C15L;
 
 	// use a very unlikely value to mark unused keys.
@@ -114,11 +117,22 @@ public class FastLongHashMap<T> {
 		this.values[slot] = null;
 		this.count--;
 
-		this.shiftKeys(slot);
+		if (this.size >= 64 && this.count < (this.size >> 2)) {
+			this.resize(this.size >> 1);
+		} else {
+			this.shiftKeys(slot);
+		}
+
 		return removed;
 	}
 
-	public void put(long key, Object value) {
+	public void put(long key, T value) {
+		// This does not share the same behavior as most maps!.
+		if (value == null) {
+			this.remove(key);
+			return;
+		}
+
 		int size = this.size;
 		int newCount = this.count + 1;
 
@@ -126,8 +140,8 @@ public class FastLongHashMap<T> {
 			this.lastKey = NULL;
 		}
 
-		if (getNewSize(newCount) >= size) {
-			this.resize();
+		if (newCount >= (size * 3) >> 2) { // 0.75f load factor
+			this.resize(size * 2);
 		}
 
 		if (key == NULL) {
@@ -184,13 +198,7 @@ public class FastLongHashMap<T> {
 		return this.lastObject = this.values[slot];
 	}
 
-	static int getNewSize(int size) {
-		return (size * 2);
-	}
-
-	void resize() {
-		int newSize = getNewSize(this.size);
-
+	void resize(int newSize) {
 		long[] newKeys = new long[newSize];
 		T[] newValues = (T[]) new Object[newSize];
 
@@ -231,6 +239,68 @@ public class FastLongHashMap<T> {
 				newValues[slot] = value;
 				newKeys[slot] = key;
 			}
+		}
+	}
+
+	public void clear() {
+		Arrays.fill(this.keys, NULL);
+		Arrays.fill(this.values, null);
+		this.count = 0;
+		this.lastKey = NULL;
+		this.lastObject = null;
+	}
+
+	public T[] toArray(Class<T> arrayClass) {
+		T[] values = (T[]) Array.newInstance(arrayClass, this.count);
+		int index = 0;
+
+		for (T value : this.values) {
+			if (value != null) {
+				values[index++] = value;
+			}
+		}
+
+		return values;
+	}
+
+	public boolean isEmpty() {
+		return this.count == 0;
+	}
+
+	@Override
+	public @NotNull Iterator<T> iterator() {
+		return new MapIterator<>(this);
+	}
+
+	public static class MapIterator<T> implements Iterator<T> {
+		private final T[] values;
+
+		private int count;
+		private int index;
+
+		public MapIterator(FastLongHashMap<T> map) {
+			this.values = map.values;
+			this.count = map.count;
+		}
+
+		@Override
+		public boolean hasNext() {
+			return this.count > 0;
+		}
+
+		@Override
+		public T next() {
+			while (this.values[this.index] == null) {
+				this.index++;
+			}
+
+			this.count--;
+			return this.values[this.index++];
+		}
+
+		@Override
+		public void remove() {
+			throw new UnsupportedOperationException();
 		}
 	}
 }
