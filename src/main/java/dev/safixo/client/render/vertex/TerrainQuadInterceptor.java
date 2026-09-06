@@ -43,7 +43,16 @@ public class TerrainQuadInterceptor implements IQuadReceiver {
 
 	@Override
 	public int writeQuad(Quad quad, long ptr) {
-		this.pipeline.calculate(quad, this.pos, this.out, quad.getNormalEnum(), true);
+		boolean shade = false;
+
+		for (int i = 0; i < 4; i++) {
+			if (quad.getColor(i) != 0xFFFFFFFF) {
+				shade = true;
+				break;
+			}
+		}
+
+		this.pipeline.calculate(quad, this.pos, this.out, quad.getNormalEnum(), shade);
 
 		for (int i = 0; i < 4; i++) {
 			quad.setLight(i, this.out.lm[i]);

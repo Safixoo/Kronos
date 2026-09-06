@@ -63,6 +63,16 @@ public class MinecraftHook {
 		return Vec3.createVectorHelper(x, y, z);
 	}
 
+	public static boolean isAmbientOcclusionEnabled() {
+		// As the meshing pipeline already shades every quad, applying ambience in RenderBlocks
+		// is useless, also it makes detecting things like if the block shades or not easier.
+		if (AsyncBlockHook.isAsync()) {
+			return false;
+		}
+
+		return Minecraft.getMinecraft() != null && Minecraft.getMinecraft().gameSettings.ambientOcclusion != 0;
+	}
+
 	public static void setProfilerTarget(String prof) {
 		if (Thread.currentThread() != MAIN_THREAD) {
 			return;

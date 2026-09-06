@@ -334,6 +334,10 @@ public class SmoothLightPipeline implements LightPipeline {
     }
 
     private void applySidedBrightness(AoFaceData out, int face, boolean shade) {
+		if (!shade) {
+			return;
+		}
+
         float brightness = VoxelMesher.SIDE_LIGHT_MULTIPLIER[face];
         float[] ao = out.ao;
 

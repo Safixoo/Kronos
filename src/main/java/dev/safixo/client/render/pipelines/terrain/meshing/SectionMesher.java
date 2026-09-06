@@ -87,7 +87,6 @@ public class SectionMesher {
 		boolean ambient = Minecraft.getMinecraft().gameSettings.ambientOcclusion != 0;
 
 		RenderBlocks renderBlocks = new RenderBlocks(sectionCache);
-		renderBlocks.enableAO = false; // the final ao/colorization is replaced anyway
 
 		int solidSides = this.generator.floodFillSection(sectionCache, section, camera);
 
