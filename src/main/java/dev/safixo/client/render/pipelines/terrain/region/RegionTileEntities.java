@@ -1,5 +1,6 @@
 package dev.safixo.client.render.pipelines.terrain.region;
 
+import dev.safixo.client.render.pipelines.terrain.SectionSet;
 import it.unimi.dsi.fastutil.shorts.Short2ReferenceOpenHashMap;
 import net.minecraft.tileentity.TileEntity;
 
@@ -17,9 +18,17 @@ public class RegionTileEntities {
 		this.tileEntitiesPerSection.remove((short) regionIndex);
 	}
 
-	public void iterateTileEntities(List<TileEntity> globalList) {
+	public void iterateTileEntities(SectionSet sectionSet, List<TileEntity> globalList) {
 		for (TileEntity[] tileEntities : this.tileEntitiesPerSection.values()) {
-			Collections.addAll(globalList, tileEntities);
+			for (TileEntity tileEntity : tileEntities) {
+				int sectionX = tileEntity.xCoord >> 4;
+				int sectionY = tileEntity.yCoord >> 4;
+				int sectionZ = tileEntity.zCoord >> 4;
+
+				if (sectionSet.isVisible(sectionX, sectionY, sectionZ)) {
+					globalList.add(tileEntity);
+				}
+			}
 		}
 	}
 
