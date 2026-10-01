@@ -14,6 +14,9 @@ public class GlFogTracker {
 
 	public static void glFogi(int mode, int value) {
 		if (mode == GL11.GL_FOG_MODE) {
+			if (FOG_MODE == value) {
+				return;
+			}
 			FOG_MODE = value;
 		}
 
@@ -22,10 +25,19 @@ public class GlFogTracker {
 
 	public static void glFogf(int mode, float value) {
 		if (mode == GL11.GL_FOG_START) {
+			if (MathExt.equals(FOG_START, value)) {
+				return;
+			}
 			FOG_START = value;
 		} else if (mode == GL11.GL_FOG_END) {
+			if (MathExt.equals(FOG_END, value)) {
+				return;
+			}
 			FOG_END = value;
 		} else if (mode == GL11.GL_FOG_DENSITY) {
+			if (MathExt.equals(FOG_DENSITY, value)) {
+				return;
+			}
 			FOG_DENSITY = value;
 		}
 

@@ -3,6 +3,7 @@ package dev.safixo.client.render.vertex.writers;
 import com.google.common.collect.ImmutableList;
 import dev.safixo.client.render.pipelines.terrain.meshing.data.Quad;
 import dev.safixo.client.render.pipelines.terrain.region.RegionConstants;
+import dev.safixo.client.render.vertex.VertexWriter;
 import dev.safixo.client.util.memory.UnsafeUtil;
 import dev.safixo.client.render.gfx.vertex.GlVertexFormat;
 import dev.safixo.client.render.gfx.vertex.attribute.GlVertexAttribute;
@@ -32,6 +33,10 @@ public class TerrainFormat extends GlVertexFormat {
 		}
 
 		return offset;
+	}
+
+	@Override
+	public void writeVertex(VertexWriter writer, float x, float y, float z, long ptr) {
 	}
 
 	private static int extractRadiusPos(float pos) {

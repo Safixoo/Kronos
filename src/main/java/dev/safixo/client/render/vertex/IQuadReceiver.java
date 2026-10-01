@@ -4,5 +4,6 @@ import dev.safixo.client.render.pipelines.terrain.meshing.data.Quad;
 
 public interface IQuadReceiver {
 	int writeQuad(Quad quad, long ptr);
+	void writeVertex(VertexWriter writer, float x, float y, float z, long ptr);
 	int getStride();
 }

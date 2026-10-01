@@ -17,6 +17,10 @@ public class CloudFormat extends GlVertexFormat {
 		return 0;
 	}
 
+	@Override
+	public void writeVertex(VertexWriter writer, float x, float y, float z, long ptr) {
+	}
+
 	public static void writeCloudVertex(long ptr, int x, int y, int z, int color) {
 		UnsafeUtil.memPutLong(ptr, formatPosition(x, y, z) | formatColor(color));
 	}

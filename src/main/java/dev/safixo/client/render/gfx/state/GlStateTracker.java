@@ -1,16 +1,17 @@
 package dev.safixo.client.render.gfx.state;
 
+import dev.safixo.client.render.FrameDebug;
 import dev.safixo.client.render.ImprovedTessellator;
 import dev.safixo.client.util.data.FrameTimer;
+import org.lwjgl.BufferChecks;
+import org.lwjgl.MemoryUtil;
 import org.lwjgl.opengl.*;
 
-import java.nio.Buffer;
-import java.nio.FloatBuffer;
-import java.nio.IntBuffer;
+import java.nio.*;
 
 @SuppressWarnings("unused")
 public class GlStateTracker {
-	public static final boolean SKIP_CACHE = true;
+	public static final boolean SKIP_CACHE = false;
 	public static String VENDOR;
 
 	public static int LAST_DEPTH_FUNC = -1;
@@ -21,6 +22,8 @@ public class GlStateTracker {
 	public static void update(boolean processMessages) {
 		flushDrawState();
 		Display.update(processMessages);
+
+		FrameDebug.debug();
 
 		FrameTimer.getInstance().addFrame();
 	}
@@ -38,10 +41,6 @@ public class GlStateTracker {
 	}
 
 	public static void glBindBuffer(int target, int id) {
-		if (id != 0) {
-			GlClientStateTracker.invalidateAllCachedClientState();
-		}
-
 		if (target == GL15.GL_ARRAY_BUFFER && !SKIP_CACHE) {
 			if (id == LAST_VBO) {
 				return;
@@ -60,10 +59,6 @@ public class GlStateTracker {
 	}
 
 	public static void glBindVertexArray(int vao) {
-		if (vao != 0) {
-			GlClientStateTracker.invalidateAllCachedClientState();
-		}
-
 		if (LAST_VAO == vao) {
 			return;
 		}
@@ -111,7 +106,84 @@ public class GlStateTracker {
 		GL11.glGetInteger(name, buffer);
 	}
 
+	public static void glPolygonOffset(float factor, float units) {
+		GL11.glPolygonOffset(factor, units);
+	}
+
+	public static void glLogicOp(int opcode) {
+		flushDrawState();
+		GL11.glLogicOp(opcode);
+	}
+
+	public static void glLineWidth(float width) {
+		GL11.glLineWidth(width);
+	}
+
+	public static String glGetString(int pname) {
+		return GL11.glGetString(pname);
+	}
+
+	public static void glCullFace(int mode) {
+		GL11.glCullFace(mode);
+	}
+
 	public static void glFlush() {
+	}
+
+	public static void glBindSampler(int unit, int sampler) {
+		GL33.glBindSampler(unit, sampler);
+	}
+
+	public static void glBindBufferARB(int target, int id) {
+		glBindBuffer(target, id);
+	}
+
+	public static void glBufferData(int target, long data, int usage) {
+		GL15.glBufferData(target, data, usage);
+	}
+
+	public static void glBufferData(int target, DoubleBuffer data, int usage) {
+		GL15.glBufferData(target, data, usage);
+	}
+
+	public static void glBufferData(int target, FloatBuffer data, int usage) {
+		GL15.glBufferData(target, data, usage);
+	}
+
+	public static void glBufferData(int target, IntBuffer data, int usage) {
+		GL15.glBufferData(target, data, usage);
+	}
+
+	public static void glBufferData(int target, ShortBuffer data, int usage) {
+		GL15.glBufferData(target, data, usage);
+	}
+
+	public static void glBufferData(int target, ByteBuffer data, int usage) {
+		GL15.glBufferData(target, data, usage);
+	}
+
+	public static void glBufferSubData(int target, long offset, ByteBuffer data) {
+		GL15.glBufferSubData(target, offset, data);
+	}
+
+	public static void glBufferSubData(int target, long offset, DoubleBuffer data) {
+		GL15.glBufferSubData(target, offset, data);
+	}
+
+	public static void glBufferSubData(int target, long offset, FloatBuffer data) {
+		GL15.glBufferSubData(target, offset, data);
+	}
+
+	public static void glBufferSubData(int target, long offset, IntBuffer data) {
+		GL15.glBufferSubData(target, offset, data);
+	}
+
+	public static void glBufferSubData(int target, long offset, ShortBuffer data) {
+		GL15.glBufferSubData(target, offset, data);
+	}
+
+	public static void glCopyBufferSubData(int readtarget, int writetarget, long readoffset, long writeoffset, long size) {
+		GL31.glCopyBufferSubData(readtarget, writetarget, readoffset, writeoffset, size);
 	}
 
 	public static void flushDrawState() {

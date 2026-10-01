@@ -1,7 +1,6 @@
 package dev.safixo.client.render.vertex;
 
 import dev.safixo.client.render.ImprovedTessellator;
-import dev.safixo.client.render.gfx.vertex.GlVertexFormat;
 import dev.safixo.client.render.pipelines.terrain.meshing.data.Quad;
 import dev.safixo.client.util.memory.MemoryReference;
 import dev.safixo.client.util.memory.NativeBuffer;
@@ -101,12 +100,12 @@ public class VertexWriter {
 			throw new RuntimeException("Overflowed buffer!");
 		}
 
-		if (this.offset + offset > this.capacity) {
+		if (this.offset + offset >= this.capacity) {
 			this.grow(this.offset + offset * 2L);
 		}
 	}
 
-	public void addVertex(float x, float y, float z, boolean immediateWrite) {
+	public void addVertexToQuad(float x, float y, float z, boolean immediateWrite) {
 		if (this.quadReceiver == null) {
 			return;
 		}
@@ -134,11 +133,25 @@ public class VertexWriter {
 		}
 	}
 
-	public void bufferQuad() {
-		if ((this.vertices & 3) == 0) {
-			this.writeQuad(this.currentQuad);
-			this.currentQuad.reset();
+	public void addVertex(float x, float y, float z) {
+		if (this.quadReceiver == null) {
+			return;
 		}
+		int stride = this.quadReceiver.getStride();
+		this.ensureCapacity(stride * 4);
+
+		float xf = (float) (x + this.dx);
+		float yf = (float) (y + this.dy);
+		float zf = (float) (z + this.dz);
+
+		this.quadReceiver.writeVertex(this, xf, yf, zf, this.ptr + this.offset);
+		this.offset += stride;
+		this.vertices++;
+	}
+
+	public void bufferQuad() {
+		this.writeQuad(this.currentQuad);
+		this.currentQuad.reset();
 	}
 
 	public Quad getCurrentQuad() {

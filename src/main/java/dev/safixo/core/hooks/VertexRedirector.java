@@ -38,6 +38,6 @@ public class VertexRedirector {
 	}
 
 	public static void addVertex(VertexWriter writer, double x, double y, double z) {
-		writer.addVertex((float) x, (float) y, (float) z, true);
+		writer.addVertexToQuad((float) x, (float) y, (float) z, true);
 	}
 }

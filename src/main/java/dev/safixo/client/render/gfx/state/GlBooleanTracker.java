@@ -1,5 +1,7 @@
 package dev.safixo.client.render.gfx.state;
 
+import dev.safixo.client.render.FrameDebug;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL12;
 
@@ -13,11 +15,7 @@ public class GlBooleanTracker {
 	private static final byte UNDEFINED = 1;
 	private static final byte DEFINED_ENABLED = 2;
 
-	private static boolean DEPTH_MASK = true;
-
-	static {
-		Arrays.fill(CAP_BITS, UNDEFINED);
-	}
+	public static final IntOpenHashSet CAPS_OUTPUTTED = new IntOpenHashSet();
 
 	public static boolean isStateKnown(int cap) {
 		return CAP_BITS[cap] != UNDEFINED;
@@ -40,14 +38,28 @@ public class GlBooleanTracker {
 	}
 
 	private static boolean isRasterState(int cap, boolean state) {
-		if (GlStateTracker.SKIP_CACHE) {
+		if (GlStateTracker.SKIP_CACHE || !GlDrawTracker.RASTER_CACHE) {
 			return false;
 		}
 
-		if (cap == GL11.GL_CULL_FACE || cap == GL11.GL_BLEND || cap == GL11.GL_LIGHTING) {
-			if (GlBooleanTracker.isEnabled(cap) != state) {
-				GlStateTracker.flushDrawState();
+		if (cap == GL11.GL_CULL_FACE || cap == GL11.GL_BLEND || cap == GL11.GL_LIGHTING || cap == GL11.GL_DEPTH_TEST) {
+			int bit = 0;
+			switch (cap) {
+				case GL11.GL_CULL_FACE:
+					bit = GlDrawTracker.CULLING_BIT;
+					break;
+				case GL11.GL_BLEND:
+					bit = GlDrawTracker.BLENDING_BIT;
+					break;
+				case GL11.GL_LIGHTING:
+					bit = GlDrawTracker.LIGHTING_BIT;
+					break;
+				case GL11.GL_DEPTH_TEST:
+					bit = GlDrawTracker.DEPTH_TEST_BIT;
+					break;
 			}
+
+			GlDrawTracker.setBitTracked(state, bit);
 			GlBooleanTracker.setState(cap, state);
 			return true;
 		} else if (cap == GL11.GL_TEXTURE_2D) {
@@ -62,6 +74,10 @@ public class GlBooleanTracker {
 	}
 
 	public static void glEnable(int cap) {
+		if (FrameDebug.DEBUG_GL_STATE && !CAPS_OUTPUTTED.contains(cap)) {
+			CAPS_OUTPUTTED.add(cap);
+		}
+
 		if (isRasterState(cap, true)) {
 			return;
 		}
@@ -77,6 +93,10 @@ public class GlBooleanTracker {
 	}
 
 	public static void glDisable(int cap) {
+		if (FrameDebug.DEBUG_GL_STATE && !CAPS_OUTPUTTED.contains(cap)) {
+			CAPS_OUTPUTTED.add(cap);
+		}
+
 		if (isRasterState(cap, false)) {
 			return;
 		}
@@ -89,12 +109,9 @@ public class GlBooleanTracker {
 	}
 
 	public static void glDepthMask(boolean state) {
-		if (DEPTH_MASK == state && !GlStateTracker.SKIP_CACHE) {
-			return;
+		if (GlStateTracker.SKIP_CACHE || !GlDrawTracker.RASTER_CACHE) {
+			GL11.glDepthMask(state);
 		}
-		DEPTH_MASK = state;
-
-		GlStateTracker.flushDrawState();
-		GL11.glDepthMask(state);
+		GlDrawTracker.setBitTracked(state, GlDrawTracker.DEPTH_MASK_BIT);
 	}
 }

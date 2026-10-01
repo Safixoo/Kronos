@@ -52,6 +52,10 @@ public class RenderBuffer {
 		this.vertexBuffer.bufferSubData(buffer, offset, size);
 	}
 
+	public void upload(ByteBuffer buffer, int size) {
+		this.vertexBuffer.bufferData(buffer, size);
+	}
+
 	public GlVertexBuffer getVertexBuffer() {
 		return this.vertexBuffer;
 	}

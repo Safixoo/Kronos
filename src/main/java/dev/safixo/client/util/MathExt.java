@@ -29,7 +29,7 @@ public class MathExt {
 	}
 
 	public static boolean equals(float a, float b) {
-		return Math.abs(a - b) < (1.0f / 8192.0f);
+		return Math.abs(a - b) < (1.0f / 16384.0F);
 	}
 
 	public static boolean equals(double a, double b) {

@@ -24,6 +24,10 @@ public class EntityFormat extends GlVertexFormat {
 		return offset;
 	}
 
+	@Override
+	public void writeVertex(VertexWriter writer, float x, float y, float z, long ptr) {
+	}
+
 	public static void writeVertex(long ptr, float x, float y, float z, float u, float v, int normal) {
 		UnsafeUtil.memPutFloat(ptr + 0, x);
 		UnsafeUtil.memPutFloat(ptr + 4, y);

@@ -110,28 +110,36 @@ public class MinecraftHook {
 	private static final int RIGHT_NORMAL = MathExt.packedNormal(1.0F, 0.0F, 0.0F);
 	private static final int LEFT_NORMAL = MathExt.packedNormal(-1.0F, 0.0F, 0.0F);
 
+	private static final float EPSILON = 7E-4F;
+	private static final float EPSILON_Z = 0.1F;
+
 	public static void renderItemIn2D(Tessellator tes, float minU, float maxV, float maxU, float minV, int width, int height, float scale) {
 		ImprovedTessellator ver = (ImprovedTessellator) tes;
 		ver.startDrawingQuads();
 
-		long ptr = ver.vertexPtr + ver.offset;
+		long ptr = ver.headPtr;
 
-		ver.offset = (int) (ptr - ver.vertexPtr);
-		if (ver.offset + ITEM_STRIDE * 8 >= ver.capacity) {
+		if (ptr + ITEM_STRIDE * 8 >= ver.upperBoundCapacity) {
 			ver.resize();
 		}
+		ver.headPtr = ptr;
 
 		Matrix4f matrix = GlMatrixTracker.MODEL_VIEW_STACK.top();
 
-		if (matrix.m22() > 0) {
+		if (matrix.m22() > -EPSILON_Z) {
 			// Front quad.
 			ptr = addVertex(ptr, 0.0F, 0.0F, 0.0F, minU, minV, FRONT_NORMAL);
 			ptr = addVertex(ptr, 1.0F, 0.0F, 0.0F, maxU, minV, FRONT_NORMAL);
 			ptr = addVertex(ptr, 1.0F, 1.0F, 0.0F, maxU, maxV, FRONT_NORMAL);
 			ptr = addVertex(ptr, 0.0F, 1.0F, 0.0F, minU, maxV, FRONT_NORMAL);
 		}
-		if (matrix.m22() < 0) {
+		if (matrix.m22() < EPSILON_Z) {
 			// Behind quad.
+			ptr = addVertex(ptr, 0.0F, 1.0F, -scale, minU, maxV, BEHIND_NORMAL);
+			ptr = addVertex(ptr, 1.0F, 1.0F, -scale, maxU, maxV, BEHIND_NORMAL);
+			ptr = addVertex(ptr, 1.0F, 0.0F, -scale, maxU, minV, BEHIND_NORMAL);
+			ptr = addVertex(ptr, 0.0F, 0.0F, -scale, minU, minV, BEHIND_NORMAL);
+
 			ptr = addVertex(ptr, 0.0F, 1.0F, -scale, minU, maxV, BEHIND_NORMAL);
 			ptr = addVertex(ptr, 1.0F, 1.0F, -scale, maxU, maxV, BEHIND_NORMAL);
 			ptr = addVertex(ptr, 1.0F, 0.0F, -scale, maxU, minV, BEHIND_NORMAL);
@@ -144,24 +152,24 @@ public class MinecraftHook {
 		float halfTexelU = 0.5F * (minU - maxU) * invWidth;
 		float haltTexelV = 0.5F * (minV - maxV) * invHeight;
 
-		ver.offset = (int) (ptr - ver.vertexPtr);
-		if (ver.offset + ITEM_STRIDE * 8L * width >= ver.capacity) {
+		ver.headPtr = ptr;
+		if (ptr + ITEM_STRIDE * 8L * width >= ver.upperBoundCapacity) {
 			ver.resize();
 		}
+		ver.headPtr = ptr;
 
 		for (int i = 0; i < width; i++) {
 			float relW = i * invWidth;
-			float nextRelW = relW + invWidth;
 			float u = minU + (maxU - minU) * relW - halfTexelU;
 
-			if (matrix.m02() > 0) {
+			if (matrix.m02() > -EPSILON_Z) {
 				// +X
-				ptr = addVertex(ptr, nextRelW, 1.0F, -scale, u, maxV, RIGHT_NORMAL);
-				ptr = addVertex(ptr, nextRelW, 1.0F, 0.0F, u, maxV, RIGHT_NORMAL);
-				ptr = addVertex(ptr, nextRelW, 0.0F, 0.0F, u, minV, RIGHT_NORMAL);
-				ptr = addVertex(ptr, nextRelW, 0.0F, -scale, u, minV, RIGHT_NORMAL);
+				ptr = addVertex(ptr, relW + invWidth, 1.0F, -scale, u, maxV, RIGHT_NORMAL);
+				ptr = addVertex(ptr, relW + invWidth, 1.0F, 0.0F, u, maxV, RIGHT_NORMAL);
+				ptr = addVertex(ptr, relW + invWidth, 0.0F, 0.0F, u, minV, RIGHT_NORMAL);
+				ptr = addVertex(ptr, relW + invWidth, 0.0F, -scale, u, minV, RIGHT_NORMAL);
 			}
-			if (matrix.m02() < 0) {
+			if (matrix.m02() < EPSILON_Z) {
 				// -X
 				ptr = addVertex(ptr, relW, 0.0F, -scale, u, minV, LEFT_NORMAL);
 				ptr = addVertex(ptr, relW, 0.0F, 0.0F, u, minV, LEFT_NORMAL);
@@ -171,35 +179,34 @@ public class MinecraftHook {
 
 		}
 
-		ver.offset = (int) (ptr - ver.vertexPtr);
-		if (ver.offset + ITEM_STRIDE * 8L * height >= ver.capacity) {
+		ver.headPtr = ptr;
+		if (ptr + ITEM_STRIDE * 8L * height >= ver.upperBoundCapacity) {
 			ver.resize();
 		}
+		ver.headPtr = ptr;
 
 		for (int i = 0; i < height; i++) {
-			float relW = i * invHeight;
-			float nextRelW = relW + invHeight;
-			float v = minV + (maxV - minV) * relW - haltTexelV;
+			float relH = i * invHeight;
+			float v = minV + (maxV - minV) * relH - haltTexelV;
 
-			if (matrix.m12() > 0) {
+			if (matrix.m12() > -EPSILON_Z) {
 				// +Y
-				ptr = addVertex(ptr, 0.0F, nextRelW, 0.0F, minU, v, TOP_NORMAL);
-				ptr = addVertex(ptr, 1.0F, nextRelW, 0.0F, maxU, v, TOP_NORMAL);
-				ptr = addVertex(ptr, 1.0F, nextRelW, -scale, maxU, v, TOP_NORMAL);
-				ptr = addVertex(ptr, 0.0F, nextRelW, -scale, minU, v, TOP_NORMAL);
+				ptr = addVertex(ptr, 0.0F, relH + invHeight - EPSILON, 0.0F, minU, v, TOP_NORMAL);
+				ptr = addVertex(ptr, 1.0F, relH + invHeight - EPSILON, 0.0F, maxU, v, TOP_NORMAL);
+				ptr = addVertex(ptr, 1.0F, relH + invHeight - EPSILON, -scale, maxU, v, TOP_NORMAL);
+				ptr = addVertex(ptr, 0.0F, relH + invHeight - EPSILON, -scale, minU, v, TOP_NORMAL);
 			}
-			if (matrix.m12() < 0) {
+			if (matrix.m12() < EPSILON_Z) {
 				// -Y
-				ptr = addVertex(ptr, 1.0F, relW, 0.0F, maxU, v, BOTTOM_NORMAL);
-				ptr = addVertex(ptr, 0.0F, relW, 0.0F, minU, v, BOTTOM_NORMAL);
-				ptr = addVertex(ptr, 0.0F, relW, -scale, minU, v, BOTTOM_NORMAL);
-				ptr = addVertex(ptr, 1.0F, relW, -scale, maxU, v, BOTTOM_NORMAL);
+				ptr = addVertex(ptr, 1.0F, relH + EPSILON, 0.0F, maxU, v, BOTTOM_NORMAL);
+				ptr = addVertex(ptr, 0.0F, relH + EPSILON, 0.0F, minU, v, BOTTOM_NORMAL);
+				ptr = addVertex(ptr, 0.0F, relH + EPSILON, -scale, minU, v, BOTTOM_NORMAL);
+				ptr = addVertex(ptr, 1.0F, relH + EPSILON, -scale, maxU, v, BOTTOM_NORMAL);
 			}
 		}
 
-		ver.offset = (int) (ptr - ver.vertexPtr);
-		ver.vertices = ver.offset / ITEM_STRIDE;
 		ver.flags = ImprovedTessellator.VERTEX_UV | ImprovedTessellator.VERTEX_NORMAL;
+		ver.headPtr = ptr;
 		ver.draw();
 	}
 

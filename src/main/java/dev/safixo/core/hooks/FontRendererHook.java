@@ -146,7 +146,7 @@ public class FontRendererHook {
 				continue;
 			}
 
-			if (tes.offset + 128 > tes.capacity) {
+			if (tes.headPtr > tes.upperBoundCapacity) {
 				tes.resize();
 			}
 
@@ -216,7 +216,7 @@ public class FontRendererHook {
 	}
 
 	private static void addVertexWithUV(ImprovedTessellator tes, float x, float y, float u, float v, int color) {
-		long ptr = tes.vertexPtr + tes.offset;
+		long ptr = tes.headPtr;
 
 		UnsafeUtil.memPutFloat(ptr + 0, x);
 		UnsafeUtil.memPutFloat(ptr + 4, y);
@@ -227,10 +227,9 @@ public class FontRendererHook {
 
 		UnsafeUtil.memPutInt(ptr + 20, color);
 
-		tes.vertices++;
 		tes.flags |= ImprovedTessellator.VERTEX_UV;
 		tes.flags |= ImprovedTessellator.VERTEX_COLOR;
-		tes.offset += 24;
+		tes.headPtr += 24;
 	}
 
 	private static void drawSpikeThrough() {

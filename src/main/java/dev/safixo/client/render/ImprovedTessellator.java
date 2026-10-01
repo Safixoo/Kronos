@@ -1,6 +1,7 @@
 package dev.safixo.client.render;
 
 import dev.safixo.client.render.gfx.buffer.GlVertexBuffer;
+import dev.safixo.client.render.gfx.state.GlDrawTracker;
 import dev.safixo.client.render.vertex.VertexWriter;
 import dev.safixo.client.util.data.PrimitivesFlags;
 import dev.safixo.client.util.memory.NativeBuffer;
@@ -25,10 +26,8 @@ import java.util.Arrays;
 public class ImprovedTessellator extends Tessellator {
 	private static final ThreadLocal<ImprovedTessellator> TESSELLATORS = new ThreadLocal<>();
 
-	static {
-		Tessellator.instance = getTessellator();
-	}
-
+	protected static final byte[] STRIDES = new byte[0b1111 + 1];
+	private static final int MIN_ALLOC = 512 * 1024;
 	private static final int UNDEFINED_FORMAT = 12; // start position after position attribute.
 	private static final int UNDEFINED_VERTEX_ARRAY = -1;
 
@@ -37,29 +36,27 @@ public class ImprovedTessellator extends Tessellator {
 	public static final int VERTEX_NORMAL = 0b0001;
 	public static final int VERTEX_LIGHT  = 0b0100;
 
-	private static final int MIN_ALLOC = 1024 * 128;
+	private VertexWriter current;
+	private final int[] vertexArrays = new int[0b1111 + 1];
+	private int drawMode;
 
+	private final DrawStateRecorder drawRecorder = new DrawStateRecorder();
 	private GlVertexBuffer vertexBuffer;
 
-	private boolean disabledColor, canDraw;
-	public int drawMode, flags, capacity = MIN_ALLOC;
+	private int capacity, lastOffset;
+	private long vertexPtr;
+	private ByteBuffer vertexPtrNio;
 
-	public int vertices, offset;
+	private boolean disabledColor;
+	public long headPtr, upperBoundCapacity;
 
-	public float xOff, yOff, zOff;
+	public int flags;
+
 	public int color, light, normal;
-
-	private int lastFlag = -1;
-
-	public long vertexPtr = NativeBuffer.nmemAlloc(MIN_ALLOC);
-	private ByteBuffer vertexPtrNio = NativeBuffer.wrap(this.vertexPtr);
-
-	private VertexWriter current;
-
-	private final int[] vertexArrays = new int[0b1111 + 1];
-	private static final byte[] STRIDES = new byte[0b1111 + 1];
+	public double dx, dy, dz;
 
 	static {
+		Tessellator.instance = getTessellator();
 		for (int flagInd = 0; flagInd <= 0b1111; flagInd++) {
 			int stride = 12;
 
@@ -73,6 +70,15 @@ public class ImprovedTessellator extends Tessellator {
 	}
 
 	public ImprovedTessellator() {
+		int newCapacity = MIN_ALLOC;
+		long newVertexPtr = NativeBuffer.nmemAlloc(newCapacity);;
+
+		this.headPtr = newVertexPtr;
+		this.vertexPtr = newVertexPtr;
+		this.vertexPtrNio = NativeBuffer.wrap(newVertexPtr);
+		this.capacity = newCapacity;
+		this.upperBoundCapacity = newCapacity + newVertexPtr - 64;
+
 		Arrays.fill(this.vertexArrays, UNDEFINED_VERTEX_ARRAY);
 	}
 
@@ -99,7 +105,7 @@ public class ImprovedTessellator extends Tessellator {
 		return tes;
 	}
 
-	private int getVertexArray(int flags) {
+	public int getVertexArray(int flags) {
 		int vertexArray = this.vertexArrays[flags];
 
 		if (vertexArray != UNDEFINED_VERTEX_ARRAY) {
@@ -168,24 +174,32 @@ public class ImprovedTessellator extends Tessellator {
 		}
 	}
 
+
 	@Override
 	public int draw() {
-		this.lastFlag = this.flags;
-		this.canDraw = true;
-		this.flags = 0;
+		int byteCount = (int) (this.headPtr - this.vertexPtr) - this.lastOffset;
 
-		int offset = this.offset;
+		if (FrameDebug.DEBUG_DRAWS) {
+			FrameDebug.DRAW_CALLS_REQUESTED++;
+			FrameDebug.VERTICES += byteCount / STRIDES[this.flags];
+		}
+
+		this.drawRecorder.addDraw(GlDrawTracker.TRACKED_STATE, this.flags, byteCount);
 
 		if (this.disabledColor) {
 			this.flushState();
+		} else {
+			this.lastOffset += byteCount;
 		}
 
+		this.flags = 0;
 		this.disabledColor = false;
-		return offset;
+
+		return byteCount;
 	}
 
 	public void flushState() {
-		if (this.vertices == 0 || this.lastFlag == -1 || !this.canDraw) {
+		if (this.headPtr == this.vertexPtr || this.drawRecorder.getDrawCount() == 0) {
 			return;
 		}
 
@@ -193,33 +207,34 @@ public class ImprovedTessellator extends Tessellator {
 			this.vertexBuffer = new GlVertexBuffer(MIN_ALLOC, GL15.GL_DYNAMIC_DRAW);
 		}
 
-		int vertices = this.vertices;
-		int drawMode = this.drawMode;
-		int flags = this.lastFlag;
-		int offset = this.offset;
+		int offset = (int) (this.headPtr - this.vertexPtr);
 
-		this.vertices = 0;
-		this.offset = 0;
-		this.lastFlag = -1;
-		this.canDraw = false;
-
-		int vertexArray = this.getVertexArray(flags);
-		GL30.glBindVertexArray(vertexArray);
+		if (FrameDebug.DEBUG_DRAWS) {
+			FrameDebug.BYTES += offset;
+			FrameDebug.UPLOADS++;
+		}
 
 		this.vertexBuffer.bufferData(this.vertexPtrNio, offset);
-		this.vertexBuffer.draw(drawMode, vertices, 0);
+		this.drawRecorder.flushAllDraws(this, this.drawMode);
+
+		this.headPtr = this.vertexPtr;
+		this.lastOffset = 0;
 	}
 
 	public void resize() {
 		int newCapacity = this.capacity * 2;
 		long newVertexPtr = NativeBuffer.nmemAlloc(newCapacity);
 
-		UnsafeUtil.memCopy(this.vertexPtr, newVertexPtr, this.offset);
+		int currentOffset = (int) (this.headPtr - this.vertexPtr);
+
+		UnsafeUtil.memCopy(this.vertexPtr, newVertexPtr, currentOffset);
 		NativeBuffer.nmemFree(this.vertexPtr);
 
+		this.headPtr = newVertexPtr + currentOffset;
 		this.vertexPtr = newVertexPtr;
 		this.vertexPtrNio = NativeBuffer.wrap(newVertexPtr);
 		this.capacity = newCapacity;
+		this.upperBoundCapacity = newVertexPtr + newCapacity - 64;
 	}
 
 	@Override
@@ -245,8 +260,7 @@ public class ImprovedTessellator extends Tessellator {
 		}
 
 		this.flags |= VERTEX_UV;
-
-		long ptr = this.vertexPtr + this.offset;
+		long ptr = this.headPtr;
 
 		UnsafeUtil.memPutFloat(ptr + 12, (float) u);
 		UnsafeUtil.memPutFloat(ptr + 16, (float) v);
@@ -274,8 +288,8 @@ public class ImprovedTessellator extends Tessellator {
 	}
 
 	@Override
-	public void setColorOpaque(int par1, int par2, int par3) {
-		this.setColorRGBA(par1, par2, par3, 0xFF);
+	public void setColorOpaque(int r, int g, int b) {
+		this.setColorRGBA(r, g, b, 0xFF);
 	}
 
 	@Override
@@ -312,46 +326,38 @@ public class ImprovedTessellator extends Tessellator {
 
 		this.flags |= VERTEX_UV;
 
-		if (this.offset + 64 >= this.capacity) {
+		if (this.headPtr >= this.upperBoundCapacity) {
 			this.resize();
 		}
 
-		if (this.lastFlag != this.flags) {
-			this.flushState();
-		}
-
-		long ptr = this.vertexPtr + this.offset;
+		long ptr = this.headPtr;
 		int flags = this.flags;
 
-		float xP = (float) x + this.xOff;
-		float yP = (float) y + this.yOff;
-		float zP = (float) z + this.zOff;
+		float xP = (float) (x + this.dx);
+		float yP = (float) (y + this.dy);
+		float zP = (float) (z + this.dz);
 
-		long writePtr = ptr;
+		UnsafeUtil.memPutFloat(ptr, xP); ptr += 4;
+		UnsafeUtil.memPutFloat(ptr, yP); ptr += 4;
+		UnsafeUtil.memPutFloat(ptr, zP); ptr += 4;
 
-		UnsafeUtil.memPutFloat(writePtr, xP); writePtr += 4;
-		UnsafeUtil.memPutFloat(writePtr, yP); writePtr += 4;
-		UnsafeUtil.memPutFloat(writePtr, zP); writePtr += 4;
-
-		UnsafeUtil.memPutFloat(writePtr, (float) u); writePtr += 4;
-		UnsafeUtil.memPutFloat(writePtr, (float) v); writePtr += 4;
+		UnsafeUtil.memPutFloat(ptr, (float) u); ptr += 4;
+		UnsafeUtil.memPutFloat(ptr, (float) v); ptr += 4;
 
 		if ((flags & VERTEX_COLOR) != 0) {
-			UnsafeUtil.memPutInt(writePtr, this.color);
-			writePtr += 4;
+			UnsafeUtil.memPutInt(ptr, this.color);
+			ptr += 4;
 		}
 		if ((flags & VERTEX_NORMAL) != 0) {
-			UnsafeUtil.memPutInt(writePtr, this.normal);
-			writePtr += 4;
+			UnsafeUtil.memPutInt(ptr, this.normal);
+			ptr += 4;
 		}
 		if ((flags & VERTEX_LIGHT) != 0) {
-			UnsafeUtil.memPutInt(writePtr, this.light);
-			writePtr += 4;
+			UnsafeUtil.memPutInt(ptr, this.light);
+			ptr += 4;
 		}
 
-		this.lastFlag = this.flags;
-		this.offset += (int) (writePtr - ptr);
-		this.vertices++;
+		this.headPtr = ptr;
 	}
 
 	@Override
@@ -361,45 +367,37 @@ public class ImprovedTessellator extends Tessellator {
 			return;
 		}
 
-		if (this.offset + 64 >= this.capacity) {
+		if (this.headPtr >= this.upperBoundCapacity) {
 			this.resize();
 		}
 
-		if (this.lastFlag != this.flags) {
-			this.flushState();
-		}
-
-		long ptr = this.vertexPtr + this.offset;
+		long ptr = this.headPtr;
 		int flags = this.flags;
 
-		float xP = (float) x + this.xOff;
-		float yP = (float) y + this.yOff;
-		float zP = (float) z + this.zOff;
+		float xP = (float) (x + this.dx);
+		float yP = (float) (y + this.dy);
+		float zP = (float) (z + this.dz);
 
-		long writePtr = ptr;
+		UnsafeUtil.memPutFloat(ptr, xP); ptr += 4;
+		UnsafeUtil.memPutFloat(ptr, yP); ptr += 4;
+		UnsafeUtil.memPutFloat(ptr, zP); ptr += 4;
 
-		UnsafeUtil.memPutFloat(writePtr, xP); writePtr += 4;
-		UnsafeUtil.memPutFloat(writePtr, yP); writePtr += 4;
-		UnsafeUtil.memPutFloat(writePtr, zP); writePtr += 4;
-
-		writePtr += (flags & VERTEX_UV);
+		ptr += (flags & VERTEX_UV);
 
 		if ((flags & VERTEX_COLOR) != 0) {
-			UnsafeUtil.memPutInt(writePtr, this.color);
-			writePtr += 4;
+			UnsafeUtil.memPutInt(ptr, this.color);
+			ptr += 4;
 		}
 		if ((flags & VERTEX_NORMAL) != 0) {
-			UnsafeUtil.memPutInt(writePtr, this.normal);
-			writePtr += 4;
+			UnsafeUtil.memPutInt(ptr, this.normal);
+			ptr += 4;
 		}
 		if ((flags & VERTEX_LIGHT) != 0) {
-			UnsafeUtil.memPutInt(writePtr, this.light);
-			writePtr += 4;
+			UnsafeUtil.memPutInt(ptr, this.light);
+			ptr += 4;
 		}
 
-		this.lastFlag = this.flags;
-		this.offset += (int) (writePtr - ptr);
-		this.vertices++;
+		this.headPtr = ptr;
 	}
 
 	@Override
@@ -448,9 +446,9 @@ public class ImprovedTessellator extends Tessellator {
 			return;
 		}
 
-		this.xOff = (float) offX;
-		this.yOff = (float) offY;
-		this.zOff = (float) offZ;
+		this.dx = offX;
+		this.dy = offY;
+		this.dz = offZ;
 	}
 
 	@Override
@@ -460,8 +458,8 @@ public class ImprovedTessellator extends Tessellator {
 			return;
 		}
 
-		this.xOff += offX;
-		this.yOff += offY;
-		this.zOff += offZ;
+		this.dx += offX;
+		this.dy += offY;
+		this.dz += offZ;
 	}
 }

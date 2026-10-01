@@ -5,7 +5,6 @@ import dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache;
 import dev.safixo.client.render.pipelines.terrain.meshing.model.ModelColorizer;
 import dev.safixo.client.render.pipelines.terrain.meshing.model.light.LightPipeline;
 import dev.safixo.client.render.pipelines.terrain.meshing.model.light.data.QuadLightData;
-import dev.safixo.client.render.vertex.TerrainQuadInterceptor;
 import dev.safixo.client.render.vertex.VertexWriter;
 import dev.safixo.client.util.ColorBGRManager;
 import dev.safixo.client.util.Direction;
@@ -335,7 +334,7 @@ public class FluidMesher {
 		writer.u = u;
 		writer.v = v;
 
-		writer.addVertex(x + this.posX, y + this.posY, z + this.posZ, false);
+		writer.addVertexToQuad(x + this.posX, y + this.posY, z + this.posZ, false);
 	}
 
 	private float fluidCornerHeight(SectionCache cache, BlockFluid fluid, float fluidHeight, float fluidHeightX, float fluidHeightY, int x, int y, int z) {

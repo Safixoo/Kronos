@@ -75,6 +75,11 @@ public class TerrainQuadInterceptor implements IQuadReceiver {
 	}
 
 	@Override
+	public void writeVertex(VertexWriter writer, float x, float y, float z, long ptr) {
+
+	}
+
+	@Override
 	public int getStride() {
 		return DefaultVertexFormats.TERRAIN_FORMAT.getStride();
 	}

@@ -21,7 +21,7 @@ public class GlMatrixTracker {
 	private static final Matrix4f TEMP_MATRIX = new Matrix4f();
 
 	public static final boolean EMULATE_STACK = false;
-	private static boolean STACK_CHANGED = false;
+	private static boolean STACK_CHANGED;
 
 	public static void gluPerspective(float fovy, float aspect, float zNear, float zFar) {
 		CURRENT_STACK.top().mul(TEMP_MATRIX.setPerspective((float) Math.toRadians(fovy), aspect, zNear, zFar));
@@ -167,7 +167,7 @@ public class GlMatrixTracker {
 		GlStateTracker.flushDrawState();
 
 		// Normalize the vector for JOML.
-		if (Math.abs((x + y + z) - 1.0f) > 0.0005f) { // dirty check.
+		if (Math.abs((x + y + z - 1.0f)) > 0.0005f) { // dirty check.
 			float norm = 1.0f / (float) Math.sqrt(x * x + y * y + z * z);
 			x *= norm;
 			y *= norm;
