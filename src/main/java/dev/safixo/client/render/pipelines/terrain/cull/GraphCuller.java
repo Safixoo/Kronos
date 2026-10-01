@@ -10,6 +10,8 @@ import dev.safixo.client.util.Direction;
 import dev.safixo.client.util.MathExt;
 import org.lwjgl.opengl.GL11;
 
+import java.util.Random;
+
 import static dev.safixo.client.render.pipelines.terrain.SectionFlags.*;
 
 public class GraphCuller {
@@ -27,13 +29,18 @@ public class GraphCuller {
 	}
 
 	private final CullerQueue cullerQueue;
+	private final Random random = new Random();
 
 	public GraphCuller() {
 		this.cullerQueue = new CullerQueue(12);
 	}
 
-	public void clearQueueIndices() {
-		this.cullerQueue.clear();
+	public void clearTaskedIndices() {
+		this.cullerQueue.clearTasks();
+	}
+
+	public void clearGraphIndices() {
+		this.cullerQueue.clearGraph();
 	}
 
 	public CullerQueue getCullerQueue() {
@@ -41,7 +48,7 @@ public class GraphCuller {
 	}
 
 	public void resetRegionCounters(RegionManager regionManager) {
-		for (RegionRender render : regionManager.regionMap.values()) {
+		for (RegionRender render : regionManager.regionMap) {
 			render.resetRenderIndex();
 		}
 	}
@@ -84,6 +91,9 @@ public class GraphCuller {
 		this.prepareRenderTasks(sectionSet, camera);
 
 		clearAxisVisibility(camera, sectionSet, cameraIndex, diameter);
+
+		// just so the visibility info gets cleaned later.
+		this.cullerQueue.addToGraph(cameraIndex);
 	}
 
 	private static void setupAxisVisibility(CameraData camera, SectionSet sectionSet, int cameraIndex, int renderDiameter) {
@@ -91,9 +101,9 @@ public class GraphCuller {
 		int offsetY = renderDiameter;
 		int offsetZ = renderDiameter << 4;
 
-		fillAxisVisibility(sectionSet, cameraIndex, Direction.EAST, offsetX, (short) -1);
-		fillAxisVisibility(sectionSet, cameraIndex, Direction.UP, offsetY, (short) -1);
-		fillAxisVisibility(sectionSet, cameraIndex, Direction.SOUTH, offsetZ, (short) -1);
+		fillAxisVisibility(sectionSet, cameraIndex, offsetX, Direction.EAST, true);
+		fillAxisVisibility(sectionSet, cameraIndex, offsetY, Direction.UP, true);
+		fillAxisVisibility(sectionSet, cameraIndex, offsetZ, Direction.SOUTH, true);
 	}
 
 	private static void clearAxisVisibility(CameraData camera, SectionSet sectionSet, int cameraIndex, int renderDiameter) {
@@ -101,34 +111,42 @@ public class GraphCuller {
 		int offsetY = renderDiameter;
 		int offsetZ = renderDiameter << 4;
 
-		fillAxisVisibility(sectionSet, cameraIndex, offsetX, Direction.EAST, (short) 0);
-		fillAxisVisibility(sectionSet, cameraIndex, offsetY, Direction.UP, (short) 0);
-		fillAxisVisibility(sectionSet, cameraIndex, offsetZ, Direction.SOUTH, (short) 0);
+		fillAxisVisibility(sectionSet, cameraIndex, offsetX, Direction.EAST, false);
+		fillAxisVisibility(sectionSet, cameraIndex, offsetY, Direction.UP, false);
+		fillAxisVisibility(sectionSet, cameraIndex, offsetZ, Direction.SOUTH, false);
 	}
 
-	private static void fillAxisVisibility(SectionSet sectionSet, int cameraIndex, int offset, int direction, short gridFactor) {
+	private static void fillAxisVisibility(SectionSet sectionSet, int cameraIndex, int offset, int direction, boolean fill) {
 		int radius = sectionSet.getRadius();
 		short[] visSet = sectionSet.getVisibilitySet();
 		byte[] cullData = sectionSet.getSections();
 
-		int index = cameraIndex;
+		int index = cameraIndex - offset;
 
 		// Negative direction.
-		for (int a = 0; a < radius; a++) {
+		for (int a = 1; a < radius; a++) {
 			int faces = cullData[index];
-			visSet[index] = gridFactor;
+			if (fill) {
+				visSet[index] = (short) 0x8FFF;
+			} else if (visSet[index] < 0) {
+				visSet[index] = 0;
+			}
 			index -= offset;
 
 			if (Direction.hasSet(~getSolidFaces(faces), Direction.opposite(direction))) {
 				break;
 			}
 		}
-		index = cameraIndex;
+		index = cameraIndex + offset;
 
 		// Positive direction.
-		for (int a = 0; a < radius; a++) {
+		for (int a = 1; a < radius; a++) {
 			int faces = cullData[index];
-			visSet[index] = gridFactor;
+			if (fill) {
+				visSet[index] = (short) 0x8FFF;
+			} else if (visSet[index] < 0) {
+				visSet[index] = 0;
+			}
 			index += offset;
 
 			if (Direction.hasSet(~getSolidFaces(faces), direction)) {
@@ -191,6 +209,57 @@ public class GraphCuller {
 	}
 
 	/**
+	* To improve draw batching, some sections are marked dirty if their visible facings doesn't
+	* equal the last ones, to not murder performance in a different way, only some are selected each frame.
+	*/
+	public void updateSectionsDynamically(WorldManager worldManager, SectionSet sectionSet, CameraData camera) {
+		RegionManager regionManager = WorldManager.getRegionManager();
+		regionManager.saveIndexedRegions(sectionSet, camera);
+
+		int maxDirtyPerFrame = 1;
+		int markedDirty = 0;
+
+		int radius = sectionSet.getRadius();
+		int diameter = radius * 2 + 1;
+		int magicConstant = (int) Math.ceil((1 << 20) / (double) diameter);
+
+		int cameraChunkX = -radius + (camera.intX >> 4);
+		int cameraChunkZ = -radius + (camera.intZ >> 4);
+
+		for (int i = 0; i < Math.min(this.cullerQueue.getRenderIndex(), 20); i++) {
+			if (markedDirty >= maxDirtyPerFrame) { // for now max 1 section correction per frame.
+				break;
+			}
+
+			int randomIndex = this.random.nextInt(this.cullerQueue.getRenderIndex());
+
+			int sectionIndex = this.cullerQueue.getRenderId(randomIndex);
+			int flags = sectionSet.getSection(sectionIndex);
+
+			if (SectionFlags.isDirty(flags)) {
+				continue;
+			}
+
+			int sectionY = (sectionIndex * magicConstant) >> 20;
+			int offsetX = sectionIndex - (sectionY * diameter);
+			int offsetZ = sectionY >> 4;
+
+			sectionY &= 15;
+			int sectionX = offsetX + cameraChunkX;
+			int sectionZ = offsetZ + cameraChunkZ;
+
+			RegionRender region = regionManager.getRegionFromIndexed(sectionX, sectionY, sectionZ);
+			int regionIndex = RegionConstants.regionIndex(sectionX, sectionY, sectionZ);
+			int visibleFaces = RegionConstants.getSectionVisibleFaces(camera.intX, camera.intY, camera.intZ, sectionX, sectionY, sectionZ);
+
+			if (region.getMeshedVisibleFaces(regionIndex) != visibleFaces) {
+				this.cullerQueue.addToRebuildList(sectionIndex);
+				markedDirty++;
+			}
+		}
+	}
+
+	/**
 	 * Does a BFS traversal based off <a href="https://tomcc.github.io/2014/08/31/visibility-1.html">Advanced Cave Culling</a>
 	 * by tomcc and the Sodium implementation, with many differences as it doesn't try to find connectivity 100% and uses some
 	 * different ideas to avoid section queueing during the search.
@@ -208,7 +277,7 @@ public class GraphCuller {
 
 		while (readIndex < this.cullerQueue.getGraphIndex()) {
 			int sectionIndex = graphQueue[readIndex++];
-			int flags = MathExt.byteToUnsigned(sectionFlags[sectionIndex]);
+			int flags = sectionFlags[sectionIndex] & 0xFF;
 
 			// kind of ugly indexing but it works fine.
 			int sectionY = (sectionIndex * magicConstant) >> 20;
@@ -378,9 +447,7 @@ public class GraphCuller {
 	 * @return Grid Visibility Factor
 	 */
 	private static short setGridFactor(short[] visSet, int sectionIndex, int renderDiameter, int diffX, int diffY, int diffZ) {
-		int gridFactor = visSet[sectionIndex];
-
-		if (gridFactor == -1) {
+		if (visSet[sectionIndex] < 0) {
 			return visSet[sectionIndex] = (short) MAX_GRID_FACTOR;
 		}
 

@@ -1,9 +1,11 @@
 package dev.safixo.client.render.pipelines.terrain.region;
 
+import dev.safixo.client.render.gfx.state.GlMatrixTracker;
 import dev.safixo.client.render.pipelines.terrain.SectionSet;
 import dev.safixo.client.util.collection.FastLongHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
+import net.minecraft.profiler.Profiler;
 import net.minecraft.tileentity.TileEntity;
 import org.lwjgl.opengl.*;
 import dev.safixo.client.render.pipelines.terrain.WorldManager;
@@ -16,7 +18,7 @@ import java.util.List;
 public class RegionManager {
 	public static boolean SUPPORT_INDIRECT;
 
-	public final Long2ReferenceOpenHashMap<RegionRender> regionMap = new Long2ReferenceOpenHashMap<>();
+	public final FastLongHashMap<RegionRender> regionMap = new FastLongHashMap<>();
 
 	private double lastUpdateX;
 	private double lastUpdateZ;
@@ -58,19 +60,20 @@ public class RegionManager {
 		int factorXZ = Integer.MIN_VALUE;
 		int factorY = 256 >> RegionConstants.BLOCK_SHIFT_Y;
 
-		for (RegionRender region : this.regionMap.values()) {
+		for (RegionRender region : this.regionMap) {
 			int regionX = Math.abs(region.regionX - regionCameraX);
 			int regionZ = Math.abs(region.regionZ - regionCameraZ);
 
 			factorXZ = Math.max(factorXZ, Math.max(regionX, regionZ));
 		}
+		factorXZ++;
 
 		RegionRender[] indexedRegions = new RegionRender[MathExt.square(factorXZ * 2 + 1) * factorY];
 
 		regionCameraX = -regionCameraX + factorXZ;
 		regionCameraZ = -regionCameraZ + factorXZ;
 
-		for (RegionRender region : this.regionMap.values()) {
+		for (RegionRender region : this.regionMap) {
 			int regionX = region.regionX + regionCameraX;
 			int regionY = region.regionY;
 			int regionZ = region.regionZ + regionCameraZ;
@@ -101,7 +104,7 @@ public class RegionManager {
 	}
 
 	public void clear() {
-		for (RegionRender region : this.regionMap.values()) {
+		for (RegionRender region : this.regionMap) {
 			region.clear();
 		}
 
@@ -118,7 +121,7 @@ public class RegionManager {
 			return null;
 		}
 
-		RegionRender[] regions = this.regionMap.values().toArray(new RegionRender[0]);
+		RegionRender[] regions = this.regionMap.toArray(RegionRender.class);
 		int[] distances = new int[regions.length];
 		int maxRegionDistance = Integer.MIN_VALUE;
 
@@ -164,31 +167,34 @@ public class RegionManager {
 		return Math.abs(pX - rX) + Math.abs(pY - rY) + Math.abs(pZ - rZ);
 	}
 
-	public void update(CameraData camera, int renderDistance, boolean worldUpdated) {
+	public void update(Profiler profiler, CameraData camera, int renderDistance, boolean worldUpdated) {
+		profiler.startSection("update_regions");
+
 		if (worldUpdated) {
 			this.lastUpdateX = camera.cameraXD();
 			this.lastUpdateZ = camera.cameraZD();
 
 			this.clear();
-			return;
+		} else {
+			double diffX = Math.abs(camera.cameraXD() - this.lastUpdateX);
+			double diffZ = Math.abs(camera.cameraZD() - this.lastUpdateZ);
+
+			if (Math.max(diffX, diffZ) >= 16) {
+				this.lastUpdateX = camera.cameraXD();
+				this.lastUpdateZ = camera.cameraZD();
+
+				this.sanitizeRegions(camera, renderDistance);
+			}
 		}
 
-		double diffX = Math.abs(camera.cameraXD() - this.lastUpdateX);
-		double diffZ = Math.abs(camera.cameraZD() - this.lastUpdateZ);
-
-		if (Math.max(diffX, diffZ) >= 16) {
-			this.lastUpdateX = camera.cameraXD();
-			this.lastUpdateZ = camera.cameraZD();
-
-			this.sanitizeRegions(camera, renderDistance);
-		}
+		profiler.endSection();
 	}
 
 	public void iterateAllTileEntities(SectionSet sectionSet, List<TileEntity> globalList) {
 		globalList.clear();
 
-		for (RegionRender region : this.regionMap.values()) {
-			if (region.getRenderIndex() == 0 || !region.hasTileEntities()) {
+		for (RegionRender region : this.regionMap) {
+			if (!region.hasTileEntities()) {
 				continue;
 			}
 
@@ -200,7 +206,7 @@ public class RegionManager {
 		LongArrayList forRemoval = new LongArrayList();
 		int distanceSquared = MathExt.square((renderDistance + 3) << 4);
 
-		for (RegionRender region : this.regionMap.values()) {
+		for (RegionRender region : this.regionMap) {
 			if (nearestDistanceToRegion(camera, region) > distanceSquared && region.getRenderIndex() == 0) {
 				long regionPos = MathExt.asLong(region.regionX, region.regionY, region.regionZ);
 

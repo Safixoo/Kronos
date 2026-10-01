@@ -87,7 +87,7 @@ public class WorldManager {
 	}
 
 	public int getRegionCount() {
-		return this.regionManager.regionMap.size();
+		return this.regionManager.regionMap.getSize();
 	}
 
 	public void addUsedMemory(int bytes) {
@@ -178,12 +178,15 @@ public class WorldManager {
 		this.sectionSet.updateSet(this, camera, worldChanged);
 		profiler.endStartSection("culling");
 
-		this.graphCuller.clearQueueIndices();
+		this.graphCuller.clearTaskedIndices();
 		Item playerItem = this.getHeldItem();
 
 		// For debugging occ culling.
 		//noinspection ConstantValue
-		if ((playerItem != DEBUG_ITEM || DEBUG_ITEM == null)) {
+		if ((playerItem != DEBUG_ITEM || DEBUG_ITEM == null) && shouldUpdateGraph) {
+			this.sectionSet.clearVisibilityState(this.graphCuller.getCullerQueue());
+			this.graphCuller.clearGraphIndices();
+
 			this.graphCuller.resetRegionCounters(this.regionManager);
 			this.graphCuller.updateRenderList(this, this.camera);
 			this.graphUpdated = true;
@@ -191,22 +194,21 @@ public class WorldManager {
 			this.graphUpdated = false;
 		}
 
+		this.graphCuller.updateSectionsDynamically(this, this.sectionSet, camera);
+
 		profiler.endStartSection("updatechunks");
 
-		// TODO: Fix this generating extreme weird rendering behaviour.
 		// If there isn't any chunk geometry updated and in the next frame there wasn't any
 		// section/state update we can conserve the last terrain state.
-		this.terrainDirty = true; // false;
+		this.terrainDirty = false;
 
-		this.regionManager.update(this.camera, renderDistance, worldChanged);
-		this.mesherManager.queueRebuilds(this.graphCuller.getCullerQueue(), this);
+		this.regionManager.update(profiler, this.camera, renderDistance, worldChanged);
+		this.mesherManager.queueRebuilds(profiler, this.graphCuller.getCullerQueue(), this);
 
 		profiler.endStartSection("ticking");
-
 		@SuppressWarnings("unchecked")
 		List<TileEntity> tileEntities = (List<TileEntity>) Minecraft.getMinecraft().renderGlobal.tileEntities;
 		this.regionManager.iterateAllTileEntities(this.sectionSet, tileEntities);
-
 		profiler.endStartSection("updatechunks");
 	}
 

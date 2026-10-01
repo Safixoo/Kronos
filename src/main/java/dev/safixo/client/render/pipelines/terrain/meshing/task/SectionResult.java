@@ -12,11 +12,14 @@ import dev.safixo.client.util.memory.MemoryReference;
 import dev.safixo.client.util.memory.UnsafeUtil;
 import net.minecraft.tileentity.TileEntity;
 
+import java.util.List;
+
 public class SectionResult {
 	public final SectionTask task;
 
 	private final TileEntity[] tileEntityArray;
 
+	private final int visibleFaces;
 	private final int meshOrder;
 	private final int cullMask;
 	private final int drawMask;
@@ -52,7 +55,7 @@ public class SectionResult {
 			}
 
 			int solidMask = RegionConstants.getSolidMask(drawMask);
-			int visibleFaces = RegionConstants.getSectionVisibleFaces(camera.intX, camera.intY, camera.intZ, section.blockX, section.blockY, section.blockZ);
+			int visibleFaces = this.visibleFaces = RegionConstants.getSectionVisibleFaces(camera.intX, camera.intY, camera.intZ, section.blockX, section.blockY, section.blockZ);
 			int meshOrder = MeshDirection.getSortedMeshOrder(visibleFaces & solidMask);
 
 			long[] drawData = this.joinAllSolidBuffers(writers, joined, meshOrder);
@@ -61,6 +64,7 @@ public class SectionResult {
 			this.solidDrawData = drawData;
 			this.solidWriter = joined;
 		} else {
+			this.visibleFaces = 0;
 			this.meshOrder = 0;
 			this.solidDrawData = new long[MeshDirection.COUNT];
 			this.solidWriter = null;
@@ -134,6 +138,10 @@ public class SectionResult {
 
 	public int getMeshOrder() {
 		return this.meshOrder;
+	}
+
+	public int getVisibleFaces() {
+		return this.visibleFaces;
 	}
 
 	public int getDrawMask() {

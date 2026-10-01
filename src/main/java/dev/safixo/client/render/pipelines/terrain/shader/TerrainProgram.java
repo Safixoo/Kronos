@@ -7,7 +7,7 @@ import dev.safixo.client.util.memory.NativeBuffer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiNewChat;
 import org.joml.Matrix4f;
-import org.lwjgl.opengl.GL20;
+import org.lwjgl.opengl.*;
 import dev.safixo.client.render.pipelines.terrain.cull.FrustumCuller;
 import dev.safixo.client.util.data.CameraData;
 import dev.safixo.client.render.vertex.writers.TerrainFormat;
@@ -20,6 +20,8 @@ public class TerrainProgram extends GlProgram {
 	private int u_ProjModelViewMat;
 	public int u_FogColor;
 
+	private final int atlasSampler;
+
 	public TerrainProgram() {
 		super("terrain/terrain_vertex.glsl", "terrain/terrain_fragment.glsl");
 
@@ -28,10 +30,26 @@ public class TerrainProgram extends GlProgram {
 			chat.printChatMessage("Terrain shaders reloaded!");
 		}
 
+		this.atlasSampler = GL33.glGenSamplers();
+		GL33.glSamplerParameteri(this.atlasSampler, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_NEAREST);
+		GL33.glSamplerParameteri(this.atlasSampler, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_NEAREST_MIPMAP_NEAREST);
+
 		this.useProgram();
 		GL20.glUniform1i(this.u_TexId, 0);
 		GL20.glUniform1i(this.u_LightTex, 1);
 		this.disableProgram();
+	}
+
+	@Override
+	public void useProgram() {
+		super.useProgram();
+		GL33.glBindSampler(0, this.atlasSampler);
+	}
+
+	@Override
+	public void disableProgram() {
+		GL33.glBindSampler(0, 0);
+		super.disableProgram();
 	}
 
 	@Override

@@ -59,6 +59,9 @@ public class RegionRender {
 	// fundamentally impossible batching draws without meshes meeting very specific criteria.
 	private final int[] sortedMeshOffsets = new int[REGION_SECTION_SIZE];
 
+	// The visible faces that the section had during the last time it was meshed.
+	private final byte[] visibleFaces = new byte[REGION_SECTION_SIZE];
+
 	// Number of sections queued for rendering in the current frame.
 	private int queuedSections;
 
@@ -68,14 +71,14 @@ public class RegionRender {
 
 	// Memoize drawing context to check if the result of the last draw construction is still valid to cache.
 	private final RegionDrawContext drawContext = new RegionDrawContext();
-
-	private final RegionTileEntities tileEntities = new RegionTileEntities();
+	private final RegionTileEntities tileEntities;
 
 	protected RegionRender(RegionManager regionManager, int sectionX, int sectionY, int sectionZ) {
 		this.regionX = sectionX >> (RegionConstants.BLOCK_SHIFT_X - 4);
 		this.regionY = sectionY >> (RegionConstants.BLOCK_SHIFT_Y - 4);
 		this.regionZ = sectionZ >> (RegionConstants.BLOCK_SHIFT_Z - 4);
 
+		this.tileEntities = new RegionTileEntities(this.regionX, this.regionY, this.regionZ);
 		this.regionManager = regionManager;
 
 		if (RegionManager.SUPPORT_INDIRECT) {
@@ -164,10 +167,16 @@ public class RegionRender {
 		}
 	}
 
+	public int getMeshedVisibleFaces(int regionIndex) {
+		return this.visibleFaces[regionIndex];
+	}
+
 	public void addSolidMesh(SectionRender render, VertexWriter manager, SectionResult buildResult) {
 		this.drawContext.invalidatePass(SOLID_PASS);
 
 		this.setMeshOrder(render.regionIndex, buildResult.getMeshOrder());
+		this.visibleFaces[render.regionIndex] = (byte) buildResult.getVisibleFaces();
+
 		long[] packedDrawData = buildResult.getDrawData();
 
 		if (this.solidDrawData == null) {

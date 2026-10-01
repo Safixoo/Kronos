@@ -8,25 +8,18 @@ import dev.safixo.client.render.vertex.VertexWriter;
 import dev.safixo.client.util.MathExt;
 import dev.safixo.client.util.data.PrimitivesFlags;
 import dev.safixo.core.HookUtils;
-import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
-import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import net.minecraft.block.Block;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderGlobal;
+import net.minecraft.client.renderer.RenderHelper;
 import net.minecraft.client.renderer.culling.ICamera;
-import net.minecraft.client.renderer.texture.TextureMap;
 import net.minecraft.client.settings.GameSettings;
 import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.launchwrapper.Launch;
-import net.minecraft.launchwrapper.LaunchClassLoader;
 import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL13;
-
-import java.util.Map;
 
 // TODO: Replace the current system now by a simpler one, now that the two pass has been patched.
 @SuppressWarnings("unused")
-public  class RenderGlobalHook {
+public class RenderGlobalHook {
 	public static WorldManager MANAGER;
 
 	public static boolean SHOULD_RELOAD;
@@ -113,50 +106,29 @@ public  class RenderGlobalHook {
 		CloudRenderer.renderCloudsFancy(partialTick);
 	}
 
-	public static void sortAndRender(RenderGlobal global, EntityLivingBase player, int renderPass, double partialTick) {
+	public static int sortAndRender(RenderGlobal renderGlobal, EntityLivingBase player, int pass, double tick) {
+		renderAllRenderLists(renderGlobal, pass, tick);
+		return 0;
+	}
+
+	public static void renderAllRenderLists(RenderGlobal renderGlobal, int pass, double tick) {
 		Minecraft minecraft = Minecraft.getMinecraft();
 
-		GL13.glActiveTexture(GL13.GL_TEXTURE0);
-		Minecraft.getMinecraft().getTextureManager().bindTexture(TextureMap.locationBlocksTexture);
-		GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_NEAREST_MIPMAP_NEAREST);
-
-		// Enable lightmap.
-		minecraft.entityRenderer.enableLightmap(partialTick);
 		GL11.glEnable(GL11.GL_CULL_FACE);
+		RenderHelper.disableStandardItemLighting();
+		minecraft.entityRenderer.enableLightmap(tick);
 
-		if (!OPTIFINE_ACTIVE) {
-			if (renderPass == 0) {
-				// Render solid pass.
-				MANAGER.drawRenderPass(RegionConstants.SOLID_PASS);
-				global.renderersBeingRendered = MANAGER.drawnSolidRenderers;
-				MANAGER.drawnSolidRenderers = 0;
-			} else {
-				// Render translucent pass.
-				GL11.glDisable(GL11.GL_ALPHA_TEST);
-				GL11.glColorMask(true, true, true, true);
-				MANAGER.drawRenderPass(RegionConstants.TRANSLUCENT_PASS);
-				GL11.glEnable(GL11.GL_ALPHA_TEST);
-			}
-		} else {
-			// Render solid pass.
-			MANAGER.drawRenderPass(RegionConstants.SOLID_PASS);
-			global.renderersBeingRendered = MANAGER.drawnSolidRenderers;
-			MANAGER.drawnSolidRenderers = 0;
-
-			// Render translucent pass.
-			GL11.glEnable(GL11.GL_BLEND);
-			GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
-			GL11.glDisable(GL11.GL_ALPHA_TEST);
-
-			GL11.glColorMask(true, true, true, true);
-			MANAGER.drawRenderPass(RegionConstants.TRANSLUCENT_PASS);
-
-			GL11.glEnable(GL11.GL_ALPHA_TEST);
+		if (pass == RegionConstants.SOLID_PASS) {
 			GL11.glDisable(GL11.GL_BLEND);
+			MANAGER.drawRenderPass(RegionConstants.SOLID_PASS);
+			renderGlobal.renderersBeingRendered = MANAGER.drawnSolidRenderers;
+		} else {
+			GL11.glEnable(GL11.GL_BLEND);
+			MANAGER.drawRenderPass(RegionConstants.TRANSLUCENT_PASS);
 		}
+		MANAGER.drawnSolidRenderers = 0;
 
-		// Disable lightmap.
-		minecraft.entityRenderer.disableLightmap(partialTick);
+		minecraft.entityRenderer.disableLightmap(tick);
 		GL11.glDisable(GL11.GL_CULL_FACE);
 	}
 

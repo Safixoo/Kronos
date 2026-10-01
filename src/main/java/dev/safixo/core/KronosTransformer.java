@@ -1,7 +1,12 @@
 package dev.safixo.core;
 
+import cpw.mods.fml.common.asm.transformers.deobf.FMLDeobfuscatingRemapper;
 import dev.safixo.core.hooks.LongHashMapHook;
 import net.minecraft.launchwrapper.Launch;
+import net.minecraft.launchwrapper.LaunchClassLoader;
+import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL12;
+import org.lwjgl.opengl.GL13;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.ClassWriter;
 import net.minecraft.launchwrapper.IClassTransformer;
@@ -9,7 +14,10 @@ import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.tree.*;
 
 import java.awt.*;
+import java.io.IOException;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 
 import static org.objectweb.asm.Opcodes.*;
 
@@ -24,10 +32,12 @@ public class KronosTransformer implements IClassTransformer {
 	static final String MINECRAFT_HOOK = "dev/safixo/core/hooks/MinecraftHook";
 	static final String TEXTURE_MAP_HOOK = "dev/safixo/core/hooks/TextureMapHook";
 
+	static final String SKY_RENDERER = "dev/safixo/client/render/pipelines/sky/SkyRenderer";
 	static final String ADV_MODEL_RENDERER = "dev/safixo/client/render/pipelines/entity/AdvancedModelRenderer";
 	static final String REBUILD_LISTENER = "dev/safixo/client/render/pipelines/terrain/meshing/RebuildListener";
 
 	static final String RENDER = "net.minecraft.client.renderer.entity.Render";
+	static final String TEXTURE_ATLAS_SPRITE = "net.minecraft.client.renderer.texture.TextureAtlasSprite";
 	static final String PROFILER = "net.minecraft.profiler.Profiler";
 	static final String BLOCK_SNOW = "net.minecraft.block.BlockSnow";
 	static final String RENDER_GLOBAL = "net.minecraft.client.renderer.RenderGlobal";
@@ -42,9 +52,10 @@ public class KronosTransformer implements IClassTransformer {
 	static final String MODEL_RENDERER = "net.minecraft.client.model.ModelRenderer";
 	static final String TEXTURE_MAP = "net.minecraft.client.renderer.texture.TextureMap";
 	static final String WORLD = "net.minecraft.world.World";
-	static final String CHUNK = "net.minecraft.world.chunk.Chunk";
 
 	static HashMap<String, String> FUNCTION_NAMES;
+	public static HashSet<String> UNKNOWN_FUNCTIONS;
+	public static HashMap<Integer, String> CAP_TO_NAME;
 
 	public static boolean IN_DEV;
 	static boolean CHECKED_FOR_DEV;
@@ -60,87 +71,95 @@ public class KronosTransformer implements IClassTransformer {
 		IN_DEV = deObf != null && (Boolean) deObf;
 	}
 
+	private byte[] classBytes;
+
 	@Override
 	public byte[] transform(String name, String transformedName, byte[] basicClass) {
-		byte[][] reference = new byte[][] { basicClass };
+		this.classBytes = basicClass;
 
 		checkDevEnvironment();
 
 		// Overwrites classes methods completely with a function call with the same
 		// args and with the instance of the original class.
 		switch (transformedName) {
+			case TEXTURE_ATLAS_SPRITE:
+				this.replaceClassMethod(TEXTURE_MAP_HOOK, "updateAnimation", "()V");
+				break;
 			case TEXTURE_MAP:
-				replaceClassMethod(TEXTURE_MAP_HOOK, "loadTextureAtlas", "b", "(Lbjp;)V", reference, true);
+				this.replaceClassMethod(TEXTURE_MAP_HOOK, "loadTextureAtlas", "(Lbjp;)V");
 				break;
 			case RENDER:
-				replaceClassMethod(MINECRAFT_HOOK, "bindTexture", "a", "(D)V", reference, true);
+				this.replaceClassMethod(MINECRAFT_HOOK, "bindTexture", "(D)V");
 				break;
 			case PROFILER:
-				setFieldInProfiling(reference);
+				this.setFieldInProfiling();
 				break;
 			case ENTITY_RENDERER:
-				avoidDoublePassBullshit(reference);
-				replaceClassMethod(MINECRAFT_HOOK, "disableLightmap", "a", "(D)V", reference, true);
-				replaceClassMethod(MINECRAFT_HOOK, "enableLightmap", "b", "(D)V", reference, true);
+				this.avoidDoublePassBullshit();
+				this.replaceClassMethod(MINECRAFT_HOOK, "disableLightmap", "(D)V");
+				this.replaceClassMethod(MINECRAFT_HOOK, "enableLightmap", "(D)V");
 				break;
 			case BLOCK_SNOW:
-				replaceClassMethod(MINECRAFT_HOOK, "shouldSideBeRendered", "a", "(Lacf;IIII)Z", reference, false);
+				this.replaceClassMethod(MINECRAFT_HOOK, "shouldSideBeRendered", "(Lacf;IIII)Z");
 				break;
 			case MODEL_RENDERER:
-				replaceClassMethod(ADV_MODEL_RENDERER, "render", "a", "(F)V", reference, false);
-				replaceClassMethod(ADV_MODEL_RENDERER, "renderWithRotation", "b", "(F)V", reference, false);
-				replaceClassMethod(ADV_MODEL_RENDERER, "postRender", "c", "(F)V", reference, false);
+				this.replaceClassMethod(ADV_MODEL_RENDERER, "render", "(F)V");
+				this.replaceClassMethod(ADV_MODEL_RENDERER, "renderWithRotation", "(F)V");
+				this.replaceClassMethod(ADV_MODEL_RENDERER, "postRender", "(F)V");
 				break;
 			case WORLD_CLIENT:
-				replaceClassMethod(MINECRAFT_HOOK, "createChunkProvider", "j", "()Lado", reference, false);
+				this.replaceClassMethod(MINECRAFT_HOOK, "createChunkProvider", "()Lado");
 				break;
 			case LONG_HASH_MAP:
 				return LongHashMapHook.rewriteHashMapClass();
 			case WORLD:
-				replaceClassMethod(MINECRAFT_HOOK, "getLightBrightnessForSkyBlocks", "h", "(IIII)I", reference, false);
+				this.replaceClassMethod(MINECRAFT_HOOK, "getLightBrightnessForSkyBlocks", "(IIII)I");
 				break;
 			case RENDER_GLOBAL:
-				// Redirect terrain rendering calls.
-				replaceClassMethod(RENDER_GLOBAL_HOOK, "loadRenderers", "a", "()V", reference, true);
-				replaceClassMethod(RENDER_GLOBAL_HOOK, "clipRenderersByFrustum", "a", "(Lbft;F)V", reference, true);
-				replaceClassMethod(RENDER_GLOBAL_HOOK, "sortAndRender", "a", "(Lof;ID)I", reference, true);
-				replaceClassMethod(RENDER_GLOBAL_HOOK, "updateRenderers", "a", "(Lof;Z)Z", reference, false);
+				this.replaceClassMethod(SKY_RENDERER, "renderSky", "(F)V");
 
-				// NO-OP without OptiFine, it OptiFine is present it avoids a crash for invalid null terrain arrays.
-				replaceClassMethod(RENDER_GLOBAL_HOOK, "renderAllSortedRenderers", "", "", reference, true);
+				// Redirect terrain rendering calls.
+				this.replaceClassMethod(RENDER_GLOBAL_HOOK, "loadRenderers", "()V");
+				this.replaceClassMethod(RENDER_GLOBAL_HOOK, "clipRenderersByFrustum", "(Lbft;F)V");
+				this.replaceClassMethod(RENDER_GLOBAL_HOOK, "sortAndRender", "(Lof;ID)I");
+				this.replaceClassMethod(RENDER_GLOBAL_HOOK, "updateRenderers", "(Lof;Z)Z");
+				this.replaceClassMethod(RENDER_GLOBAL_HOOK, "renderAllRenderLists", "(Lof;ID)V");
+
+				// OptiFine seems to replace renderAllRenderLists by this method.
+				this.replaceClassMethod(RENDER_GLOBAL_HOOK, "renderAllSortedRenderers", "()V");
 
 				// Redirect most renderer updates.
-				replaceClassMethod(REBUILD_LISTENER, "markBlockForUpdate", "a", "(III)V", reference, true);
-				replaceClassMethod(REBUILD_LISTENER, "markBlockForRenderUpdate", "b", "(III)V", reference, true);
-				replaceClassMethod(REBUILD_LISTENER, "markBlockRangeForRenderUpdate", "a", "(IIIIII)V", reference, true);
-				replaceClassMethod(REBUILD_LISTENER, "markBlocksForUpdate", "b", "(IIIIII)V", reference, true);
+				this.replaceClassMethod(REBUILD_LISTENER, "markBlockForUpdate", "(III)V");
+				this.replaceClassMethod(REBUILD_LISTENER, "markBlockForRenderUpdate","(III)V");
+				this.replaceClassMethod(REBUILD_LISTENER, "markBlockRangeForRenderUpdate","(IIIIII)V");
+				this.replaceClassMethod(REBUILD_LISTENER, "markBlocksForUpdate", "(IIIIII)V");
 
 				// Improved clouds.
-				replaceClassMethod(RENDER_GLOBAL_HOOK, "renderCloudsFancy", "c", "(F)V", reference, true);
+				this.replaceClassMethod(RENDER_GLOBAL_HOOK, "renderCloudsFancy", "(F)V");
 				break;
 			case ITEM_RENDERER:
 				// Batches all Tessellator calls to item renderer.
-				replaceClassMethod(MINECRAFT_HOOK, "renderItemIn2D", "a", "(Ljava/lang/String;III)I", reference, false);
+				this.replaceClassMethod(MINECRAFT_HOOK, "renderItemIn2D", "(Ljava/lang/String;III)I");
 				break;
 			case FONT_RENDERER:
 				// Debug info.
-				replaceClassMethod(DEBUG_SCREEN_HOOK, "drawStringWithShadow", "a", "(Ljava/lang/String;III)I", reference, false);
+				this.replaceClassMethod(DEBUG_SCREEN_HOOK, "drawStringWithShadow", "(Ljava/lang/String;III)I");
 
 				// Redirect improved font-renderer draw loop.
-				replaceClassMethod(FONT_RENDERER_HOOK, "renderString", "b", "(Ljava/lang/String;IIIZ)I", reference, false);
+				this.replaceClassMethod(FONT_RENDERER_HOOK, "renderString", "(Ljava/lang/String;IIIZ)I");
 				break;
 			case CLIPPING_HELPER_IMPL:
 				// Redirect frustum setup to a more optimized and used one.
-				replaceClassMethod(FRUSTUM_HOOK, "init", "b", "()V", reference, true);
+				this.replaceClassMethod(FRUSTUM_HOOK, "init", "()V");
 				break;
 			case CLIPPING_HELPER:
 				// Uses the optimized implementation of frustum.
-				replaceClassMethod(FRUSTUM_HOOK, "isBoxInFrustum", "b", "(DDDDDD)Z", reference, false);
+				this.replaceClassMethod(FRUSTUM_HOOK, "isBoxInFrustum", "(DDDDDD)Z");
 				break;
 			case MINECRAFT:
 				// In many drivers in make stalls the GPU too soon in the tick loop.
-				replaceClassMethod(MINECRAFT_HOOK, "checkGLError", "c", "(Ljava/lang/String;)V", reference, true);
-				replaceClassMethod(MINECRAFT_HOOK, "isAmbientOcclusionEnabled", "", "()V", reference, false);
+				this.replaceClassMethod(MINECRAFT_HOOK, "checkGLError", "(Ljava/lang/String;)V");
+				this.replaceClassMethod(MINECRAFT_HOOK, "isAmbientOcclusionEnabled", "()Z");
 				break;
 		}
 
@@ -148,36 +167,34 @@ public class KronosTransformer implements IClassTransformer {
 
 		if (DEBUG_MEM_OPT) {
 			if (!transformedName.contains("joptsimple") && !transformedName.startsWith("dev.safixo")) {
-				changeHashMap(reference);
-				changeHashSet(reference);
+				this.changeHashMap();
+				this.changeHashSet();
 
 				if (transformedName.equals("cpw.mods.fml.common.discovery.ModCandidate")) {
-					changeListSet(reference);
+					this.changeListSet();
 				}
 			}
 		}
 
 		if (!transformedName.equals("net.minecraft.client.renderer.Tessellator")) {
-			replaceTessellatorsInstances(reference);
+			this.replaceTessellatorsInstances();
 		}
 
 		if (!transformedName.startsWith("dev.safixo.client.render.gfx.state") && !transformedName.equals("dev.safixo.core.hooks.GLFunctions")) {
-			redirectGlCalls(reference);
+			this.redirectGlCalls();
 		}
 
-		return reference[0];
+		return this.classBytes;
 	}
 
-	static void changeHashMap(byte[][] basicClass) {
-		ClassReader reader = new ClassReader(basicClass[0]);
+	void changeHashMap() {
+		ClassReader reader = new ClassReader(this.classBytes);
 		ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
 
 		ClassNode classNode = new ClassNode();
 		reader.accept(classNode, 0);
 
-		for (int i = 0; i < classNode.methods.size(); i++) {
-			MethodNode method = (MethodNode) classNode.methods.get(i);
-
+		for (MethodNode method : (List<MethodNode>) classNode.methods) {
 			InsnList inns = method.instructions;
 			AbstractInsnNode insn = inns.getFirst();
 
@@ -208,11 +225,11 @@ public class KronosTransformer implements IClassTransformer {
 		}
 
 		classNode.accept(writer);
-		basicClass[0] = writer.toByteArray();
+		this.classBytes = writer.toByteArray();
 	}
 
-	static void changeHashSet(byte[][] basicClass) {
-		ClassReader reader = new ClassReader(basicClass[0]);
+	void changeHashSet() {
+		ClassReader reader = new ClassReader(this.classBytes);
 		ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
 
 		ClassNode classNode = new ClassNode();
@@ -249,11 +266,11 @@ public class KronosTransformer implements IClassTransformer {
 		}
 
 		classNode.accept(writer);
-		basicClass[0] = writer.toByteArray();
+		this.classBytes = writer.toByteArray();
 	}
 
-	static void changeListSet(byte[][] basicClass) {
-		ClassReader reader = new ClassReader(basicClass[0]);
+	void changeListSet() {
+		ClassReader reader = new ClassReader(this.classBytes);
 		ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
 
 		ClassNode classNode = new ClassNode();
@@ -287,11 +304,11 @@ public class KronosTransformer implements IClassTransformer {
 		}
 
 		classNode.accept(writer);
-		basicClass[0] = writer.toByteArray();
+		this.classBytes = writer.toByteArray();
 	}
 
-	static void setFieldInProfiling(byte[][] basicClass) {
-		ClassReader reader = new ClassReader(basicClass[0]);
+	void setFieldInProfiling() {
+		ClassReader reader = new ClassReader(this.classBytes);
 
 		ClassNode classNode = new ClassNode();
 		reader.accept(classNode, 0);
@@ -310,11 +327,11 @@ public class KronosTransformer implements IClassTransformer {
 		ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
 		classNode.accept(writer);
 
-		basicClass[0] = writer.toByteArray();
+		this.classBytes = writer.toByteArray();
 	}
 
-	static void replaceTessellatorsInstances(byte[][] basicClass) {
-		ClassReader reader = new ClassReader(basicClass[0]);
+	void replaceTessellatorsInstances() {
+		ClassReader reader = new ClassReader(this.classBytes);
 
 		ClassNode classNode = new ClassNode();
 		reader.accept(classNode, 0);
@@ -346,16 +363,55 @@ public class KronosTransformer implements IClassTransformer {
 		ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
 		classNode.accept(writer);
 
-		basicClass[0] = writer.toByteArray();
+		this.classBytes = writer.toByteArray();
 	}
 
 	static void addFunction(String className, String function) {
 		FUNCTION_NAMES.put(function, className);
 	}
 
+	static void readGLFields(byte[] classBytes) {
+		ClassReader reader = new ClassReader(classBytes);
+
+		ClassNode classNode = new ClassNode();
+		reader.accept(classNode, 0);
+
+		for (FieldNode field : (List<FieldNode>) classNode.fields) {
+			if (field.value instanceof Integer) {
+				CAP_TO_NAME.put((Integer) field.value, field.name);
+			}
+		}
+	}
+
+/*
+[X] glLogicOp
+[X] glLineWidth
+[X] glPolygonOffset
+
+[X] glVertexAttribPointer
+[X] glDisableVertexAttribArray
+[X] glEnableVertexAttribArray
+[X] glVertexAttribIPointer
+
+// Buffer data.
+[X] glSamplerParameteri
+ */
+
 	static void fillStateMachineFunctions() {
 		if (FUNCTION_NAMES == null) {
 			FUNCTION_NAMES = new HashMap<>(64);
+			CAP_TO_NAME = new HashMap<>(64);
+			UNKNOWN_FUNCTIONS = new HashSet<>(64);
+		} else {
+			return;
+		}
+
+		try {
+			readGLFields(Launch.classLoader.getClassBytes(GL11.class.getName()));
+			readGLFields(Launch.classLoader.getClassBytes(GL12.class.getName()));
+			readGLFields(Launch.classLoader.getClassBytes(GL13.class.getName()));
+		} catch (IOException e) {
+			throw new RuntimeException(e);
 		}
 
 		addFunction("GlBooleanTracker", "glEnable");
@@ -392,6 +448,18 @@ public class KronosTransformer implements IClassTransformer {
 		addFunction("GlTextureTracker", "glCopyTexSubImage2D");
 		addFunction("GlTextureTracker", "glBindFramebuffer");
 
+		addFunction("GlTextureTracker", "glTexParameteri");
+		addFunction("GlTextureTracker", "glTexParameterf");
+		addFunction("GlTextureTracker", "glMultiTexCoord2fARB");
+		addFunction("GlTextureTracker", "glGetTexLevelParameteri");
+		addFunction("GlTextureTracker", "glTexGen");
+		addFunction("GlTextureTracker", "glTexGeni");
+		addFunction("GlTextureTracker", "glAlphaFunc");
+		addFunction("GlTextureTracker", "glActiveTextureARB");
+		addFunction("GlTextureTracker", "glClientActiveTextureARB");
+		addFunction("GlTextureTracker", "glTexSubImage2D");
+		addFunction("GlTextureTracker", "glTexImage2D");
+
 		addFunction("GlLightColorTracker", "glColorMaterial");
 		addFunction("GlLightColorTracker", "glColor4f");
 		addFunction("GlLightColorTracker", "glColor3f");
@@ -400,35 +468,84 @@ public class KronosTransformer implements IClassTransformer {
 		addFunction("GlLightColorTracker", "glBlendFunc");
 		addFunction("GlLightColorTracker", "glShadeModel");
 		addFunction("GlLightColorTracker", "glClear");
+		addFunction("GlLightColorTracker", "glClearDepth");
 		addFunction("GlLightColorTracker", "glLight");
 		addFunction("GlLightColorTracker", "glLightf");
 		addFunction("GlLightColorTracker", "glLighti");
 		addFunction("GlLightColorTracker", "glLightModel");
 
-		addFunction("GlDrawTracker", "glNewList");
-		addFunction("GlDrawTracker", "glEndList");
-		addFunction("GlDrawTracker", "glCallList");
-		addFunction("GlDrawTracker", "glBegin");
-		addFunction("GlDrawTracker", "glEnd");
 		addFunction("GlDrawTracker", "glDrawArrays");
 		addFunction("GlDrawTracker", "glMultiDrawArrays");
 		addFunction("GlDrawTracker", "glMultiDrawArraysIndirect");
 
+		addFunction("GlImmediateTracker", "glVertex3f");
+		addFunction("GlImmediateTracker", "glTexCoord2f");
+		addFunction("GlImmediateTracker", "glNormal3f");
+		addFunction("GlImmediateTracker", "glNewList");
+		addFunction("GlImmediateTracker", "glEndList");
+		addFunction("GlImmediateTracker", "glCallList");
+		addFunction("GlImmediateTracker", "glCallLists");
+		addFunction("GlImmediateTracker", "glBegin");
+		addFunction("GlImmediateTracker", "glEnd");
+
 		addFunction("GlStateTracker", "glGetInteger");
+		addFunction("GlStateTracker", "glGetString");
 		addFunction("GlStateTracker", "glGetFloat");
-		addFunction("GlStateTracker", "glBindVertexArray");
-		addFunction("GlStateTracker", "glBindBuffer");
+		addFunction("GlStateTracker", "glBufferSubData");
 		addFunction("GlStateTracker", "glFlush");
 		addFunction("GlStateTracker", "glDepthFunc");
+		addFunction("GlStateTracker", "glCullFace");
+
+		addFunction("GlStateTracker", "glBindVertexArray");
+		addFunction("GlStateTracker", "glBindSampler");
+		addFunction("GlStateTracker", "glBindBuffer");
+		addFunction("GlStateTracker", "glBindBufferARB");
+
+		addFunction("GlStateTracker", "glPolygonOffset");
+		addFunction("GlStateTracker", "glLogicOp");
+		addFunction("GlStateTracker", "glLineWidth");
+
+		addFunction("GlStateTracker", "glCopyBufferSubData");
+		addFunction("GlStateTracker", "glBufferData");
+		addFunction("GlStateTracker", "glBufferDataARB");
 		addFunction("GlStateTracker", "update");
 
 		addFunction("GlFogTracker", "glFog");
 		addFunction("GlFogTracker", "glFogf");
 		addFunction("GlFogTracker", "glFogi");
+		addFunction("GlFogTracker", "glFog");
+		addFunction("GlFogTracker", "glFogf");
+		addFunction("GlFogTracker", "glFogi");
+
+		addFunction("GlResourceTracker", "glGenBuffersARB");
+		addFunction("GlResourceTracker", "glGenBuffers");
+		addFunction("GlResourceTracker", "glGenLists");
+		addFunction("GlResourceTracker", "glGenSamplers");
+		addFunction("GlResourceTracker", "glGenTextures");
+		addFunction("GlResourceTracker", "glGenQueriesARB");
+		addFunction("GlResourceTracker", "glGenVertexArrays");
+
+		addFunction("GlResourceTracker", "glDeleteLists");
+		addFunction("GlResourceTracker", "glDeleteTextures");
+		addFunction("GlResourceTracker", "glDeleteVertexArrays");
+		addFunction("GlResourceTracker", "glDeleteBuffers");
+		addFunction("GlResourceTracker", "glDeleteShader");
+		addFunction("GlResourceTracker", "glDeleteProgram");
+
+		addFunction("GlShaderTracker", "glGetShaderInfoLog");
+		addFunction("GlShaderTracker", "glGetProgramInfoLog");
+		addFunction("GlShaderTracker", "glGetUniformLocation");
+		addFunction("GlShaderTracker", "glShaderSource");
+		addFunction("GlShaderTracker", "glCompileShader");
+		addFunction("GlShaderTracker", "glCreateShader");
+		addFunction("GlShaderTracker", "glAttachShader");
+		addFunction("GlShaderTracker", "glUseProgram");
+		addFunction("GlShaderTracker", "glCreateProgram");
+		addFunction("GlShaderTracker", "glLinkProgram");
 	}
 
-	static void avoidDoublePassBullshit(byte[][] basicClass) {
-		ClassReader reader = new ClassReader(basicClass[0]);
+	void avoidDoublePassBullshit() {
+		ClassReader reader = new ClassReader(this.classBytes);
 		ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
 
 		ClassNode classNode = new ClassNode();
@@ -436,9 +553,7 @@ public class KronosTransformer implements IClassTransformer {
 
 		String renderWorld = IN_DEV ? "renderWorld" : "a";
 
-		for (int i = 0; i < classNode.methods.size(); i++) {
-			MethodNode node = (MethodNode) classNode.methods.get(i);
-
+		for (MethodNode node : (List<MethodNode>) classNode.methods) {
 			if (!node.name.equals(renderWorld) ) {
 				continue;
 			}
@@ -462,11 +577,11 @@ public class KronosTransformer implements IClassTransformer {
 		}
 
 		classNode.accept(writer);
-		basicClass[0] = writer.toByteArray();
+		this.classBytes = writer.toByteArray();
 	}
 
-	static void redirectGlCalls(byte[][] basicClass) {
-		ClassReader reader = new ClassReader(basicClass[0]);
+	void redirectGlCalls() {
+		ClassReader reader = new ClassReader(this.classBytes);
 		ClassNode classNode = new ClassNode();
 		reader.accept(classNode, 0);
 
@@ -487,6 +602,8 @@ public class KronosTransformer implements IClassTransformer {
 						if (className != null) {
 							m.owner = "dev/safixo/client/render/gfx/state/" + className;
 							shouldReplace = true;
+						} else {
+							UNKNOWN_FUNCTIONS.add(m.name);
 						}
 					}
 				}
@@ -497,12 +614,16 @@ public class KronosTransformer implements IClassTransformer {
 		if (shouldReplace) {
 			ClassWriter writer = new ClassWriter(0);
 			classNode.accept(writer);
-			basicClass[0] = writer.toByteArray();
+			this.classBytes = writer.toByteArray();
 		}
 	}
 
-	static void replaceClassMethod(String hookPath, String methodName, String runtimeName, String descriptor, byte[][] basicClass, boolean voidRet) {
-		ClassReader reader = new ClassReader(basicClass[0]);
+	static String stripMethodName(String methodName) {
+		return methodName.substring(0, methodName.indexOf("("));
+	}
+
+	void replaceClassMethod(String hookPath, String methodName, String descriptor) {
+		ClassReader reader = new ClassReader(this.classBytes);
 		ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
 
 		ClassNode classNode = new ClassNode();
@@ -513,7 +634,13 @@ public class KronosTransformer implements IClassTransformer {
 		for (int i = 0; i < classNode.methods.size(); i++) {
 			MethodNode method = (MethodNode) classNode.methods.get(i);
 
-			if ((!method.name.equals(methodName) && ((!method.name.equals(runtimeName)) || !method.desc.contains(descriptor)))) {
+			String mappedName = FMLDeobfuscatingRemapper.INSTANCE.mapMethodName(
+				classNode.name,
+				method.name,
+				method.desc
+			);
+
+			if (!methodName.equals(mappedName)) {
 				continue;
 			}
 
@@ -546,11 +673,7 @@ public class KronosTransformer implements IClassTransformer {
 				argumentOffset = processType(newDesc, type, inject, argumentOffset);
 			}
 
-			if (returnType.getSort() == Type.VOID || voidRet) {
-				newDesc.append(")V");
-			} else {
-				newDesc.append(")").append(returnType.getDescriptor());
-			}
+			newDesc.append(")").append(returnType.getDescriptor());
 
 			inject.add(new MethodInsnNode(INVOKESTATIC,
 				hookPath,
@@ -559,16 +682,8 @@ public class KronosTransformer implements IClassTransformer {
 			));
 
 			if (returnType.getSort() == Type.INT || returnType.getSort() == Type.BOOLEAN) {
-				if (voidRet) {
-					inject.add(new InsnNode(ICONST_0));
-				}
-
 				inject.add(new InsnNode(IRETURN));
 			} else if (returnType.getSort() == Type.OBJECT) {
-				if (voidRet) {
-					inject.add(new InsnNode(ACONST_NULL));
-				}
-
 				inject.add(new InsnNode(ARETURN));
 			} else {
 				inject.add(new InsnNode(RETURN));
@@ -585,7 +700,7 @@ public class KronosTransformer implements IClassTransformer {
 			System.err.println("[ERROR] Class path: " + classNode.name);
 			throw e;
 		}
-		basicClass[0] = writer.toByteArray();
+		this.classBytes = writer.toByteArray();
 	}
 
 	static int processType(StringBuilder newDesc, Type type, InsnList inject, int offset) {

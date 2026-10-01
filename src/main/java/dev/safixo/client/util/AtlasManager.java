@@ -37,6 +37,15 @@ public class AtlasManager {
 		}
 	}
 
+	public void updateAnimations(TextureMap atlas) {
+		TextureUtil.bindTexture(atlas.getGlTextureId());
+		List<TextureAtlasSprite> animatedSprites = (List<TextureAtlasSprite>) atlas.listAnimatedSprites;
+
+		for (TextureAtlasSprite sprite : animatedSprites) {
+			sprite.updateAnimation();
+		}
+	}
+	
 	public void loadTextureAtlas(TextureMap atlas, ResourceManager resourceManager) {
 		int maxTexSize = Minecraft.getGLMaximumTextureSize();
 		Stitcher stitcher = new Stitcher(maxTexSize, maxTexSize, true);
@@ -170,7 +179,7 @@ public class AtlasManager {
 		GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL12.GL_TEXTURE_BASE_LEVEL, 0);
 		GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL12.GL_TEXTURE_MAX_LEVEL, maxMipmap);
 		GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_NEAREST);
-		GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_NEAREST_MIPMAP_NEAREST);
+		GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_NEAREST);
 	}
 
 	private static int blend(int one, int two, int three, int four) {
@@ -226,14 +235,6 @@ public class AtlasManager {
 		int bb = unpackLB(b);
 
 		return packLinearToSrgb((ar + br) >> 1, (ag + bg) >> 1, (ab + bb) >> 1, alpha);
-	}
-
-	private static int averageRgb(int a, int b, int c, int d, int alpha) {
-		int lr = unpackLR(a) + unpackLR(b) + unpackLR(c) + unpackLR(d);
-		int lg = unpackLG(a) + unpackLG(b) + unpackLG(c) + unpackLG(d);
-		int lb = unpackLB(a) + unpackLB(b) + unpackLB(c) + unpackLB(d);
-
-		return packLinearToSrgb(lr >> 2, lg >> 2, lb >> 2, alpha);
 	}
 
 	private static int mulWeight(int x, int weight) {

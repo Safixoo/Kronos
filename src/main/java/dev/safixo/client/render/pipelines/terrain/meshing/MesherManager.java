@@ -10,6 +10,8 @@ import dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache;
 import dev.safixo.client.render.pipelines.terrain.meshing.model.ModelColorizer;
 import dev.safixo.client.render.pipelines.terrain.meshing.task.SectionResult;
 import dev.safixo.client.render.pipelines.terrain.meshing.task.SectionTask;
+import dev.safixo.client.render.pipelines.terrain.region.RegionConstants;
+import dev.safixo.client.render.pipelines.terrain.region.RegionRender;
 import dev.safixo.client.render.vertex.DefaultVertexFormats;
 import dev.safixo.client.render.vertex.VertexWriter;
 import dev.safixo.client.util.MathExt;
@@ -21,6 +23,7 @@ import dev.safixo.core.hooks.AsyncBlockHook;
 import dev.safixo.core.hooks.RenderGlobalHook;
 import it.unimi.dsi.fastutil.objects.ReferenceArrayList;
 import net.minecraft.client.renderer.WorldRenderer;
+import net.minecraft.profiler.Profiler;
 import net.minecraft.util.Vec3Pool;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
@@ -71,9 +74,11 @@ public class MesherManager {
 		AsyncBlockHook.setMeshingThread(this.meshThread);
 	}
 
-	public void queueRebuilds(CullerQueue cullerQueue, WorldManager manager) {
+	public void queueRebuilds(Profiler profiler, CullerQueue cullerQueue, WorldManager manager) {
 		int rebuildSize = cullerQueue.getRebuildIndex();
 		int maxSize = Math.min(WorldManager.MAX_UPDATES_TRIES, rebuildSize);
+
+		profiler.startSection("select_tasks");
 
 		SectionSet sectionSet = manager.getSectionSet();
 		PrimitivesFlags.processLeavesSolid();
@@ -121,8 +126,11 @@ public class MesherManager {
 			manager.markDirty();
 		}
 
+		profiler.endStartSection("queue_tasks");
 		this.queueTasks(manager);
+		profiler.endStartSection("read_results");
 		this.readAsyncResults(manager, results);
+		profiler.endSection();
 	}
 
 	private void queueTasks(WorldManager manager) {
@@ -201,6 +209,10 @@ public class MesherManager {
 			section.setFlags(SectionFlags.setPassesNonEmpty(section.flags, 0b0));
 			section.setFlags(SectionFlags.setDirty(section.flags, false));
 			section.sendFlagsToSet();
+
+			if (section.region != RegionConstants.NULL) {
+				section.region.getTileEntityManager().removeTileEntities(section.regionIndex);
+			}
 
 			manager.markDirty();
 			return false;

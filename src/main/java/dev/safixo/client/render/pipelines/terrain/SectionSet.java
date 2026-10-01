@@ -32,8 +32,37 @@ public class SectionSet {
 			this.lastSectionZ = this.camera.intZ >> 4;
 		}
 
-		this.resetVisibilityState(manager.getGraphCuller().getCullerQueue());
+		this.setupVisibilityState(manager.getGraphCuller().getCullerQueue());
 		this.updateSectionArray(manager, lastCamera, worldChanged);
+	}
+
+	public void clearVisibilityState(CullerQueue cullerQueue) {
+		final short[] visSet = this.visibilitySet;
+		final int[] graphIndices = cullerQueue.getGraphQueue();
+
+		int maxIndex = cullerQueue.getGraphIndex();
+
+		if (maxIndex == 0) {
+			return;
+		}
+
+		int i = 0;
+
+		while (i < (maxIndex & -4)) {
+			int i0 = graphIndices[i++];
+			int i1 = graphIndices[i++];
+			int i2 = graphIndices[i++];
+			int i3 = graphIndices[i++];
+
+			visSet[i0] = 0;
+			visSet[i1] = 0;
+			visSet[i2] = 0;
+			visSet[i3] = 0;
+		}
+
+		for (int j = maxIndex & -4; j < maxIndex; j++) {
+			visSet[graphIndices[j]] = 0;
+		}
 	}
 
 	public short[] getVisibilitySet() {
@@ -150,12 +179,18 @@ public class SectionSet {
 		return MathExt.byteToUnsigned(this.sections[this.getSectionIndex(sectionX, sectionY, sectionZ)]);
 	}
 
+	public int getSection(int sectionIndex) {
+		return MathExt.byteToUnsigned(this.sections[sectionIndex]);
+	}
+
 	public boolean isVisible(int sectionX, int sectionY, int sectionZ) {
 		if (!this.isInBounds(sectionX, sectionZ)) {
 			return false;
 		}
 
-		return this.visibilitySet[this.getSectionIndex(sectionX, sectionY, sectionZ)] > GraphCuller.TOLERANCE;
+		int visibility = this.visibilitySet[this.getSectionIndex(sectionX, sectionY, sectionZ)];
+
+		return (visibility & GraphCuller.MAX_GRID_FACTOR) > GraphCuller.TOLERANCE;
 	}
 
 	public SectionRender getSectionInstance(WorldManager manager, int sectionX, int sectionY, int sectionZ) {
@@ -205,35 +240,12 @@ public class SectionSet {
 		this.initializeChunkInfo(sectionX, sectionZ, false);
 	}
 
-	private void resetVisibilityState(CullerQueue cullerQueue) {
+	private void setupVisibilityState(CullerQueue cullerQueue) {
 		int size = MathExt.square(this.radius * 2 + 1) * 16;
 
 		if (this.visibilitySet == null || this.visibilitySet.length != size) {
 			this.visibilitySet = new short[size];
 			this.clampVisibilitySet();
-			return;
-		}
-
-		final short[] visSet = this.visibilitySet;
-		final int[] graphIndices = cullerQueue.getGraphQueue();
-
-		int maxIndex = cullerQueue.getGraphIndex();
-		int i = 0;
-
-		while (i < (maxIndex & -4)) {
-			int i0 = graphIndices[i++];
-			int i1 = graphIndices[i++];
-			int i2 = graphIndices[i++];
-			int i3 = graphIndices[i++];
-
-			visSet[i0] = 0;
-			visSet[i1] = 0;
-			visSet[i2] = 0;
-			visSet[i3] = 0;
-		}
-
-		for (int j = maxIndex & -4; j < maxIndex; j++) {
-			visSet[graphIndices[j]] = 0;
 		}
 	}
 
@@ -267,7 +279,6 @@ public class SectionSet {
 		int lastCameraSectionZ = this.lastSectionZ;
 
 		int cameraSectionX = this.camera.intX >> 4;
-		int cameraSectionY = this.camera.intY >> 4;
 		int cameraSectionZ = this.camera.intZ >> 4;
 
 		int diffCameraX = cameraSectionX - lastCameraSectionX;
@@ -277,8 +288,6 @@ public class SectionSet {
 		if (diffCameraX == 0 && diffCameraZ == 0) {
 			return;
 		}
-
-		manager.markDirty();
 
 		int signX = MathExt.sign(diffCameraX);
 		int signZ = MathExt.sign(diffCameraZ);
@@ -316,12 +325,16 @@ public class SectionSet {
 			return;
 		}
 
+		int lastSectionIndex = this.getSectionIndexRelative(xi + diffCameraX, 0, zi + diffCameraZ);
+		int sectionIndex = this.getSectionIndexRelative(xi, 0, zi);
+
+		int incY = this.radius * 2 + 1;
+
 		// Copy part of the volume that now its inside and before it was also.
 		for (int sectionY = 0; sectionY < 16; sectionY++) {
-			int lastSectionIndex = this.getSectionIndexRelative(xi + diffCameraX, sectionY, zi + diffCameraZ);
-			int sectionIndex = this.getSectionIndexRelative(xi, sectionY, zi);
-
 			this.sections[sectionIndex] = this.sections[lastSectionIndex];
+			lastSectionIndex += incY;
+			sectionIndex += incY;
 		}
 	}
 

@@ -24,14 +24,21 @@ public class CullerQueue {
 		}
 	}
 
-	public void clear() {
-		this.bfsIndex = 0;
+	public void clearTasks() {
 		this.renderIndex = 0;
 		this.dirtyIndex = 0;
 	}
 
+	public void clearGraph() {
+		this.bfsIndex = 0;
+	}
+
 	public void addToRenderList(int sectionIndex) {
 		this.renderIndices[this.renderIndex++] = sectionIndex;
+	}
+
+	public void addToGraph(int sectionIndex) {
+		this.graphIndices[this.bfsIndex++] = sectionIndex;
 	}
 
 	public void addToRebuildList(int sectionIndex) {

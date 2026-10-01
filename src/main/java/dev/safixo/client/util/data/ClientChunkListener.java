@@ -60,13 +60,10 @@ public class ClientChunkListener extends ChunkProviderClient {
 		}
 
 		WorldManager manager = WorldManager.getCurrentInstance();
-		Minecraft mc = Minecraft.getMinecraft();
 
-		if (mc.skipRenderWorld) {
-			for (int chunkX = x - 1; chunkX <= x + 1; chunkX++) {
-				for (int chunkZ = z - 1; chunkZ <= z + 1; chunkZ++) {
-					manager.unloadChunk(chunkX, chunkZ);
-				}
+		for (int chunkX = x - 1; chunkX <= x + 1; chunkX++) {
+			for (int chunkZ = z - 1; chunkZ <= z + 1; chunkZ++) {
+				manager.unloadChunk(chunkX, chunkZ);
 			}
 		}
 
@@ -131,20 +128,12 @@ public class ClientChunkListener extends ChunkProviderClient {
 
 				if (this.chunkMap.getAdjacentMask(currentIndex) == 0b111_111_111 && prevCurrentMask != 0b111_111_111) {
 					WorldManager manager = WorldManager.getCurrentInstance();
-					Minecraft mc = Minecraft.getMinecraft();
-
-					if (mc.skipRenderWorld) {
-						manager.loadChunk(chunk.xPosition, chunk.zPosition);
-					}
+					manager.loadChunk(chunk.xPosition, chunk.zPosition);
 				}
 
 				if (this.chunkMap.getAdjacentMask(neighborIndex) == 0b111_111_111 && prevNeighborMask != 0b111_111_111) {
 					WorldManager manager = WorldManager.getCurrentInstance();
-					Minecraft mc = Minecraft.getMinecraft();
-
-					if (mc.skipRenderWorld) {
-						manager.loadChunk(chunk.xPosition, chunk.zPosition);
-					}
+					manager.loadChunk(chunk.xPosition, chunk.zPosition);
 				}
 			}
 		}
