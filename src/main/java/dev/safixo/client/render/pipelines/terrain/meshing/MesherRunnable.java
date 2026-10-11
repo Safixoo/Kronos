@@ -10,6 +10,7 @@ import dev.safixo.client.render.pipelines.terrain.meshing.task.SectionResult;
 import dev.safixo.client.render.pipelines.terrain.meshing.task.SectionTask;
 import dev.safixo.client.render.vertex.TerrainQuadInterceptor;
 import dev.safixo.client.util.memory.MemoryPool;
+import dev.safixo.client.util.memory.MemoryReference;
 import it.unimi.dsi.fastutil.objects.ReferenceArrayList;
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.Vec3Pool;
@@ -22,7 +23,7 @@ public class MesherRunnable implements Runnable {
 	private final ConcurrentLinkedDeque<SectionTask> tasks = new ConcurrentLinkedDeque<>();
 	private final ArrayBlockingQueue<SectionResult> results = new ArrayBlockingQueue<>(WorldManager.MAX_TASK_CONCURRENTLY * 2);
 
-	private final MemoryPool memoryPool = new MemoryPool(4 << 20, WorldManager.MAX_TASK_CONCURRENTLY * 3);
+	private final MemoryPool memoryPool = new MemoryPool(4 << 20);
 
 	private final ArrayLightDataCache lightDataCache = new ArrayLightDataCache();
 	private final LightPipelineProvider provider = new LightPipelineProvider(this.lightDataCache);
@@ -35,9 +36,12 @@ public class MesherRunnable implements Runnable {
 		this.vecPool = pool;
 	}
 
-	public void addTasks(Thread thread, List<SectionTask> regularTasks, List<SectionTask> importantTasks) {
+	public void addTasks(Thread thread, List<SectionTask> regularTasks, List<SectionTask> importantTasks, MemoryReference[] memoryRefs) {
 		for (SectionTask task : importantTasks) {
 			this.tasks.addFirst(task);
+		}
+		if (memoryRefs != null) {
+			this.tasks.addFirst(new SectionTask(memoryRefs));
 		}
 
 		this.tasks.addAll(regularTasks);
@@ -74,11 +78,14 @@ public class MesherRunnable implements Runnable {
 				SectionTask task;
 
 				while ((task = this.tasks.poll()) != null) {
+					if (task.taskType == SectionTask.TaskType.MEMORY_REF_RETURNER) {
+						this.memoryPool.returnRefs(task.getReturningRefs());
+						continue;
+					}
+
 					SectionResult result = this.mesher.buildMesh(this.lightDataCache, this.provider.getLighter(LightMode.getCurrent()), this.memoryPool, task);
 
 					this.vecPool.clear();
-					this.memoryPool.tick();
-
 					this.results.put(result);
 				}
 

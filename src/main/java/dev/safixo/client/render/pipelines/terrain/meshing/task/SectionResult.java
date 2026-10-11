@@ -1,8 +1,10 @@
 package dev.safixo.client.render.pipelines.terrain.meshing.task;
 
 import dev.safixo.client.render.pipelines.terrain.SectionRender;
-import dev.safixo.client.render.pipelines.terrain.region.RegionAllocation;
+import dev.safixo.client.render.pipelines.terrain.region.GlAllocator;
 import dev.safixo.client.render.pipelines.terrain.region.RegionConstants;
+import dev.safixo.client.render.pipelines.terrain.sorting.BSPReader;
+import dev.safixo.client.render.pipelines.terrain.sorting.BSPWriter;
 import dev.safixo.client.render.vertex.VertexWriter;
 import dev.safixo.client.render.vertex.writers.TerrainFormat;
 import dev.safixo.client.util.MeshDirection;
@@ -11,8 +13,6 @@ import dev.safixo.client.util.memory.MemoryPool;
 import dev.safixo.client.util.memory.MemoryReference;
 import dev.safixo.client.util.memory.UnsafeUtil;
 import net.minecraft.tileentity.TileEntity;
-
-import java.util.List;
 
 public class SectionResult {
 	public final SectionTask task;
@@ -25,9 +25,10 @@ public class SectionResult {
 	private final int drawMask;
 	private final long[] solidDrawData;
 
+	private final BSPReader tree;
 	private final VertexWriter solidWriter, translucentWriter;
 
-	public SectionResult(MemoryPool pool, TileEntity[] tileEntityArray, VertexWriter[] writers, SectionTask task, int cullMask) {
+	public SectionResult(BSPReader tree, MemoryPool pool, TileEntity[] tileEntityArray, VertexWriter[] writers, SectionTask task, int cullMask) {
 		CameraData camera = task.camera;
 		SectionRender section = task.section;
 
@@ -37,8 +38,10 @@ public class SectionResult {
 		if ((drawMask & 0b1) != 0) {
 			VertexWriter translucentWriter = task.getTranslucentWriter();
 			MemoryReference translucentBuffer = pool.allocate(translucentWriter.getOffset());
+			this.tree = tree;
 			this.translucentWriter = translucentBuffer != null ? translucentWriter.copy(translucentBuffer) : translucentWriter.copy();
 		} else {
+			this.tree = null;
 			this.translucentWriter = null;
 		}
 
@@ -56,7 +59,7 @@ public class SectionResult {
 
 			int solidMask = RegionConstants.getSolidMask(drawMask);
 			int visibleFaces = this.visibleFaces = RegionConstants.getSectionVisibleFaces(camera.intX, camera.intY, camera.intZ, section.blockX, section.blockY, section.blockZ);
-			int meshOrder = MeshDirection.getSortedMeshOrder(visibleFaces & solidMask);
+			int meshOrder = MeshDirection.getSortedMeshOrder(visibleFaces, solidMask);
 
 			long[] drawData = this.joinAllSolidBuffers(writers, joined, meshOrder);
 
@@ -106,6 +109,10 @@ public class SectionResult {
 		return this.cullMask;
 	}
 
+	public BSPReader getTranslucencyTree() {
+		return this.tree;
+	}
+
 	private long[] joinAllSolidBuffers(VertexWriter[] writers, VertexWriter joiner, int meshDrawOrder) {
 		long[] drawData = new long[MeshDirection.COUNT];
 
@@ -114,7 +121,7 @@ public class SectionResult {
 			VertexWriter writer = writers[realMeshDir];
 
 			int writerOffset = writer.getOffset();
-			drawData[realMeshDir] = RegionAllocation.packDrawData(writerOffset / TerrainFormat.STRIDE, joiner.getOffset() / TerrainFormat.STRIDE);
+			drawData[realMeshDir] = GlAllocator.packAllocation(writerOffset / TerrainFormat.STRIDE, joiner.getOffset() / TerrainFormat.STRIDE);
 
 			UnsafeUtil.memCopy(writer.getPtr(), joiner.getPtr() + joiner.getOffset(), writerOffset);
 			joiner.offset += writerOffset;

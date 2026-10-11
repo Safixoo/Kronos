@@ -25,7 +25,9 @@ public class DebugScreenHook {
 			offY += 10;
 			renderDebugOption(fontRenderer, "Regions: " + manager.getRegionCount(), x, offY, color);
 			offY += 10;
-			renderDebugOption(fontRenderer, "VRAM U/A: " + manager.getMemoryUsed() + "/" + manager.getMemoryTotal() + "MiB", x, offY, color);
+			renderDebugOption(fontRenderer, "V: U/A: " + manager.getVertexMemoryUsed() / (1 << 20) + "/" + manager.getVertexMemoryTotal() / (1 << 20) + "MiB", x, offY, color);
+			offY += 10;
+			renderDebugOption(fontRenderer, "I: U/A: " + manager.getIndexMemoryUsed() / (1 << 20) + "/" + manager.getIndexMemoryTotal() / (1 << 20) + "MiB", x, offY, color);
 
 			x -= charWidth;
 

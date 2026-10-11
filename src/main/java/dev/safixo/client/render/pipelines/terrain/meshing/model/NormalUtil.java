@@ -90,4 +90,24 @@ public class NormalUtil {
 	private static boolean equalZero(float a) {
 		return Math.abs(a) < 0.005F;
 	}
+
+	public static int packedNormal(float normalX, float normalY, float normalZ) {
+		int nX = (byte) (normalX * 0x7F);
+		int nY = (byte) (normalY * 0x7F);
+		int nZ = (byte) (normalZ * 0x7F);
+
+		return (nX & 0xFF) << 0 | (nY & 0xFF) << 8 | (nZ & 0xFF) << 16;
+	}
+
+	public static float getNormalX(int normal) {
+		return ((byte) ((normal >>> 0) & 0xFF)) * (1.0F / 0x7F);
+	}
+
+	public static float getNormalY(int normal) {
+		return ((byte) ((normal >>> 8) & 0xFF)) * (1.0F / 0x7F);
+	}
+
+	public static float getNormalZ(int normal) {
+		return ((byte) ((normal >>> 16) & 0xFF)) * (1.0F / 0x7F);
+	}
 }

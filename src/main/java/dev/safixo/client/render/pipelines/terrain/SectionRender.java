@@ -93,6 +93,15 @@ public class SectionRender {
 		VertexWriter solidWriter = result.getSolidWriter();
 		VertexWriter translucentWriter = result.getTranslucentWriter();
 
+		if (translucentWriter != null && translucentWriter.getOffset() != 0) {
+			if (this.region == RegionConstants.NULL) {
+				this.region = manager.getRegion(this.blockX >> 4, this.blockY >> 4, this.blockZ >> 4);
+			}
+
+			this.region.setDrawMask(this.regionIndex, getSortedDrawMask(result.getMeshOrder(), result.getDrawMask()));
+			this.region.addTranslucentMesh(this, manager.getCamera(), translucentWriter, result);
+		}
+
 		if (solidWriter != null && solidWriter.getOffset() != 0) {
 			if (this.region == RegionConstants.NULL) {
 				this.region = manager.getRegion(this.blockX >> 4, this.blockY >> 4, this.blockZ >> 4);
@@ -100,15 +109,6 @@ public class SectionRender {
 
 			this.region.setDrawMask(this.regionIndex, getSortedDrawMask(result.getMeshOrder(), result.getDrawMask()));
 			this.region.addSolidMesh(this, solidWriter, result);
-		}
-
-		if (translucentWriter != null && translucentWriter.getOffset() != 0) {
-			if (this.region == RegionConstants.NULL) {
-				this.region = manager.getRegion(this.blockX >> 4, this.blockY >> 4, this.blockZ >> 4);
-			}
-
-			this.region.setDrawMask(this.regionIndex, getSortedDrawMask(result.getMeshOrder(), result.getDrawMask()));
-			this.region.addTranslucentMesh(this, translucentWriter);
 		}
 	}
 

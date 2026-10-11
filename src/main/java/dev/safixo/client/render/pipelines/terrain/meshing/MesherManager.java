@@ -1,5 +1,6 @@
 package dev.safixo.client.render.pipelines.terrain.meshing;
 
+import dev.safixo.client.render.gfx.util.StagingBuffer;
 import dev.safixo.client.render.pipelines.terrain.SectionFlags;
 import dev.safixo.client.render.pipelines.terrain.SectionRender;
 import dev.safixo.client.render.pipelines.terrain.SectionSet;
@@ -19,6 +20,7 @@ import dev.safixo.client.util.MeshDirection;
 import dev.safixo.client.util.collection.ObjectPooler;
 import dev.safixo.client.util.data.CameraData;
 import dev.safixo.client.util.data.PrimitivesFlags;
+import dev.safixo.client.util.memory.MemoryReference;
 import dev.safixo.core.hooks.AsyncBlockHook;
 import dev.safixo.core.hooks.RenderGlobalHook;
 import it.unimi.dsi.fastutil.objects.ReferenceArrayList;
@@ -29,6 +31,7 @@ import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.storage.ExtendedBlockStorage;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class MesherManager {
@@ -56,6 +59,7 @@ public class MesherManager {
 
 	private final List<SectionTask> regularTasks = new ReferenceArrayList<>();
 	private final List<SectionTask> importantTasks = new ReferenceArrayList<>();
+	private final List<MemoryReference> memoryRefs = new ArrayList<>();
 
 	private int importantTasksWaiting;
 	private int currentTaskId;
@@ -74,7 +78,7 @@ public class MesherManager {
 		AsyncBlockHook.setMeshingThread(this.meshThread);
 	}
 
-	public void queueRebuilds(Profiler profiler, CullerQueue cullerQueue, WorldManager manager) {
+	public void queueRebuilds(Profiler profiler, CullerQueue cullerQueue, WorldManager manager, float partialTick) {
 		int rebuildSize = cullerQueue.getRebuildIndex();
 		int maxSize = Math.min(WorldManager.MAX_UPDATES_TRIES, rebuildSize);
 
@@ -84,7 +88,7 @@ public class MesherManager {
 		PrimitivesFlags.processLeavesSolid();
 
 		long current = System.nanoTime();
-		long budget = this.calculateFrameBudgetNs(current);
+		long budget = this.calculateFrameBudgetNs(current, partialTick);
 
 		int updateIndex = 0, nonEmptyUpdates = 0;
 
@@ -114,7 +118,6 @@ public class MesherManager {
 		}
 
 		long diff = System.nanoTime() - current;
-		float partialTick = RenderGlobalHook.PARTIAL_TICK;
 
 		this.lastFrameBuildTime = diff > this.lastFrameBuildTime
 			? diff
@@ -149,7 +152,8 @@ public class MesherManager {
 		this.dirtySections.clear();
 
 		if (!this.regularTasks.isEmpty() || !this.importantTasks.isEmpty()) {
-			this.mesherRunnable.addTasks(this.meshThread, this.regularTasks, this.importantTasks);
+			this.mesherRunnable.addTasks(this.meshThread, this.regularTasks, this.importantTasks, this.memoryRefs.toArray(new MemoryReference[this.memoryRefs.size()]));
+			this.memoryRefs.clear();
 		}
 		this.importantTasksWaiting += this.importantTasks.size();
 
@@ -173,6 +177,13 @@ public class MesherManager {
 		for (SectionResult result : results) {
 			SectionTask task = result.task;
 
+			if (result.getTranslucentWriter() != null && result.getTranslucentWriter().isFromPool()) {
+				this.memoryRefs.add(result.getTranslucentWriter().getNullableMemRef());
+			}
+			if (result.getSolidWriter() != null && result.getSolidWriter().isFromPool()) {
+				this.memoryRefs.add(result.getSolidWriter().getNullableMemRef());
+			}
+
 			if (task.taskId != this.currentTaskId) {
 				result.delete();
 				continue;
@@ -192,6 +203,8 @@ public class MesherManager {
 			}
 			this.caches.push(task.cache);
 		}
+
+		StagingBuffer.getInstance().flushAllCopies();
 	}
 
 	public boolean areImportantResultsScheduled() {
@@ -250,7 +263,7 @@ public class MesherManager {
 		return centerSection == null || centerSection.isEmpty();
 	}
 
-	private long calculateFrameBudgetNs(long current) {
+	private long calculateFrameBudgetNs(long current, float partialTick) {
 		long currentFrameTimeNs = (current - this.lastFrameNano) - this.lastFrameBuildTime;
 		long budget = Math.min(currentFrameTimeNs / 8, MAX_TIME);
 
@@ -258,7 +271,7 @@ public class MesherManager {
 		// but if the budget is lower simply give lower budget.
 		if (budget > this.lerpFrameBudget && this.lerpFrameBudget != 0L) {
 			// adds 10ms of budget per sec.
-			budget = (long) Math.min(budget, this.lerpFrameBudget + (RenderGlobalHook.PARTIAL_TICK * 1E+7));
+			budget = (long) Math.min(budget, this.lerpFrameBudget + (partialTick * 1E+7));
 		}
 
 		this.lerpFrameBudget = budget;

@@ -1,6 +1,7 @@
 package dev.safixo.client.render.pipelines.terrain;
 
 import dev.safixo.client.render.gfx.state.GlFogTracker;
+import dev.safixo.client.render.gfx.util.StagingBuffer;
 import dev.safixo.client.render.pipelines.terrain.meshing.MesherManager;
 import dev.safixo.client.render.pipelines.terrain.shader.ExpFogProgram;
 import dev.safixo.client.render.pipelines.terrain.shader.LinearFogProgram;
@@ -43,7 +44,6 @@ public class WorldManager {
 	private World worldObj;
 	private CameraData camera;
 
-	private long vramUsed, vramAllocated;
 	private int renderDistance;
 	private boolean graphUpdated;
 
@@ -53,7 +53,7 @@ public class WorldManager {
 
 	private static WorldManager INSTANCE;
 
-	public WorldManager(WorldClient world) {
+	private WorldManager(WorldClient world) {
 		INSTANCE = this;
 		this.worldObj = world;
 	}
@@ -90,28 +90,20 @@ public class WorldManager {
 		return this.regionManager.regionMap.getSize();
 	}
 
-	public void addUsedMemory(int bytes) {
-		this.vramUsed += bytes;
+	public long getVertexMemoryUsed() {
+		return this.regionManager.getVertexMemoryUsed();
 	}
 
-	public void removeUsedMemory(int bytes) {
-		this.vramUsed -= bytes;
+	public long getVertexMemoryTotal() {
+		return this.regionManager.getVertexMemoryTotal();
 	}
 
-	public void addMemory(int bytes) {
-		this.vramAllocated += bytes;
+	public long getIndexMemoryUsed() {
+		return this.regionManager.getIndexMemoryUsed();
 	}
 
-	public void removeMemory(int bytes) {
-		this.vramAllocated -= bytes;
-	}
-
-	public long getMemoryUsed() {
-		return (this.vramUsed / 1024L) / 1024L;
-	}
-
-	public long getMemoryTotal() {
-		return (this.vramAllocated / 1024L) / 1024L;
+	public long getIndexMemoryTotal() {
+		return this.regionManager.getIndexMemoryTotal();
 	}
 
 	public void markDirty(int sectionX, int sectionY, int sectionZ) {
@@ -151,6 +143,8 @@ public class WorldManager {
 				this.linearFogProgram = null;
 			}
 		}
+
+		StagingBuffer.deleteInstance();
 
 		this.mesherManager.clear();
 		this.regionManager.clear();
@@ -202,8 +196,12 @@ public class WorldManager {
 		// section/state update we can conserve the last terrain state.
 		this.terrainDirty = false;
 
-		this.regionManager.update(profiler, this.camera, renderDistance, worldChanged);
-		this.mesherManager.queueRebuilds(profiler, this.graphCuller.getCullerQueue(), this);
+		this.regionManager.update(profiler, this.sectionSet, this.camera, renderDistance, worldChanged);
+		this.mesherManager.queueRebuilds(profiler, this.graphCuller.getCullerQueue(), this, partialTick);
+
+		profiler.endStartSection("translucency");
+
+		this.regionManager.updateTranslucency(camera);
 
 		profiler.endStartSection("ticking");
 		@SuppressWarnings("unchecked")

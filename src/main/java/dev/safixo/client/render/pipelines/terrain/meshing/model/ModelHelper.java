@@ -96,9 +96,9 @@ public class ModelHelper {
 
 	public static boolean checkPartial(Quad quad, int blockX, int blockY, int blockZ) {
 		for (int i = 0; i < 4; i++) {
-			float x = quad.getPosRelX(blockX, i);
-			float y = quad.getPosRelY(blockY, i);
-			float z = quad.getPosRelZ(blockZ, i);
+			float x = quad.getBlockRelX(blockX, i);
+			float y = quad.getBlockRelY(blockY, i);
+			float z = quad.getBlockRelZ(blockZ, i);
 
 			if (!MathExt.equals(x, 0.0F) && !MathExt.equals(x, 1.0F)) {
 				return true;

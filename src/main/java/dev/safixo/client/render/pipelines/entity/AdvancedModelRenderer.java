@@ -259,7 +259,7 @@ public class AdvancedModelRenderer {
 		VERTEX_ARRAY_FPP.unbind();
 		VERTEX_BUFFER.unbind();
 
-		VERTEX_BUFFER.bufferSubData(writer.getNioPtr(), OFFSET, writer.getOffset());
+		VERTEX_BUFFER.bufferSubData(writer.getNioPtr(), 0, OFFSET, writer.getOffset());
 		int drawData = writer.getVertices() | (OFFSET / 24) << 16;
 
 		OFFSET += writer.getOffset();

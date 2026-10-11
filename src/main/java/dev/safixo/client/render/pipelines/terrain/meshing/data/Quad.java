@@ -106,15 +106,15 @@ public class Quad {
 		NativeBuffer.nmemFree(this.ptr);
 	}
 
-	public float getPosRelX(int x, int index) {
+	public float getBlockRelX(int x, int index) {
 		return this.getX(index) - (x & RegionConstants.BLOCK_BITS_X);
 	}
 
-	public float getPosRelY(int y, int index) {
+	public float getBlockRelY(int y, int index) {
 		return this.getY(index) - (y & RegionConstants.BLOCK_BITS_Y);
 	}
 
-	public float getPosRelZ(int z, int index) {
+	public float getBlockRelZ(int z, int index) {
 		return this.getZ(index) - (z & RegionConstants.BLOCK_BITS_Z);
 	}
 }

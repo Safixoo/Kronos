@@ -1,7 +1,9 @@
 package dev.safixo.client.render.gfx.buffer;
 
+import dev.safixo.client.util.memory.NativeBuffer;
 import org.lwjgl.opengl.*;
 
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 
 public class GlPersistentBuffer implements GlBuffer {
@@ -44,6 +46,31 @@ public class GlPersistentBuffer implements GlBuffer {
 	}
 
 	@Override
+	public int getBufferTarget() {
+		return GL15.GL_ARRAY_BUFFER;
+	}
+
+	@Override
+	public void bufferData(long ptr, int offset, int size) {
+		throw new RuntimeException("Persistent buffers doesn't use glBufferData");
+	}
+
+	@Override
+	public void bufferSubData(long ptr, int offset, int writingOffset, int size) {
+		throw new RuntimeException("Persistent buffers doesn't use glBufferSubData");
+	}
+
+	@Override
+	public void bufferData(ByteBuffer buffer, int offset, int size) {
+		throw new RuntimeException("Persistent buffers doesn't use glBufferData");
+	}
+
+	@Override
+	public void bufferSubData(ByteBuffer buffer, int offset, int writingOffset, int size) {
+		throw new RuntimeException("Persistent buffers doesn't use glBufferSubData");
+	}
+
+	@Override
 	public int getCapacity() {
 		return this.capacity;
 	}
@@ -62,6 +89,11 @@ public class GlPersistentBuffer implements GlBuffer {
 	public void delete() {
 		GL15.glDeleteBuffers(this.id);
 		this.id = -1;
+	}
+
+	@Override
+	public BufferType getBufferType() {
+		return null;
 	}
 
 	public void bind() {

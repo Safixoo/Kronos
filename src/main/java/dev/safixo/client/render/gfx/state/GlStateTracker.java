@@ -2,7 +2,9 @@ package dev.safixo.client.render.gfx.state;
 
 import dev.safixo.client.render.FrameDebug;
 import dev.safixo.client.render.ImprovedTessellator;
+import dev.safixo.client.render.gfx.util.StagingBuffer;
 import dev.safixo.client.util.data.FrameTimer;
+import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import org.lwjgl.BufferChecks;
 import org.lwjgl.MemoryUtil;
 import org.lwjgl.opengl.*;
@@ -12,12 +14,18 @@ import java.nio.*;
 @SuppressWarnings("unused")
 public class GlStateTracker {
 	public static final boolean SKIP_CACHE = false;
+
 	public static String VENDOR;
 
 	public static int LAST_DEPTH_FUNC = -1;
 	public static int LAST_VAO = -1;
-	public static int LAST_VBO = -1;
-	public static int LAST_SSBO = -1;
+
+	private static final Int2IntOpenHashMap LAST_BUFFER_TARGET = new Int2IntOpenHashMap();
+	private static ImprovedTessellator TESSELLATOR;
+
+	static {
+		LAST_BUFFER_TARGET.defaultReturnValue(-1);
+	}
 
 	public static void update(boolean processMessages) {
 		flushDrawState();
@@ -25,6 +33,7 @@ public class GlStateTracker {
 
 		FrameDebug.debug();
 
+		StagingBuffer.advanceFrame();
 		FrameTimer.getInstance().addFrame();
 	}
 
@@ -41,27 +50,22 @@ public class GlStateTracker {
 	}
 
 	public static void glBindBuffer(int target, int id) {
-		if (target == GL15.GL_ARRAY_BUFFER && !SKIP_CACHE) {
-			if (id == LAST_VBO) {
-				return;
-			}
-			LAST_VBO = id;
+		if (id == LAST_BUFFER_TARGET.get(target) && !SKIP_CACHE) {
+			return;
 		}
-
-		if (target == GL43.GL_SHADER_STORAGE_BUFFER && !SKIP_CACHE) {
-			if (id == LAST_SSBO) {
-				return;
-			}
-			LAST_SSBO = id;
+		if (!SKIP_CACHE) {
+			LAST_BUFFER_TARGET.put(target, id);
 		}
 
 		GL15.glBindBuffer(target, id);
 	}
 
 	public static void glBindVertexArray(int vao) {
-		if (LAST_VAO == vao) {
+		if (LAST_VAO == vao && !SKIP_CACHE) {
 			return;
 		}
+
+		LAST_BUFFER_TARGET.remove(GL15.GL_ELEMENT_ARRAY_BUFFER);
 
 		LAST_VAO = vao;
 		GL30.glBindVertexArray(vao);
@@ -187,6 +191,10 @@ public class GlStateTracker {
 	}
 
 	public static void flushDrawState() {
-		ImprovedTessellator.getTessellator().flushState();
+		if (TESSELLATOR == null) {
+			TESSELLATOR = ImprovedTessellator.getTessellator();
+		}
+
+		TESSELLATOR.flushState();
 	}
 }

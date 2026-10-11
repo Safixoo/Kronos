@@ -249,6 +249,11 @@ public class GraphCuller {
 			int sectionZ = offsetZ + cameraChunkZ;
 
 			RegionRender region = regionManager.getRegionFromIndexed(sectionX, sectionY, sectionZ);
+
+			if (region == null) {
+				continue;
+			}
+
 			int regionIndex = RegionConstants.regionIndex(sectionX, sectionY, sectionZ);
 			int visibleFaces = RegionConstants.getSectionVisibleFaces(camera.intX, camera.intY, camera.intZ, sectionX, sectionY, sectionZ);
 

@@ -1,9 +1,11 @@
 package dev.safixo.client.render.pipelines.terrain.region;
 
-import dev.safixo.client.render.gfx.state.GlMatrixTracker;
+import dev.safixo.client.render.gfx.buffer.GlBuffer;
+import dev.safixo.client.render.gfx.buffer.GlIndexBuffer;
+import dev.safixo.client.render.gfx.buffer.GlVertexBuffer;
 import dev.safixo.client.render.pipelines.terrain.SectionSet;
+import dev.safixo.client.render.pipelines.terrain.sorting.IndexBufferWriter;
 import dev.safixo.client.util.collection.FastLongHashMap;
-import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import net.minecraft.profiler.Profiler;
 import net.minecraft.tileentity.TileEntity;
@@ -16,16 +18,19 @@ import dev.safixo.client.util.MathExt;
 import java.util.List;
 
 public class RegionManager {
+	private static final int BUFFER_CAPACITY = 24 << 20;
 	public static boolean SUPPORT_INDIRECT;
 
-	public final FastLongHashMap<RegionRender> regionMap = new FastLongHashMap<>();
+	private GlBuffer spareBuffer;
+	private GlAllocator<GlIndexBuffer> globalIndexBuffer;
 
-	private double lastUpdateX;
-	private double lastUpdateZ;
+	public final FastLongHashMap<RegionRender> regionMap = new FastLongHashMap<>();
 
 	private RegionRender[] indexedRegions;
 	private int addRegionX, addRegionZ;
 	private int factorY, factorZ;
+
+	private IndexBufferWriter indexBufferWriter = new IndexBufferWriter();
 
 	public RegionManager() {
 		String vendor = GL11.glGetString(GL11.GL_VENDOR);
@@ -48,8 +53,40 @@ public class RegionManager {
 		return region;
 	}
 
-	static int getRenderDiameter(CameraData camera) {
-		return camera.renderDistance * 2 + 1 + (2 << 3);
+	public int getVertexMemoryUsed() {
+		int sum = 0;
+
+		for (RegionRender region : this.regionMap) {
+			sum += region.getAllocator().getAllocationSum();
+		}
+
+		return sum;
+	}
+
+	public int getVertexMemoryTotal() {
+		int sum = 0;
+
+		for (RegionRender region : this.regionMap) {
+			sum += region.getAllocator().getCapacity();
+		}
+
+		return sum;
+	}
+
+	public int getIndexMemoryTotal() {
+		return this.globalIndexBuffer == null ? 0 : this.globalIndexBuffer.getCapacity();
+	}
+
+	public int getIndexMemoryUsed() {
+		return this.globalIndexBuffer == null ? 0 : this.globalIndexBuffer.getAllocationSum();
+	}
+
+	public GlBuffer getSpareBuffer() {
+		if (this.spareBuffer == null) {
+			this.spareBuffer = new GlVertexBuffer(BUFFER_CAPACITY, GL15.GL_STATIC_COPY);
+		}
+
+		return this.spareBuffer;
 	}
 
 	// Creates a mapping between position and regions, useful for BFS only.
@@ -107,13 +144,21 @@ public class RegionManager {
 		for (RegionRender region : this.regionMap) {
 			region.clear();
 		}
-
-		if (RegionAllocation.SPARE_BUFFER != null) {
-			RegionAllocation.SPARE_BUFFER.delete();
-			RegionAllocation.SPARE_BUFFER = null;
+		this.regionMap.clear();
+		if (this.indexBufferWriter != null) {
+			this.indexBufferWriter.delete();
+			this.indexBufferWriter = null;
 		}
 
-		this.regionMap.clear();
+		if (this.globalIndexBuffer != null) {
+			this.globalIndexBuffer.delete();
+			this.globalIndexBuffer = null;
+		}
+
+		if (this.spareBuffer != null) {
+			this.spareBuffer.delete();
+			this.spareBuffer = null;
+		}
 	}
 
 	private RegionRender[] getRegionsSorted(CameraData camera) {
@@ -167,27 +212,30 @@ public class RegionManager {
 		return Math.abs(pX - rX) + Math.abs(pY - rY) + Math.abs(pZ - rZ);
 	}
 
-	public void update(Profiler profiler, CameraData camera, int renderDistance, boolean worldUpdated) {
+	public void update(Profiler profiler, SectionSet sectionSet, CameraData camera, int renderDistance, boolean worldUpdated) {
 		profiler.startSection("update_regions");
 
 		if (worldUpdated) {
-			this.lastUpdateX = camera.cameraXD();
-			this.lastUpdateZ = camera.cameraZD();
-
 			this.clear();
 		} else {
-			double diffX = Math.abs(camera.cameraXD() - this.lastUpdateX);
-			double diffZ = Math.abs(camera.cameraZD() - this.lastUpdateZ);
-
-			if (Math.max(diffX, diffZ) >= 16) {
-				this.lastUpdateX = camera.cameraXD();
-				this.lastUpdateZ = camera.cameraZD();
-
-				this.sanitizeRegions(camera, renderDistance);
-			}
+			this.sanitizeRegions(sectionSet, camera);
 		}
 
 		profiler.endSection();
+	}
+
+	public void updateTranslucency(CameraData camera) {
+		if (this.indexBufferWriter == null) {
+			this.indexBufferWriter = new IndexBufferWriter();
+		}
+
+		for (RegionRender region : this.regionMap) {
+			if (region.getRenderIndex() == 0) {
+				continue;
+			}
+
+			region.updateTranslucency(this.indexBufferWriter, camera);
+		}
 	}
 
 	public void iterateAllTileEntities(SectionSet sectionSet, List<TileEntity> globalList) {
@@ -202,12 +250,11 @@ public class RegionManager {
 		}
 	}
 
-	public void sanitizeRegions(CameraData camera, int renderDistance) {
+	public void sanitizeRegions(SectionSet sectionSet, CameraData camera) {
 		LongArrayList forRemoval = new LongArrayList();
-		int distanceSquared = MathExt.square((renderDistance + 3) << 4);
 
 		for (RegionRender region : this.regionMap) {
-			if (nearestDistanceToRegion(camera, region) > distanceSquared && region.getRenderIndex() == 0) {
+			if (!isAnyRegionSectionActive(sectionSet, camera, region)) {
 				long regionPos = MathExt.asLong(region.regionX, region.regionY, region.regionZ);
 
 				forRemoval.add(regionPos);
@@ -220,17 +267,54 @@ public class RegionManager {
 		}
 	}
 
-	private static int nearestDistanceToRegion(CameraData camera, RegionRender region) {
-		int minX = (region.regionX << RegionConstants.BLOCK_SHIFT_X) - camera.intX;
-		int minZ = (region.regionZ << RegionConstants.BLOCK_SHIFT_Z) - camera.intZ;
+	public IndexBufferWriter getIndexBufferWriter() {
+		if (this.indexBufferWriter == null) {
+			this.indexBufferWriter = new IndexBufferWriter();
+		}
 
-		int maxX = minX + RegionConstants.DIAMETER_X;
-		int maxZ = minZ + RegionConstants.DIAMETER_Z;
+		return this.indexBufferWriter;
+	}
 
-		int diffX = Math.min(maxX, Math.max(0, minX));
-		int diffZ = Math.min(maxZ, Math.max(0, minZ));
+	public GlAllocator<GlIndexBuffer> getGlobalIndexBuffer() {
+		if (this.globalIndexBuffer == null) {
+			this.globalIndexBuffer = this.createGlobalIndexBuffer();
+		}
 
-		return MathExt.square(diffX) + MathExt.square(diffZ);
+		return this.globalIndexBuffer;
+	}
+
+	private GlAllocator<GlIndexBuffer> createGlobalIndexBuffer() {
+		GlAllocator<GlIndexBuffer> globalIndexBuffer = new GlAllocator<>(
+			new GlIndexBuffer(GL15.GL_STATIC_DRAW), this.getSpareBuffer(), IndexBufferWriter.STRIDE_PER_QUAD << 16, false);
+
+		if (this.indexBufferWriter == null) {
+			this.indexBufferWriter = new IndexBufferWriter();
+		}
+
+		this.indexBufferWriter.restart();
+		this.indexBufferWriter.ensureQuadCapacity((1 << 16) / 4);
+
+		for (int i = 0; i < (1 << 16) / 4; i++) {
+			this.indexBufferWriter.writeQuad(i);
+		}
+
+		globalIndexBuffer.allocate(-1, (IndexBufferWriter.STRIDE_PER_QUAD << 16) / 4);
+		globalIndexBuffer.getBuffer().bufferSubData(this.indexBufferWriter.getPtrNio(), 0, 0, (IndexBufferWriter.STRIDE_PER_QUAD << 16) / 4);
+
+		return globalIndexBuffer;
+	}
+
+	private static boolean isAnyRegionSectionActive(SectionSet sectionSet, CameraData camera, RegionRender region) {
+		int minX = (region.regionX << (RegionConstants.BLOCK_SHIFT_X - 4)) - (camera.intX >> 4);
+		int minZ = (region.regionZ << (RegionConstants.BLOCK_SHIFT_Z - 4)) - (camera.intZ >> 4);
+
+		int maxX = minX + (RegionConstants.DIAMETER_X >> 4);
+		int maxZ = minZ + (RegionConstants.DIAMETER_Z >> 4);
+
+		int sectionX = Math.min(maxX, Math.max(0, minX)) + (camera.intX >> 4);
+		int sectionZ = Math.min(maxZ, Math.max(0, minZ)) + (camera.intZ >> 4);
+
+		return sectionSet.isInBounds(sectionX, sectionZ);
 	}
 
 	public void drawAllRegions(WorldManager manager, TerrainProgram shader, CameraData camera, int pass) {
@@ -244,7 +328,7 @@ public class RegionManager {
 		int end;
 		int inc;
 
-		if (pass == 1) {
+		if (pass == RegionConstants.TRANSLUCENT_PASS) {
 			index = regionRenders.length - 1;
 			end = -1;
 			inc = -1;
@@ -267,5 +351,9 @@ public class RegionManager {
 		}
 
 		GL30.glBindVertexArray(0);
+
+		if (pass == RegionConstants.TRANSLUCENT_PASS) {
+			this.globalIndexBuffer.getBuffer().unbind();
+		}
 	}
  }

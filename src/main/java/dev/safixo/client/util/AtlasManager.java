@@ -45,7 +45,7 @@ public class AtlasManager {
 			sprite.updateAnimation();
 		}
 	}
-	
+
 	public void loadTextureAtlas(TextureMap atlas, ResourceManager resourceManager) {
 		int maxTexSize = Minecraft.getGLMaximumTextureSize();
 		Stitcher stitcher = new Stitcher(maxTexSize, maxTexSize, true);

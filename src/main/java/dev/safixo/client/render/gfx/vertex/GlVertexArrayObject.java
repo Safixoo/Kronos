@@ -1,6 +1,8 @@
 package dev.safixo.client.render.gfx.vertex;
 
+import dev.safixo.client.render.gfx.buffer.GlBuffer;
 import dev.safixo.client.render.gfx.buffer.GlVertexBuffer;
+import org.lwjgl.opengl.GL15;
 import org.lwjgl.opengl.GL30;
 
 public class GlVertexArrayObject {
@@ -11,16 +13,18 @@ public class GlVertexArrayObject {
 		this.vertexFormat = format;
 	}
 
-	private void saveStateInVao(GlVertexBuffer vbo) {
+	private void saveStateInVao(GlBuffer vbo, GlBuffer ibo) {
 		this.id = GL30.glGenVertexArrays();
 
-		this.bind(vbo);
-		vbo.bind();
+		GL30.glBindVertexArray(this.id);
+		if (vbo != null) GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, vbo.getHandle());
+		if (ibo != null) GL15.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, ibo.getHandle());
 
 		this.vertexFormat.setupBufferState();
 
-		vbo.unbind();
-		this.unbind();
+		GL30.glBindVertexArray(0);
+		if (vbo != null) GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
+		if (ibo != null) GL15.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, 0);
 
 		this.vertexFormat.cleanupBufferState();
 	}
@@ -41,13 +45,18 @@ public class GlVertexArrayObject {
 		return this.id;
 	}
 
-	public void bind(GlVertexBuffer vbo) {
+
+	public void bind(GlBuffer vbo) {
+		this.bind(vbo, null);
+	}
+
+	public void bind(GlBuffer vbo, GlBuffer ibo) {
 		if ((vbo == null || this.vertexFormat == null) && this.id == 0x80000000) {
 			this.id = GL30.glGenVertexArrays();
 		}
 
 		if (this.id == 0x80000000) {
-			this.saveStateInVao(vbo);
+			this.saveStateInVao(vbo, ibo);
 		}
 
 		GL30.glBindVertexArray(this.id);

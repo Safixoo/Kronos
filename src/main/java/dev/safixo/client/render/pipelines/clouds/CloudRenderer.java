@@ -129,13 +129,6 @@ public class CloudRenderer {
 		Minecraft mc = Minecraft.getMinecraft();
 		WorldClient world = mc.theWorld;
 
-		int cameraBlockId = ActiveRenderInfo.getBlockIdAtEntityViewpoint(mc.theWorld, mc.renderViewEntity, partialTick);
-
-		// Don't render clouds underwater.
-		if (cameraBlockId != 0 && Block.blocksList[cameraBlockId].blockMaterial.isLiquid()) {
-			return;
-		}
-
 		Vec3 cameraPosition = ActiveRenderInfo.projectViewFromEntity(mc.renderViewEntity, partialTick);
 
 		int renderDistance = MathExt.getCanonicalRenderDistance(mc.gameSettings);
@@ -182,7 +175,7 @@ public class CloudRenderer {
 		buildGeometry(writer, cellDistance, cloudCamFracX, cloudCamFracZ, cloudIntX, cloudIntZ, cloudCamIntX, cloudCamIntZ, cloudCameraY, insideIndex);
 
 		// Upload the geometry.
-		ImprovedTessellator.getTessellator().getVertexBuffer().bufferData(writer.getNioPtr(), writer.getOffset());
+		ImprovedTessellator.getTessellator().getVertexBuffer().bufferData(writer.getNioPtr(), 0, writer.getOffset());
 
 		// Draw the clouds.
 		drawClouds(writer.getVertices(), cloudFracX, cloudY, cloudFracZ);

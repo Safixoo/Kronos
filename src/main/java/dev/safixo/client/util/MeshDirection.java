@@ -1,6 +1,8 @@
 package dev.safixo.client.util;
 
+import dev.safixo.client.render.pipelines.terrain.SectionRender;
 import dev.safixo.client.render.pipelines.terrain.region.RegionConstants;
+import dev.safixo.client.util.data.CameraData;
 
 public class MeshDirection {
 	public static final int YN = Direction.DOWN;
@@ -15,30 +17,9 @@ public class MeshDirection {
 	public static final int GENERIC = Direction.COUNT;
 	public static final int COUNT = GENERIC + 1;
 
-	public static final int ALL_MASK = (1 << COUNT) - 1;
-
 	/**
 	 * Returns a set of directions sorted by the active bits in the mask passed in parameter.
 	 */
-	public static int getSortedMeshOrder(int meshBitDirections) {
-		int preferredCount = 0;
-		int restCount = 0;
-
-		int preferredDirSet = 0;
-		int restDirectionSet = 0;
-
-		for (int dir = 0; dir < MeshDirection.COUNT; dir++) {
-			// Mesh directions are always less than 0xF.
-			if ((meshBitDirections & (1 << dir)) != 0) {
-				preferredDirSet |= (dir & 0xF) << (preferredCount++ * 4);
-			} else {
-				restDirectionSet |= (dir & 0xF) << (restCount++ * 4);
-			}
-		}
-
-		return preferredDirSet | (restDirectionSet << (preferredCount * 4));
-	}
-
 	public static int getSortedMeshOrder(int visibleFaces, int solidMask) {
 		int preferredCount = 0;
 		int nonNullCount = 0;

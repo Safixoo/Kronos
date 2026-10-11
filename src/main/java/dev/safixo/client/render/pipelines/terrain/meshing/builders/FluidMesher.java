@@ -5,6 +5,8 @@ import dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache;
 import dev.safixo.client.render.pipelines.terrain.meshing.model.ModelColorizer;
 import dev.safixo.client.render.pipelines.terrain.meshing.model.light.LightPipeline;
 import dev.safixo.client.render.pipelines.terrain.meshing.model.light.data.QuadLightData;
+import dev.safixo.client.render.pipelines.terrain.sorting.BSPWriter;
+import dev.safixo.client.render.vertex.TerrainQuadInterceptor;
 import dev.safixo.client.render.vertex.VertexWriter;
 import dev.safixo.client.util.ColorBGRManager;
 import dev.safixo.client.util.Direction;
@@ -37,11 +39,7 @@ public class FluidMesher {
 
 	private final QuadLightData out = new QuadLightData();
 
-	private int posX, posY, posZ;
-
-	public FluidMesher() {
-
-	}
+	public FluidMesher() {}
 
 	protected int getEffectiveFlowDecay(Material blockMaterial, SectionCache cache, int x, int y, int z) {
 		if (cache.getBlockMaterial(x, y, z) != blockMaterial) {
@@ -100,24 +98,20 @@ public class FluidMesher {
 		int blockId = cache.getBlockId(x, y, z);
 		Material material = PrimitivesFlags.MATERIAL[blockId];
 
-		return !(material != block.blockMaterial && (side == Direction.UP || (material != Material.ice && !PrimitivesFlags.SOLID[blockId])));
+		return !(material != block.blockMaterial && (side == Direction.UP || !PrimitivesFlags.SOLID[blockId]));
 	}
 
 	public void render(VertexWriter writer, LightPipeline pipeline, SectionCache cache, BlockFluid block, int x, int y, int z) {
-		int posX = this.posX = x;
-		int posY = this.posY = y;
-		int posZ = this.posZ = z;
-
 		this.blockPos.set(x, y, z);
 
-		boolean sfUp = this.isFluidOccluded(cache, posX, posY + 1, posZ, Direction.UP, block);
-		boolean sfDown = this.isFluidOccluded(cache, posX, posY - 1, posZ, Direction.DOWN, block);
-		boolean sfNorth = this.isFluidOccluded(cache, posX, posY, posZ - 1, Direction.NORTH, block);
-		boolean sfSouth = this.isFluidOccluded(cache, posX, posY, posZ + 1, Direction.SOUTH, block);
-		boolean sfWest = this.isFluidOccluded(cache, posX - 1, posY, posZ, Direction.WEST, block);
-		boolean sfEast = this.isFluidOccluded(cache, posX + 1, posY, posZ, Direction.EAST, block);
+		boolean sfUp = this.isFluidOccluded(cache, x, y + 1, z, Direction.UP, block);
+		boolean sfDown = this.isFluidOccluded(cache, x, y - 1, z, Direction.DOWN, block);
+		boolean sfNorth = this.isFluidOccluded(cache, x, y, z - 1, Direction.NORTH, block);
+		boolean sfSouth = this.isFluidOccluded(cache, x, y, z + 1, Direction.SOUTH, block);
+		boolean sfWest = this.isFluidOccluded(cache, x - 1, y, z, Direction.WEST, block);
+		boolean sfEast = this.isFluidOccluded(cache, x + 1, y, z, Direction.EAST, block);
 
-		int meta = cache.getBlockMetadata(posX, posY, posZ);
+		int meta = cache.getBlockMetadata(x, y, z);
 
 		if (sfUp && sfDown && sfEast && sfWest && sfNorth && sfSouth) {
 			return;
@@ -126,7 +120,7 @@ public class FluidMesher {
 		ModelColorizer colorizer = cache.getColorizer();
 		int color = ColorBGRManager.rgbToBgr(colorizer.getColor(cache, x, y, z, block));
 
-		float fluidHeight = this.fluidHeight(cache, block, posX, posY, posZ);
+		float fluidHeight = this.fluidHeight(cache, block, x, y, z);
 		float northWestHeight, southWestHeight, southEastHeight, northEastHeight;
 		if (fluidHeight >= 1.0f) {
 			northWestHeight = 1.0f;
@@ -138,10 +132,10 @@ public class FluidMesher {
 			float heightSouth = this.fluidHeight(cache, block, x, y, z + 1);
 			float heightEast = this.fluidHeight(cache, block, x + 1, y, z);
 			float heightWest = this.fluidHeight(cache, block, x - 1, y, z);
-			northWestHeight = this.fluidCornerHeight(cache, block, fluidHeight, heightNorth, heightWest, posX - 1, posY, posZ - 1);
-			southWestHeight = this.fluidCornerHeight(cache, block, fluidHeight, heightSouth, heightWest, posX - 1, posY, posZ + 1);
-			southEastHeight = this.fluidCornerHeight(cache, block, fluidHeight, heightSouth, heightEast, posX + 1, posY, posZ + 1);
-			northEastHeight = this.fluidCornerHeight(cache, block, fluidHeight, heightNorth, heightEast, posX + 1, posY, posZ - 1);
+			northWestHeight = this.fluidCornerHeight(cache, block, fluidHeight, heightNorth, heightWest, x - 1, y, z - 1);
+			southWestHeight = this.fluidCornerHeight(cache, block, fluidHeight, heightSouth, heightWest, x - 1, y, z + 1);
+			southEastHeight = this.fluidCornerHeight(cache, block, fluidHeight, heightSouth, heightEast, x + 1, y, z + 1);
+			northEastHeight = this.fluidCornerHeight(cache, block, fluidHeight, heightNorth, heightEast, x + 1, y, z - 1);
 		}
 		float yOffset = sfDown ? 0.0F : EPSILON;
 
@@ -151,7 +145,7 @@ public class FluidMesher {
 			southEastHeight -= EPSILON;
 			northEastHeight -= EPSILON;
 
-			Vector3f velocity = this.getFlowVector(cache, block, posX, posY, posZ);
+			Vector3f velocity = this.getFlowVector(cache, block, x, y, z);
 
 			TextureAtlasSprite sprite;
 			float u1, u2, u3, u4;
@@ -207,7 +201,6 @@ public class FluidMesher {
 				this.setVertex(writer, 1.0F, southEastHeight, 1.0F, u3, v3);
 				this.setVertex(writer, 1.0F, northEastHeight, 0.0f, u4, v4);
 			}
-			this.bufferQuad(pipeline, writer);
 		}
 
 		if (!sfDown) {
@@ -224,7 +217,6 @@ public class FluidMesher {
 			this.setVertex(writer, 0.0f, yOffset, 0.0f, minU, minV);
 			this.setVertex(writer, 1.0F, yOffset, 0.0f, maxU, minV);
 			this.setVertex(writer, 1.0F, yOffset, 1.0F, maxU, maxV);
-			this.bufferQuad(pipeline, writer);
 		}
 
 		for (int dir = Direction.NORTH; dir < Direction.COUNT; dir++) {
@@ -298,20 +290,7 @@ public class FluidMesher {
 			this.setVertex(writer, x2, yOffset, z2, u2, v3);
 			this.setVertex(writer, x1, yOffset, z1, u1, v3);
 			this.setVertex(writer, x1, c1, z1, u1, v1);
-			this.bufferQuad(pipeline, writer);
 		}
-	}
-
-	private void bufferQuad(LightPipeline pipeline, VertexWriter writer) {
-		Quad quad = writer.getCurrentQuad();
-		pipeline.calculate(quad, this.blockPos, this.out, quad.getNormalEnum(), true);
-
-		for (int i = 0; i < 4; i++) {
-			quad.setLight(i, this.out.lm[i]);
-			quad.setColor(i, ColorBGRManager.multiplyColor(writer.color, this.out.br[i]));
-		}
-
-		writer.bufferQuad();
 	}
 
 	private static boolean isAlignedEquals(float a, float b) {
@@ -334,7 +313,7 @@ public class FluidMesher {
 		writer.u = u;
 		writer.v = v;
 
-		writer.addVertexToQuad(x + this.posX, y + this.posY, z + this.posZ, false);
+		writer.addVertexToQuad(x + this.blockPos.x, y + this.blockPos.y, z + this.blockPos.z, true);
 	}
 
 	private float fluidCornerHeight(SectionCache cache, BlockFluid fluid, float fluidHeight, float fluidHeightX, float fluidHeightY, int x, int y, int z) {

@@ -6,9 +6,8 @@ import dev.safixo.client.util.Direction;
 import dev.safixo.client.util.MeshDirection;
 import dev.safixo.client.util.data.CameraData;
 import dev.safixo.client.util.memory.NativeBuffer;
-import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL14;
-import org.lwjgl.opengl.GL43;
+import dev.safixo.client.util.memory.UnsafeUtil;
+import org.lwjgl.opengl.*;
 
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
@@ -104,8 +103,27 @@ public class RegionDrawContext {
 			return;
 		}
 
-		RenderBuffer vertexBuffer = region.getRenderBuffer(pass);
-		vertexBuffer.bindState(true);
+		this.setupRegionState(region, shader, camera, pass);
+
+		if (pass == RegionConstants.SOLID_PASS) {
+			if (RegionManager.SUPPORT_INDIRECT) {
+				this.multiDrawArraysIndirect(region, drawCount, pass);
+			} else {
+				this.multiDrawArraysDirect(region, drawCount, pass);
+			}
+		} else {
+			if (RegionManager.SUPPORT_INDIRECT) {
+				this.multiDrawElementsIndirect(region, drawCount, pass);
+			} else {
+				this.multiDrawElementsDirect(region, drawCount, pass);
+			}
+		}
+	}
+
+	public void setupRegionState(RegionRender region, TerrainProgram shader, CameraData camera, int pass) {
+		RenderBuffer vertexBuffer = region.getBuffer();
+
+		vertexBuffer.bind(region.getIndexBuffer());
 
 		int blockRegionX = region.regionX << RegionConstants.BLOCK_SHIFT_X;
 		int blockRegionY = region.regionY << RegionConstants.BLOCK_SHIFT_Y;
@@ -113,22 +131,16 @@ public class RegionDrawContext {
 
 		// Setup camera and region offset.
 		shader.setupRegionOffset(camera, blockRegionX, blockRegionY, blockRegionZ);
-
-		if (RegionManager.SUPPORT_INDIRECT) {
-			this.multiDrawIndirect(region, drawCount, pass);
-		} else {
-			this.multiDrawDirect(region, drawCount, pass);
-		}
 	}
 
-	private void multiDrawDirect(RegionRender region, int drawCount, int pass) {
-		long first = region.getFirstPtr(pass);
-		long count = region.getCountPtr(pass);
+	private void multiDrawArraysDirect(RegionRender region, int drawCount, int pass) {
+		long pFirst = region.getFirstPtr(pass);
+		long pCount = region.getCountPtr(pass);
 
 		// As of now count and first use the pointer but with some offset, so simply offset
 		// count itself to make the same effect.
-		IntBuffer firstBuff = NativeBuffer.wrap(first).asIntBuffer();
-		IntBuffer countBuff = NativeBuffer.wrap(count).asIntBuffer();
+		IntBuffer firstBuff = NativeBuffer.wrap(pFirst).asIntBuffer();
+		IntBuffer countBuff = NativeBuffer.wrap(pCount).asIntBuffer();
 
 		((Buffer) firstBuff).limit(drawCount);
 		((Buffer) countBuff).limit(drawCount);
@@ -136,14 +148,32 @@ public class RegionDrawContext {
 		GL14.glMultiDrawArrays(GL11.GL_QUADS, firstBuff, countBuff);
 	}
 
-	private void multiDrawIndirect(RegionRender region, int drawCount, int pass) {
+	private void multiDrawArraysIndirect(RegionRender region, int drawCount, int pass) {
 		ByteBuffer indirectBuffer = region.getIndirectBuffer(pass);
 
-		if (indirectBuffer == null) {
-			return;
-		}
-
-		((Buffer) indirectBuffer).limit(drawCount * RegionRender.INDIRECT_STRUCT_SIZE);
+		((Buffer) indirectBuffer).limit(drawCount * RegionRender.INDIRECT_ARRAYS_STRUCT_SIZE);
 		GL43.glMultiDrawArraysIndirect(GL11.GL_QUADS, indirectBuffer, drawCount, 0);
+	}
+
+	private void multiDrawElementsDirect(RegionRender region, int drawCount, int pass) {
+		long pFirst = region.getFirstPtr(pass);
+		long pCount = region.getCountPtr(pass);
+		long pIndex = region.getIndexPtr();
+
+		// glMultiDrawElementsBaseVertex for poor people (people that doesn't have LWJGL3)
+		for (int i = 0; i < drawCount; i++) {
+			int count = UnsafeUtil.memGetInt(pCount + (i << 2L));
+			int first = UnsafeUtil.memGetInt(pFirst + (i << 2L));
+			int index = UnsafeUtil.memGetInt(pIndex + (i << 2L));
+
+			GL32.glDrawElementsBaseVertex(GL11.GL_QUADS, count, GL11.GL_UNSIGNED_SHORT, index, first);
+		}
+	}
+
+	private void multiDrawElementsIndirect(RegionRender region, int drawCount, int pass) {
+		ByteBuffer indirectBuffer = region.getIndirectBuffer(pass);
+
+		((Buffer) indirectBuffer).limit(drawCount * RegionRender.INDIRECT_ELEMENTS_STRUCT_SIZE);
+		GL43.glMultiDrawElementsIndirect(GL11.GL_QUADS, GL11.GL_UNSIGNED_SHORT, indirectBuffer, drawCount, 0);
 	}
 }

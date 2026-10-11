@@ -25,7 +25,7 @@ public class GlShaderStorageBuffer implements GlBuffer {
 
 	public GlShaderStorageBuffer(int size, int bindingIndex, int hint) {
 		this(hint, bindingIndex);
-		this.allocate(UnsafeUtil.NULL, size);
+		this.bufferData(UnsafeUtil.NULL, 0, size);
 	}
 
 	@Override
@@ -33,41 +33,55 @@ public class GlShaderStorageBuffer implements GlBuffer {
 		return this.id;
 	}
 
-	public void allocate(long vertexData, int size) {
+	@Override
+	public int getBufferTarget() {
+		return 0;
+	}
+
+	@Override
+	public void bufferData(long ptr, int offset, int size) {
+		if (ptr == UnsafeUtil.NULL) {
+			this.bufferData(null, offset, size);
+			return;
+		}
+
+
+		this.bufferData(NativeBuffer.wrap(ptr), offset, size);
+	}
+
+	@Override
+	public void bufferSubData(long ptr, int offset, int writingOffset, int size) {
+		if (ptr == UnsafeUtil.NULL) {
+			this.bufferSubData(null, 0, 0, size);
+			return;
+		}
+
+		this.bufferSubData(NativeBuffer.wrap(ptr), offset, writingOffset, size);
+	}
+
+	@Override
+	public void bufferData(ByteBuffer buffer, int position, int size) {
 		this.bind();
 
-		if (vertexData != UnsafeUtil.NULL) {
-			ByteBuffer vertexDataBuffer = NativeBuffer.wrap(vertexData);
-			((Buffer) vertexDataBuffer).limit(size);
-
-			GL15.glBufferData(GL43.GL_SHADER_STORAGE_BUFFER, vertexDataBuffer, this.hint);
+		if (buffer == null) {
+			GL15.glBufferData(this.getBufferTarget(), size, this.hint);
 		} else {
-			GL15.glBufferData(GL43.GL_SHADER_STORAGE_BUFFER, size, this.hint);
+			((Buffer)buffer).position(position);
+			((Buffer)buffer).limit(size);
+			GL15.glBufferData(this.getBufferTarget(), buffer, this.hint);
 		}
 
 		this.capacity = size;
-		this.unbind();
 	}
 
-	public void bufferData(ByteBuffer buffer, int size) {
-		((Buffer) buffer).limit(size);
+	@Override
+	public void bufferSubData(ByteBuffer buffer, int offset, int writingOffset, int size) {
+		this.bind();
 
-		if (GpuFlags.EXT_DSA) {
-			EXTDirectStateAccess.glNamedBufferDataEXT(this.id, buffer, this.hint);
-		} else {
-			this.bind();
-			GL15.glBufferData(GL43.GL_SHADER_STORAGE_BUFFER, buffer, this.hint);
-		}
-	}
-
-	public void bufferSubData(ByteBuffer buffer, int offset, int size) {
-		((Buffer) buffer).limit(size);
-
-		if (GpuFlags.EXT_DSA) {
-			EXTDirectStateAccess.glNamedBufferSubDataEXT(this.id, offset, buffer);
-		} else {
-			this.bind();
-			GL15.glBufferSubData(GL43.GL_SHADER_STORAGE_BUFFER, offset, buffer);
+		if (buffer != null) {
+			((Buffer) buffer).position(offset);
+			((Buffer) buffer).limit(offset + size);
+			GL15.glBufferSubData(this.getBufferTarget(), writingOffset, buffer);
 		}
 	}
 
@@ -86,10 +100,21 @@ public class GlShaderStorageBuffer implements GlBuffer {
 
 	public void clear() {
 		this.bind();
-		this.allocate(UnsafeUtil.NULL, 0);
+		this.bufferData(UnsafeUtil.NULL, 0, 0);
 		this.unbind();
 	}
 
+	@Override
+	public void bind() {
+		GL15.glBindBuffer(this.getBufferTarget(), this.id);
+	}
+
+	@Override
+	public void unbind() {
+		GL15.glBindBuffer(this.getBufferTarget(), 0);
+	}
+
+	@Override
 	public void delete() {
 		this.clear();
 
@@ -97,15 +122,12 @@ public class GlShaderStorageBuffer implements GlBuffer {
 		this.id = -1;
 	}
 
+	@Override
+	public BufferType getBufferType() {
+		return BufferType.SHADER_STORAGE_BUFFER;
+	}
+
 	public void bindBase() {
 		GL30.glBindBufferBase(GL43.GL_SHADER_STORAGE_BUFFER, this.bindingIndex, this.id);
-	}
-
-	public void bind() {
-		GL15.glBindBuffer(GL43.GL_SHADER_STORAGE_BUFFER, this.id);
-	}
-
-	public void unbind() {
-		GL15.glBindBuffer(GL43.GL_SHADER_STORAGE_BUFFER, 0);
 	}
 }

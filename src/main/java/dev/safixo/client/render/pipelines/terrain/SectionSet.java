@@ -25,7 +25,7 @@ public class SectionSet {
 	public void updateSet(WorldManager manager, CameraData camera, boolean worldChanged) {
 		CameraData lastCamera = this.camera;
 		this.camera = camera;
-		this.radius = camera.renderDistance + (16 / camera.renderDistance) + 1;
+		this.radius = camera.renderDistance + (6 / camera.renderDistance) + 1;
 
 		if (this.lastSectionX == Integer.MIN_VALUE || this.lastSectionZ == Integer.MIN_VALUE) {
 			this.lastSectionX = this.camera.intX >> 4;
@@ -189,7 +189,6 @@ public class SectionSet {
 		}
 
 		int visibility = this.visibilitySet[this.getSectionIndex(sectionX, sectionY, sectionZ)];
-
 		return (visibility & GraphCuller.MAX_GRID_FACTOR) > GraphCuller.TOLERANCE;
 	}
 
@@ -246,6 +245,8 @@ public class SectionSet {
 		if (this.visibilitySet == null || this.visibilitySet.length != size) {
 			this.visibilitySet = new short[size];
 			this.clampVisibilitySet();
+
+			cullerQueue.clearGraph();
 		}
 	}
 

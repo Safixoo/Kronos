@@ -9,6 +9,8 @@ import java.util.Arrays;
 
 @SuppressWarnings("unused")
 public class GlTextureTracker {
+	private static final boolean SKIP_CACHE = true;
+
 	public static int ACTIVE_UNIT = 0;
 	public static int BINDED_UNIT = 0;
 
@@ -31,7 +33,7 @@ public class GlTextureTracker {
 	public static void glViewport(int x, int y, int width, int height) {
 		int mask = width | height << 16;
 
-		if (mask != LAST_VIEWPORT_WH || GlStateTracker.SKIP_CACHE) {
+		if (mask != LAST_VIEWPORT_WH || SKIP_CACHE) {
 			LAST_VIEWPORT_WH = mask;
 			GL11.glViewport(x, y, width, height);
 		}
@@ -53,7 +55,7 @@ public class GlTextureTracker {
 	public static void glMultiTexCoord2f(int target, float u, float v) {
 		GlTextureTracker.assertActiveTexture();
 
-		if (GlStateTracker.SKIP_CACHE || LAST_TARGET != target || MV != v || MU != u) {
+		if (true || SKIP_CACHE || LAST_TARGET != target || MV != v || MU != u) {
 			GL13.glMultiTexCoord2f(target, u, v);
 		}
 
@@ -66,7 +68,7 @@ public class GlTextureTracker {
 	// uses the active texture.
 	public static void glActiveTexture(int target) {
 		ACTIVE_UNIT = target - GL13.GL_TEXTURE0;
-		if (GlStateTracker.SKIP_CACHE) {
+		if (SKIP_CACHE) {
 			GL13.glActiveTexture(target);
 		}
 	}
@@ -81,7 +83,7 @@ public class GlTextureTracker {
 	}
 
 	public static void glBindTexture(int target, int texture) {
-		if (GlStateTracker.SKIP_CACHE || texture != TEXTURE_PER_UNIT[ACTIVE_UNIT]) {
+		if (SKIP_CACHE || texture != TEXTURE_PER_UNIT[ACTIVE_UNIT]) {
 			TEXTURE_PER_UNIT[ACTIVE_UNIT] = texture;
 			GlStateTracker.flushDrawState();
 

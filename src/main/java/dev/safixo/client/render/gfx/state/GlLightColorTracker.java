@@ -13,6 +13,8 @@ import java.util.Arrays;
 
 @SuppressWarnings("unused")
 public class GlLightColorTracker {
+	private static final boolean SKIP_CACHE = GlStateTracker.SKIP_CACHE;
+
 	public static long LAST_COLOR_MATERIAL = -31;
 	public static int LAST_CLEAR_COLOR = 0;
 	public static int LAST_COLOR = -1;
@@ -30,7 +32,7 @@ public class GlLightColorTracker {
 	}
 
 	public static void glShadeModel(int mode) {
-		if (GlStateTracker.SKIP_CACHE || !GlDrawTracker.RASTER_CACHE) {
+		if (SKIP_CACHE || !GlDrawTracker.RASTER_CACHE) {
 			GL11.glShadeModel(mode);
 		}
 
@@ -48,7 +50,7 @@ public class GlLightColorTracker {
 	}
 
 	public static void glBlendFunc(int sFactor, int dFactor) {
-		if (GlStateTracker.SKIP_CACHE || !GlDrawTracker.RASTER_CACHE) {
+		if (SKIP_CACHE || !GlDrawTracker.RASTER_CACHE) {
 			GL11.glBlendFunc(sFactor, dFactor);
 			return;
 		}
@@ -61,7 +63,7 @@ public class GlLightColorTracker {
 	}
 
 	public static void glColor3f(float red, float green, float blue) {
-		if (R != red || G != green || B != blue || GlStateTracker.SKIP_CACHE) {
+		if (R != red || G != green || B != blue || SKIP_CACHE) {
 			GlStateTracker.flushDrawState();
 			R = red;
 			G = green;
@@ -76,7 +78,7 @@ public class GlLightColorTracker {
 			glColor3f(red, green, blue); return;
 		}
 
-		if (R != red || G != green || B != blue || A != alpha || GlStateTracker.SKIP_CACHE) {
+		if (R != red || G != green || B != blue || A != alpha || SKIP_CACHE) {
 			GlStateTracker.flushDrawState();
 			R = red;
 			G = green;
@@ -89,7 +91,7 @@ public class GlLightColorTracker {
 	public static void glClearColor(float red, float green, float blue, float alpha) {
 		int clearColor = ColorBGRManager.packColor(red, green, blue) | (int) (alpha * 255.0f) << 24;
 
-		if (LAST_CLEAR_COLOR != clearColor || GlStateTracker.SKIP_CACHE) {
+		if (LAST_CLEAR_COLOR != clearColor || SKIP_CACHE) {
 			LAST_CLEAR_COLOR = clearColor;
 			GL11.glClearColor(red, green, blue, alpha);
 		}
@@ -98,7 +100,7 @@ public class GlLightColorTracker {
 	public static void glColorMaterial(int face, int mode) {
 		long mask = (face & 0xFFFFFFFFL) << 32L | (mode & 0xFFFFFFFFL);
 
-		if (LAST_COLOR_MATERIAL != mask || GlStateTracker.SKIP_CACHE) {
+		if (LAST_COLOR_MATERIAL != mask || SKIP_CACHE) {
 			GlStateTracker.flushDrawState();
 			GL11.glColorMaterial(face, mode);
 			LAST_COLOR_MATERIAL = mask;
@@ -127,7 +129,7 @@ public class GlLightColorTracker {
 			}
 		}
 
-		if (different || GlStateTracker.SKIP_CACHE) {
+		if (different || SKIP_CACHE) {
 			GL11.glLight(light, pname, params);
 		}
 	}
@@ -166,7 +168,7 @@ public class GlLightColorTracker {
 			}
 		}
 
-		if (different || GlStateTracker.SKIP_CACHE) {
+		if (different || SKIP_CACHE) {
 			GL11.glLight(light, pname, params);
 		}
 	}
@@ -188,7 +190,7 @@ public class GlLightColorTracker {
 			}
 		}
 
-		if (different || GlStateTracker.SKIP_CACHE) {
+		if (different || SKIP_CACHE) {
 			GL11.glLightModel(pname, params);
 		}
 	}
@@ -210,7 +212,7 @@ public class GlLightColorTracker {
 			}
 		}
 
-		if (different || GlStateTracker.SKIP_CACHE) {
+		if (different || SKIP_CACHE) {
 			GL11.glLightModel(pname, params);
 		}
 	}
@@ -224,7 +226,7 @@ public class GlLightColorTracker {
 			Arrays.fill(value, Float.NaN);
 		}
 
-		if (value[0] != params || GlStateTracker.SKIP_CACHE) {
+		if (value[0] != params || SKIP_CACHE) {
 			GL11.glLighti(light, pname, params);
 			value[0] = params;
 		}
@@ -239,7 +241,7 @@ public class GlLightColorTracker {
 			Arrays.fill(value, Float.NaN);
 		}
 
-		if (value[0] != params || GlStateTracker.SKIP_CACHE) {
+		if (value[0] != params || SKIP_CACHE) {
 			GL11.glLightf(light, pname, params);
 			value[0] = params;
 		}
@@ -254,7 +256,7 @@ public class GlLightColorTracker {
 			Arrays.fill(value, Float.NaN);
 		}
 
-		if (value[0] != params || GlStateTracker.SKIP_CACHE) {
+		if (value[0] != params || SKIP_CACHE) {
 			GL11.glLightModeli(pname, params);
 			value[0] = params;
 		}
@@ -269,7 +271,7 @@ public class GlLightColorTracker {
 			Arrays.fill(value, Float.NaN);
 		}
 
-		if (value[0] != params || GlStateTracker.SKIP_CACHE) {
+		if (value[0] != params || SKIP_CACHE) {
 			GL11.glLightModelf(pname, params);
 			value[0] = params;
 		}

@@ -58,6 +58,14 @@ public class Direction {
 		}
 	}
 
+	public static boolean isPositive(int direction) {
+		return (direction & 0b1) == 1;
+	}
+
+	public static boolean isNegative(int direction) {
+		return (direction & 0b1) == 0;
+	}
+
 	public static int opposite(int direction) {
 		return direction ^ 1;
 	}

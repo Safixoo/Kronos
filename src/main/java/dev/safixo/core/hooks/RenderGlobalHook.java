@@ -10,6 +10,7 @@ import dev.safixo.client.util.data.PrimitivesFlags;
 import dev.safixo.core.HookUtils;
 import net.minecraft.block.Block;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.ActiveRenderInfo;
 import net.minecraft.client.renderer.RenderGlobal;
 import net.minecraft.client.renderer.RenderHelper;
 import net.minecraft.client.renderer.culling.ICamera;
@@ -25,8 +26,6 @@ public class RenderGlobalHook {
 	public static boolean SHOULD_RELOAD;
 	public static boolean OPTIFINE_CHECKED = false;
 	public static boolean OPTIFINE_ACTIVE = false;
-
-	public static float PARTIAL_TICK;
 
 	public static void loadRenderers(RenderGlobal renderGlobal) {
 		// Check capabilities (TODO: This check is probably implemented too late)
@@ -77,29 +76,28 @@ public class RenderGlobalHook {
 		OPTIFINE_ACTIVE = HookUtils.existsField(Minecraft.getMinecraft().gameSettings, "ofRenderDistanceFine");
 	}
 
-	// Executed only in the first pass of renderWorld.
 	public static boolean updateRenderers(RenderGlobal renderGlobal, EntityLivingBase player, boolean idk) {
-		double cameraX = MathExt.lerp(player.lastTickPosX, player.posX, PARTIAL_TICK);
-		double cameraY = MathExt.lerp(player.lastTickPosY, player.posY, PARTIAL_TICK);
-		double cameraZ = MathExt.lerp(player.lastTickPosZ, player.posZ, PARTIAL_TICK);
+		return true;
+	}
+
+	public static void clipRenderersByFrustum(RenderGlobal renderGlobal, ICamera frustum, float partialTick) {
+		Minecraft minecraft = Minecraft.getMinecraft();
+		EntityLivingBase player = minecraft.renderViewEntity;
+
+		double cameraX = MathExt.lerp(player.lastTickPosX, player.posX, partialTick);
+		double cameraY = MathExt.lerp(player.lastTickPosY, player.posY, partialTick);
+		double cameraZ = MathExt.lerp(player.lastTickPosZ, player.posZ, partialTick);
 
 		MinecraftHook.MAIN_THREAD = Thread.currentThread();
 
-		Minecraft minecraft = Minecraft.getMinecraft();
 		int realRenderDistance = MathExt.getCanonicalRenderDistance(minecraft.gameSettings);
 
 		if (PrimitivesFlags.DEV_ENVIRONMENT) {
 			minecraft.thePlayer.capabilities.setFlySpeed(0.25f);
 		}
 
-		MANAGER.update(minecraft.theWorld, realRenderDistance, cameraX, cameraY, cameraZ, SHOULD_RELOAD, PARTIAL_TICK);
+		MANAGER.update(minecraft.theWorld, realRenderDistance, cameraX, cameraY, cameraZ, SHOULD_RELOAD, partialTick);
 		SHOULD_RELOAD = false;
-
-		return true;
-	}
-
-	public static void clipRenderersByFrustum(RenderGlobal renderGlobal, ICamera frustum, float partialTick) {
-		PARTIAL_TICK = partialTick;
 	}
 
 	public static void renderCloudsFancy(RenderGlobal renderGlobal, float partialTick) {
@@ -107,15 +105,11 @@ public class RenderGlobalHook {
 	}
 
 	public static int sortAndRender(RenderGlobal renderGlobal, EntityLivingBase player, int pass, double tick) {
-		renderAllRenderLists(renderGlobal, pass, tick);
-		return 0;
-	}
-
-	public static void renderAllRenderLists(RenderGlobal renderGlobal, int pass, double tick) {
 		Minecraft minecraft = Minecraft.getMinecraft();
 
-		GL11.glEnable(GL11.GL_CULL_FACE);
 		RenderHelper.disableStandardItemLighting();
+
+		GL11.glEnable(GL11.GL_CULL_FACE);
 		minecraft.entityRenderer.enableLightmap(tick);
 
 		if (pass == RegionConstants.SOLID_PASS) {
@@ -123,16 +117,26 @@ public class RenderGlobalHook {
 			MANAGER.drawRenderPass(RegionConstants.SOLID_PASS);
 			renderGlobal.renderersBeingRendered = MANAGER.drawnSolidRenderers;
 		} else {
+			GL11.glColorMask(true, true, true, true);
 			GL11.glEnable(GL11.GL_BLEND);
+			GL11.glBlendFunc(770, 771);
+			GL11.glDisable(GL11.GL_ALPHA_TEST);
 			MANAGER.drawRenderPass(RegionConstants.TRANSLUCENT_PASS);
+			GL11.glEnable(GL11.GL_ALPHA_TEST);
 		}
 		MANAGER.drawnSolidRenderers = 0;
 
 		minecraft.entityRenderer.disableLightmap(tick);
 		GL11.glDisable(GL11.GL_CULL_FACE);
+
+		return 0;
+	}
+
+	public static void renderAllRenderLists(RenderGlobal renderGlobal, int pass, double tick) {
+
 	}
 
 	public static void renderAllSortedRenderers(RenderGlobal renderGlobal, int pass, double tick) {
-		// NO-OP OptiFine method.
+
 	}
 }

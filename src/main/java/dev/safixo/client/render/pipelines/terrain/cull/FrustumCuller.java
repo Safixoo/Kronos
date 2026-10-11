@@ -1,36 +1,33 @@
 package dev.safixo.client.render.pipelines.terrain.cull;
 
-
 import dev.safixo.client.render.pipelines.clouds.CloudRenderer;
 import org.joml.Matrix4f;
-
-import java.nio.FloatBuffer;
 
 public class FrustumCuller {
 	public static final Matrix4f projectionMatrix = new Matrix4f();
 	public static final Matrix4f modelViewMatrix = new Matrix4f();
 
-	public static FloatBuffer modelViewBuff, projectionBuff;
-
 	private static float nxX, nxY, nxZ, nxW;
 	private static float pxX, pxY, pxZ, pxW;
 	private static float nyX, nyY, nyZ, nyW;
 	private static float pyX, pyY, pyZ, pyW;
+	private static float nzX, nzY, nzZ, nzW;
 
-	private static float nxWG, pxWG, nyWG, pyWG;
+	private static float nxWG, pxWG, nyWG, pyWG, nzWG;
 
-	private static int nxXC, nxZC, nxWC;
-	private static int pxXC, pxZC, pxWC;
+	private static float nxXC, nxZC, nxWC;
+	private static float pxXC, pxZC, pxWC;
 
 	/**
 	 * Creates a frustum at the style of JOML, it needs to be normalized to keep as much precision as possible
 	 * also an extra w is created to fast path some checks in section frustum tests.
 	 */
-	public static void processMatrices(org.joml.Matrix4f m) {
+	public static void processMatrices(Matrix4f m) {
 		double nxX, nxY, nxZ, nxW;
 		double pxX, pxY, pxZ, pxW;
 		double nyX, nyY, nyZ, nyW;
 		double pyX, pyY, pyZ, pyW;
+		double nzX, nzY, nzZ, nzW;
 
 		nxX = (double) m.m03() + (double) m.m00(); nxY = (double) m.m13() + (double) m.m10(); nxZ = (double) m.m23() + (double) m.m20(); nxW = (double) m.m33() + (double) m.m30();
 		double invl = invSqrt(nxX * nxX + nxY * nxY + nxZ * nxZ);
@@ -68,6 +65,15 @@ public class FrustumCuller {
 		if (pyY > 0) pyW += 16.0 * pyY;
 		if (pyZ > 0) pyW += 16.0 * pyZ;
 
+		nzX = (double) m.m03() + (double) m.m02(); nzY = (double) m.m13() + (double) m.m12(); nzZ = (double) m.m23() + (double) m.m22(); nzW = (double) m.m33() + (double) m.m32();
+		invl = invSqrt(nzX * nzX + nzY * nzY + nzZ * nzZ);
+		nzX *= invl; nzY *= invl; nzZ *= invl; nzW *= invl;
+
+		nzWG = (float) -nzW;
+		if (nzX > 0) nzW += 16.0 * nzX;
+		if (nzY > 0) nzW += 16.0 * nzY;
+		if (nzZ > 0) nzW += 16.0 * nzZ;
+
 		FrustumCuller.nxX = (float) nxX;
 		FrustumCuller.nxY = (float) nxY;
 		FrustumCuller.nxZ = (float) nxZ;
@@ -87,6 +93,11 @@ public class FrustumCuller {
 		FrustumCuller.pyY = (float) pyY;
 		FrustumCuller.pyZ = (float) pyZ;
 		FrustumCuller.pyW = (float) -pyW;
+
+		FrustumCuller.nzX = (float) nzX;
+		FrustumCuller.nzY = (float) nzY;
+		FrustumCuller.nzZ = (float) nzZ;
+		FrustumCuller.nzW = (float) -nzW;
 	}
 
 	private static double invSqrt(double a) {
@@ -149,14 +160,14 @@ public class FrustumCuller {
 		pxWC += (CloudRenderer.MAX_CELL_DISTANCE + worldFracX) * pxXC;
 		pxWC += (CloudRenderer.MAX_CELL_DISTANCE + worldFracZ) * pxZC;
 
-		FrustumCuller.nxXC = (int) (nxXC * (1 << 20));
-		FrustumCuller.nxZC = (int) (nxZC * (1 << 20));
+		FrustumCuller.nxXC = (float) nxXC;
+		FrustumCuller.nxZC = (float) nxZC;
 
-		FrustumCuller.pxXC = (int) (pxXC * (1 << 20));
-		FrustumCuller.pxZC = (int) (pxZC * (1 << 20));
+		FrustumCuller.pxXC = (float) pxXC;
+		FrustumCuller.pxZC = (float) pxZC;
 
-		FrustumCuller.pxWC = (int) (pxWC * (1 << 20));
-		FrustumCuller.nxWC = (int) (nxWC * (1 << 20));
+		FrustumCuller.pxWC = (float) pxWC;
+		FrustumCuller.nxWC = (float) nxWC;
 	}
 
 	/**

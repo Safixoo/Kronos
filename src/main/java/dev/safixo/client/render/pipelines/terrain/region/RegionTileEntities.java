@@ -2,6 +2,7 @@ package dev.safixo.client.render.pipelines.terrain.region;
 
 import dev.safixo.client.render.pipelines.terrain.SectionSet;
 import it.unimi.dsi.fastutil.shorts.Short2ReferenceOpenHashMap;
+import it.unimi.dsi.fastutil.shorts.ShortSet;
 import net.minecraft.tileentity.TileEntity;
 
 import java.util.Collections;
@@ -9,12 +10,15 @@ import java.util.List;
 
 public class RegionTileEntities {
 	private final Short2ReferenceOpenHashMap<TileEntity[]> tileEntitiesPerSection = new Short2ReferenceOpenHashMap<>();
+	private final ShortSet regionIndices;
 	private final int sectionX, sectionY, sectionZ;
 
 	public RegionTileEntities(int regionX, int regionY, int regionZ) {
 		this.sectionX = regionX << (RegionConstants.BLOCK_SHIFT_X - 4);
 		this.sectionY = regionY << (RegionConstants.BLOCK_SHIFT_Y - 4);
 		this.sectionZ = regionZ << (RegionConstants.BLOCK_SHIFT_Z - 4);
+
+		this.regionIndices = this.tileEntitiesPerSection.keySet();
 	}
 
 	public void addTileEntities(TileEntity[] tileEntities, int regionIndex) {
@@ -26,7 +30,7 @@ public class RegionTileEntities {
 	}
 
 	public void iterateTileEntities(SectionSet sectionSet, List<TileEntity> globalList) {
-		for (short regionIndex : this.tileEntitiesPerSection.keySet()) {
+		for (short regionIndex : this.regionIndices) {
 			int sectionX = this.sectionX + RegionConstants.getLocalSectionX(regionIndex);
 			int sectionY = this.sectionY + RegionConstants.getLocalSectionY(regionIndex);
 			int sectionZ = this.sectionZ + RegionConstants.getLocalSectionZ(regionIndex);

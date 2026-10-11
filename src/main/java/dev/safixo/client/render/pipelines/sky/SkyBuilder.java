@@ -67,22 +67,22 @@ public class SkyBuilder {
 	public void buildAllBuffers(SkyRenderer skyRender) {
 		this.buildStars();
 
-		skyRender.skyStars.bufferData(this.writer.getNioPtr(), this.writer.getOffset());
+		skyRender.skyStars.bufferData(this.writer.getNioPtr(), 0, this.writer.getOffset());
 		skyRender.starVertices = this.writer.getVertices();
 
 		this.buildSkyDisc(16.0F);
 
-		skyRender.topSky.bufferData(this.writer.getNioPtr(), this.writer.getOffset());
+		skyRender.topSky.bufferData(this.writer.getNioPtr(), 0, this.writer.getOffset());
 		skyRender.topVertices = this.writer.getVertices();
 
 		this.buildSkyDisc(-16.0F);
 
-		skyRender.bottomSky.bufferData(this.writer.getNioPtr(), this.writer.getOffset());
+		skyRender.bottomSky.bufferData(this.writer.getNioPtr(), 0, this.writer.getOffset());
 		skyRender.bottomVertices = this.writer.getVertices();
 
 		this.buildSunrise();
 
-		skyRender.sunriseSky.bufferData(this.writer.getNioPtr(), this.writer.getOffset());
+		skyRender.sunriseSky.bufferData(this.writer.getNioPtr(), 0, this.writer.getOffset());
 		skyRender.sunriseVertices = this.writer.getVertices();
 	}
 

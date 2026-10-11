@@ -2,6 +2,7 @@ package dev.safixo.client.util.data;
 
 import dev.safixo.client.util.MathExt;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.ActiveRenderInfo;
 
 public class CameraData {
 	public final int intX;
@@ -58,15 +59,15 @@ public class CameraData {
 	}
 
 	public double cameraXD() {
-		return this.intX + (double) this.fractX;
+		return this.intX + (double) this.fractX + ActiveRenderInfo.objectX;
 	}
 
 	public double cameraYD() {
-		return this.intY + (double) this.fractY;
+		return this.intY + (double) this.fractY + ActiveRenderInfo.objectY + Minecraft.getMinecraft().thePlayer.getEyeHeight();
 	}
 
 	public double cameraZD() {
-		return this.intZ + (double) this.fractZ;
+		return this.intZ + (double) this.fractZ + ActiveRenderInfo.objectZ;
 	}
 
 	@Override

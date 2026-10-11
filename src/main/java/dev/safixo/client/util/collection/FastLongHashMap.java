@@ -23,6 +23,8 @@ public class FastLongHashMap<T> implements Iterable<T> {
 	private long lastKey = NULL;
 	private T lastObject;
 
+	private MapIterator mapIterator;
+
 	public FastLongHashMap() {
 		this(INITIAL_SIZE);
 	}
@@ -269,18 +271,25 @@ public class FastLongHashMap<T> implements Iterable<T> {
 
 	@Override
 	public @NotNull Iterator<T> iterator() {
-		return new MapIterator<>(this);
+		if (this.mapIterator != null) {
+			this.mapIterator.resetCounter();
+			return this.mapIterator;
+		}
+
+		return this.mapIterator = new MapIterator();
 	}
 
-	public static class MapIterator<T> implements Iterator<T> {
-		private final T[] values;
-
+	public class MapIterator implements Iterator<T> {
 		private int count;
 		private int index;
 
-		public MapIterator(FastLongHashMap<T> map) {
-			this.values = map.values;
-			this.count = map.count;
+		public MapIterator() {
+			this.count = FastLongHashMap.this.count;
+		}
+
+		public void resetCounter() {
+			this.count = FastLongHashMap.this.count;
+			this.index = 0;
 		}
 
 		@Override
@@ -290,12 +299,12 @@ public class FastLongHashMap<T> implements Iterable<T> {
 
 		@Override
 		public T next() {
-			while (this.values[this.index] == null) {
+			while (values[this.index] == null) {
 				this.index++;
 			}
 
 			this.count--;
-			return this.values[this.index++];
+			return values[this.index++];
 		}
 
 		@Override

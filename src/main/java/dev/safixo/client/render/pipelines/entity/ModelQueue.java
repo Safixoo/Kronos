@@ -128,7 +128,7 @@ public class ModelQueue {
 		}
 
 		ByteBuffer matrixBuffer = NativeBuffer.wrap(this.matricesPtr);
-		this.matrixDataBuffer.bufferData(matrixBuffer, this.position * 64);
+		this.matrixDataBuffer.bufferData(matrixBuffer, 0, this.position * 64);
 		this.modelProgram.useProgram();
 		this.modelProgram.uploadUniforms();
 

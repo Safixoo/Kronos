@@ -1,9 +1,7 @@
 package dev.safixo.client.render.gfx.buffer;
 
-import dev.safixo.client.render.gfx.util.GpuFlags;
 import dev.safixo.client.util.memory.NativeBuffer;
 import dev.safixo.client.util.memory.UnsafeUtil;
-import org.lwjgl.opengl.EXTDirectStateAccess;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL15;
 
@@ -22,7 +20,7 @@ public class GlVertexBuffer implements GlBuffer {
 
 	public GlVertexBuffer(int size, int hint) {
 		this(hint);
-		this.allocate(UnsafeUtil.NULL, size);
+		this.bufferData(UnsafeUtil.NULL, 0, size);
 	}
 
 	@Override
@@ -31,43 +29,59 @@ public class GlVertexBuffer implements GlBuffer {
 	}
 
 	@Override
-	public int getCapacity() {
-		return this.capacity;
+	public int getBufferTarget() {
+		return GL15.GL_ARRAY_BUFFER;
 	}
 
-	public void allocate(long vertexData, int size) {
+	@Override
+	public void bufferData(long ptr, int offset, int size) {
+		if (ptr == UnsafeUtil.NULL) {
+			this.bufferData(null, offset, size);
+			return;
+		}
+
+		this.bufferData(NativeBuffer.wrap(ptr), offset, size);
+	}
+
+	@Override
+	public void bufferSubData(long ptr, int offset, int writingOffset, int size) {
+		if (ptr == UnsafeUtil.NULL) {
+			this.bufferSubData(null, 0, 0, size);
+			return;
+		}
+
+		this.bufferSubData(NativeBuffer.wrap(ptr), offset, writingOffset, size);
+	}
+
+	@Override
+	public void bufferData(ByteBuffer buffer, int position, int size) {
 		this.bind();
 
-		if (vertexData != UnsafeUtil.NULL) {
-			ByteBuffer vertexDataBuffer = NativeBuffer.wrap(vertexData);
-			((Buffer) vertexDataBuffer).limit(size);
-
-			GL15.glBufferData(GL15.GL_ARRAY_BUFFER, vertexDataBuffer, this.hint);
+		if (buffer == null) {
+			GL15.glBufferData(this.getBufferTarget(), size, this.hint);
 		} else {
-			GL15.glBufferData(GL15.GL_ARRAY_BUFFER, size, this.hint);
+			((Buffer)buffer).position(position);
+			((Buffer)buffer).limit(position + size);
+			GL15.glBufferData(this.getBufferTarget(), buffer, this.hint);
 		}
 
 		this.capacity = size;
-		this.unbind();
 	}
 
-	public void bufferSubData(long vertexData, int offset, int size) {
-		ByteBuffer vertexDataBuffer = NativeBuffer.wrap(vertexData);
-		this.bufferSubData(vertexDataBuffer, offset, size);
-	}
-
-	public void bufferData(ByteBuffer buffer, int size) {
-		((Buffer) buffer).limit(size);
-
+	@Override
+	public void bufferSubData(ByteBuffer buffer, int offset, int writingOffset, int size) {
 		this.bind();
-		GL15.glBufferData(GL15.GL_ARRAY_BUFFER, buffer, this.hint);
+
+		if (buffer != null) {
+			((Buffer) buffer).position(offset);
+			((Buffer) buffer).limit(offset + size);
+			GL15.glBufferSubData(this.getBufferTarget(), writingOffset, buffer);
+		}
 	}
 
-	public void bufferSubData(ByteBuffer buffer, int offset, int size) {
-		((Buffer) buffer).limit(((Buffer) buffer).position() + size);
-
-		this.bind();
-		GL15.glBufferSubData(GL15.GL_ARRAY_BUFFER, offset, buffer);
+	@Override
+	public int getCapacity() {
+		return this.capacity;
 	}
 
 	public void draw(int vertices, int first) {
@@ -84,10 +98,11 @@ public class GlVertexBuffer implements GlBuffer {
 
 	public void clear() {
 		this.bind();
-		this.allocate(UnsafeUtil.NULL, 0);
+		this.bufferData(UnsafeUtil.NULL, 0, 0);
 		this.unbind();
 	}
 
+	@Override
 	public void delete() {
 		this.clear();
 
@@ -95,10 +110,17 @@ public class GlVertexBuffer implements GlBuffer {
 		this.id = -1;
 	}
 
+	@Override
+	public BufferType getBufferType() {
+		return null;
+	}
+
+	@Override
 	public void bind() {
 		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, this.id);
 	}
 
+	@Override
 	public void unbind() {
 		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
 	}

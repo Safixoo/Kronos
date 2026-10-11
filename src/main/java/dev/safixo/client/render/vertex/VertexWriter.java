@@ -29,12 +29,14 @@ public class VertexWriter {
 
 	public int vertices, offset;
 	private boolean fromPool;
+	private MemoryReference reference;
 
 	private static final ThreadLocal<VertexWriter> WRITER_PER_THREAD = new ThreadLocal<>();
 
 	public VertexWriter(MemoryReference reference) {
 		this.fromPool = true;
 
+		this.reference = reference;
 		this.ptr = reference.ptr;
 		this.capacity = reference.size;
 		this.vertexPtrNio = reference.ptrNio;
@@ -103,6 +105,14 @@ public class VertexWriter {
 		if (this.offset + offset >= this.capacity) {
 			this.grow(this.offset + offset * 2L);
 		}
+	}
+
+	public boolean isFromPool() {
+		return this.fromPool;
+	}
+
+	public MemoryReference getNullableMemRef() {
+		return this.reference;
 	}
 
 	public void addVertexToQuad(float x, float y, float z, boolean immediateWrite) {

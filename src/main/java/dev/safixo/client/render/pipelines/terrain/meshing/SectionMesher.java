@@ -11,6 +11,8 @@ import dev.safixo.client.render.pipelines.terrain.meshing.model.light.data.Array
 import dev.safixo.client.render.pipelines.terrain.meshing.task.SectionResult;
 import dev.safixo.client.render.pipelines.terrain.meshing.task.SectionTask;
 import dev.safixo.client.render.pipelines.terrain.region.RegionConstants;
+import dev.safixo.client.render.pipelines.terrain.sorting.BSPReader;
+import dev.safixo.client.render.pipelines.terrain.sorting.BSPWriter;
 import dev.safixo.client.render.vertex.DefaultVertexFormats;
 import dev.safixo.client.render.vertex.TerrainQuadInterceptor;
 import dev.safixo.client.render.vertex.VertexWriter;
@@ -93,36 +95,36 @@ public class SectionMesher {
 		// +-X face
 		for (int y = 0; y < 16; y++) {
 			for (int z = 0; z < 16; z++) {
-				meshBlock(task, renderBlocks, 15, y, z, ambient, false);
+				this.meshBlock(task, renderBlocks, 15, y, z, ambient, false);
 			}
 		}
 		for (int y = 0; y < 16; y++) {
 			for (int z = 0; z < 16; z++) {
-				meshBlock(task, renderBlocks, 0, y, z, ambient, false);
+				this.meshBlock(task, renderBlocks, 0, y, z, ambient, false);
 			}
 		}
 
 		// -+Y face
 		for (int z = 0; z < 16; z++) {
 			for (int x = 1; x < 15; x++) {
-				meshBlock(task, renderBlocks, x, 15, z, ambient, false);
+				this.meshBlock(task, renderBlocks, x, 15, z, ambient, false);
 			}
 		}
 		for (int z = 0; z < 16; z++) {
 			for (int x = 1; x < 15; x++) {
-				meshBlock(task, renderBlocks, x, 0, z, ambient, false);
+				this.meshBlock(task, renderBlocks, x, 0, z, ambient, false);
 			}
 		}
 
 		// -+Z face
 		for (int y = 1; y < 15; y++) {
 			for (int x = 1; x < 15; x++) {
-				meshBlock(task, renderBlocks, x, y, 15, ambient, false);
+				this.meshBlock(task, renderBlocks, x, y, 15, ambient, false);
 			}
 		}
 		for (int y = 1; y < 15; y++) {
 			for (int x = 1; x < 15; x++) {
-				meshBlock(task, renderBlocks, x, y, 0, ambient, false);
+				this.meshBlock(task, renderBlocks, x, y, 0, ambient, false);
 			}
 		}
 
@@ -133,17 +135,27 @@ public class SectionMesher {
 			for (int y = 1; y < 15; y++) {
 				for (int z = 1; z < 15; z++) {
 					for (int x = 1; x < 15; x++) {
-						meshBlock(task, renderBlocks, x, y, z, ambient, true);
+						this.meshBlock(task, renderBlocks, x, y, z, ambient, true);
 					}
 				}
 			}
 		}
 
-		SectionResult result = new SectionResult(pool, this.getTileEntityArray(), task.getWriters(), task, solidSides);
+		if (this.quadInterceptor.getTranslucencyTree() != null && this.quadInterceptor.getTranslucencyTree().isAutoSorted()) {
+			this.quadInterceptor.clearTree();
+		}
+
+		BSPWriter tree = this.quadInterceptor.getTranslucencyTree();
+		BSPReader readTree = null;
+
+		if (tree != null) {
+			readTree = tree.getReader();
+		}
+
+		SectionResult result = new SectionResult(readTree, pool, this.getTileEntityArray(), task.getWriters(), task, solidSides);
 		this.clearTileEntityList();
 
 		sectionCache.clearReferences();
-
 		return result;
 	}
 
@@ -208,7 +220,7 @@ public class SectionMesher {
 			VertexWriter writer;
 			int blockRenderPass = PrimitivesFlags.RENDER_PASS[blockId];
 
-			if (blockRenderPass == 1) {
+			if (blockRenderPass == RegionConstants.TRANSLUCENT_PASS) {
 				writer = task.getTranslucentWriter();
 			} else {
 				writer = task.getSolidWriter(MeshDirection.GENERIC);
@@ -223,12 +235,11 @@ public class SectionMesher {
 			Block block = Block.blocksList[blockId];
 
 			this.quadInterceptor.setCursor(block, this.pos.set(blockX, blockY, blockZ));
+			writer.setQuadReceiver(this.quadInterceptor);
 
 			if (block.getRenderType() == FLUID_RENDER_TYPE) {
-				writer.setQuadReceiver(DefaultVertexFormats.TERRAIN_FORMAT);
 				this.fluidMesher.render(writer, this.pipeline, cache, (BlockFluid) block, blockX, blockY, blockZ);
 			} else {
-				writer.setQuadReceiver(this.quadInterceptor);
 				renderBlocks.renderBlockByRenderType(block, blockX, blockY, blockZ);
 			}
 		}

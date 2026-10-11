@@ -1,10 +1,7 @@
 package dev.safixo.client.render.gfx.state;
 
 import dev.safixo.client.util.memory.NativeBuffer;
-import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL13;
-import org.lwjgl.opengl.GL14;
-import org.lwjgl.opengl.GL43;
+import org.lwjgl.opengl.*;
 
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
@@ -132,12 +129,28 @@ public class GlDrawTracker {
 		GL11.glDrawArrays(mode, first, count);
 	}
 
+	public static void glDrawElementsBaseVertex(int mode, int count, int type, long indices, int baseVertex) {
+		GlMatrixTracker.loadCurrentMatrix();
+		GlStateTracker.flushDrawState();
+		GlDrawTracker.flushRasterState();
+
+		GL32.glDrawElementsBaseVertex(mode, count, type, indices, baseVertex);
+	}
+
 	public static void glMultiDrawArrays(int mode, IntBuffer piFirst, IntBuffer piCount) {
 		GlMatrixTracker.loadCurrentMatrix();
 		GlStateTracker.flushDrawState();
 		GlDrawTracker.flushRasterState();
 
 		GL14.glMultiDrawArrays(mode, piFirst, piCount);
+	}
+
+	public static void glMultiDrawElementsIndirect(int mode, int type, ByteBuffer indirect, int primcount, int stride) {
+		GlMatrixTracker.loadCurrentMatrix();
+		GlStateTracker.flushDrawState();
+		GlDrawTracker.flushRasterState();
+
+		GL43.glMultiDrawElementsIndirect(mode, type, indirect, primcount, stride);
 	}
 
 	public static void glMultiDrawArraysIndirect(int mode, ByteBuffer indirect, int primCount, int stride) {

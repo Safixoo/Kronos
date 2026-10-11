@@ -5,6 +5,7 @@ import dev.safixo.client.util.Direction;
 import dev.safixo.client.util.MathExt;
 import dev.safixo.client.util.NibbleUtil;
 import dev.safixo.client.util.collection.ObjectPooler;
+import dev.safixo.client.util.data.ClientChunkListener;
 import net.minecraft.block.*;
 import net.minecraft.block.material.Material;
 import net.minecraft.tileentity.TileEntity;
@@ -44,10 +45,10 @@ public class SectionCache implements IBlockAccess {
 
 	private final byte[] biomes = new byte[BIOME_CHUNK_WIDTH * BIOME_CHUNK_WIDTH];
 
-	private final byte[][] sectionBlocksLsb = new byte[3 * 3 * 3][4096];
-	private final byte[][] sectionBlocksMsb = new byte[3 * 3 * 3][2048];
+	private final byte[][] sectionBlocksLsb = new byte[3 * 3 * 3][];
+	private final byte[][] sectionBlocksMsb = new byte[3 * 3 * 3][];
 
-	private final byte[][] sectionData = new byte[3 * 3 * 3][2048];
+	private final byte[][] sectionData = new byte[3 * 3 * 3][];
 
 	private final byte[][] skyLight = new byte[3 * 3 * 3][];
 	private final byte[][] blockLight = new byte[3 * 3 * 3][];
@@ -60,10 +61,9 @@ public class SectionCache implements IBlockAccess {
 
 	private boolean centerSectEmpty;
 
-	private final ObjectPooler<byte[]> byteArrays = new ObjectPooler<>(null, 27);
-	private final ObjectPooler<byte[]> nibbleArrays = new ObjectPooler<>(null, 27 * 2);
-
 	public SectionCache(ModelColorizer colorizer, FakeInlinedBiome inlinedBiome, Vec3Pool pool) {
+		this.clearReferences();
+
 		this.colorizer = colorizer;
 		this.inlinedBiome = inlinedBiome;
 		this.pool = pool;
@@ -112,42 +112,36 @@ public class SectionCache implements IBlockAccess {
 					int relY = y - minSectionY;
 					int sectionIndex = sectionIndex(relX, relY, relZ);
 
-					int minIndex = this.getMinBlockIndex(sectionIndex);
-					int maxIndex = this.getMaxBlockIndex(sectionIndex);
-
 					if (section != null) {
 						if (!section.isEmpty()) {
-							this.sectionBlocksLsb[sectionIndex] = this.popByteArray(this.sectionBlocksLsb[sectionIndex]);
-							copy(this.sectionBlocksLsb[sectionIndex], section.getBlockLSBArray(), minIndex, maxIndex);
-
-							this.sectionData[sectionIndex] = this.popNibbleArray(this.sectionData[sectionIndex]);
-							copyNibble(this.sectionData[sectionIndex], section.getMetadataArray().data, minIndex, maxIndex);
+							this.sectionBlocksLsb[sectionIndex] = section.getBlockLSBArray();
+							this.sectionData[sectionIndex] = section.getMetadataArray().data;
 
 							if (section.getBlockMSBArray() != null) {
-								this.sectionBlocksMsb[sectionIndex] = this.popNibbleArray(this.sectionBlocksMsb[sectionIndex]);
-								copyNibble(this.sectionBlocksMsb[sectionIndex], section.getBlockMSBArray().data, minIndex, maxIndex);
+								this.sectionBlocksMsb[sectionIndex] = section.getBlockMSBArray().data;
 							} else {
-								this.sectionBlocksMsb[sectionIndex] = this.pushNibbleArray(this.sectionBlocksMsb[sectionIndex]);
+								this.sectionBlocksMsb[sectionIndex] = BYTE_ARRAY;
 							}
 						} else {
-							this.sectionBlocksLsb[sectionIndex] = this.pushByteArray(this.sectionBlocksLsb[sectionIndex]);
-							this.sectionBlocksMsb[sectionIndex] = this.pushNibbleArray(this.sectionBlocksMsb[sectionIndex]);
-							this.sectionData[sectionIndex] = this.pushNibbleArray(this.sectionData[sectionIndex]);
+							this.sectionBlocksLsb[sectionIndex] = BYTE_ARRAY;
+							this.sectionBlocksMsb[sectionIndex] = BYTE_ARRAY;
+							this.sectionData[sectionIndex] = BYTE_ARRAY;
 						}
 
-						if (!world.provider.hasNoSky) {
-							this.skyLight[sectionIndex] = section.getSkylightArray().data;
-						} else {
+						if (world.provider.hasNoSky) {
 							this.skyLight[sectionIndex] = BYTE_ARRAY;
+						} else {
+							this.skyLight[sectionIndex] = section.getSkylightArray().data;
 						}
 						this.blockLight[sectionIndex] = section.getBlocklightArray().data;
 					} else {
-						this.skyLight[sectionIndex] = FULL_BYTE_ARRAY;
+						// Probably don't totally correct but enough for most cases.
+						if (world.provider.hasNoSky) {
+							this.skyLight[sectionIndex] = BYTE_ARRAY;
+						} else {
+							this.skyLight[sectionIndex] = FULL_BYTE_ARRAY;
+						}
 						this.blockLight[sectionIndex] = BYTE_ARRAY;
-
-						this.sectionBlocksLsb[sectionIndex] = this.pushByteArray(this.sectionBlocksLsb[sectionIndex]);
-						this.sectionBlocksMsb[sectionIndex] = this.pushNibbleArray(this.sectionBlocksMsb[sectionIndex]);
-						this.sectionData[sectionIndex] = this.pushNibbleArray(this.sectionData[sectionIndex]);
 					}
 				}
 			}
@@ -163,8 +157,13 @@ public class SectionCache implements IBlockAccess {
 	}
 
 	public void clearReferences() {
-		Arrays.fill(this.skyLight, BYTE_ARRAY);
-		Arrays.fill(this.blockLight, BYTE_ARRAY);
+		for (int i = 0; i < 27; i++) {
+			this.skyLight[i] = BYTE_ARRAY;
+			this.blockLight[i] = BYTE_ARRAY;
+			this.sectionBlocksLsb[i] = BYTE_ARRAY;
+			this.sectionBlocksMsb[i] = BYTE_ARRAY;
+			this.sectionData[i] = BYTE_ARRAY;
+		}
 
 		this.centerBlocklight = BYTE_ARRAY;
 		this.centerSkylight = BYTE_ARRAY;
@@ -268,151 +267,8 @@ public class SectionCache implements IBlockAccess {
 		return this.colorizer;
 	}
 
-	private byte[] popNibbleArray(byte[] array) {
-		if (array == BYTE_ARRAY) {
-			return this.nibbleArrays.poll();
-		}
-		return array;
-	}
-
-	private byte[] popByteArray(byte[] array) {
-		if (array == BYTE_ARRAY) {
-			return this.byteArrays.poll();
-		}
-		return array;
-	}
-
-	private byte[] pushNibbleArray(byte[] array) {
-		if (array != BYTE_ARRAY) {
-			this.nibbleArrays.push(array);
-		}
-		return BYTE_ARRAY;
-	}
-
-	private byte[] pushByteArray(byte[] array) {
-		if (array != BYTE_ARRAY) {
-			this.byteArrays.push(array);
-		}
-		return BYTE_ARRAY;
-	}
-
-	private static final int RADIUS = 1;
-
-	private void copy(byte[] to, byte[] from, int minIndex, int maxIndex) {
-		int copyLength = maxIndex - minIndex + 1;
-
-		if (copyLength == 1){
-			to[minIndex] = from[minIndex];
-		} else if (copyLength == 16*16*16 || copyLength == 16*16) {
-			System.arraycopy(from, minIndex, to, minIndex, copyLength);
-		} else {
-			int minX = blockX(minIndex);
-			int minY = blockY(minIndex);
-			int minZ = blockZ(minIndex);
-
-			int maxX = blockX(maxIndex);
-			int maxY = blockY(maxIndex);
-			int maxZ = blockZ(maxIndex);
-
-			for (int y = minY; y <= maxY; y++) {
-				for (int z = minZ; z <= maxZ; z++) {
-					for (int x = minX; x <= maxX; x++) {
-						int blockIndex = makeBlockIndex(x, y, z);
-						to[blockIndex] = from[blockIndex];
-					}
-				}
-			}
-		}
-	}
-
-	private void copyNibble(byte[] to, byte[] from, int minIndex, int maxIndex) {
-		int copyLength = maxIndex - minIndex + 1;
-
-		if (copyLength == 1){
-			to[minIndex >>> 1] = from[minIndex >>> 1];
-		} else if (copyLength == 16*16*16 || copyLength == 16*16) {
-			maxIndex++;
-			maxIndex >>>= 1;
-			minIndex >>>= 1;
-
-			copyLength = maxIndex - minIndex;
-			System.arraycopy(from, minIndex, to, minIndex, copyLength);
-		} else {
-			int minX = blockX(minIndex) & ~1;
-			int minY = blockY(minIndex);
-			int minZ = blockZ(minIndex);
-
-			int maxX = blockX(maxIndex);
-			int maxY = blockY(maxIndex);
-			int maxZ = blockZ(maxIndex);
-
-			for (int y = minY; y <= maxY; y++) {
-				for (int z = minZ; z <= maxZ; z++) {
-					for (int x = minX; x <= maxX; x += 2) {
-						int blockIndex = makeBlockIndex(x, y, z) >>> 1;
-						to[blockIndex] = from[blockIndex];
-					}
-				}
-			}
-		}
-	}
-
-	static int blockX(int index) {
-		return index & 0xF;
-	}
-
-	static int blockY(int index) {
-		return (index >>> 8) & 0xF;
-	}
-
-	static int blockZ(int index) {
-		return (index >>> 4) & 0xF;
-	}
-
-	private int getMinBlockIndex(int sectionIndex) {
-		int sectX = sectionX(sectionIndex);
-		int sectY = sectionY(sectionIndex);
-		int sectZ = sectionZ(sectionIndex);
-
-		int blockX = this.blockX + sectX * 16;
-		int blockY = this.blockY + sectY * 16;
-		int blockZ = this.blockZ + sectZ * 16;
-
-		int minX = Math.max(blockX, this.blockX + 16 - RADIUS);
-		int minY = Math.max(blockY, this.blockY + 16 - RADIUS);
-		int minZ = Math.max(blockZ, this.blockZ + 16 - RADIUS);
-		return makeBlockIndex(minX & 15, minY & 15, minZ & 15);
-	}
-
-	private int getMaxBlockIndex(int sectionIndex) {
-		int sectX = sectionX(sectionIndex);
-		int sectY = sectionY(sectionIndex);
-		int sectZ = sectionZ(sectionIndex);
-
-		int blockX = this.blockX + sectX * 16;
-		int blockY = this.blockY + sectY * 16;
-		int blockZ = this.blockZ + sectZ * 16;
-
-		int maxX = Math.min(blockX + 15, this.blockX + 16 + 15 + RADIUS);
-		int maxY = Math.min(blockY + 15, this.blockY + 16 + 15 + RADIUS);
-		int maxZ = Math.min(blockZ + 15, this.blockZ + 16 + 15 + RADIUS);
-		return makeBlockIndex(maxX & 15, maxY & 15, maxZ & 15);
-	}
-
 	public static int sectionIndex(int x, int y, int z) {
 		return x + (z * 3) + (y * 9);
-	}
-
-	private static int sectionX(int sectionIndex) {
-		return sectionIndex % 3;
-	}
-
-	private static int sectionY(int sectionIndex) {
-		return (sectionIndex / 9);
-	}
-
-	private static int sectionZ(int sectionIndex) {
-		return (sectionIndex / 3) % 3;
 	}
 
 	public static int makeBlockIndex(int x, int y, int z) {

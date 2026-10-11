@@ -5,9 +5,11 @@ import dev.safixo.client.render.pipelines.terrain.meshing.data.SectionCache;
 import dev.safixo.client.render.pipelines.terrain.meshing.model.ModelColorizer;
 import dev.safixo.client.render.pipelines.terrain.meshing.model.light.LightPipeline;
 import dev.safixo.client.render.pipelines.terrain.meshing.model.light.data.QuadLightData;
+import dev.safixo.client.render.pipelines.terrain.sorting.BSPWriter;
 import dev.safixo.client.util.ColorBGRManager;
 import dev.safixo.client.util.MeshDirection;
 import net.minecraft.block.Block;
+import net.minecraft.client.Minecraft;
 import org.joml.Vector3i;
 
 public class TerrainQuadInterceptor implements IQuadReceiver {
@@ -20,19 +22,31 @@ public class TerrainQuadInterceptor implements IQuadReceiver {
 	private VertexWriter[] solidWriters;
 	private VertexWriter translucentWriter;
 
+	private BSPWriter tree;
+
 	private Vector3i pos;
-	private int blockColor;
+	private int blockColor, blockId;
 
 	public void setContext(ModelColorizer colorizer, SectionCache cache, LightPipeline pipe) {
 		this.pipeline = pipe;
 		this.cache = cache;
 		this.colorizer = colorizer;
+		this.tree = null;
+	}
+
+	public BSPWriter getTranslucencyTree() {
+		return this.tree;
+	}
+
+	public void clearTree() {
+		this.tree = null;
 	}
 
 	public void setCursor(Block block, Vector3i pos) {
 		this.pos = pos;
 
-		int blockColor = this.colorizer.getColor(this.cache, this.pos.x, this.pos.y, this.pos.z, block);
+		int blockColor = this.colorizer.getColor(this.cache, pos.x, pos.y, pos.z, block);
+		this.blockId = this.cache.getBlockId(pos.x, pos.y, pos.z);
 		this.blockColor = ColorBGRManager.rgbToBgr(blockColor);
 	}
 
@@ -71,7 +85,18 @@ public class TerrainQuadInterceptor implements IQuadReceiver {
 			return 0;
 		}
 
+		if (this.translucentWriter.getCurrentQuad() == quad) {
+			this.addTranslucentQuad(quad);
+		}
+
 		return DefaultVertexFormats.TERRAIN_FORMAT.writeQuad(quad, ptr);
+	}
+
+	public void addTranslucentQuad(Quad quad) {
+		if (this.tree == null) {
+			this.tree = new BSPWriter(this.pos.x >> 4, this.pos.y >> 4, this.pos.z >> 4);
+		}
+		this.tree.addQuad(quad);
 	}
 
 	@Override

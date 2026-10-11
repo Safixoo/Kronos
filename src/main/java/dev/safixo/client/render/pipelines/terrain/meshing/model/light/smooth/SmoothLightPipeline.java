@@ -390,21 +390,21 @@ public class SmoothLightPipeline implements LightPipeline {
 	 * Returns the X vertex pos relative to the block.
 	 */
 	private static float getBlockRelX(Quad quad, Vector3i block, int index) {
-		return quad.getPosRelX(block.x, index);
+		return quad.getBlockRelX(block.x, index);
 	}
 
 	/**
 	 * Returns the Y vertex pos relative to the block.
 	 */
 	private static float getBlockRelY(Quad quad, Vector3i block, int index) {
-		return quad.getPosRelY(block.y, index);
+		return quad.getBlockRelY(block.y, index);
 	}
 
 	/**
 	 * Returns the Z vertex pos relative to the block.
 	 */
 	private static float getBlockRelZ(Quad quad, Vector3i block, int index) {
-		return quad.getPosRelZ(block.z, index);
+		return quad.getBlockRelZ(block.z, index);
 	}
 
     /**

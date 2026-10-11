@@ -4,6 +4,7 @@ import cpw.mods.fml.common.asm.transformers.deobf.FMLDeobfuscatingRemapper;
 import dev.safixo.core.hooks.LongHashMapHook;
 import net.minecraft.launchwrapper.Launch;
 import net.minecraft.launchwrapper.LaunchClassLoader;
+import org.lwjgl.LWJGLUtil;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL12;
 import org.lwjgl.opengl.GL13;
@@ -475,7 +476,9 @@ public class KronosTransformer implements IClassTransformer {
 		addFunction("GlLightColorTracker", "glLightModel");
 
 		addFunction("GlDrawTracker", "glDrawArrays");
+		addFunction("GlDrawTracker", "glDrawElementsBaseVertex");
 		addFunction("GlDrawTracker", "glMultiDrawArrays");
+		addFunction("GlDrawTracker", "glMultiDrawElementsIndirect");
 		addFunction("GlDrawTracker", "glMultiDrawArraysIndirect");
 
 		addFunction("GlImmediateTracker", "glVertex3f");

@@ -3,11 +3,13 @@ package dev.safixo.client.render;
 import dev.safixo.client.render.gfx.buffer.GlVertexBuffer;
 import dev.safixo.client.render.gfx.state.GlDrawTracker;
 import dev.safixo.client.render.vertex.VertexWriter;
+import dev.safixo.client.util.MathExt;
 import dev.safixo.client.util.data.PrimitivesFlags;
 import dev.safixo.client.util.memory.NativeBuffer;
 import dev.safixo.client.util.memory.UnsafeUtil;
 import dev.safixo.core.hooks.AsyncBlockHook;
 import dev.safixo.core.hooks.VertexRedirector;
+import it.unimi.dsi.fastutil.objects.Reference2ReferenceArrayMap;
 import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.Tessellator;
 import org.lwjgl.opengl.*;
@@ -24,7 +26,8 @@ import java.util.Arrays;
 // - Compacts vertex format based in the used attributes (vanilla uses 32-byte at all times).
 // - Overall more optimized and clean code.
 public class ImprovedTessellator extends Tessellator {
-	private static final ThreadLocal<ImprovedTessellator> TESSELLATORS = new ThreadLocal<>();
+	private static final Reference2ReferenceArrayMap<Thread, ImprovedTessellator> TESSELLATORS = new Reference2ReferenceArrayMap<>(16);
+	private static final boolean INSTANT_FLUSH = false;
 
 	protected static final byte[] STRIDES = new byte[0b1111 + 1];
 	private static final int MIN_ALLOC = 512 * 1024;
@@ -96,10 +99,11 @@ public class ImprovedTessellator extends Tessellator {
 	}
 
 	public static ImprovedTessellator getTessellator() {
-		ImprovedTessellator tes = TESSELLATORS.get();
+		Thread thread = Thread.currentThread();
+		ImprovedTessellator tes = TESSELLATORS.get(Thread.currentThread());
 
 		if (tes == null) {
-			TESSELLATORS.set(tes = new ImprovedTessellator());
+			TESSELLATORS.put(thread, tes = new ImprovedTessellator());
 		}
 
 		return tes;
@@ -119,15 +123,15 @@ public class ImprovedTessellator extends Tessellator {
 
 		this.vertexBuffer.bind();
 		setupVertexState(flags, stride);
-		this.vertexBuffer.unbind();
 
 		GL30.glBindVertexArray(0);
+		this.vertexBuffer.unbind();
 		cleanupVertexState(flags);
 
 		return this.vertexArrays[flags] = vertexArray;
 	}
 
-	private static void setupVertexState(int flags, int stride) {
+	protected static void setupVertexState(int flags, int stride) {
 		GL11.glEnableClientState(GL11.GL_VERTEX_ARRAY);
 		GL11.glVertexPointer(3, GL11.GL_FLOAT, stride, 0);
 
@@ -150,13 +154,12 @@ public class ImprovedTessellator extends Tessellator {
 		}
 		if ((flags & VERTEX_LIGHT) != 0) {
 			GL13.glClientActiveTexture(OpenGlHelper.lightmapTexUnit);
-
 			GL11.glEnableClientState(GL11.GL_TEXTURE_COORD_ARRAY);
 			GL11.glTexCoordPointer(2, GL11.GL_SHORT, stride, offset);
 		}
 	}
 
-	private static void cleanupVertexState(int flags) {
+	protected static void cleanupVertexState(int flags) {
 		GL11.glDisableClientState(GL11.GL_VERTEX_ARRAY);
 
 		if ((flags & VERTEX_LIGHT) != 0) {
@@ -174,7 +177,6 @@ public class ImprovedTessellator extends Tessellator {
 		}
 	}
 
-
 	@Override
 	public int draw() {
 		int byteCount = (int) (this.headPtr - this.vertexPtr) - this.lastOffset;
@@ -186,7 +188,7 @@ public class ImprovedTessellator extends Tessellator {
 
 		this.drawRecorder.addDraw(GlDrawTracker.TRACKED_STATE, this.flags, byteCount);
 
-		if (this.disabledColor) {
+		if (INSTANT_FLUSH || this.disabledColor) {
 			this.flushState();
 		} else {
 			this.lastOffset += byteCount;
@@ -214,7 +216,7 @@ public class ImprovedTessellator extends Tessellator {
 			FrameDebug.UPLOADS++;
 		}
 
-		this.vertexBuffer.bufferData(this.vertexPtrNio, offset);
+		this.vertexBuffer.bufferData(this.vertexPtrNio, 0, offset);
 		this.drawRecorder.flushAllDraws(this, this.drawMode);
 
 		this.headPtr = this.vertexPtr;
@@ -425,11 +427,7 @@ public class ImprovedTessellator extends Tessellator {
 
 	@Override
 	public void setNormal(float normalX, float normalY, float normalZ) {
-		int nX = (byte) (normalX * 0x7F);
-		int nY = (byte) (normalY * 0x7F);
-		int nZ = (byte) (normalZ * 0x7F);
-
-		this.normal = (nX & 0xFF) << 0 | (nY & 0xFF) << 8 | (nZ & 0xFF) << 16;
+		this.normal = MathExt.packedNormal(normalX, normalY, normalZ);
 
 		if (PrimitivesFlags.REDIRECT_DRAWING || AsyncBlockHook.isAsync()) {
 			VertexRedirector.setNormal(this.current, this.normal);

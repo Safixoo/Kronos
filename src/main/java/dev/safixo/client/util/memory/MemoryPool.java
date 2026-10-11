@@ -1,42 +1,38 @@
 package dev.safixo.client.util.memory;
 
+import dev.safixo.client.render.gfx.util.RingBuffer;
+
 import java.nio.ByteBuffer;
+import java.util.*;
 
 public class MemoryPool {
-	private final int ticksUntilReset;
-	private final int capacity;
-
-	private int offset;
-	private int ticks;
-
 	private final long ptr;
 	private final ByteBuffer ptrNio;
+	private final RingBuffer ringBuffer;
 
-	public MemoryPool(int size, int ticksUntilReset) {
-		this.ticksUntilReset = Math.max(1, ticksUntilReset);
-		this.capacity = size;
+	private final ArrayList<RingBuffer.PoolAllocation> allocHolder = new ArrayList<>();
 
+	public MemoryPool(int size) {
+		this.ringBuffer = new RingBuffer(size);
 		this.ptr = NativeBuffer.nmemAlloc(size);
 		this.ptrNio = NativeBuffer.wrap(this.ptr);
 	}
 
 	public MemoryReference allocate(int size) {
-		if (this.offset + size >= this.capacity) {
-			return null;
-		}
-
-		int offset = this.offset;
-		this.offset += size;
-
-		return new MemoryReference(this.ptrNio, this.ptr, offset, size);
+		RingBuffer.PoolAllocation alloc = this.ringBuffer.allocate(size);
+		return new MemoryReference(alloc, this.ptrNio, this.ptr, alloc.offset, size);
 	}
 
-	public void tick() {
-		this.ticks++;
-
-		if (this.ticks == this.ticksUntilReset) {
-			this.offset = 0;
-			this.ticks = 0;
+	public void returnRefs(MemoryReference[] refs) {
+		if (refs.length == 0) {
+			return;
 		}
+
+		for (int i = 0; i < refs.length; i++) {
+			this.allocHolder.add(refs[i].poolAllocation);
+		}
+
+		this.ringBuffer.returnAllocations(this.allocHolder.toArray(new RingBuffer.PoolAllocation[0]));
+		this.allocHolder.clear();
 	}
 }

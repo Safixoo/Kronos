@@ -31,7 +31,7 @@ public class NativeBuffer {
 	}
 
 	public static ByteBuffer wrap(long ptr) {
-		return BUFFER_TO_PTR.get(ptr);
+		return BUFFER_TO_PTR.get(ptr).duplicate();
 	}
 
 	public static ByteBuffer memAlloc(int size) {
