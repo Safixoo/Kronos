@@ -2,17 +2,14 @@ package dev.safixo.client.render.pipelines.terrain.meshing;
 
 import dev.safixo.client.render.pipelines.terrain.WorldManager;
 import dev.safixo.client.render.pipelines.terrain.meshing.model.light.LightMode;
-import dev.safixo.client.render.pipelines.terrain.meshing.model.light.LightPipeline;
 import dev.safixo.client.render.pipelines.terrain.meshing.model.light.LightPipelineProvider;
 import dev.safixo.client.render.pipelines.terrain.meshing.model.light.data.ArrayLightDataCache;
-import dev.safixo.client.render.pipelines.terrain.meshing.model.light.smooth.SmoothLightPipeline;
 import dev.safixo.client.render.pipelines.terrain.meshing.task.SectionResult;
 import dev.safixo.client.render.pipelines.terrain.meshing.task.SectionTask;
 import dev.safixo.client.render.vertex.TerrainQuadInterceptor;
 import dev.safixo.client.util.memory.MemoryPool;
 import dev.safixo.client.util.memory.MemoryReference;
 import it.unimi.dsi.fastutil.objects.ReferenceArrayList;
-import net.minecraft.client.Minecraft;
 import net.minecraft.util.Vec3Pool;
 
 import java.util.List;
@@ -61,12 +58,6 @@ public class MesherRunnable implements Runnable {
 
 	public void clear() {
 		this.tasks.clear();
-
-		List<SectionResult> results = this.getResults();
-
-		for (SectionResult result : results) {
-			result.delete();
-		}
 	}
 
 	@Override
