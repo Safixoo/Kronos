@@ -11,9 +11,6 @@ version '1.0'
 
 base.archivesName = 'kronos'
 
-// this is just here so we can test the outputs easier and clean between tests
-unimined.useGlobalCache = true
-
 sourceCompatibility = JavaVersion.VERSION_1_7
 targetCompatibility = JavaVersion.VERSION_1_7
 
